@@ -75,6 +75,7 @@
         Output will be in the same format as the input file. 
         Added help feature and graceful exit option. - Now pressing q will exit the program at any stage
         Added keyword xfits to read in xspecplot formatted files [RB 9.10.2017]
+        Did minor syntax change to fix saving file issue [RB 06.17.2019]
         ---------------------------------------------------------------------------
 '''
    
