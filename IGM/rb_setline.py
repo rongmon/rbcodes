@@ -71,13 +71,13 @@ def read_line_list(label):
     
 
     if label=='atom':
-        filename=resource_filename('rbvfit','lines/atom_full.dat')
+        filename=resource_filename('IGM','lines/atom_full.dat')
     elif label == 'LLS':
-        filename=resource_filename('rbvfit','lines/lls.lst')
+        filename=resource_filename('IGM','lines/lls.lst')
     elif label == 'LLS Small':
-        filename=resource_filename('rbvfit','lines/lls_sub.lst')
+        filename=resource_filename('IGM','lines/lls_sub.lst')
     elif label == 'DLA':
-        filename=resource_filename('rbvfit','lines/dla.lst')
+        filename=resource_filename('IGM','lines/dla.lst')
     else:
         print('Give Correct LineList')
 
