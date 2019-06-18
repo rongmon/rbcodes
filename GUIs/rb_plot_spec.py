@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('QT5agg')
+matplotlib.use('Tkagg')
 import numpy as np
 import matplotlib.pyplot as plt 
 from astropy.io import ascii
@@ -236,8 +236,9 @@ class rb_plot_spec(object):
         self.label=label
         if label == 'None':
             line,=self.ax.plot([0],[0],'k--')
-        else:       
-            data=read_line_list(label)
+        else:
+            from IGM import rb_setline as line        
+            data=line.read_line_list(label)
 
             # Now make a smaller linelist within the current xaxes range.
 
@@ -261,49 +262,6 @@ class rb_plot_spec(object):
         #self.ax.set_xlim(np.min(xdata), np.max(xdata))
         plt.draw()
         self.fig.canvas.draw()
-
-
-    if label=='atom':
-        filename=resource_filename('rbvfit','lines/atom_full.dat')
-    elif label == 'LLS':
-        filename=resource_filename('rbvfit','lines/lls.lst')
-    elif label == 'LLS Small':
-        filename=resource_filename('rbvfit','lines/lls_sub.lst')
-    elif label == 'DLA':
-        filename=resource_filename('rbvfit','lines/dla.lst')
-    else:
-        print('Give Correct LineList')
-
-    data = []
-
-    if label=='atom':
-
-        s=ascii.read(filename)
-
-        for line in range(0,len(s['col1'])):
-            source = {}
-            source['wrest'] = float(s['col2'][line])
-            source['ion'] = s['col1'][line]+' '+np.str(np.int(s['col2'][line]))
-            source['fval']=float(s['col3'][line])
-            source['gamma']=float(s['col4'][line])
-
-            data.append(source)
-
-
-    else:       
-        f=open(filename,'r')
-        header1 = f.readline()
-        for line in f:
-            line = line.strip()
-            columns = line.split()
-            source = {}
-            source['wrest'] = float(columns[0])
-            source['ion'] = columns[1]+' '+columns[2]
-            source['fval']=float(columns[3])
-            data.append(source)
-
-
-    return data
 
 
     

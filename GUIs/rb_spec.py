@@ -167,7 +167,7 @@ class read_spec(object):
 
         """
         if Legendre==False:
-            from GUI import rb_fit_interactive_continuum as f
+            from GUIs import rb_fit_interactive_continuum as f
             s=f.rb_fit_interactive_continuum(self.wave_slice,self.flux_slice,self.error_slice);
             cont=s.cont
 
