@@ -165,6 +165,9 @@ class rb_plot_spec(object):
             eclick=len(self.lam_lim);
 
             ax.plot(np.array([event.xdata]),np.array([event.ydata]),'ro',ms=5,markeredgecolor='k')
+            plt.draw()
+
+
 
 
             if eclick==2:
@@ -180,6 +183,9 @@ class rb_plot_spec(object):
                 ax.text(np.mean([self.lam_lim]),np.max(self.lam_ylim)+0.2,Wval, rotation=90,verticalalignment='bottom')
                 print(Wval)
                 print('---------------------------------------------------------------------------')
+                plt.draw()
+
+
     
                 self.lam_lim=[]
                 self.lam_ylim=[]
@@ -192,8 +198,9 @@ class rb_plot_spec(object):
     
             fclick=len(self.FXval)    
             ax.plot(event.xdata,event.ydata,'rs',ms=5,picker=5,label='EW_pt',markeredgecolor='k')
-            plt.draw()
-    
+            self.fig.canvas.draw()
+            plt.show()
+
             #Start Fitting
             if fclick==3:
                 # First fit a quick continuum
