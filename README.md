@@ -19,6 +19,19 @@ The IGM folder contains several python routines for intergalactic medium and cir
 
 	1) compute_EW.py :  Compute equivalent width and column densities of any absorption/emission lines.
 	2) rb_setline.py :  For any given rest frame wavelength find corresponding atomic transition and the fvalues. [Can find any line nearest to the input wavelength].
+
+The halo folder contains modules to compute NFW halo profiles
+
+       1) rb_nfw.py      : Compute NFW halo profile
+       2) mstar2mhalo.py : Convert stellar mass to Halo mass using Moster et al. 2010.
+The stat folder contains several statistical codes:
+
+       1) rb_wilsonscore.py :  Wilsonscore confidence intervals.
+       2) rb_boot.py .      :  Bootstram function
+
+The utils folder contains several utility modules:
+
+      1) rb_utility.py .  :  Several utility functions
 	
 
 
