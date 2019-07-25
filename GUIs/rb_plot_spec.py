@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('Tkagg')
+matplotlib.use('QT5Agg')
 import numpy as np
 import matplotlib.pyplot as plt 
 from astropy.io import ascii
@@ -19,6 +19,7 @@ class rb_plot_spec(object):
     def __init__(self,wave,flux,error,zabs=0.):
         self.wave=wave
         self.flux=flux
+        self.smoothed_spectrum=flux
         self.error=error
         self.zabs=zabs
         self.label='None' # Initializing a label
@@ -99,30 +100,16 @@ class rb_plot_spec(object):
         elif event.key=='S':
             self.vel[0] += 2
             Filter_size=np.int(self.vel[0]) 
-            smoothed_spectrum =convolve(self.flux, Box1DKernel(Filter_size))#medfilt(flux,np.int(Filter_size))
-            xlim=ax.get_xlim()
-            ylim=ax.get_ylim()
-            ax.cla()
-            ax.step(self.wave/(1.+zabs),smoothed_spectrum,'k-',lw=1,label='smooth')
-            ax.set_xlabel('Wavelength')
-            ax.set_ylabel('Flux')
-            ax.set_xlim(xlim)
-            ax.set_ylim(ylim)
+            self.smoothed_spectrum =convolve(self.flux, Box1DKernel(Filter_size))#medfilt(flux,np.int(Filter_size))
+            self.specplot()
         #Unsmooth Spectrum
         elif event.key=='U':
             self.vel[0] -= 2
             if self.vel[0] <= 0:
                 self.vel[0]=1;
             Filter_size=np.int(self.vel[0]) 
-            smoothed_spectrum =convolve(self.flux, Box1DKernel(Filter_size))#medfilt(flux,np.int(Filter_size))
-            xlim=ax.get_xlim()
-            ylim=ax.get_ylim()
-            ax.cla()
-            ax.step(self.wave/(1.+zabs),smoothed_spectrum,'k-',lw=1,label='smooth')
-            ax.set_xlabel('Wavelength')
-            ax.set_ylabel('Flux')
-            ax.set_xlim(xlim)
-            ax.set_ylim(ylim)
+            self.smoothed_spectrum =convolve(self.flux, Box1DKernel(Filter_size))#medfilt(flux,np.int(Filter_size))
+            self.specplot()
 
             # Set X max
         elif event.key=='X':
@@ -164,8 +151,10 @@ class rb_plot_spec(object):
             # Keep running tab of all E clicks
             eclick=len(self.lam_lim);
 
-            ax.plot(np.array([event.xdata]),np.array([event.ydata]),'ro',ms=5,markeredgecolor='k')
-            plt.draw()
+            self.specplot()
+            ax = plt.gca()
+            ax.plot(event.xdata,event.ydata,'ro',ms=5,picker=5,label='cont_pnt',markeredgecolor='k')
+
 
 
 
@@ -269,6 +258,23 @@ class rb_plot_spec(object):
         #self.ax.set_xlim(np.min(xdata), np.max(xdata))
         plt.draw()
         self.fig.canvas.draw()
+
+    def specplot(self):
+        ax=self.ax
+        xlim=ax.get_xlim()
+        ylim=ax.get_ylim()
+        ax.cla()
+        ax.step(self.wave/(1.+self.zabs),self.smoothed_spectrum,'k-',lw=1,label='smooth')
+        ax.set_xlabel('Wavelength')
+        ax.set_ylabel('Flux')
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        
+        
+        self.ax=ax
+
+
+
 
 
     
