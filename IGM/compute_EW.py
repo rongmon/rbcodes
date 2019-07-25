@@ -28,12 +28,14 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
     #           output['colerr']      :- 1 sigma error on AOD column density 
     #           output['n']           :- AOD column density as a function of velocity
     #           output['Tau_a']       :- AOD as a function of velocity
+    #           output['med_vel']     :- Median Optical Depth weighted velocity within lmts
     #
     #
     #   Written :- Rongmon Bordoloi                             2nd November 2016
     #-  I translated this from my matlab code compute_EW.m, which in turn is from Chris Thom's eqwrange.pro. 
     #   This was tested with COS-Halos/Dwarfs data. 
     #   Edit:  RB July 5 2017. Output is a dictionary. Edited minor dictionary arrangement
+    #          RB July 25 2019. Added med_vel
     #------------------------------------------------------------------------------------------
     defnorm=1.0;
     spl=2.9979e5;  #speed of light
@@ -92,6 +94,13 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
         f0=kwargs['f0']
         #compute apparent optical depth
         Tau_a =np.log(1./norm_flx);
+        
+        #compute the median optical depth weighted velcity.
+        Tau50=np.cumsum(Tau_a[pix])/np.max(Tau_a[pix])
+        vel50=np.interp(0.5,Tau50,vel[pix])
+
+
+
 
         # REMEMBER WE ARE SWITCHING TO VELOCITY HERE
         del_vel_j=np.diff(vel);
@@ -108,6 +117,7 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
         output["col"]=col
         output["colerr"]=colerr
         output["Tau_a"]=Tau_a
+        output["med_vel"]=vel50
         
 
 
