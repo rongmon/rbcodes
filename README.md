@@ -11,6 +11,7 @@ The GUIs folder contains several graphical user interfaces for astrophysics.
 	2) rb_spec.py :  An absorption line analysis pipeline. Allowing to create an object from an 1D spectrum do continuum fitting, measure equivalenth widths/column densities and save the final data and measurements. Also allows the fitting of a simple Voigt profile. 
 
 	3) rb_interactive_vpfit_singlet.py : Interactive simple Voigt profile fitter [used with rb_spec.py]
+	[ Look for rbvfit github repository for an interactive Voigt profile fitter, suited for any complex profiles.]
 
 	4) rb_plot_spec.py:  To plot 1D spectrum, smooth, pan, zoom and explore spectrum. Allows to plot absorption lines at any redshifts, and do simple equivalent width and Gaussian fitting. My version of x_specplot routine. 
 
