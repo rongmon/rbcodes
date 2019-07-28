@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('QT5Agg')
+matplotlib.use('TkAgg')
 import numpy as np
 import matplotlib.pyplot as plt 
 from astropy.io import ascii
@@ -10,8 +10,9 @@ from scipy.signal import medfilt
 from astropy.convolution import convolve, Box1DKernel
 from numpy import sqrt, pi, exp, linspace, loadtxt
 from lmfit import  Model
-from matplotlib.widgets import TextBox, RadioButtons
 from pkg_resources import resource_filename
+import PySimpleGUI as sg
+from IGM import rb_setline as line       
 
 
 class rb_plot_spec(object):
@@ -26,8 +27,6 @@ class rb_plot_spec(object):
         
         fig, ax = plt.subplots(1)
         self.fig=fig
-        plt.subplots_adjust(bottom=0.2)
-        initial_text = str(self.zabs)
 
         spectrum, = ax.step(self.wave, self.flux, 'k-',lw=1)
         ax.set_xlabel('Wavelength')
@@ -42,17 +41,6 @@ class rb_plot_spec(object):
         self.lam_ylim=[]
         self.FXval=[]
         self.FYval=[]
-
-        # Box to input redshift
-        axbox = plt.axes([0.1, 0.05, 0.2, 0.075])
-        text_box = TextBox(axbox, 'Redshift', initial=initial_text)
-        text_box.on_submit(self.set_redshift)
-
-
-        # Radio Button for Line Selection
-        rax = plt.axes([0.7, 0.01, 0.2, 0.1])
-        radio = RadioButtons(rax,  ('None','LLS', 'LLS Small', 'DLA'))
-        radio.on_clicked(self.DrawLineList)
 
     
         plt.gcf().canvas.mpl_connect('key_press_event',self.ontype)
@@ -80,13 +68,19 @@ class rb_plot_spec(object):
             ylim=ax.get_ylim()
             ax.set_ylim([ylim[0],event.ydata])
             ax.set_xlim(xlim)
-        elif event.key=='j':
+        elif event.key=='Z':
             print('Testing to see if we can get a pop up window to work')
-            #fig1, ax1 = plt.subplots()
-            #print(event.xdata)
-            ax.plot([event.xdata,event.xdata],[-10,10])
-            #import ipywidgets as widgets
-            #widgets.IntSlider()
+            self.set_redshift()
+            self.ax.plot([event.xdata,event.xdata],[-10,10])
+
+        elif event.key =='j':
+            lambda_rest, LineList=self.identify_line_GUI()
+            print(lambda_rest,LineList)
+            self.zabs= (event.xdata -lambda_rest)/lambda_rest
+            self.label=LineList
+            self.DrawLineList(self.label)
+
+
 
         # Set top y min
         elif event.key=='b':
@@ -152,8 +146,8 @@ class rb_plot_spec(object):
             eclick=len(self.lam_lim);
 
             self.specplot()
-            ax = plt.gca()
-            ax.plot(event.xdata,event.ydata,'ro',ms=5,picker=5,label='cont_pnt',markeredgecolor='k')
+
+            self.plot_keystroke(event)
 
 
 
@@ -231,9 +225,8 @@ class rb_plot_spec(object):
         self.ax.texts=[]
         self.label=label
         if label == 'None':
-            line,=self.ax.plot([0],[0],'k--')
-        else:
-            from IGM import rb_setline as line        
+            lineplot,=self.ax.plot([0],[0],'k--')
+        else:                   
             data=line.read_line_list(label)
 
             # Now make a smaller linelist within the current xaxes range.
@@ -246,25 +239,101 @@ class rb_plot_spec(object):
                 if ((data[i]['wrest']*(1.+self.zabs) >= np.double(xlim[0])) & (data[i]['wrest']*(1.+self.zabs) <= np.double(xlim[1]))):
                     xdata=[data[i]['wrest']*(1.+self.zabs),data[i]['wrest']*(1.+self.zabs)]
                     ydata=[0,2]
-                    line,=self.ax.plot(xdata,ydata,'k--',)
+                    lineplot,=self.ax.plot(xdata,ydata,'k--',)
                     ss=self.ax.transData.transform((0, .9))
                     tt=self.ax.text(xdata[0],0.85*ylim[1],data[i]['ion'],rotation=90) 
-        plt.draw()              
-    def set_redshift(self,text):
-        self.zabs=np.double(text)
+        plt.draw()
+
+    def plot_keystroke(self,event):
+        xdata=event.xdata
+        ydata=event.ydata
+        test,=self.ax.plot([xdata,0],[ydata,0],'ro',)
+
+
+    def set_redshift(self):
+        zabs,LineList=self.set_redshift_GUI()
+        self.zabs=np.double(zabs)
+        self.label=LineList
         self.DrawLineList(self.label)
+        print('Target Redshfit set at : ' + np.str(self.zabs))
         #xdata = self.wave/(1.+np.double(text))
         #self.spectrum.set_xdata(xdata)
         #self.ax.set_xlim(np.min(xdata), np.max(xdata))
         plt.draw()
         self.fig.canvas.draw()
 
+    def identify_line_GUI(self):
+        if self.label == 'None':
+            self.label='LLS Small'
+        data=line.read_line_list(self.label)
+        Transition_List=[]
+        wavelist=[]
+        for i in range(0,len(data)):
+            Transition_List.append(data[i]['ion'])
+            wavelist.append(data[i]['wrest'])
+
+        layout = [
+            [sg.Text('Please select the transition and LineList')],
+            [sg.Listbox(values=Transition_List, size=(30, 6),key='_Transition_')],
+            [sg.Text('LineList', size=(15, 1)),
+                sg.Drop(values=(self.label,'LLS', 'LLS Small', 'DLA'),size=(15, 1), key='_Menu_')], 
+            [sg.Button('Refresh'), sg.Button('Exit')]]
+
+
+        window = sg.Window('Line Identification', layout,font=("Helvetica", 12))  
+
+
+        while True:             # Event Loop  
+            event, values = window.Read()  
+
+            if event is None or event == 'Exit':  
+                break
+            self.label=values['_Menu_']  
+            data=line.read_line_list(self.label)
+            Transition_List=[]
+            wavelist=[]
+            for i in range(0,len(data)):
+                Transition_List.append(data[i]['ion'])
+                wavelist.append(data[i]['wrest'])
+            window.Element('_Transition_').Update(Transition_List)  
+        window.Close()
+
+
+
+        Transition_List=np.array(Transition_List)
+        wavelist=np.array(wavelist)
+
+        Transition_rest=values['_Transition_']
+        qq=np.where(Transition_List==Transition_rest)
+        lambda_rest=wavelist[qq][0]
+        LineList=values['_Menu_']
+        return lambda_rest,LineList
+
+
+
+
+    def set_redshift_GUI(self):
+        layout = [
+            [sg.Text('Please enter the desired redshift, LineList')],
+            [sg.Text('Redshift', size=(15, 1)), sg.InputText(np.str(self.zabs))],
+            [sg.Text('LineList', size=(15, 1)),
+                sg.Drop(values=(self.label,'None','LLS', 'LLS Small', 'DLA'), auto_size_text=True)], 
+            [sg.Submit(), sg.Cancel()]]
+
+        window = sg.Window('Redshift Query', layout,font=("Helvetica", 12))   
+        event, values = window.Read()
+        window.Close()
+        zabs=values[0]
+        LineList=values[1]
+        return zabs,LineList
+
+
     def specplot(self):
         ax=self.ax
         xlim=ax.get_xlim()
         ylim=ax.get_ylim()
         ax.cla()
-        ax.step(self.wave/(1.+self.zabs),self.smoothed_spectrum,'k-',lw=1,label='smooth')
+        ax.step(self.wave,self.smoothed_spectrum,'k-',lw=1,label='smooth')
         ax.set_xlabel('Wavelength')
         ax.set_ylabel('Flux')
         ax.set_xlim(xlim)
@@ -272,6 +341,9 @@ class rb_plot_spec(object):
         
         
         self.ax=ax
+
+
+
 
 
 
