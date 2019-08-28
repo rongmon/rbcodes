@@ -44,7 +44,7 @@ def bootstrap(data, bootnum=100, samples=None, bootfunc=None):
         resultdims = (bootnum,)
         boot = np.empty(resultdims)
 
-    for i in xrange(bootnum):
+    for i in range(bootnum):
         bootarr = np.random.randint(low=0,high=data.shape[0],size=samples)
         if bootfunc is None:
             boot[i] = data[bootarr]

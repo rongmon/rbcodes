@@ -80,6 +80,11 @@ class rb_plot_spec(object):
             self.label=LineList
             self.DrawLineList(self.label)
 
+        elif event.key =='K':
+            lambda_rest, LineList=self.select_several_line_GUI()
+            print(lambda_rest)
+
+
 
 
         # Set top y min
@@ -238,9 +243,9 @@ class rb_plot_spec(object):
             for i in range(0, len(data)):
                 if ((data[i]['wrest']*(1.+self.zabs) >= np.double(xlim[0])) & (data[i]['wrest']*(1.+self.zabs) <= np.double(xlim[1]))):
                     xdata=[data[i]['wrest']*(1.+self.zabs),data[i]['wrest']*(1.+self.zabs)]
-                    ydata=[0,2]
-                    lineplot,=self.ax.plot(xdata,ydata,'k--',)
                     ss=self.ax.transData.transform((0, .9))
+                    ydata=[0,2]
+                    lineplot,=self.ax.plot(xdata,ydata,'k--',)                    
                     tt=self.ax.text(xdata[0],0.85*ylim[1],data[i]['ion'],rotation=90) 
         plt.draw()
 
@@ -308,6 +313,58 @@ class rb_plot_spec(object):
         lambda_rest=wavelist[qq][0]
         LineList=values['_Menu_']
         return lambda_rest,LineList
+
+
+    def select_several_line_GUI(self):
+        if self.label == 'None':
+            self.label='LLS Small'
+        data=line.read_line_list(self.label)
+        Transition_List=[]
+        wavelist=[]
+        for i in range(0,len(data)):
+            Transition_List.append(data[i]['ion'])
+            wavelist.append(data[i]['wrest'])
+
+        layout = [
+            [sg.Text('Please select the transitions and LineList')],
+            [sg.Listbox(values=Transition_List, size=(30, 6),key='_Transition_',select_mode='multiple')],
+            [sg.Text('LineList', size=(15, 1)),
+                sg.Drop(values=(self.label,'LLS', 'LLS Small', 'DLA'),size=(15, 1), key='_Menu_')], 
+            [sg.Button('Refresh'), sg.Button('Finished')]]
+
+
+        window = sg.Window('Line Identification', layout,font=("Helvetica", 12))  
+
+
+        while True:             # Event Loop  
+            event, values = window.Read()  
+
+            if event is None or event == 'Finished':  
+                break
+            self.label=values['_Menu_']  
+            data=line.read_line_list(self.label)
+            Transition_List=[]
+            wavelist=[]
+            for i in range(0,len(data)):
+                Transition_List.append(data[i]['ion'])
+                wavelist.append(data[i]['wrest'])
+            window.Element('_Transition_').Update(Transition_List)  
+        window.Close()
+
+
+
+        Transition_List=np.array(Transition_List)
+        wavelist=np.array(wavelist)
+
+        Transition_rest=values['_Transition_']
+        qq=np.where(Transition_List==Transition_rest)
+        lambda_rest=wavelist[qq][0]
+        LineList=values['_Menu_']
+        return lambda_rest,LineList
+
+
+
+
 
 
 
