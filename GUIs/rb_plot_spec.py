@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Qt5Agg')
 import numpy as np
 import matplotlib.pyplot as plt 
 from astropy.io import ascii
