@@ -2,7 +2,7 @@ import numpy as np
 from scipy.interpolate import splrep,splev
 import sys
 import os
-
+import pdb
 class read_spec(object):
     """A spectrum read into a class. spectrum will have
     following properties:
@@ -58,9 +58,9 @@ class read_spec(object):
             dat=file[1].data
             tab=dat.names
             wave=np.array(dat['WAVE'])
-            flux=np.array(dat['FLUX'])
+            flux=np.array(dat['FLUX'])#/np.median(np.array(dat['FLUX']))
             if (len(tab)>=3):
-                error=np.array(dat['ERROR'])
+                error=np.array(dat['ERROR'])#/np.median(np.array(dat['FLUX']))
             else:
                 error=0.*flux
 
@@ -168,7 +168,8 @@ class read_spec(object):
         """
         if Legendre==False:
             from GUIs import rb_fit_interactive_continuum as f
-            s=f.rb_fit_interactive_continuum(self.wave_slice,self.flux_slice,self.error_slice);
+            #pdb.set_trace()
+            s=f.rb_fit_interactive_continuum(self.wave_slice,self.flux_slice,self.error_slice)
             cont=s.cont
 
 
