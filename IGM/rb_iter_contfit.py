@@ -20,8 +20,14 @@ def rb_iter_contfit(wave,flux,error,**kwargs):
                fit_error  : error on the fit [standard deviation of the residual]
 
     Written by:  Rongmon Bordoloi
-    Tested on Python 3.7
+    Tested on Python 3.7  Sep 4 2019
+    --------------------------
 
+    example :
+        from IGM import rb_iter_contfit as r
+        out= r.rb_iter_contfit(wave,flux,error,order=5)
+
+        out[0] = fitted continuum
     '''
 
     if 'maxiter' in kwargs:
