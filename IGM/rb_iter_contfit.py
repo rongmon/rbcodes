@@ -1,6 +1,7 @@
 import numpy as np
 from astropy.stats import sigma_clip
 from astropy.modeling import models, fitting
+import warnings
 import pdb
 
 def rb_iter_contfit(wave,flux,error,**kwargs):
@@ -59,7 +60,7 @@ def rb_iter_contfit(wave,flux,error,**kwargs):
     if (np.size(q)>0):
         flux[q]=error[q]
 
-    w=error**2. # Weight
+    w=1/error**2. # Weight
 
     index=0 #Initialize the counter
     outside_chip_gap= np.where(((error!=0) & (flux!=0)) | (error-flux!=0));
@@ -83,8 +84,11 @@ def rb_iter_contfit(wave,flux,error,**kwargs):
     g_init = models.Legendre1D(order)
     # initialize fitters
     fit = fitting.LevMarLSQFitter()
-    new_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip,niter=maxiter, sigma=3.0)
-    new_fit,filtered_data = new_fit(g_init, wave_new,flux_new)
+    with warnings.catch_warnings():
+        # Ignore model linearity warning from the fitter
+        warnings.simplefilter('ignore') 
+        new_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip,niter=maxiter, sigma=3.0)
+        new_fit,filtered_data = new_fit(g_init, wave_new,flux_new)#,weights=weights)
 
     ''''
     while (index < maxiter):
