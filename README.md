@@ -20,6 +20,8 @@ The IGM folder contains several python routines for intergalactic medium and cir
 
 	1) compute_EW.py :  Compute equivalent width and column densities of any absorption/emission lines.
 	2) rb_setline.py :  For any given rest frame wavelength find corresponding atomic transition and the fvalues. [Can find any line nearest to the input wavelength].
+	3) rb_iter_contfit.py : Iteratively fit [with sigma clipping] continuum to a small slice of 1D spectrum using Legendre polynomials.
+	4) rb_specbin.py  :  Rebin 1D spectrum to increase S/N
 
 The halo folder contains modules to compute NFW halo profiles
 
