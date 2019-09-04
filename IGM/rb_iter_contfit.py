@@ -5,11 +5,11 @@ from astropy.modeling import models, fitting
 
 def rb_iter_contfit(wave,flux,error,**kwargs):
 
-	if 'maxiter' in kwargs::
+	if 'maxiter' in kwargs:
 		maxiter=kwargs['maxiter']
 	else:
 		maxiter=25
-	if 'order' in kwargs::
+	if 'order' in kwargs:
 		order=kwargs['order']
 	else:
 		order=4
