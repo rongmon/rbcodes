@@ -88,7 +88,7 @@ def rb_iter_contfit(wave,flux,error,**kwargs):
         # Ignore model linearity warning from the fitter
         warnings.simplefilter('ignore') 
         new_fit = fitting.FittingWithOutlierRemoval(fit, sigma_clip,niter=maxiter, sigma=3.0)
-        new_fit,filtered_data = new_fit(g_init, wave_new,flux_new)#,weights=weights)
+        filtered_fit,filtered_data = new_fit(g_init, wave_new,flux_new)#,weights=weights)
 
     ''''
     while (index < maxiter):
@@ -138,7 +138,7 @@ def rb_iter_contfit(wave,flux,error,**kwargs):
 
     '''
     #pdb.set_trace()
-    fit_final=new_fit(wave)
+    fit_final=filtered_fit(wave)
     resid_final=flux/fit_final
     fit_error=np.std(resid_final)#np.sqrt(scipy.stats.moment(resid_final,2))
 

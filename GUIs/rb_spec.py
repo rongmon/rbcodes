@@ -90,6 +90,7 @@ class read_spec(object):
             wave=file[2].data
             flux=file[0].data
             error=file[1].data
+            
 
 
 
