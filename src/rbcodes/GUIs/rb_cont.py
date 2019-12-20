@@ -80,7 +80,7 @@
 '''
    
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import splrep,splev
