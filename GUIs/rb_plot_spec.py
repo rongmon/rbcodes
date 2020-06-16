@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('Qt5Agg')
+matplotlib.use('TkAgg')
 import numpy as np
 import matplotlib.pyplot as plt 
 from astropy.io import ascii
@@ -13,7 +13,7 @@ from lmfit import  Model
 from pkg_resources import resource_filename
 import PySimpleGUI as sg
 from IGM import rb_setline as line       
-
+import ipdb
 
 class rb_plot_spec(object):
 
@@ -54,11 +54,11 @@ class rb_plot_spec(object):
             # when the user hits 'r': clear the axes and plot the original spectrum
         if event.key=='r':
             ax.cla()
-            ax.step(self.wave/(1.+zabs),self.flux,'k-',linewidth=1)
+            ax.step(self.wave,self.flux,'k-',linewidth=1)
             ax.set_xlabel('Wavelength')
             ax.set_ylabel('Flux')
-            xr=[np.min(self.wave),np.max(self.wave)]/(1.+zabs)
-            yr=[np.min(self.flux)-0.2,np.max(self.flux)+.2]
+            xr=[np.min(self.wave),np.max(self.wave)]
+            yr=[np.min(self.flux),np.max(self.flux)]
             ax.set_ylim([yr[0],yr[1]])
             ax.set_xlim([xr[0], xr[1]])
     
@@ -71,7 +71,7 @@ class rb_plot_spec(object):
         elif event.key=='Z':
             print('Testing to see if we can get a pop up window to work')
             self.set_redshift()
-            self.ax.plot([event.xdata,event.xdata],[-10,10])
+            self.DrawLineList(self.label)
 
         elif event.key =='j':
             lambda_rest, LineList=self.identify_line_GUI()
@@ -79,6 +79,8 @@ class rb_plot_spec(object):
             self.zabs= (event.xdata -lambda_rest)/lambda_rest
             self.label=LineList
             self.DrawLineList(self.label)
+            print('Target Redshfit set at : ' + np.str(self.zabs))
+
 
         elif event.key =='K':
             lambda_rest, LineList=self.select_several_line_GUI()
@@ -153,6 +155,7 @@ class rb_plot_spec(object):
             self.specplot()
 
             self.plot_keystroke(event)
+            plt.draw()
 
 
 
@@ -163,12 +166,14 @@ class rb_plot_spec(object):
                 tab=self.lam_lim.argsort()
 
 
-                EW,sig_EW=compute_EW(self.wave/(1.+zabs),self.flux,self.lam_lim[tab],self.lam_ylim[tab],self.error,self.ax)
+                EW,sig_EW,cont,wave_slice=self.compute_EW(self.wave/(1.+zabs),self.flux,self.lam_lim[tab],self.lam_ylim[tab],self.error)
                 EW=np.array(EW)*1000.
                 sig_EW=np.array(sig_EW)*1000.
+                self.ax.plot(wave_slice,cont,'r--')
+                #ipdb.set_trace()
                 print('---------------------- Equivalent Width -------------------------------------')
                 Wval='EW [mAA]: '+ '%.1f' % EW + ' +/- ' + '%.1f' % sig_EW
-                ax.text(np.mean([self.lam_lim]),np.max(self.lam_ylim)+0.2,Wval, rotation=90,verticalalignment='bottom')
+                self.ax.text(np.mean([self.lam_lim]),np.max(self.lam_ylim)+0.2,Wval, rotation=90,verticalalignment='bottom')
                 print(Wval)
                 print('---------------------------------------------------------------------------')
                 plt.draw()
@@ -247,12 +252,17 @@ class rb_plot_spec(object):
                     ydata=[0,2]
                     lineplot,=self.ax.plot(xdata,ydata,'k--',)                    
                     tt=self.ax.text(xdata[0],0.85*ylim[1],data[i]['ion'],rotation=90) 
+        #print('Target Redshfit set at : ' + np.str(self.zabs))
         plt.draw()
 
     def plot_keystroke(self,event):
         xdata=event.xdata
         ydata=event.ydata
-        test,=self.ax.plot([xdata,0],[ydata,0],'ro',)
+        test,=self.ax.plot(xdata,ydata,'r+',)
+        print(xdata,ydata)
+        plt.draw()
+        self.fig.canvas.draw()
+
 
 
     def set_redshift(self):
@@ -282,7 +292,7 @@ class rb_plot_spec(object):
             [sg.Listbox(values=Transition_List, size=(30, 6),key='_Transition_')],
             [sg.Text('LineList', size=(15, 1)),
                 sg.Drop(values=(self.label,'LLS', 'LLS Small', 'DLA'),size=(15, 1), key='_Menu_')], 
-            [sg.Button('Refresh'), sg.Button('Exit')]]
+            [sg.Button('Reset'), sg.Button('Submit')]]
 
 
         window = sg.Window('Line Identification', layout,font=("Helvetica", 12))  
@@ -291,7 +301,7 @@ class rb_plot_spec(object):
         while True:             # Event Loop  
             event, values = window.Read()  
 
-            if event is None or event == 'Exit':  
+            if event is None or event == 'Submit':  
                 break
             self.label=values['_Menu_']  
             data=line.read_line_list(self.label)
@@ -310,6 +320,7 @@ class rb_plot_spec(object):
 
         Transition_rest=values['_Transition_']
         qq=np.where(Transition_List==Transition_rest)
+        #ipdb.set_trace()
         lambda_rest=wavelist[qq][0]
         LineList=values['_Menu_']
         return lambda_rest,LineList
@@ -400,6 +411,24 @@ class rb_plot_spec(object):
         self.ax=ax
 
 
+    
+    def compute_EW(self,lam,flx,lam_lim,lam_ylim,err_flx):
+        qtq=np.where( ( lam >= lam_lim[0] ) & ( lam <= lam_lim[1] ) )
+        ww=lam[qtq]                 
+        flux1=flx[qtq]
+        spline = splrep(lam_lim,lam_ylim,k=1)
+        continuum = splev(ww,spline)
+        #ax.plot(ww,continuum,'k--')
+        sig_flx1=err_flx[qtq]/continuum
+        flux1=flux1/continuum
+    
+        EW=np.trapz(1.-flux1, x= ww)
+        delw=np.double(ww[2]-ww[1])
+        sig_w=delw*sig_flx1
+        sig_wtot=np.sqrt(np.sum(sig_w**2.))
+        return EW,sig_wtot,continuum,ww
+
+
 
 
 
@@ -412,19 +441,3 @@ def gaussian(x, amp, cen, wid):
     return (amp/(sqrt(2*pi)*wid)) * exp(-(x-cen)**2 /(2*wid**2))
     
     
-    
-def compute_EW(lam,flx,lam_lim,lam_ylim,err_flx,ax):
-    qtq=np.where( ( lam >= lam_lim[0] ) & ( lam <= lam_lim[1] ) )
-    ww=lam[qtq]                 
-    flux1=flx[qtq]
-    spline = splrep(lam_lim,lam_ylim,k=1)
-    continuum = splev(ww,spline)
-    ax.plot(ww,continuum,'k--')
-    sig_flx1=err_flx[qtq]/continuum
-    flux1=flux1/continuum
-
-    EW=np.trapz(1.-flux1, x= ww)
-    delw=np.double(ww[2]-ww[1])
-    sig_w=delw*sig_flx1
-    sig_wtot=np.sqrt(np.sum(sig_w**2.))
-    return EW,sig_wtot
