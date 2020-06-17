@@ -154,9 +154,11 @@ class rb_plot_spec(object):
 
             self.specplot()
 
-            self.plot_keystroke(event)
-            plt.draw()
+            self.ax.plot(event.xdata,event.ydata,'rs',ms=5,picker=5,label='EW_pt',markeredgecolor='k')
+            self.fig.canvas.draw()
+            
 
+           
 
 
 
