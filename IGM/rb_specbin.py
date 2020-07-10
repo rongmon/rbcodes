@@ -54,9 +54,9 @@ def rb_specbin(flux,nbin,**kwargs):
     first = wavePixels % nbin
     if first == 0:
         first = nbin
-    newFlux = np.zeros([numPix,1])
-    newVar = np.zeros([numPix,1])
-    newWave = np.zeros([numPix,1]) 
+    newFlux = np.zeros(numPix,)
+    newVar = np.zeros(numPix,)
+    newWave = np.zeros(numPix,) 
     # Binning
     for qq in range(numPix-1): 
         ii = qq*nbin
