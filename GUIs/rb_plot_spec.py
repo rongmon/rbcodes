@@ -14,6 +14,7 @@ from pkg_resources import resource_filename
 import PySimpleGUI as sg
 from IGM import rb_setline as line       
 import ipdb
+import pandas as pd
 
 class rb_plot_spec(object):
 
@@ -42,6 +43,10 @@ class rb_plot_spec(object):
         self.FXval=[]
         self.FYval=[]
 
+        #create indentified line list
+        d={'zabs':[0,0,0,0,0,0,0,0,0,0],'List':['None','None','None','None','None','None','None','None','None','None'], 'color':['k','k','k','k','k','k','k','k','k','k']} 
+        df=pd.DataFrame(data=d) 
+        self.identified_list=df
     
         plt.gcf().canvas.mpl_connect('key_press_event',self.ontype)
         plt.draw()
@@ -83,8 +88,12 @@ class rb_plot_spec(object):
 
 
         elif event.key =='K':
-            lambda_rest, LineList=self.select_several_line_GUI()
-            print(lambda_rest)
+            lambda_rest, LineList=self.identify_line_GUI()
+            print(lambda_rest,LineList)
+            self.zabs= (event.xdata -lambda_rest)/lambda_rest
+            self.DrawLineList_cont(LineList)
+            print('Target Redshfit set at : ' + np.str(self.zabs))
+
 
 
 
@@ -251,11 +260,36 @@ class rb_plot_spec(object):
                 if ((data[i]['wrest']*(1.+self.zabs) >= np.double(xlim[0])) & (data[i]['wrest']*(1.+self.zabs) <= np.double(xlim[1]))):
                     xdata=[data[i]['wrest']*(1.+self.zabs),data[i]['wrest']*(1.+self.zabs)]
                     ss=self.ax.transData.transform((0, .9))
-                    ydata=[0,2]
+                    ydata=[0,ylim[1]]
                     lineplot,=self.ax.plot(xdata,ydata,'k--',)                    
-                    tt=self.ax.text(xdata[0],0.85*ylim[1],data[i]['ion'],rotation=90) 
+                    tt=self.ax.text(xdata[0],0.75*ylim[1],data[i]['ion']+' '+ np.str(self.zabs),rotation=90) 
         #print('Target Redshfit set at : ' + np.str(self.zabs))
         plt.draw()
+
+    def DrawLineList_cont(self,label):
+        #del self.ax.lines[1:len(self.ax.lines)]
+        #self.ax.texts=[]
+        self.label=label
+        if label != 'None':                   
+            data=line.read_line_list(label)
+
+            # Now make a smaller linelist within the current xaxes range.
+            xlim=self.ax.get_xlim()
+            ylim=self.ax.get_ylim()
+            for i in range(0, len(data)):
+                if ((data[i]['wrest']*(1.+self.zabs) >= np.double(xlim[0])) & (data[i]['wrest']*(1.+self.zabs) <= np.double(xlim[1]))):
+                    xdata=[data[i]['wrest']*(1.+self.zabs),data[i]['wrest']*(1.+self.zabs)]
+                    ss=self.ax.transData.transform((0, .9))
+                    ydata=[0,ylim[1]]
+                    lineplot,=self.ax.plot(xdata,ydata,'k--',)                    
+                    tt=self.ax.text(xdata[0],0.75*ylim[1],data[i]['ion']+' '+ np.str(self.zabs),rotation=90) 
+        #print('Target Redshfit set at : ' + np.str(self.zabs))
+        plt.draw()
+
+
+
+
+
 
     def plot_keystroke(self,event):
         xdata=event.xdata
@@ -328,6 +362,9 @@ class rb_plot_spec(object):
         return lambda_rest,LineList
 
 
+    #def manage_identified_linelist(self):
+
+
     def select_several_line_GUI(self):
         if self.label == 'None':
             self.label='LLS Small'
@@ -374,9 +411,6 @@ class rb_plot_spec(object):
         lambda_rest=wavelist[qq][0]
         LineList=values['_Menu_']
         return lambda_rest,LineList
-
-
-
 
 
 
