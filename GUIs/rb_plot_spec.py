@@ -45,7 +45,7 @@ class rb_plot_spec(object):
 
         #create indentified line list
         # Very basic window.  Return values using auto numbered keys
-        d={'zabs':[0.,0.,0.,0.,0.,0.,0.,0.,0.,0.],'List':['LLS','LLS','LLS','LLS','LLS','LLS','LLS','LLS','LLS','LLS'], 'color':['None','None','None','None','None','None','None','None','None','None']} 
+        d={'zabs':[0.,0.,0.,0.,0.,0.,0.,0.,0.,0.],'List':['None','None','None','None','None','None','None','None','None','None'], 'color':['None','None','None','None','None','None','None','None','None','None']} 
         df=pd.DataFrame(data=d)    
 
         self.zabs_list=df
@@ -247,7 +247,7 @@ class rb_plot_spec(object):
                 FYval=[]
          # Making sure any drawn line list remains drawn
         self.DrawLineList(self.label)
-        q=np.where(self.zabs_list['color'] != 'None')
+        q=np.where(self.zabs_list['List'] != 'None')
         if len(q[0] >0): 
             self.draw_any_linelist()
         plt.draw()
@@ -289,7 +289,7 @@ class rb_plot_spec(object):
 
         #Hardcoding that only 10 independent absorber systems can be plotted
         for i in range(0,10):
-            if self.zabs_list['color'][i] != 'None':
+            if self.zabs_list['List'][i] != 'None':
                 zabs=np.double(self.zabs_list['zabs'][i])
                 linelist=self.zabs_list['List'][i]
                 lineclr=self.zabs_list['color'][i]
@@ -318,16 +318,16 @@ class rb_plot_spec(object):
                [sg.Text('9. zabs', size=(5, 1)), sg.In(default_text=np.str(self.zabs_list['zabs'][8]),  size=(15, 1))],
                [sg.Text('10. zabs',size=(5, 1)), sg.In(default_text=np.str(self.zabs_list['zabs'][9]),  size=(15, 1))]]
 
-        col2= [[sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][0], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][1], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][2], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][3], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][4], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][5], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][6], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][7], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][8], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][9], size=(10,1))]]
+        col2= [[sg.Text('LineList', size=(5, 1)),sg.Spin(values=('None','LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][0], size=(10,1))],
+               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('None','LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][1], size=(10,1))],
+               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('None','LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][2], size=(10,1))],
+               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('None','LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][3], size=(10,1))],
+               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('None','LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][4], size=(10,1))],
+               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('None','LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][5], size=(10,1))],
+               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('None','LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][6], size=(10,1))],
+               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('None','LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][7], size=(10,1))],
+               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('None','LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][8], size=(10,1))],
+               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('None','LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][9], size=(10,1))]]
 
 
         col3=  [[sg.Text('color', size=(5, 1)), sg.In(default_text=self.zabs_list['color'][0] ,size=(5, 1))],
@@ -479,6 +479,8 @@ class rb_plot_spec(object):
 
 
     def load_linelist_GUI(self):
+        sg.ChangeLookAndFeel('Dark')
+
         event, values = sg.Window('Load Identifed Line list', [[sg.Text('Filename')], [sg.Input(), sg.FileBrowse()], [sg.OK(), sg.Cancel()] ]).read(close=True)
         tt=ascii.read(values[0])
         #count how many entries
