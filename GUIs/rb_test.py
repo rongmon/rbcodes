@@ -9,7 +9,6 @@ import os
 from scipy.signal import medfilt
 from astropy.convolution import convolve, Box1DKernel
 from numpy import sqrt, pi, exp, linspace, loadtxt
-from lmfit import  Model
 from pkg_resources import resource_filename
 import PySimpleGUI as sg
 from IGM import rb_setline as line       
@@ -45,7 +44,7 @@ class rb_plot_spec(object):
 
         #create indentified line list
         # Very basic window.  Return values using auto numbered keys
-        d={'zabs':[0.,0.,0.,0.,0.,0.,0.,0.,0.,0.],'List':['LLS','LLS','LLS','LLS','LLS','LLS','LLS','LLS','LLS','LLS'], 'color':['None','None','None','None','None','None','None','None','None','None']} 
+        d={'zabs':[0.,0.,0.,0.,0.,0.,0.,0.,0.,0.],'List':['None','None','None','None','None','None','None','None','None','None'], 'color':['k','k','k','k','k','k','k','k','k','k']} 
         df=pd.DataFrame(data=d)    
 
         self.zabs_list=df
@@ -93,12 +92,6 @@ class rb_plot_spec(object):
         #Clunky GUI to plot lines
         elif event.key =='K':
             self.manage_identified_absorbers()
-
-        #Load a saved linelist
-        elif event.key =='0':
-            self.load_linelist_GUI()
-            self.manage_identified_absorbers()
-
 
 
         # Set top y min
@@ -172,7 +165,7 @@ class rb_plot_spec(object):
             # Keep running tab of all E clicks
             eclick=len(self.lam_lim);
 
-            #self.specplot()
+            self.specplot()
 
             self.ax.plot(event.xdata,event.ydata,'rs',ms=5,picker=5,label='EW_pt',markeredgecolor='k')
             self.fig.canvas.draw()
@@ -198,7 +191,7 @@ class rb_plot_spec(object):
                 self.ax.text(np.mean([self.lam_lim]),np.max(self.lam_ylim)+0.2,Wval, rotation=90,verticalalignment='bottom')
                 print(Wval)
                 print('---------------------------------------------------------------------------')
-                #plt.draw()
+                plt.draw()
 
 
     
@@ -247,9 +240,6 @@ class rb_plot_spec(object):
                 FYval=[]
          # Making sure any drawn line list remains drawn
         self.DrawLineList(self.label)
-        q=np.where(self.zabs_list['color'] != 'None')
-        if len(q[0] >0): 
-            self.draw_any_linelist()
         plt.draw()
         self.fig.canvas.draw()
 
@@ -318,28 +308,29 @@ class rb_plot_spec(object):
                [sg.Text('9. zabs', size=(5, 1)), sg.In(default_text=np.str(self.zabs_list['zabs'][8]),  size=(15, 1))],
                [sg.Text('10. zabs',size=(5, 1)), sg.In(default_text=np.str(self.zabs_list['zabs'][9]),  size=(15, 1))]]
 
-        col2= [[sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][0], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][1], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][2], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][3], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][4], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][5], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][6], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][7], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][8], size=(10,1))],
-               [sg.Text('LineList', size=(5, 1)),sg.Spin(values=('LLS', 'LLS Small', 'DLA'), initial_value=self.zabs_list['List'][9], size=(10,1))]]
+        col2= [[sg.Text('LineList', size=(5, 1)),sg.Drop(values=('LLS', 'LLS Small', 'DLA'), auto_size_text=True)],
+               [sg.Text('LineList', size=(5, 1)),sg.Drop(values=('LLS', 'LLS Small', 'DLA'), auto_size_text=True)],
+               [sg.Text('LineList', size=(5, 1)),sg.Drop(values=('LLS', 'LLS Small', 'DLA'), auto_size_text=True)],
+               [sg.Text('LineList', size=(5, 1)),sg.Drop(values=('LLS', 'LLS Small', 'DLA'), auto_size_text=True)],
+               [sg.Text('LineList', size=(5, 1)),sg.Drop(values=('LLS', 'LLS Small', 'DLA'), auto_size_text=True)],
+               [sg.Text('LineList', size=(5, 1)),sg.Drop(values=('LLS', 'LLS Small', 'DLA'), auto_size_text=True)],
+               [sg.Text('LineList', size=(5, 1)),sg.Drop(values=('LLS', 'LLS Small', 'DLA'), auto_size_text=True)],
+               [sg.Text('LineList', size=(5, 1)),sg.Drop(values=('LLS', 'LLS Small', 'DLA'), auto_size_text=True)],
+               [sg.Text('LineList', size=(5, 1)),sg.Drop(values=('LLS', 'LLS Small', 'DLA'), auto_size_text=True)],
+               [sg.Text('LineList', size=(5, 1)),sg.Drop(values=('LLS', 'LLS Small', 'DLA'), auto_size_text=True)]]
 
 
-        col3=  [[sg.Text('color', size=(5, 1)), sg.In(default_text=self.zabs_list['color'][0] ,size=(5, 1))],
-                [sg.Text('color', size=(5, 1)), sg.In(default_text=self.zabs_list['color'][1] ,size=(5, 1))],
-                [sg.Text('color', size=(5, 1)), sg.In(default_text=self.zabs_list['color'][2] ,size=(5, 1))],
-                [sg.Text('color', size=(5, 1)), sg.In(default_text=self.zabs_list['color'][3] ,size=(5, 1))],
-                [sg.Text('color', size=(5, 1)), sg.In(default_text=self.zabs_list['color'][4] ,size=(5, 1))],
-                [sg.Text('color', size=(5, 1)), sg.In(default_text=self.zabs_list['color'][5] ,size=(5, 1))],
-                [sg.Text('color', size=(5, 1)), sg.In(default_text=self.zabs_list['color'][6] ,size=(5, 1))],
-                [sg.Text('color', size=(5, 1)), sg.In(default_text=self.zabs_list['color'][7] ,size=(5, 1))],
-                [sg.Text('color', size=(5, 1)), sg.In(default_text=self.zabs_list['color'][8] ,size=(5, 1))],
-                [sg.Text('color', size=(5, 1)), sg.In(default_text=self.zabs_list['color'][9] ,size=(5, 1))]]
+
+        col3=  [[sg.Text('color', size=(5, 1)), sg.In(default_text='None' ,size=(5, 1))],
+                [sg.Text('color', size=(5, 1)), sg.In(default_text='None' ,size=(5, 1))],
+                [sg.Text('color', size=(5, 1)), sg.In(default_text='None' ,size=(5, 1))],
+                [sg.Text('color', size=(5, 1)), sg.In(default_text='None' ,size=(5, 1))],
+                [sg.Text('color', size=(5, 1)), sg.In(default_text='None' ,size=(5, 1))],
+                [sg.Text('color', size=(5, 1)), sg.In(default_text='None' ,size=(5, 1))],
+                [sg.Text('color', size=(5, 1)), sg.In(default_text='None' ,size=(5, 1))],
+                [sg.Text('color', size=(5, 1)), sg.In(default_text='None' ,size=(5, 1))],
+                [sg.Text('color', size=(5, 1)), sg.In(default_text='None' ,size=(5, 1))],
+                [sg.Text('color', size=(5, 1)), sg.In(default_text='None' ,size=(5, 1))]]
     
 
 
@@ -476,31 +467,6 @@ class rb_plot_spec(object):
         
         
         self.ax=ax
-
-
-    def load_linelist_GUI(self):
-        event, values = sg.Window('Load Identifed Line list', [[sg.Text('Filename')], [sg.Input(), sg.FileBrowse()], [sg.OK(), sg.Cancel()] ]).read(close=True)
-        tt=ascii.read(values[0])
-        #count how many entries
-        n_abs=len(tt['zabs'])
-        # Now load the first 10 absorbers into the identifed linelist database
-
-        if n_abs>10:
-            for i in range(0,10):
-                self.zabs_list.at[i, 'zabs'] = tt['zabs'][i]
-                self.zabs_list.at[i, 'List'] = tt['List'][i]
-                self.zabs_list.at[i, 'color'] = tt['color'][i]   
-
-        else:
-            for i in range(0,n_abs):
-                self.zabs_list.at[i, 'zabs'] = tt['zabs'][i]
-                self.zabs_list.at[i, 'List'] = tt['List'][i]
-                self.zabs_list.at[i, 'color'] = tt['color'][i]   
-
- 
-
-
-
 
 
     
