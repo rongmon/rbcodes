@@ -175,12 +175,7 @@ class rb_plot_spec(object):
             #self.specplot()
 
             self.ax.plot(event.xdata,event.ydata,'rs',ms=5,picker=5,label='EW_pt',markeredgecolor='k')
-            self.fig.canvas.draw()
-            
-
-           
-
-
+            #self.fig.canvas.draw()
 
 
             if eclick==2:
@@ -198,13 +193,16 @@ class rb_plot_spec(object):
                 self.ax.text(np.mean([self.lam_lim]),np.max(self.lam_ylim)+0.2,Wval, rotation=90,verticalalignment='bottom')
                 print(Wval)
                 print('---------------------------------------------------------------------------')
-                #plt.draw()
-
-
-    
                 self.lam_lim=[]
                 self.lam_ylim=[]
 
+            plt.draw()
+            self.fig.canvas.draw()
+
+
+
+    
+                
         
         # Fit a Gaussian
         elif event.key=='F':
@@ -245,6 +243,11 @@ class rb_plot_spec(object):
     
                 FXval=[]
                 FYval=[]
+
+
+
+
+
          # Making sure any drawn line list remains drawn
         self.DrawLineList(self.label)
         q=np.where(self.zabs_list['List'] != 'None')
