@@ -16,6 +16,53 @@ from linetools.spectra.xspectrum1d import XSpectrum1D
 class cont_fitter(object):
 
     def __init__(self,filename, efil=None,medfilter_window=149,**kwargs):
+
+        '''
+            """A continuum fitter class. This reads in a 1D spectrum and allows continuum fitting.
+            The initial continuum is fitted using a random sample consensus model.
+            Then user has the option to tweak the fitted continuum by hand usling interactive 
+            linetools API and/or save the spectrum object.
+
+
+    Attributes:
+
+
+        output: This gives a cont_fitter object with following attributes:
+
+        self.wave= wavelength
+
+        self.flux= Flux
+        self.error= error
+        self.cont= Fitted continuum 
+
+    Written : Rongmon Bordoloi      August 2020
+    Based on RANSAC continuum fitter written by Bin Liu Summer 2020.
+    --------------------------------------------------------------------------------------------
+    EXAMPLE: 
+               from IGM import ransac_contfit as c 
+
+
+               #efil = optional if error spectrum is defined in another file
+               sp=c.c.cont_fitter(fluxfilename,efil=errorfilename)
+
+               #AND YOU ARE DONE.
+
+               #OPTIONAL:
+
+               #Tweak the fitted continuum 
+               sp.tweak_continuum()
+
+               #Show new continuum
+               sp.plot_spectrum()
+
+               #Save it as a fits file
+               sp.save_spectrum(outputfilename)
+
+
+    --------------------------------------------------------------------------------------------
+
+ 
+        '''
         self.read_spectrum(filename,efil=efil)
         self.prepare_data(medfilter_window=medfilter_window)
         self.run_ransac()
