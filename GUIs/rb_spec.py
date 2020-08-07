@@ -12,15 +12,97 @@ class read_spec(object):
         flux: flux.
         error: error
         filename=filename and location
-        filetype = False [default] : other options ascii,fits, HSLA, xfits, p, temp, linetools
+        filetype = False [default] : other options 
+                 ascii, fits, HSLA, xfits, p [pickle], temp, and linetools [uses linetools.io routine for this]
 
     Optional:  All only valid for filetype=linetools option
          efil= errorfile [Default None]
+
+        output: This gives a read_spec object with following attributes:
+
+        self.zabs= Absorber redshift
+
+        self.wave_slice= sliced observed wavelength vector
+        self.flux_slice= sliced observed flux vector
+        self.error_slice= sliced velocity spectra 
+        self.linelist=. LineList used
+
+        
+        self.velo=  sliced velocity vector
+
+
+
+        self.cont = Fitted continuum
+        self.fnorm= Normalized flux
+        self.enorm= Normalized error
+
+        self.trans=  Name of the Transition
+        self.fval= fvalue of transition
+        self.trans_wave= rest frame wavelength of transition
+        self.vmin=     velocity minimum used for equivalent width calculation
+        self.vmax=    velocity maximum used for equivalent width calculation
+        self.W=    Rest Frame equivalenth width
+        self.W_e=  uncertainty on rest frame equivalent width
+        self.logN=  AOD column density
+        self.logN_e= AOD column density uncertainty
+        self.Tau= Apparant optical depth as a function of velocity
+
 
 
     Written : Rongmon Bordoloi      April 2018
     Edit    : Rongmon Bordoloi      September 2018 Changed kwargs to be compatible to python 3   
     Edit    : Rongmon Bordoloi      Aug 2020: added linetools.io.readspec file
+
+    --------------------------------------------------------------------------------------------
+    EXAMPLE: import numpy as np
+            import matplotlib
+            matplotlib.use('TkAgg')
+            import matplotlib.pyplot as plt
+            from GUIs import rb_spec as r 
+
+            # List of absorber redshifts
+            zabs=[0.511020,1.026311,1.564481]
+            transition= 2796.3
+            #Which absorber to analyze
+            index=0
+            filename='Quasar_Spectrum.fits'
+            #Read in file
+            s=r.read_spec(filename,filetype='linetools')
+
+            #Shift spectra to rest frame
+            s.shift_spec(zabs[index]);
+            #Velocity window around transition
+            xlim=[-1500,1500]
+            
+            #Slice Spectrum within that window
+            s.slice_spec(transition,xlim[0],xlim[1],use_vel=True);
+
+            #Fit continuum Mask the regions defined by velocity
+            s.fit_continuum(mask=[-200,300,500,1100],domain=xlim,Legendre=3)
+
+            #Compute EW
+            #Compute equivalent width within a velocity window
+            s.compute_EW(transition,vmin=-200.,vmax=360.);
+
+            #save everything as a pickle file
+            s.save_slice('outfile.p')
+
+            #plot the Full spectrum
+            s.plot_spec()
+
+            #plot the sliced and fitted continuum
+            #Plot stuff
+            plt.subplot(2,1,1)
+            plt.step(s.velo,s.flux_slice)
+            plt.step(s.velo,s.flux_slice/s.fnorm)
+            plt.xlim(xlim)
+            plt.subplot(2,1,2)
+            plt.step(s.velo,s.fnorm)
+            plt.plot([-1500,1500],[1,1],'--')
+            plt.xlim(xlim)
+            plt.show()
+    --------------------------------------------------------------------------------------------
+
     """
     def __init__(self,filename,filetype=False, efil=None,**kwargs):
         """ creates the spectrum object """
@@ -103,7 +185,7 @@ class read_spec(object):
             wave=sp.wavelength.value
             flux=sp.flux.value
 
-            if sp.sig_is_set == True:
+            if sp.sig_is_set == False:
                 print('Assuiming arbiarbitrary 10% error on flux')
                 error=0.1*flux
             else:
