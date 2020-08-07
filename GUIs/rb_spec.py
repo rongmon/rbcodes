@@ -12,11 +12,17 @@ class read_spec(object):
         flux: flux.
         error: error
         filename=filename and location
+        filetype = False [default] : other options ascii,fits, HSLA, xfits, p, temp, linetools
+
+    Optional:  All only valid for filetype=linetools option
+         efil= errorfile [Default None]
+
 
     Written : Rongmon Bordoloi      April 2018
     Edit    : Rongmon Bordoloi      September 2018 Changed kwargs to be compatible to python 3   
+    Edit    : Rongmon Bordoloi      Aug 2020: added linetools.io.readspec file
     """
-    def __init__(self,filename,filetype=False):
+    def __init__(self,filename,filetype=False, efil=None,**kwargs):
         """ creates the spectrum object """
         self.filename=filename
 
@@ -90,9 +96,21 @@ class read_spec(object):
             wave=file[2].data
             flux=file[0].data
             error=file[1].data
-            
+        #Use linetools.io.readspec to read file
+        elif filetype =='linetools':
+            from linetools.spectra import io as tio
+            sp=tio.readspec(filename,inflg=None, efil=None,**kwargs)
+            wave=sp.wavelength.value
+            flux=sp.flux.value
+
+            if sp.sig_is_set == True:
+                print('Assuiming arbiarbitrary 10% error on flux')
+                error=0.1*flux
+            else:
+                error=sp.sig.value
 
 
+        
 
         self.wave=wave
         self.flux=flux
