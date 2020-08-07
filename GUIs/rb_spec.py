@@ -181,7 +181,7 @@ class read_spec(object):
         #Use linetools.io.readspec to read file
         elif filetype =='linetools':
             from linetools.spectra import io as tio
-            sp=tio.readspec(filename,inflg=None, efil=None,**kwargs)
+            sp=tio.readspec(filename,inflg=None, efil=efil,**kwargs)
             wave=sp.wavelength.value
             flux=sp.flux.value
 
