@@ -19,6 +19,52 @@ import pandas as pd
 class rb_plot_spec(object):
 
     def __init__(self,wave,flux,error,zabs=0.):
+
+        '''
+               ---------------------------------------------------------------------------
+        This is an interactive 1D spectrum viewer.
+        The help scene activates by pressing h on the plot.
+
+
+        The program only works properly if none of the toolbar buttons in the figure is activated. 
+        It also needs pysimpleGUI code to be installed. 
+        https://pysimplegui.readthedocs.io/en/latest/
+
+
+
+
+
+        Useful Keystrokes:
+
+            Keystrokes:
+              
+              r        :    Reset Spectrum and replot to default settings.
+              h        :    Prints this help window.
+              x or X   :    Set xmin, xmax
+              b or t   :    Set ymin, ymax
+              [ or ]   :    Pan left or right 
+              s or S.  :    Smooth or Unsmooth spectra
+              E        :    Two E keystrokes will compute rest frame equivalent width at a defined region
+              F        :    Three keystrokes to fit a Gaussian profile. [Currently not drawing on the spectrum]
+
+              #GUI ELEMENTS [WARNING UNSTABLE]
+              Works with TkAGG backend and pysimplegui
+
+              Z  :   pop up window to select absorber redshift and linelist
+              j  :   pop up window to select a corresponding rest frame transition and linelist
+              K  :   pop up window to select multiple absorber lines and plot them
+              0  :   pop up window to select identified absorber list to show with 1d spectrum
+
+              q     :    Quit Program.
+         ---------------------------------------------------------------------------
+        Written By:  Rongmon Bordoloi                                   August 2020.
+
+        HEALTH WARNING: The GUI implementation is still in alpha version and is quite unstable.
+        User must be careful to make sure that they exit individual GUIs first by pressing the correct button
+        before closing the plot window.
+        ''' 
+
+
         self.wave=wave
         self.flux=flux
         self.smoothed_spectrum=flux
@@ -245,6 +291,54 @@ class rb_plot_spec(object):
                 FYval=[]
 
 
+            #If the user presses 'h': The help is printed on the screen
+    elif event.key=='h':
+        print(
+        '''    
+        ---------------------------------------------------------------------------
+        This is an interactive 1D spectrum viewer.
+        The help scene activates by pressing h on the plot.
+
+
+        The program only works properly if none of the toolbar buttons in the figure is activated. 
+        It also needs pysimpleGUI code to be installed. 
+        https://pysimplegui.readthedocs.io/en/latest/
+
+
+
+
+
+        Useful Keystrokes:
+
+            Keystrokes:
+              
+              r        :    Reset Spectrum and replot to default settings.
+              h        :    Prints this help window.
+              x or X   :    Set xmin, xmax
+              b or t   :    Set ymin, ymax
+              [ or ]   :    Pan left or right 
+              s or S.  :    Smooth or Unsmooth spectra
+              E        :    Two E keystrokes will compute rest frame equivalent width at a defined region
+              F        :    Three keystrokes to fit a Gaussian profile. [Currently not drawing on the spectrum]
+
+              #GUI ELEMENTS [WARNING UNSTABLE]
+              Works with TkAGG backend and pysimplegui
+
+              Z  :   pop up window to select absorber redshift and linelist
+              j  :   pop up window to select a corresponding rest frame transition and linelist
+              K  :   pop up window to select multiple absorber lines and plot them
+              0  :   pop up window to select identified absorber list to show with 1d spectrum
+
+              q     :    Quit Program.
+         ---------------------------------------------------------------------------
+        Written By:  Rongmon Bordoloi                                   August 2020.
+
+        HEALTH WARNING: The GUI implementation is still in alpha version and is quite unstable.
+        User must be careful to make sure that they exit individual GUIs first by pressing the correct button
+        before closing the plot window. 
+
+        '''
+        )
 
 
 
