@@ -36,7 +36,7 @@ The IGM folder contains several python routines for intergalactic medium and cir
 
 	4) rb_specbin.py  :  Rebin 1D spectrum to increase S/N
 
-	5) ransac_contfit.py : Powerful hybrid continuum fitter. Initial fit is done by automated ransac 
+	5) ransac_contfit.py : Powerful hybrid continuum fitter. Initial fit is done by an automated ransac 
 	                       algorithm, then allows user to tweak the fit using linetools.fit_continuum 
 	                       routine. Saves the fitted continuum and the 1D spectrum as a xspectrum1D object
 	                       Very helpful to fit a full quasar continuum.	
