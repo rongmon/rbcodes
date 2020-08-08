@@ -2,7 +2,9 @@
 This is a public release of my python codes
 Add this folder to your pythonpath and you are good to go.
 
-Dependencies:  astropy, lmfit, scipy, numpy, matplotlib
+Dependencies:  astropy, lmfit, scipy, numpy, matplotlib, linetools
+
+Partial Dependencies: PysimpleGUI for some GUIs. 
 
 The GUIs folder contains several graphical user interfaces for astrophysics. 
 
@@ -13,7 +15,7 @@ The GUIs folder contains several graphical user interfaces for astrophysics.
 	3) rb_interactive_vpfit_singlet.py : Interactive simple Voigt profile fitter [used with rb_spec.py]
 	[ Look for rbvfit github repository for an interactive Voigt profile fitter, suited for any complex profiles.]
 
-	4) rb_plot_spec.py:  To plot 1D spectrum, smooth, pan, zoom and explore spectrum. Allows to plot absorption lines at any redshifts, and do simple equivalent width and Gaussian fitting. My version of x_specplot routine. 
+	4) rb_plot_spec.py:  To plot 1D spectrum, smooth, pan, zoom and explore spectrum. Allows to plot absorption lines at any redshifts, and do simple equivalent width and Gaussian fitting. My version of x_specplot routine. Now updated to plot multiple absorbers and load previously identified absorbers. 
 
 
 The IGM folder contains several python routines for intergalactic medium and circumgalactic medium calculations.
@@ -22,6 +24,7 @@ The IGM folder contains several python routines for intergalactic medium and cir
 	2) rb_setline.py :  For any given rest frame wavelength find corresponding atomic transition and the fvalues. [Can find any line nearest to the input wavelength].
 	3) rb_iter_contfit.py : Iteratively fit [with sigma clipping] continuum to a small slice of 1D spectrum using Legendre polynomials.
 	4) rb_specbin.py  :  Rebin 1D spectrum to increase S/N
+	5) ransac_contfit.py : Powerful hybrid continuum fitter. Initial fit is done by automated ransac algorithm, then allows user to tweak the fit using linetools.fit_continuum routine. Saves the fitted continuum and the 1D spectrum as a xspectrum1D object. Very helpful to fit a full quasar continuum.	
 
 The halo folder contains modules to compute NFW halo profiles
 
@@ -30,11 +33,14 @@ The halo folder contains modules to compute NFW halo profiles
 The stat folder contains several statistical codes:
 
        1) rb_wilsonscore.py :  Wilsonscore confidence intervals.
-       2) rb_boot.py .      :  Bootstram function
+       2) rb_boot.py        :  Bootstram function
 
 The utils folder contains several utility modules:
 
-      1) rb_utility.py .  :  Several utility functions
+      1) rb_utility.py     :  Several utility functions
+      2) rb_x1d_id.py      : This function will read all HST/COS x1d fits files in a folder and print out the header info for raw spectra. It will print filename, exposure type, and object type entries from the header.
+      3) Read IRAF (echelle) spectrum in multispec format from a FITS file. Can read most multispec formats including linear, log, cubic spline, Chebyshev or Legendre dispersion spectra.
+
 	
 
 
