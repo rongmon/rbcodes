@@ -21,25 +21,33 @@ The GUIs folder contains several graphical user interfaces for astrophysics.
 The IGM folder contains several python routines for intergalactic medium and circumgalactic medium calculations.
 
 	1) compute_EW.py :  Compute equivalent width and column densities of any absorption/emission lines.
+
 	2) rb_setline.py :  For any given rest frame wavelength find corresponding atomic transition and the fvalues. [Can find any line nearest to the input wavelength].
+
 	3) rb_iter_contfit.py : Iteratively fit [with sigma clipping] continuum to a small slice of 1D spectrum using Legendre polynomials.
+
 	4) rb_specbin.py  :  Rebin 1D spectrum to increase S/N
+
 	5) ransac_contfit.py : Powerful hybrid continuum fitter. Initial fit is done by automated ransac algorithm, then allows user to tweak the fit using linetools.fit_continuum routine. Saves the fitted continuum and the 1D spectrum as a xspectrum1D object. Very helpful to fit a full quasar continuum.	
 
 The halo folder contains modules to compute NFW halo profiles
 
        1) rb_nfw.py      : Compute NFW halo profile
+
        2) mstar2mhalo.py : Convert stellar mass to Halo mass using Moster et al. 2010.
 The stat folder contains several statistical codes:
 
        1) rb_wilsonscore.py :  Wilsonscore confidence intervals.
+
        2) rb_boot.py        :  Bootstram function
 
 The utils folder contains several utility modules:
 
       1) rb_utility.py     :  Several utility functions
+
       2) rb_x1d_id.py      : This function will read all HST/COS x1d fits files in a folder and print out the header info for raw spectra. It will print filename, exposure type, and object type entries from the header.
-      3) Read IRAF (echelle) spectrum in multispec format from a FITS file. Can read most multispec formats including linear, log, cubic spline, Chebyshev or Legendre dispersion spectra.
+      	
+      3) readmultispec.py  :Read IRAF (echelle) spectrum in multispec format from a FITS file. Can read most multispec formats including linear, log, cubic spline, Chebyshev or Legendre dispersion spectra.
 
 	
 
