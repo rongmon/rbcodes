@@ -15,7 +15,7 @@ from linetools.spectra.xspectrum1d import XSpectrum1D
 
 class cont_fitter(object):
 
-    def __init__(self,filename, efil=None,medfilter_window=149,**kwargs):
+    def __init__(self,filename, efil=None,window=149,**kwargs):
 
         '''
             """A continuum fitter class. This reads in a 1D spectrum and allows continuum fitting.
@@ -64,7 +64,7 @@ class cont_fitter(object):
  
         '''
         self.read_spectrum(filename,efil=efil)
-        self.prepare_data(medfilter_window=medfilter_window)
+        self.prepare_data(window=window)
         self.run_ransac()
         self.spectrum= XSpectrum1D.from_tuple((self.wave, self.flux, self.error,self.cont),verbose=False)
 
@@ -84,8 +84,8 @@ class cont_fitter(object):
         self.error=error
 
 
-    def prepare_data(self,medfilter_window=149):
-        self.flx_md=medfilt(self.flux,medfilter_window)
+    def prepare_data(self,window=149):
+        self.flx_md=medfilt(self.flux,window)
         (self.peaks, prop) = find_peaks(self.flux, height=self.flx_md)
 
         #interpolate the peaks
@@ -94,7 +94,7 @@ class cont_fitter(object):
 
         ####4. RANSAC RANSAC(spec-evenlope)
         self.sp_diff = self.flux - peak_interp
-        self.medfilter_window=medfilter_window
+        self.window=window
 
 
     def run_ransac(self):
@@ -114,7 +114,7 @@ class cont_fitter(object):
     def plot_spectrum(self):
         plt.figure(figsize=(10,6))
         plt.plot(self.wave, self.flux, c='grey', label='Original Spectrum')
-        plt.plot(self.wave, self.flx_md, c='blue', label='RunningMedFilter, '+str(self.medfilter_window))
+        plt.plot(self.wave, self.flx_md, c='blue', label='RunningMedFilter, '+str(self.window))
         plt.plot(self.wave, self.cont, c='red', label='RANSAC fit')
         plt.xlabel('Wavelength ($\AA$)', fontsize=15)
         plt.ylabel('Relative Flux ', fontsize=15)
