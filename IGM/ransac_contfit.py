@@ -16,7 +16,7 @@ from linetools.spectra.xspectrum1d import XSpectrum1D
 
 class cont_fitter(object):
 
-    def __init__(self,filename, efil=None,window=149,**kwargs):
+    def __init__(self,filename, efil=None,window=149,mednorm=False,**kwargs):
 
         '''
             """A continuum fitter class. This reads in a 1D spectrum and allows continuum fitting.
@@ -27,6 +27,12 @@ class cont_fitter(object):
 
     Attributes:
 
+        Input:
+              filename=input spectrum filename
+              efil = input error spectrum name [If it exists, otherwise None]
+              window=    default [149], smoothing window
+              mednorm = False [default], if set normalizes the spectrum with median value
+
 
         output: This gives a cont_fitter object with following attributes:
 
@@ -35,6 +41,7 @@ class cont_fitter(object):
         self.flux= Flux
         self.error= error
         self.cont= Fitted continuum 
+
 
     Written : Rongmon Bordoloi      August 2020
     Based on RANSAC continuum fitter written by Bin Liu Summer 2020.
@@ -64,6 +71,7 @@ class cont_fitter(object):
 
  
         '''
+        self.mednorm=mednorm
         self.read_spectrum(filename,efil=efil)
         self.prepare_data(window=window)
         self.run_ransac()
@@ -72,13 +80,18 @@ class cont_fitter(object):
 
     def read_spectrum(self,filename,efil=None,**kwargs):
         sp=tio.readspec(filename,inflg=None, efil=efil,**kwargs)
+        if self.mednorm ==True:
+            cnt=np.nanmedian(flux)
+        else:
+            cnt=1.
+
         wave=sp.wavelength.value
-        flux=sp.flux.value
+        flux=sp.flux.value/cnt
         if sp.sig_is_set == False:
             print('Assuiming arbiarbitrary 10% error on flux')
-            error=0.1*flux
+            error=0.1*flux/cnt
         else:
-            error=sp.sig.value
+            error=sp.sig.value/cnt
 
         self.wave=wave
         self.flux=flux
