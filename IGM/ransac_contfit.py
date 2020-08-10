@@ -80,13 +80,15 @@ class cont_fitter(object):
 
     def read_spectrum(self,filename,efil=None,**kwargs):
         sp=tio.readspec(filename,inflg=None, efil=efil,**kwargs)
+
+        wave=sp.wavelength.value
         if self.mednorm ==True:
-            cnt=np.nanmedian(flux)
+            cnt=np.nanmedian(sp.flux.value)
         else:
             cnt=1.
 
-        wave=sp.wavelength.value
         flux=sp.flux.value/cnt
+
         if sp.sig_is_set == False:
             print('Assuiming arbiarbitrary 10% error on flux')
             error=0.1*flux/cnt
