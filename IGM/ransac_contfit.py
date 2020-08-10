@@ -1,3 +1,4 @@
+""" A continuum fitter class. This reads in a 1D spectrum and allows continuum fitting."""
 import os
 import time
 import numpy as np

@@ -1,3 +1,4 @@
+""" Read in HST/COS x1d header files and give some info"""
 import glob
 from astropy.io import fits
 '''

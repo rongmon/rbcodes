@@ -1,3 +1,5 @@
+""" Rebin 1D spectrum to new pixel scale."""
+
 import math
 import numpy as np
 #binning function

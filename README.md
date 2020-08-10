@@ -50,7 +50,7 @@ The stat folder contains several statistical codes:
 
        1) rb_wilsonscore.py :  Wilsonscore confidence intervals.
 
-       2) rb_boot.py        :  Bootstram function
+       2) rb_boot.py        :  Bootstrap function
 
 The utils folder contains several utility modules:
 
@@ -62,7 +62,7 @@ The utils folder contains several utility modules:
 
       3) readmultispec.py  : Read IRAF (echelle) spectrum in multispec format from a FITS file. Can read 
                              most multispec formats including linear, log, cubic spline, Chebyshev or 
-                             Legendre dispersion spectra.
+                             Legendre dispersion spectra. I got this code from https://github.com/kgullikson88/General.
 
 	
 

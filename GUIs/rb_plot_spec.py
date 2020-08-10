@@ -1,3 +1,5 @@
+""" Interactive 1D spectrum viewer and multiple absorber identifier."""
+
 import matplotlib
 matplotlib.use('TkAgg')
 import numpy as np

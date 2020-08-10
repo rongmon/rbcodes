@@ -1,3 +1,5 @@
+""" Spectrum class to read in, analyze and measure absorption lines."""
+
 import numpy as np
 from scipy.interpolate import splrep,splev
 import sys

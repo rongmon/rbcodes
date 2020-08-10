@@ -1,3 +1,5 @@
+""" Interactive continuum fitter for 1D spectrum."""
+
 '''    
         ---------------------------------------------------------------------------
         This is an interactive continuum fitter for 1D spectrum.

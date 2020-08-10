@@ -1,3 +1,5 @@
+""" Function to compute the equivalent width within a given velocity limits."""
+
 import numpy as np
 def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
     #------------------------------------------------------------------------------------------

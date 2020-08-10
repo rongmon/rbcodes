@@ -1,3 +1,5 @@
+""" Interactive Voigt profile fitter."""
+
 import matplotlib
 matplotlib.use('Qt5Agg')
 import numpy as np

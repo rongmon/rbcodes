@@ -1,3 +1,5 @@
+""" GUI for multiple line EW measurement."""
+
 import numpy as np
 import matplotlib
 matplotlib.use('TkAgg')

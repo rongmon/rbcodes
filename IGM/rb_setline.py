@@ -1,3 +1,5 @@
+""" Read in atomic line information for a given or approximate rest frame  wavelength."""
+
 from __future__ import print_function, absolute_import, division, unicode_literals
 import numpy as np
 from astropy.io import ascii

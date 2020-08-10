@@ -1,3 +1,4 @@
+"""  Several utility functions. (1) show for loop progress (2) load color list"""
 #!/usr/bin/python
 from numpy import double
 import sys
