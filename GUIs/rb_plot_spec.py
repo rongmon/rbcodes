@@ -18,6 +18,12 @@ from IGM import rb_setline as line
 import ipdb
 import pandas as pd
 
+import subprocess
+import pkg_resources
+
+
+    
+
 class rb_plot_spec(object):
 
     def __init__(self,wave,flux,error,zabs=0.):
@@ -73,11 +79,22 @@ class rb_plot_spec(object):
         self.error=error
         self.zabs=zabs
         self.label='None' # Initializing a label
+
+        required = {'mplcyberpunk'}
+        installed = {pkg.key for pkg in pkg_resources.working_set}
+        missing = required - installed
+
+        if not missing:
+            import mplcyberpunk
+            plt.style.use("cyberpunk")
+
+
+
         
         fig, ax = plt.subplots(1,figsize=(20, 5))
         self.fig=fig
 
-        spectrum, = ax.step(self.wave, self.flux, 'k-',lw=1)
+        spectrum, = ax.step(self.wave, self.flux, '-',lw=1)
         ax.set_xlabel('Wavelength')
         ax.set_ylabel('Flux')
         xr=[min(self.wave),max(self.wave)]
@@ -101,6 +118,9 @@ class rb_plot_spec(object):
         plt.gcf().canvas.mpl_connect('key_press_event',self.ontype)
         plt.draw()
         plt.show()
+        #if not missing:
+        #    mplcyberpunk.add_glow_effects(ax)
+
 
 
     def ontype(self,event):
@@ -294,53 +314,53 @@ class rb_plot_spec(object):
 
 
             #If the user presses 'h': The help is printed on the screen
-    elif event.key=='h':
-        print(
-        '''    
-        ---------------------------------------------------------------------------
-        This is an interactive 1D spectrum viewer.
-        The help scene activates by pressing h on the plot.
-
-
-        The program only works properly if none of the toolbar buttons in the figure is activated. 
-        It also needs pysimpleGUI code to be installed. 
-        https://pysimplegui.readthedocs.io/en/latest/
-
-
-
-
-
-        Useful Keystrokes:
-
-            Keystrokes:
-              
-              r        :    Reset Spectrum and replot to default settings.
-              h        :    Prints this help window.
-              x or X   :    Set xmin, xmax
-              b or t   :    Set ymin, ymax
-              [ or ]   :    Pan left or right 
-              s or S.  :    Smooth or Unsmooth spectra
-              E        :    Two E keystrokes will compute rest frame equivalent width at a defined region
-              F        :    Three keystrokes to fit a Gaussian profile. [Currently not drawing on the spectrum]
-
-              #GUI ELEMENTS [WARNING UNSTABLE]
-              Works with TkAGG backend and pysimplegui
-
-              Z  :   pop up window to select absorber redshift and linelist
-              j  :   pop up window to select a corresponding rest frame transition and linelist
-              K  :   pop up window to select multiple absorber lines and plot them
-              0  :   pop up window to select identified absorber list to show with 1d spectrum
-
-              q     :    Quit Program.
-         ---------------------------------------------------------------------------
-        Written By:  Rongmon Bordoloi                                   August 2020.
-
-        HEALTH WARNING: The GUI implementation is still in alpha version and is quite unstable.
-        User must be careful to make sure that they exit individual GUIs first by pressing the correct button
-        before closing the plot window. 
-
-        '''
-        )
+        elif event.key=='h':
+            print(
+            '''    
+            ---------------------------------------------------------------------------
+            This is an interactive 1D spectrum viewer.
+            The help scene activates by pressing h on the plot.
+    
+    
+            The program only works properly if none of the toolbar buttons in the figure is activated. 
+            It also needs pysimpleGUI code to be installed. 
+            https://pysimplegui.readthedocs.io/en/latest/
+    
+    
+    
+    
+    
+            Useful Keystrokes:
+    
+                Keystrokes:
+                  
+                  r        :    Reset Spectrum and replot to default settings.
+                  h        :    Prints this help window.
+                  x or X   :    Set xmin, xmax
+                  b or t   :    Set ymin, ymax
+                  [ or ]   :    Pan left or right 
+                  s or S.  :    Smooth or Unsmooth spectra
+                  E        :    Two E keystrokes will compute rest frame equivalent width at a defined region
+                  F        :    Three keystrokes to fit a Gaussian profile. [Currently not drawing on the spectrum]
+    
+                  #GUI ELEMENTS [WARNING UNSTABLE]
+                  Works with TkAGG backend and pysimplegui
+    
+                  Z  :   pop up window to select absorber redshift and linelist
+                  j  :   pop up window to select a corresponding rest frame transition and linelist
+                  K  :   pop up window to select multiple absorber lines and plot them
+                  0  :   pop up window to select identified absorber list to show with 1d spectrum
+    
+                  q     :    Quit Program.
+             ---------------------------------------------------------------------------
+            Written By:  Rongmon Bordoloi                                   August 2020.
+    
+            HEALTH WARNING: The GUI implementation is still in alpha version and is quite unstable.
+            User must be careful to make sure that they exit individual GUIs first by pressing the correct button
+            before closing the plot window. 
+    
+            '''
+            )
 
 
 
@@ -566,7 +586,7 @@ class rb_plot_spec(object):
         xlim=ax.get_xlim()
         ylim=ax.get_ylim()
         ax.cla()
-        ax.step(self.wave,self.smoothed_spectrum,'k-',lw=1,label='smooth')
+        ax.step(self.wave,self.smoothed_spectrum,'-',lw=1,label='smooth')
 
         ax.set_xlabel('Wavelength')
         ax.set_ylabel('Flux')
