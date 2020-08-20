@@ -62,6 +62,8 @@ class rb_plot_spec(object):
               j  :   pop up window to select a corresponding rest frame transition and linelist
               K  :   pop up window to select multiple absorber lines and plot them
               0  :   pop up window to select identified absorber list to show with 1d spectrum
+              +  :   pop up window to select filename of pre-identified list of individual absorbers and plot them
+
 
               q     :    Quit Program.
          ---------------------------------------------------------------------------
@@ -80,13 +82,13 @@ class rb_plot_spec(object):
         self.zabs=zabs
         self.label='None' # Initializing a label
 
-        required = {'mplcyberpunk'}
-        installed = {pkg.key for pkg in pkg_resources.working_set}
-        missing = required - installed
+        #required = {'mplcyberpunk'}
+        #installed = {pkg.key for pkg in pkg_resources.working_set}
+        #missing = required - installed
 
-        if not missing:
-            import mplcyberpunk
-            plt.style.use("cyberpunk")
+        #if not missing:
+        #    import mplcyberpunk
+        #    plt.style.use("cyberpunk")
 
 
 
@@ -168,6 +170,13 @@ class rb_plot_spec(object):
         elif event.key =='0':
             self.load_linelist_GUI()
             self.manage_identified_absorbers()
+        #Load pre identified individual absorbers
+        elif event.key=='+':
+            filename=self.read_identified_linelist_GUI()
+            #print(filename)
+            self.plot_identified_linelist(filename)
+            self.fig.canvas.draw()
+            plt.draw()
 
 
 
@@ -352,6 +361,7 @@ class rb_plot_spec(object):
                   j  :   pop up window to select a corresponding rest frame transition and linelist
                   K  :   pop up window to select multiple absorber lines and plot them
                   0  :   pop up window to select identified absorber list to show with 1d spectrum
+                  +  :   pop up window to select filename of pre-identified list of individual absorbers and plot them
     
                   q     :    Quit Program.
              ---------------------------------------------------------------------------
@@ -360,6 +370,14 @@ class rb_plot_spec(object):
             HEALTH WARNING: The GUI implementation is still in alpha version and is quite unstable.
             User must be careful to make sure that they exit individual GUIs first by pressing the correct button
             before closing the plot window. 
+            ---------------------------------------------------------------------------
+            import matplotlib
+            matplotlib.use('TkAgg')
+            from linetools.spectra.xspectrum1d import XSpectrum1D  
+            from GUIs import rb_plot_spec as r
+
+            sp=XSpectrum1D.from_file('PG0832+251_nbin3_coadd.fits') 
+            r.rb_plot_spec(sp.wavelength.value,sp.flux.value,sp.sig.value) 
     
             '''
             )
@@ -425,6 +443,41 @@ class rb_plot_spec(object):
                         tt_list=self.ax.text(xdata[0],0.75*ylim[1],data[i]['ion']+' '+ np.str('%.5f' %zabs),rotation=90) 
         #print('Target Redshfit set at : ' + np.str(self.zabs))
         plt.draw()
+
+
+    def plot_identified_linelist(self,filename):
+        xlim=self.ax.get_xlim()
+        ylim=self.ax.get_ylim()
+
+        dat=ascii.read(filename)
+
+        for i in range(0,len(dat['col1'])):
+            transition=dat['col1'][i]+' '+dat['col2'][i] 
+            lam_rest=dat['col3'][i]
+            zabs=dat['col4'][i]
+            xdata=[lam_rest*(1.+zabs),lam_rest*(1.+zabs)]
+            ss=self.ax.transData.transform((0, .9))
+            ydata=[0,ylim[1]]
+            self.ax.plot(xdata,ydata,'k--')                    
+            self.ax.text(xdata[0],0.75*ylim[1],transition+' '+ np.str('%.5f' %zabs),rotation=90) 
+            print(xdata[0],0.75*ylim[1])
+        plt.draw()
+        plt.show()
+        
+
+
+
+    def read_identified_linelist_GUI(self):
+        sg.ChangeLookAndFeel('Dark')
+
+        event, values = sg.Window('READ Pre-Identifed Lines', [[sg.Text('Filename')], [sg.Input(), sg.FileBrowse()], [sg.OK(), sg.Cancel()] ]).read(close=True)
+        filename=values[0]
+        return filename
+        
+ 
+
+
+
 
     def manage_identified_absorbers(self):
         sg.ChangeLookAndFeel('Dark')   
