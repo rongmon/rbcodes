@@ -1,5 +1,7 @@
 # rbcodes
-This is a public release of my python codes
+This is a public release of python codes commonly used for astrophysical reserach by Rongmon Bordoloi.
+This package is constantly under development and will be periodically updated. 
+
 Add this folder to your pythonpath and you are good to go.
 
 Dependencies:  astropy, lmfit, scipy, numpy, matplotlib, linetools

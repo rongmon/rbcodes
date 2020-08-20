@@ -94,7 +94,7 @@ class rb_plot_spec(object):
         fig, ax = plt.subplots(1,figsize=(20, 5))
         self.fig=fig
 
-        spectrum, = ax.step(self.wave, self.flux, '-',lw=1)
+        spectrum, = ax.plot(self.wave, self.flux, '-',lw=1)
         ax.set_xlabel('Wavelength')
         ax.set_ylabel('Flux')
         xr=[min(self.wave),max(self.wave)]
@@ -119,7 +119,9 @@ class rb_plot_spec(object):
         plt.draw()
         plt.show()
         #if not missing:
-        #    mplcyberpunk.add_glow_effects(ax)
+            #mplcyberpunk.add_glow_effects()
+            #mplcyberpunk.make_lines_glow(ax)
+            #mplcyberpunk.add_underglow()
 
 
 
