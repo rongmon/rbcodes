@@ -125,6 +125,7 @@ class cont_fitter(object):
         self.cont = medfilt(spec_inliers, 99)
 
     def save_spectrum(self,filename):
+        spec= XSpectrum1D.from_tuple((self.wave, self.flux, self.error,self.cont), masking='none')
         spec.write_to_fits(filename)
 
     def plot_spectrum(self):
