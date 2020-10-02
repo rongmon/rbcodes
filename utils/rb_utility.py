@@ -10,21 +10,21 @@ def rb_perccount(jj,maxjj):
     -------------------------------------------------------------------
     This code reports the percentage of a for loop done to the screen.
     **** NOTE *** This code currently only works on command line.
-	Need to figure out how to make it work in notebook environment.
+  Need to figure out how to make it work in notebook environment.
 
-	Calling Sequence: rb_perccount(I,Imax)
+  Calling Sequence: rb_perccount(I,Imax)
     Input:
             I = Current iteration between 0 and Imax
-	     Imax = Maximum number of iterations
-	
+       Imax = Maximum number of iterations
+  
     Output: 
             Percentage of the for loop done.
             Shows the amount of time elapsed during the job.
-	
+  
     WARNING: Do not print anything to the screen between calls of this function!
-	
+  
        Written by Rongmon Bordoloi Nov 15 2016
-	--------------------------------------------------------------------
+  --------------------------------------------------------------------
     """
     global _start_time
     jj=double(jj)
@@ -59,7 +59,7 @@ def format_interval(t):
         -------
         out  : str
         [H:]MM:SS
-        """
+    """
     mins, s = divmod(int(t), 60)
     h, m = divmod(mins, 60)
     if h:
