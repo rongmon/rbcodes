@@ -51,7 +51,7 @@ class cont_fitter(object):
 
 
                #efil = optional if error spectrum is defined in another file
-               sp=c.c.cont_fitter(fluxfilename,efil=errorfilename)
+               sp=c.cont_fitter(fluxfilename,efil=errorfilename)
 
                #AND YOU ARE DONE.
 
@@ -74,7 +74,7 @@ class cont_fitter(object):
         self.mednorm=mednorm
         self.read_spectrum(filename,efil=efil)
         self.prepare_data(window=window)
-        self.run_ransac()
+        self.run_ransac(window=window)
         self.spectrum= XSpectrum1D.from_tuple((self.wave, self.flux, self.error,self.cont),verbose=False)
 
 
@@ -113,7 +113,7 @@ class cont_fitter(object):
         self.window=window
 
 
-    def run_ransac(self):
+    def run_ransac(self,window=149):
         inlier_masks = []
         outlier_masks = []
         ransac = RANSACRegressor()
@@ -122,7 +122,8 @@ class cont_fitter(object):
         outlier_masks.append(np.logical_not(ransac.inlier_mask_))
         ####5. Use `inlier_masks` to interpolate
         spec_inliers = np.interp(self.wave,self.wave[inlier_masks],self.flux[inlier_masks]) 
-        self.cont = medfilt(spec_inliers, 99)
+        self.cont = medfilt(spec_inliers, window)
+
 
     def save_spectrum(self,filename):
         spec= XSpectrum1D.from_tuple((self.wave, self.flux, self.error,self.cont), masking='none')
