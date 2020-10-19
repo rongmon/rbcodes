@@ -172,12 +172,14 @@ class rb_plot_spec(object):
             self.manage_identified_absorbers()
         #Load pre identified individual absorbers
         elif event.key=='+':
-            filename=self.read_identified_linelist_GUI()
+            #filename=self.read_identified_linelist_GUI()
             #print(filename)
-            self.plot_identified_linelist(filename)
+            #self.plot_identified_linelist(filename)
+            self.load_linelist_GUI()
+            self.manage_identified_absorbers()
             self.fig.canvas.draw()
             plt.draw()
-
+            
 
 
         # Set top y min
