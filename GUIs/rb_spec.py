@@ -156,12 +156,13 @@ class read_spec(object):
 
 
         if filetype=='xfits':
-            from astropy.io import fits
-            hdu = fits.open(filename)
-            wave = hdu['wavelength'].data
-            flux = hdu['flux'].data
-            error=hdu['error'].data
-            hdu.close()
+            from linetools.spectra.xspectrum1d import XSpectrum1D  
+            sp=XSpectrum1D.from_file(filename)
+
+            wave=sp.wavelength.value
+            flux=sp.flux.value
+            error=sp.sig.value
+
         elif filetype=='p':
             import pickle
             dat=pickle.load( open(filename, "rb" ))
@@ -262,7 +263,7 @@ class read_spec(object):
 
         return self.wave_slice,self.error_slice,self.flux_slice,self.velo,self.linelist
 
-    def fit_continuum(self,mask=False,domain=False,Legendre=False):
+    def fit_continuum(self,mask=False,domain=False,Legendre=False,jupyter_nb=False,prefit_cont=[]):
         """
         By default calls an interactive continuum fitter to the sliced spectrum.
         Or an automated Legendre polynomial fitter if keyword set Legendre.
@@ -270,10 +271,14 @@ class read_spec(object):
 
         """
         if Legendre==False:
-            from GUIs import rb_fit_interactive_continuum as f
             #pdb.set_trace()
-            s=f.rb_fit_interactive_continuum(self.wave_slice,self.flux_slice,self.error_slice)
-            cont=s.cont
+            if jupyter_nb==True:
+                cont=prefit_cont;
+
+            else:
+                from GUIs import rb_fit_interactive_continuum as f
+                s=f.rb_fit_interactive_continuum(self.wave_slice,self.flux_slice,self.error_slice)
+                cont=s.cont
 
 
         else:
@@ -323,7 +328,7 @@ class read_spec(object):
 
         return self.cont,self.fnorm,self.enorm
 
-    def compute_EW(self,lam_cen,vmin=-50.,vmax=50.,method='closest'):
+    def compute_EW(self,lam_cen,vmin=-50.,vmax=50.,method='closest',plot=False):
         """
         Computes rest frame equivalent width and column density for a desired atomic line.
         Around the species lam_cen and given vmin and vmax keyword values. 
@@ -334,7 +339,7 @@ class read_spec(object):
         str=s.rb_setline(lam_cen,method,linelist=self.linelist)
 
         from IGM import compute_EW as EW
-        out=EW.compute_EW(self.wave_slice,self.fnorm,str['wave'],[vmin,vmax],self.enorm,f0=str['fval'],zabs=0.)
+        out=EW.compute_EW(self.wave_slice,self.fnorm,str['wave'],[vmin,vmax],self.enorm,f0=str['fval'],zabs=0.,plot=plot)
 
         self.trans=str['name']
         self.fval=str['fval']

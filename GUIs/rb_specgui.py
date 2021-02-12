@@ -44,32 +44,8 @@ if __name__ == "__main__":
         flux=np.array(dat[tab[1]])
         if (len(dat.keys())>=3):
             error=dat[tab[2]]
-    elif filetype=='fits':
-        from astropy.io import fits
-        file=fits.open(cwd+'/'+filename)
-        dat=file[1].data
-        tab=dat.names
-        wave=np.array(dat['wave'][0])
-        flux=np.array(dat['flux'][0])
-        if (len(tab)>=3):
-            error=np.array(dat['error'][0])
-    if filetype=='xfits':
-        from astropy.io import fits
-        hdu = fits.open(filename)
-        wave = hdu['wavelength'].data
-        flux = hdu['flux'].data
-        error=hdu['error'].data
-        hdu.close()
-    elif filetype=='p':
-        import pickle
-        dat=pickle.load( open(cwd+'/'+filename, "rb" ))
-        tab=dat.keys()
-        wave=np.array(dat['wave'])
-        flux=np.array(dat['flux'])
-        if (len(tab)>=3):
-            error=np.array(dat['error'])
-    #Use linetools.io.readspec to read file
-    elif filetype =='linetools':
+    elif (filetype=='fits') | (filetype=='linetools'):
+        #Use linetools.io.readspec to read file
         #from linetools.spectra import io as tio
         if (len(sys.argv) >3):
             sp=XSpectrum1D.from_file(filename,efil=efil)
@@ -85,8 +61,31 @@ if __name__ == "__main__":
             error=0.1*flux
         else:
             error=sp.sig.value
+        #from astropy.io import fits
+        #file=fits.open(cwd+'/'+filename)
+        #dat=file[1].data
+        #tab=dat.names
+        #wave=np.array(dat['wave'][0])
+        #flux=np.array(dat['flux'][0])
+        #if (len(tab)>=3):
+        #    error=np.array(dat['error'][0])
 
-
+    if filetype=='xfits':
+        from astropy.io import fits
+        hdu = fits.open(filename)
+        wave = hdu['wavelength'].data
+        flux = hdu['flux'].data
+        error=hdu['error'].data
+        hdu.close()
+    elif filetype=='p':
+        import pickle
+        dat=pickle.load( open(cwd+'/'+filename, "rb" ))
+        tab=dat.keys()
+        wave=np.array(dat['wave'])
+        flux=np.array(dat['flux'])
+        if (len(tab)>=3):
+            error=np.array(dat['error'])
+ 
 
 
     #sp=XSpectrum1D.from_file('PG0832+251_nbin3_coadd.fits') 
