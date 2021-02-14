@@ -39,7 +39,7 @@ class rb_fit_interactive_continuum(object):
         if event.button==1 and toolbar.mode=='':
             window = ((event.xdata-2.5)<=self.wave) & (self.wave<=(event.xdata+2.5))
             y = np.median(self.flux[window])
-            plt.plot(event.xdata,y,'ro',ms=5,picker=5,label='cont_pnt',markeredgecolor='k')
+            plt.plot(event.xdata,y,'ro',ms=5,pickradius=5,label='cont_pnt',markeredgecolor='k')
         plt.draw()
     def onpick(self,event):
         # when the user clicks right on a continuum point, remove it
@@ -104,7 +104,7 @@ class rb_fit_interactive_continuum(object):
     
         # when the user hits 'b': selects a handpicked x,y value
         elif event.key=='b':
-            plt.plot(event.xdata,event.ydata,'ro',ms=5,picker=5,label='cont_pnt',markeredgecolor='k')
+            plt.plot(event.xdata,event.ydata,'ro',ms=5,pickradius=5,label='cont_pnt',markeredgecolor='k')
             plt.draw()
     
         #If the user presses 'h': The help is printed on the screen

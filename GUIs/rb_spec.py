@@ -263,7 +263,7 @@ class read_spec(object):
 
         return self.wave_slice,self.error_slice,self.flux_slice,self.velo,self.linelist
 
-    def fit_continuum(self,mask=False,domain=False,Legendre=False,jupyter_nb=False,prefit_cont=[]):
+    def fit_continuum(self,mask=False,domain=False,Legendre=False,prefit_cont=[1.]):
         """
         By default calls an interactive continuum fitter to the sliced spectrum.
         Or an automated Legendre polynomial fitter if keyword set Legendre.
@@ -272,13 +272,13 @@ class read_spec(object):
         """
         if Legendre==False:
             #pdb.set_trace()
-            if jupyter_nb==True:
-                cont=prefit_cont;
-
-            else:
+            if prefit_cont == 'False':
                 from GUIs import rb_fit_interactive_continuum as f
                 s=f.rb_fit_interactive_continuum(self.wave_slice,self.flux_slice,self.error_slice)
                 cont=s.cont
+            else:
+                cont=prefit_cont
+
 
 
         else:

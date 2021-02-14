@@ -33,7 +33,7 @@ class interactive_cont(object):
         # plot somewhere, compute the median value of the spectrum in a 5angstrom
         # window around the x-coordinate of the clicked point. The y coordinate
         # of the clicked point is not important. Make sure the continuum points
-        # `feel` it when it gets clicked, set the `feel-radius` (picker) to 5 points
+        # `feel` it when it gets clicked, set the `feel-radius` (pickradius) to 5 points
         toolbar = plt.get_current_fig_manager().toolbar
         self.w.value = 'button=%d, x=%d, y=%d, xdata=%f, ydata=%f'%(event.button, event.x, event.y, event.xdata, event.ydata)
         if event.button==1 and toolbar.mode=='':
