@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ipywidgets as widgets
 # Converting To velocities
-from rbvfit import rb_setline as line
+from IGM import rb_setline as line
 from scipy.interpolate import splrep,splev
 import sys
 import os
