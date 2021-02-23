@@ -163,6 +163,13 @@ class read_spec(object):
             flux=sp.flux.value
             error=sp.sig.value
 
+
+            if sp.co_is_set == True:
+                print('Normalizing spectrum using given continuum...')
+                error=sp.flux.value/sp.co.value
+                flux=sp.sig.value/sp.co.value
+ 
+
         elif filetype=='p':
             import pickle
             dat=pickle.load( open(filename, "rb" ))
