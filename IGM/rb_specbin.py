@@ -84,7 +84,7 @@ def rb_specbin(flux,nbin,**kwargs):
     if TF == 1:
         #newVar is in second column of returns
         #returns = np.append(returns,newVar,axis = 1)
-        output['error']=np.sqrt(newVar)
+        output['error']=np.sqrt(newVar/nbin)
     if TFF == 1:
         #returns = np.append(returns,newWave,axis = 1)
         output['wave']=newWave
