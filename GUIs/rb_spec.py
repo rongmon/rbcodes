@@ -361,6 +361,7 @@ class read_spec(object):
         self.logN_e=out['colerr']
 
         self.Tau=out['Tau_a']
+        self.vel_centroid=out['med_vel']
 
         return self.trans,self.fval,self.vmin,self.vmax,self.trans_wave,self.W,self.W_e,self.logN,self.logN_e,self.Tau
 
