@@ -48,12 +48,14 @@ class read_spec(object):
         self.logN=  AOD column density
         self.logN_e= AOD column density uncertainty
         self.Tau= Apparant optical depth as a function of velocity
+        self.vel_centroid= EW weighted velocity centroid of the absorption line
 
 
 
     Written : Rongmon Bordoloi      April 2018
     Edit    : Rongmon Bordoloi      September 2018 Changed kwargs to be compatible to python 3   
     Edit    : Rongmon Bordoloi      Aug 2020: added linetools.io.readspec file
+    Edit    : Rongmon Bordoloi      April 2021: added velocity centroid estimates
 
     --------------------------------------------------------------------------------------------
     EXAMPLE: import numpy as np
