@@ -49,6 +49,7 @@ class read_spec(object):
         self.logN_e= AOD column density uncertainty
         self.Tau= Apparant optical depth as a function of velocity
         self.vel_centroid= EW weighted velocity centroid of the absorption line
+        self.vel_disp=    1sigma velocity dispersion
 
 
 
@@ -364,6 +365,7 @@ class read_spec(object):
 
         self.Tau=out['Tau_a']
         self.vel_centroid=out['med_vel']
+        self.vel_disp=out['vel_disp']
 
         return self.trans,self.fval,self.vmin,self.vmax,self.trans_wave,self.W,self.W_e,self.logN,self.logN_e,self.Tau
 

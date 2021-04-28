@@ -31,6 +31,7 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
     #           output['n']           :- AOD column density as a function of velocity
     #           output['Tau_a']       :- AOD as a function of velocity
     #           output['med_vel']     :- Median Equivalent Width weighted velocity within lmts
+    #           output['vel_disp']    : 1 sigma velocity dispersion
     #
     #
     #   Written :- Rongmon Bordoloi                             2nd November 2016
@@ -38,7 +39,7 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
     #   This was tested with COS-Halos/Dwarfs data. 
     #   Edit:  RB July 5 2017. Output is a dictionary. Edited minor dictionary arrangement
     #          RB July 25 2019. Added med_vel
-    #          RB April 28, 2021, changed med_vel to weight be EW
+    #          RB April 28, 2021, changed med_vel to weight be EW & vel_disp
     #------------------------------------------------------------------------------------------
     defnorm=1.0;
     spl=2.9979e5;  #speed of light
@@ -91,6 +92,8 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
     #compute the velocity centroid of ew weighted velcity.
     ew50=np.cumsum(ew)/np.max(np.cumsum(ew))
     vel50=np.interp(0.5,ew50,vel[pix])
+    vel16=np.interp(0.16,ew50,vel[pix])
+    vel_disp=np.abs(vel50-vel16)
 
 
 
@@ -98,6 +101,7 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
     output={}
     output["ew_tot"]=ew_tot
     output["err_ew_tot"]=err_ew_tot
+    output["vel_disp"]=vel_disp
 
 
     if 'f0' in kwargs:
