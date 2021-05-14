@@ -1,7 +1,7 @@
 import numpy as np
 from IGM import compute_EW
 from PyQt5 import QtCore, QtGui, QtWidgets
-
+from GUIs.abstools import Absorber
 from PyQt5.QtWidgets import QStyleFactory, QPushButton,QLineEdit,QMainWindow,QInputDialog
 from matplotlib.backends.backend_qt5agg import (
     FigureCanvasQTAgg,

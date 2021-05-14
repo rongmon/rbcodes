@@ -29,3 +29,12 @@ absys=A.Absorber(z,wave,flux,error,lines)
 Abs=absys.ions
 M.Transitions(Abs)
 ```
+
+
+import pickle
+pfile='test.p'
+with open(pfile,'rb') as pklfile:
+    absys=pickle.load(pklfile)
+
+from GUIs.abstools import Metal_Plot as M   
+M.Transitions(absys)
