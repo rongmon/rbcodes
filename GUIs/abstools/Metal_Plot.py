@@ -10,6 +10,7 @@ from matplotlib.backends.backend_qt5agg import (
 from matplotlib.figure import Figure
 import pickle
 import numpy.polynomial.legendre as L
+import sys
 
 HELP = '''
             The LHS shows the spectrum with a Legengre polynomial continuum fit overlaid.
@@ -544,12 +545,11 @@ class plotText:
         line['text'] = text
         
     
-if __name__ == "__main__":
-    import sys
-    
-    app = QtWidgets.QApplication(sys.argv)
-    main = mainWindow(Abs)
-    main.resize(1400,900)
-    
-    main.show()
-    sys.exit(app.exec_())
+class Transitions:
+    def __init__(self,Abs):
+        app = QtWidgets.QApplication(sys.argv)
+        main = mainWindow(Abs)
+        main.resize(1400,900)
+
+        main.show()
+        sys.exit(app.exec_())
