@@ -11,6 +11,9 @@ from matplotlib.figure import Figure
 import pickle
 import numpy.polynomial.legendre as L
 import sys
+from astropy.io import ascii
+from utils import rb_utility as rt
+clr=rt.rb_set_color()
 
 HELP = '''
             The LHS shows the spectrum with a Legengre polynomial continuum fit overlaid.
@@ -37,11 +40,83 @@ HELP = '''
 
             1/2/0 : While on RHS, flag absorber as (1) upper limit , (2) lower limit, or (0) neither.
             t : Cycle text printed on absorbers. Displays logN, or EW
-                    Display logN and EW as detection or limit based on flag above'''
+                    Display logN and EW as detection or limit based on flag above
+
+
+            If Specified it can plot any intervening absorber list.
+                    '''
+
+
+
+def shift2vel(z1,z2):
+    # z1 at rest
+    # z2 for which relative velocity is computed
+    spl=2.9979e5;  #speed of light
+    vel=((1215.67*(1.+z2))-(1215.67*(1.0 + z1)))*spl/(1215.67*(1.0 + z1))#(self.wrest-str['wave']*(1.0 + 0.))*spl/(str['wave']*(1.0 + 0.))
+    return vel
+
+def grab_intervening_linelist(filename,z_gal,wrest_galaxy,wavelength):
+    s=ascii.read(filename)
+    ion=s['col1']
+    wrest=s['col2']
+    wobs=s['col3']
+    zobs=s['col4']
+    spl=2.9979e5;  #speed of light
+
+    #compute relative velocity difference with the host galaxy
+    delv=shift2vel(z_gal,zobs)
+    # Now select only lines within the given wavelength range
+    window_max=np.max(wavelength)#*(1.+z_gal)
+    window_min=np.min(wavelength)#*(1.+z_gal)
+    q=np.where( (wobs >= window_min) & (wobs <= window_max))#& ( np.abs(delv) >= 200.) )
+    outlist={}
+    if np.sum(q)>0:
+        #If there are lines create a new list
+        outlist['ion']=ion[q]
+        outlist['wrest']=wrest[q]
+        outlist['wobs']=wobs[q]
+        outlist['zobs']=zobs[q]
+        wobs_small=wobs[q]
+        outlist['number']=len(wobs_small)
+        vel=np.zeros((len(wobs_small),))
+        outlist['delv']=delv[q]
+        #Now computing velocity for each
+        for i in range(0,len(wobs_small)):
+            vel[i] = (outlist['wobs'][i]-wrest_galaxy*(1.0 + z_gal))*spl/(wrest_galaxy*(1.0 + z_gal))
+        outlist['vel']=vel
+    else:
+        outlist['number']=0
+
+    return outlist
+
+
+
+def plot_intervening_lines(ax,outlist,delv):
+    #Plot all intervening lines. 
+    # Other lines associated with current absorber = blue
+    # All other intervening lines = Red
+    if outlist['number']>0:
+        print('There are Intervening Lines!')
+        vellist=outlist['vel']
+        relative_vel_z=outlist['delv']
+        for index in range(0,outlist['number']):
+            if (np.abs(vellist[index]) <delv):
+                print(vellist[index])
+
+                if np.abs(relative_vel_z[index]) >200.:
+                    color =clr['pale_red']
+                else:
+                    color='b'
+                ax.text(vellist[index],1.05, np.str(outlist['ion'][index])+' '+ np.str(outlist['wrest'][index]),
+                    fontsize=4,rotation=90, rotation_mode='anchor',color=color)
+                ax.text(vellist[index]+25.,1.05, 'z = '+np.str('%.3f' % outlist['zobs'][index]),
+                    fontsize=4,rotation=90, rotation_mode='anchor',color=color)
+
+
 
 class mainWindow(QtWidgets.QTabWidget):
     
-    def __init__(self,ions, parent=None):
+    def __init__(self,ions, parent=None,intervening=False):
     
         #-----full spectra properties---------#
         self.z = ions['Target']['z']; self.flux = ions['Target']['flux']
@@ -58,6 +133,7 @@ class mainWindow(QtWidgets.QTabWidget):
         self.EWlim = [None,None] #left,right
         self.event_button = None
         self.pFlag = 1
+        self.intervening=intervening
         super(mainWindow,self).__init__(parent)
         
 #---------------Initial page setup------------------#        
@@ -401,6 +477,7 @@ class Plotting:
         window_lim = parent.ions[parent.keys[key_idx]]['window_lim']
         order = parent.ions[parent.keys[key_idx]]['order']
         EWlims = parent.ions[parent.keys[key_idx]]['EWlims']
+        lam_0=parent.ions[parent.keys[key_idx]]['lam_0']
 
         #--------------------------------------------------------------#
         if Print == False:
@@ -452,6 +529,12 @@ class Plotting:
             #Plot EW velocity limit
             if EWlims[0] is not None: parent.axesR[i][ii].axvline(EWlims[0],ymin=0,ymax=2.5,ls='--',c='b')
             if EWlims[1] is not None: parent.axesR[i][ii].axvline(EWlims[1],ymin=0,ymax=2.5,ls='--',c='r')
+
+            #### NOW PLOT INTERVENING LINES IF given
+            if parent.intervening != False:
+                outlist=grab_intervening_linelist(parent.intervening,np.double(parent.z),lam_0,wave)
+                plot_intervening_lines( parent.axesR[i][ii],outlist,np.max(vel))
+
 
             #redraw MUST BE LAST ITEM IN LIST
             if parent.page == 0: parent.fig.canvas.draw()
@@ -546,9 +629,9 @@ class plotText:
         
     
 class Transitions:
-    def __init__(self,Abs):
+    def __init__(self,Abs,intervening=False):
         app = QtWidgets.QApplication(sys.argv)
-        main = mainWindow(Abs)
+        main = mainWindow(Abs,intervening=intervening)
         main.resize(1400,900)
 
         main.show()
