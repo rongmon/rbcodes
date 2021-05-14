@@ -196,14 +196,19 @@ class mainWindow(QtWidgets.QTabWidget):
             from astropy.io import ascii
             Table_e = Table()
             Table_e['Transitions'] = self.keys
-            EW=[];EWsig=[];N=[];Nsig=[]
+            EW=[];EWsig=[];N=[];Nsig=[];Vel = []
+            EWlims_low = []; EWlims_high = []
             for ion in self.keys:
                 EW.append(np.round(self.ions[ion]['EW']*1000,2))
                 EWsig.append(np.round(self.ions[ion]['EWsig']*1000,2))
                 N.append(np.round(np.log10(self.ions[ion]['N']),2))
                 Nsig.append(np.round(np.log10(self.ions[ion]['Nsig']),2))
-            Table_e['EW'] = EW; Table_e['EWsig'] = EWsig
-            Table_e['N'] = N; Table_e['Nsig'] = Nsig
+                Vel.append(np.round(self.ions[ion]['med_vel'],2))
+                EWlims_low.append(np.round(self.ions[ion]['EWlims'][0],2))
+                EWlims_high.append(np.round(self.ions[ion]['EWlims'][1],2))
+            Table_e['EW'] = EW; Table_e['EWsig'] = EWsig; Table_e['Lower Limit']=EWlims_low
+            Table_e['Upper Limit'] = EWlims_high
+            Table_e['N'] = N; Table_e['Nsig'] = Nsig; Table_e['Vel']=Vel
          
             pfile,ok = QInputDialog.getText(self,'Input Pickle Path','Input path to save pickle file: ')
             Tablefile,ok2 = QInputDialog.getText(self,'Save Values','Input path to save tabulated measurements (.dat): ')
@@ -220,7 +225,7 @@ class mainWindow(QtWidgets.QTabWidget):
                 print(Table_e)
 
         button = QPushButton("SAVE",self)
-        button.setGeometry(600,30,200,30)
+        button.setGeometry(500,30,200,30)
         button.clicked.connect(lambda: save(self))
 
 #--------------------------------------------------------------#
@@ -231,7 +236,7 @@ class mainWindow(QtWidgets.QTabWidget):
             new_line,ok3 = QInputDialog.getDouble(self,'Add Line','Enter new transition:')#,decimals=4)
             if ok3:
                 #add new line
-                new_abs = Absorber(self.z,self.wave,self.flux,self.error,[new_line])
+                new_abs = Absorber.Absorber(self.z,self.wave,self.flux,self.error,[new_line])
                 #update initial dictionary
                 self.ions.update(new_abs.ions); self.ions['Target'] = self.ions.pop('Target')# moves Target to last index
 
@@ -255,7 +260,7 @@ class mainWindow(QtWidgets.QTabWidget):
 
         
         add_ion_button = QPushButton("Add Ion",self)
-        add_ion_button.setGeometry(600,850,200,30)
+        add_ion_button.setGeometry(700,30,200,30)
         add_ion_button.clicked.connect(lambda: NewTransition(self))
 
 #--------------------------------------------------------------------#  
@@ -316,6 +321,7 @@ class mainWindow(QtWidgets.QTabWidget):
             if self.page == 0: key_idx = self.Ridx
             if self.page == 1: key_idx = self.Ridx+6
             self.ions[self.keys[key_idx]]['flag'] = int(event.key)
+            Plotting(self,self.Ridx,modify=False,Print=True)
             
         if event.key == 't':#toggle the EW/N display
             self.pFlag = (self.pFlag+1)%3
