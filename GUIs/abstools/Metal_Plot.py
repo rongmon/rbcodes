@@ -1,5 +1,5 @@
 import numpy as np
-import compute_EW
+from IGM import compute_EW
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from PyQt5.QtWidgets import QStyleFactory, QPushButton,QLineEdit,QMainWindow,QInputDialog
