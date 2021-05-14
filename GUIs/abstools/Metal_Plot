@@ -1,49 +1,47 @@
+import numpy as np
+import compute_EW
+from PyQt5 import QtCore, QtGui, QtWidgets
 
+from PyQt5.QtWidgets import QStyleFactory, QPushButton,QLineEdit,QMainWindow,QInputDialog
+from matplotlib.backends.backend_qt5agg import (
+    FigureCanvasQTAgg,
+    NavigationToolbar2QT as NavigationToolbar,
+)
+from matplotlib.figure import Figure
+import pickle
+import numpy.polynomial.legendre as L
 
+HELP = '''
+            The LHS shows the spectrum with a Legengre polynomial continuum fit overlaid.
+                Points excluded from continuum fit are gray.
+            The RHS shows the normalized spectrum and velocity limits for measurements.
+
+            Mouse Clicks
+            LHS LMB: Add wavelengths within region set by two clicks to continuum fit.
+            LHS RMB: Remove wavelengths from continuum fit.
+            RHS LMB: Set lower velocity limit
+            RHS RMB: Set upper velocity limit
+
+            Keyboard Commands
+            Q: quit
+            left arrow: Increase Polynomial Order [default 4]
+            right arrow: Decrease Polynomial Order [default 4]
+                --uses the last modified/ selected LHS spectra
+                ---if no modifications, click on the spectra of which the order of fit should be changed
+
+            V: Initializes for all transitions to use the same velocity limits for integration
+                --Must be followed by clicking RHS on any spectra to define the velocity limits
+            m: Measure EW/N for current subplot axes
+            M: If all subplot axes on page have defined limits, measures EW/N for all ions on page
+
+            1/2/0 : While on RHS, flag absorber as (1) upper limit , (2) lower limit, or (0) neither.
+            t : Cycle text printed on absorbers. Displays logN, or EW
+                    Display logN and EW as detection or limit based on flag above'''
 
 class mainWindow(QtWidgets.QTabWidget):
-    import numpy as np
-    import compute_EW
-    from PyQt5 import QtCore, QtGui, QtWidgets
-
-    from PyQt5.QtWidgets import QStyleFactory, QPushButton,QLineEdit,QMainWindow,QInputDialog
-    from matplotlib.backends.backend_qt5agg import (
-        FigureCanvasQTAgg,
-        NavigationToolbar2QT as NavigationToolbar,
-    )
-    from matplotlib.figure import Figure
-    import pickle
-    import numpy.polynomial.legendre as L
-
-
-    HELP = '''
-                The LHS shows the spectrum with a Legengre polynomial continuum fit overlaid.
-                    Points excluded from continuum fit are gray.
-                The RHS shows the normalized spectrum and velocity limits for measurements.
-
-                Mouse Clicks
-                LHS LMB: Add wavelengths within region set by two clicks to continuum fit.
-                LHS RMB: Remove wavelengths from continuum fit.
-                RHS LMB: Set either edge of the velocity limits
-
-                Keyboard Commands
-                Q: quit
-                left arrow: Increase Polynomial Order [default 4]
-                right arrow: Decrease Polynomial Order [default 4]
-                    --uses the last modified/ selected LHS spectra
-                    ---if no modifications, click on the spectra of which the order of fit should be changed
-
-                V: Initializes for all transitions to use the same velocity limits for integration
-                    --Must be followed by clicking RHS on any spectra to define the velocity limits
-                m: Measure EW/N for current subplot axes
-                M: If all subplot axes on page have defined limits, measures EW/N for all ions on page
-
-                1/2/0 : While on RHS, flag absorber as (1) upper limit , (2) lower limit, or (0) neither.
-                t : Cycle text printed on absorbers. Displays logN, or EW
-                        Display logN and EW as detection or limit based on flag above'''
-
     
     def __init__(self,ions, parent=None):
+    
         #-----full spectra properties---------#
         self.z = ions['Target']['z']; self.flux = ions['Target']['flux']
         self.wave = ions['Target']['wave']; self.error = ions['Target']['error']
@@ -85,7 +83,8 @@ class mainWindow(QtWidgets.QTabWidget):
             self.axesR[0][ii] = self.fig.add_subplot(6,2,2*(ii+1))
             self.fig.subplots_adjust(hspace=0.01)
             Plotting(self,ii)
-                # Set up connectivity
+            
+         # Set up connectivity
         self.cid1 = self.fig.canvas.mpl_connect("button_press_event", self.onclick)
         self.cid2 = self.fig.canvas.mpl_connect("key_press_event", self.onpress)
         
@@ -187,10 +186,12 @@ class mainWindow(QtWidgets.QTabWidget):
 
 #----------------------key button events-----------------------------#            
         
-    '''on press is used to reduce the order for the polyfit'''
+    '''on press is used to reduce the order for the polyfit, toggle measurement displays, measure properties, and assist selecting EW vel bounds'''
+    
     def onpress(self,event):
+        #right arrow key (directional) increases poly order 
         if event.key == 'right':
-            if self.Lidx is not None: #need a "try" statement?
+            if self.Lidx is not None: 
                 if self.page == 0:
                     self.ions[self.keys[self.Lidx]]['order'] = self.ions[self.keys[self.Lidx]]['order']+1
                     Plotting(self,self.Lidx,modify=True)
@@ -199,6 +200,8 @@ class mainWindow(QtWidgets.QTabWidget):
                     Plotting(self,self.Lidx,modify=True)
             else:
                 print('click on a left transition window first')
+                
+        #reduce polynomial        
         if event.key == 'left':
             if self.Lidx is not None: #need a "try" statement?
                 if self.page == 0:
@@ -209,13 +212,15 @@ class mainWindow(QtWidgets.QTabWidget):
                     Plotting(self,self.Lidx,modify=True)
             else:
                 print('click on a transition window first')
-        #evaluate last limit page
+                
+        #evaluate last limit subplot
         if event.key == 'm':
             print(self.page)
             if self.page == 0:
                 EW(self,self.page,self.Ridx,self.ions[self.keys[self.Ridx]]['EWlims'])
             elif self.page == 1:
                 EW(self,self.page,self.Ridx,self.ions[self.keys[self.Ridx+6]]['EWlims'])
+                
         #evaluate all ions with limits on page
         if event.key == 'M':
             print(self.page)
@@ -227,7 +232,7 @@ class mainWindow(QtWidgets.QTabWidget):
                     EW(self,self.page,ii,self.ions[self.keys[ii+6]]['EWlims'])
             
         
-        #use same range for all ion Velocity limits and directly measure by following clicks
+        #use same range for all ion Velocity limits and directly measured by following with clicks bounds on a single subplot
         if event.key == 'V':
             self.event_button = event.key
         if event.key in ['0','1','2']: #detection, upperlimit, lower limit
@@ -270,8 +275,9 @@ class mainWindow(QtWidgets.QTabWidget):
                     if (self.axesR[self.page][ii]==event.inaxes): self.Ridx = ii
             
                     
-                
+         
         if event.button in [1,3]:
+        
             '''Left hand side is for fitting'''
             if event.inaxes is not None and ((event.inaxes in self.axesL[0]) or (event.inaxes in self.axesL[1])):
                 self.Lidx = None
@@ -314,8 +320,8 @@ class mainWindow(QtWidgets.QTabWidget):
                         #update wc for plotting
                         self.ions[self.keys[key_idx]]['wc'] = wc
                         
-                        if self.page == 0: Plotting(self,self.Lidx,modify=True)
-                        else: Plotting(self,self.Lidx,modify=True)
+                        #replot
+                        Plotting(self,self.Lidx,modify=True)
                         
                         
                 else:
@@ -324,6 +330,8 @@ class mainWindow(QtWidgets.QTabWidget):
                 '''Right hand side for picking velocity limits for EW measurements'''
             if event.inaxes is not None and ((event.inaxes in self.axesR[0]) or (event.inaxes in self.axesR[1])):
                 self.Ridx = None
+                
+                #identify page
                 if event.inaxes in self.axesR[0]:
                     self.page = 0
                 elif event.inaxes in self.axesR[1]:
@@ -352,7 +360,7 @@ class mainWindow(QtWidgets.QTabWidget):
                         elif self.page == 1: Plotting(self,self.Ridx,modify=False,Print=False)
 
                         
-                        '''If A has been selected, the clicked limits will apply to All subplot frames
+                        '''If V has been selected, the clicked limits will apply to All subplot frames
                             and the EW will be measured for all ions in page'''
                     if (self.event_button == 'V')&(None not in self.EWlim):
                         if self.page == 0: loop = self.nions
@@ -361,8 +369,7 @@ class mainWindow(QtWidgets.QTabWidget):
                             self.ions[self.keys[ii]]['EWlims'][0] = self.EWlim[0]
                             self.ions[self.keys[ii]]['EWlims'][1] = self.EWlim[1]
                             
-                            if self.page == 0: Plotting(self,ii,modify=False,Print=False)
-                            if self.page == 1: Plotting(self,ii,modify=False,Print=False)
+                            Plotting(self,ii,modify=False,Print=False)
 
                         self.event_button = None
                         self.EWlim = [None,None]
@@ -413,13 +420,12 @@ class Plotting:
             #replot right (flux; error)
             parent.axesR[i][ii].step(vel,flux/cont,color='k',where='mid');parent.axesR[i][ii].step(vel,error/cont,color='b',where='mid')
             parent.axesR[i][ii].axhline(y=1,xmin=window_lim[0],xmax=window_lim[1],ls='--',c='b')
+            
+            #plotting grayed spectra
             if modify == True:
-                #FIX THIS
                 for zz in range(int(len(gray_idx)/2)):
                     parent.axesL[i][ii].step(vel[gray_idx[zz*2]:gray_idx[2*zz+1]],flux[gray_idx[2*zz]:gray_idx[2*zz+1]],vel[gray_idx[2*zz]:gray_idx[2*zz+1]],error[gray_idx[2*zz]:gray_idx[2*zz+1]],color='gray',alpha=1)
-#                 for masks in parent.vclim_all:
-#                     anti_wc = ((vel>masks[0])&(vel<masks[1]))
-#                     parent.axesL[i][ii].step(vel[anti_wc],flux[anti_wc],vel[anti_wc],error[anti_wc],color='gray',alpha=1)
+
 
             #clear y ticks and label plots
             parent.axesL[i][ii].set_yticks([]); #parent.axesR[i][ii].set_yticks([])
