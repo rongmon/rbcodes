@@ -15,7 +15,7 @@ flux; wave; error; linelist; redshift; bin
 '''
 
 
-import rb_setline as rb_setline
+from IGM import rb_setline as rb_setline
 import numpy as np
 import numpy.polynomial.legendre as L
 c =  299792.458
