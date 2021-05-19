@@ -480,7 +480,7 @@ class Plotting:
         if Print == False:
             if modify == True: #modify is whether or not the continuum is being adjusted
                 #re-eval continuum
-                pdb.set_trace()
+                #pdb.set_trace()
                 parent.ions[parent.keys[key_idx]]['pco']=L.Legendre.fit(wave[wc],flux[wc],order,w=weight[wc])
                 parent.ions[parent.keys[key_idx]]['cont'] = parent.ions[parent.keys[key_idx]]['pco'](wave)
                 cont = parent.ions[parent.keys[key_idx]]['cont']
