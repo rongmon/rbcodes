@@ -58,7 +58,7 @@ class Absorber:
 
             '''Property initializations:'''
             ion_dict['N']=None; ion_dict['Nsig']=None; ion_dict['EW']=None; ion_dict['EWsig']=None
-            ion_dict['med_vel'] = None; ion_dict['EWlims'] = [None,None]; ion_dict['flag'] = 0
+            ion_dict['med_vel'] = None; ion_dict['EWlims'] = [mask[0],mask[1]]; ion_dict['flag'] = 0
             #for text
             ion_dict['EW_text'] = None
     
