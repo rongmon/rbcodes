@@ -13,6 +13,8 @@ import numpy.polynomial.legendre as L
 import sys
 from astropy.io import ascii
 from utils import rb_utility as rt
+import matplotlib as mpl
+mpl.rcParams['lines.linewidth'] = .9
 clr=rt.rb_set_color()
 
 HELP = '''
@@ -290,7 +292,7 @@ class mainWindow(QtWidgets.QTabWidget):
                     wc = self.ions[self.keys[key_idx]]['wc']
 
                     mask = mask_reg.split(',')
-                    mask = np.array(mask).astype(int)
+                    mask = np.array(mask).astype('float32')
 
                     wc=((vel<mask[0]) | (vel>mask[1])) & wc
                     self.ions[self.keys[key_idx]]['wc'] = wc
@@ -301,7 +303,7 @@ class mainWindow(QtWidgets.QTabWidget):
                 if ok:
                     key_idx = (self.page*6)+self.Ridx
                     integ_lims = integ_lims.split(',')
-                    integ_lims = np.array(integ_lims).astype(int)
+                    integ_lims = np.array(integ_lims).astype('float32')
 
                     self.ions[self.keys[key_idx]]['EWlims'][0] = integ_lims[0]
                     self.ions[self.keys[key_idx]]['EWlims'][1] = integ_lims[1]
@@ -343,9 +345,15 @@ class mainWindow(QtWidgets.QTabWidget):
 
             
         
-        #use same range for all ion Velocity limits and directly measured by following with clicks bounds on a single subplot
+        #use same range for all ion Velocity limits 
         if event.key == 'V':
-            self.event_button = event.key
+            EWlims = self.ions[self.keys[self.Ridx+6*self.page]]['EWlims']
+            for jj in range(len(self.figs)):
+                self.page = jj
+                for ii in range(self.nions[self.page]):
+                    self.ions[self.keys[ii+self.page*6]]['EWlims'] = EWlims
+                    Plotting(self,ii,modify=False,Print=False)
+                    
         if event.key in ['0','1','2']: #detection, upperlimit, lower limit
             key_idx = self.page*6 +self.Ridx
             self.ions[self.keys[key_idx]]['flag'] = int(event.key)
@@ -449,20 +457,6 @@ class mainWindow(QtWidgets.QTabWidget):
                         self.EWlim[1] = event.xdata
                         self.ions[self.keys[key_idx]]['EWlims'][1] = event.xdata
                         Plotting(self,self.Ridx,modify=False,Print=False)
-
-                        
-                        '''If V has been selected, the clicked limits will apply to All subplot frames
-                            and the EW will be measured for all ions in page'''
-                    
-                    if (self.event_button == 'V')&(None not in self.EWlim):
-                        for ii in range(self.nions[self.page]):
-                            self.ions[self.keys[ii]]['EWlims'][0] = self.EWlim[0]
-                            self.ions[self.keys[ii]]['EWlims'][1] = self.EWlim[1]
-                            
-                            Plotting(self,ii,modify=False,Print=False)
-
-                        self.event_button = None
-                        self.EWlim = [None,None]
                             
                            
 
@@ -515,7 +509,7 @@ class Plotting:
             #plotting grayed spectra
             if modify == True:
                 for zz in range(int(len(gray_idx)/2)):
-                    parent.axesL[parent.page][ii].step(vel[gray_idx[zz*2]:gray_idx[2*zz+1]],flux[gray_idx[2*zz]:gray_idx[2*zz+1]],vel[gray_idx[2*zz]:gray_idx[2*zz+1]],error[gray_idx[2*zz]:gray_idx[2*zz+1]],color='gray',alpha=1)
+                    parent.axesL[parent.page][ii].step(vel[gray_idx[zz*2]:gray_idx[2*zz+1]],flux[gray_idx[2*zz]:gray_idx[2*zz+1]],vel[gray_idx[2*zz]:gray_idx[2*zz+1]],error[gray_idx[2*zz]:gray_idx[2*zz+1]],color='lightgray',linewidth=1.3,alpha=1)
 
 
             #clear y ticks and label plots
