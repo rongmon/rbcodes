@@ -26,9 +26,8 @@ HELP = '''
             RHS RMB: Set upper velocity limit
             
             Keyboard Commands
-            Enter: Move mouse to desired subplot, hit enter (need to slightly move mouse again to activate 
-                   or hit enter and move to subplot without touching any other subplot) 
-                LHS: manually enter regions to mask continuum (should be performed after applying initial click masking)
+            v: Move mouse to desired subplot
+                LHS: manually enter regions to mask continuum 
                 RHS: manually enter EW intergration limits
                 
             Q: quit
@@ -122,7 +121,7 @@ class mainWindow(QtWidgets.QTabWidget):
         self.z = ions['Target']['z']; self.flux = ions['Target']['flux']
         self.wave = ions['Target']['wave']; self.error = ions['Target']['error']
         #------------------------------------#
-        
+        self.old_axes = None
         self.tab_names = ['Ions', 'Ions 2','Ions 3', 'Ions 4', 'Ions 5']
         self.ions = ions
         self.keys = list(self.ions.keys())[:-1] # last item is the full target spectrum
@@ -243,63 +242,72 @@ class mainWindow(QtWidgets.QTabWidget):
 
     def onmotion(self,event):
         if event.xdata != None and event.ydata != None:
-            if self.Manual_Mask == True:
-                for qq in range(len(self.axesL)):
-                    if event.inaxes in self.axesL[qq]:
-                        self.page = qq
-                for ii in range(len(self.axesL[self.page])):
-                    if (self.axesL[self.page][ii]==event.inaxes): 
-                        self.Lidx = ii; 
-                        mask_reg,ok = QInputDialog.getText(self,'Manual Mask Limits','Input Region to Mask (e.g. 200,250)')
-                        #does this work for different pages?
-                        if ok:
-                            key_idx = (self.page*6)+self.Lidx
-                            vel = self.ions[self.keys[key_idx]]['vel']
-                            wc = self.ions[self.keys[key_idx]]['wc']
-                            
-                            mask = mask_reg.split(',')
-                            mask = np.array(mask).astype(int)
-                            
-                            wc=((vel<mask[0]) | (vel>mask[1])) & wc
-                            self.ions[self.keys[key_idx]]['wc'] = wc
-                            Plotting(self,self.Lidx,modify=True)
-                            
-                            self.Manual_Mask = None
-                        break
-                        
-                    else: self.Lidx = None
-                    
-                if self.Lidx == None:
-                    for qq in range(len(self.axesR)):
-                        if event.inaxes in self.axesR[qq]:
-                            self.page = qq
-                    
-                    for ii in range(len(self.axesR[self.page])):
-                        if (self.axesR[self.page][ii]==event.inaxes):
-                            self.Ridx = ii
-                            integ_lims,ok = QInputDialog.getText(self,'Manual EW Limits','Input integration region (eg -100,100)')
-                            if ok:
-                                key_idx = (self.page*6)+self.Ridx
-                                integ_lims = integ_lims.split(',')
-                                integ_lims = np.array(integ_lims).astype(int)
-                                
-                                self.ions[self.keys[key_idx]]['EWlims'][0] = integ_lims[0]
-                                self.ions[self.keys[key_idx]]['EWlims'][1] = integ_lims[1]
-                                Plotting(self,self.Ridx,modify=False,Print=False)
-                                self.Manual_Mask=None
-                            break
-                            
-                        else:
-                            self.Ridx = None
-                    
-                # popup to enter in manual masking limits
-                #then set manual mask back to false once completed
+            for qq in range(len(self.axesL)):
+                if (event.inaxes in self.axesL[qq]) | (event.inaxes in self.axesR[qq]) :
+                    self.page = qq
+            for ii in range(len(self.axesL[self.page])):
+                if (self.axesL[self.page][ii]==event.inaxes): 
+                    self.Lidx = ii; self.Ridx = None
+                    if (self.old_axes != None) and (self.old_axes != self.axesL[self.page][self.Lidx]):
+                        for pos in ['top','bottom','left','right']:
+                            self.old_axes.spines[pos].set_edgecolor('black')
+                            self.old_axes.spines[pos].set_linewidth(0.5)
+                            self.figs[self.page].canvas.draw()
+                    if self.old_axes != self.axesL[self.page][self.Lidx]:
+                        for pos in ['top','bottom','left','right']:
+                            self.axesL[self.page][self.Lidx].spines[pos].set_edgecolor('#01DF01')
+                            self.axesL[self.page][self.Lidx].spines[pos].set_linewidth(2)
+                            self.figs[self.page].canvas.draw()
+                            self.old_axes = self.axesL[self.page][self.Lidx]
+                    break
+
+                elif (self.axesR[self.page][ii]==event.inaxes):
+                    self.Ridx = ii; self.Lidx = None
+                    if self.old_axes  and (self.old_axes != self.axesR[self.page][self.Ridx]):
+                        for pos in ['top','bottom','left','right']:
+                            self.old_axes.spines[pos].set_edgecolor('black')
+                            self.old_axes.spines[pos].set_linewidth(0.5)
+                            self.figs[self.page].canvas.draw()
+                    if self.old_axes != self.axesR[self.page][self.Ridx]:
+                        for pos in ['top','bottom','left','right']:
+                            self.axesR[self.page][self.Ridx].spines[pos].set_edgecolor('#01DF01')
+                            self.axesR[self.page][self.Ridx].spines[pos].set_linewidth(2)
+                            self.figs[self.page].canvas.draw()
+                            self.old_axes = self.axesR[self.page][self.Ridx]
+                    break
+
 #----------------------key button events-----------------------------#            
     
     '''on press is used to reduce the order for the polyfit, toggle measurement displays, measure properties, and assist selecting EW vel bounds'''
     def onpress(self,event):
-        if event.key == 'enter':
-            self.Manual_Mask = True
+        if event.key == 'v':
+            if self.old_axes in self.axesL[self.page]:
+                mask_reg,ok = QInputDialog.getText(self,'Manual Mask Limits','Input Region to Mask (e.g. 200,250)')
+
+                if ok:
+                    key_idx = (self.page*6)+self.Lidx
+                    vel = self.ions[self.keys[key_idx]]['vel']
+                    wc = self.ions[self.keys[key_idx]]['wc']
+
+                    mask = mask_reg.split(',')
+                    mask = np.array(mask).astype(int)
+
+                    wc=((vel<mask[0]) | (vel>mask[1])) & wc
+                    self.ions[self.keys[key_idx]]['wc'] = wc
+                    Plotting(self,self.Lidx,modify=True)
+                    
+            elif self.old_axes in self.axesR[self.page]:
+                integ_lims,ok = QInputDialog.getText(self,'Manual EW Limits','Input integration region (eg -100,100)')
+                if ok:
+                    key_idx = (self.page*6)+self.Ridx
+                    integ_lims = integ_lims.split(',')
+                    integ_lims = np.array(integ_lims).astype(int)
+
+                    self.ions[self.keys[key_idx]]['EWlims'][0] = integ_lims[0]
+                    self.ions[self.keys[key_idx]]['EWlims'][1] = integ_lims[1]
+                    Plotting(self,self.Ridx,modify=False,Print=False)
+
+        
         #right arrow key (directional) increases poly order 
         if event.key == 'right':
             if self.Lidx is not None:
@@ -322,15 +330,16 @@ class mainWindow(QtWidgets.QTabWidget):
                 
         #evaluate last limit subplot
         if event.key == 'm':
-            print(self.page)
             key_idx = self.page*6+self.Ridx
             EW(self,self.page,self.Ridx,self.ions[self.keys[key_idx]]['EWlims'])
 
                 
         #evaluate all ions with limits on page
         if event.key == 'M':
-            for ii in range(self.nions[self.page]):
-                EW(self,self.page,ii,self.ions[self.keys[ii+self.page*6]]['EWlims'])
+            for jj in range(len(self.figs)):
+                self.page = jj
+                for ii in range(self.nions[self.page]):
+                    EW(self,self.page,ii,self.ions[self.keys[ii+self.page*6]]['EWlims'])
 
             
         
@@ -344,8 +353,10 @@ class mainWindow(QtWidgets.QTabWidget):
             
         if event.key == 't':#toggle the EW/N display
             self.pFlag = (self.pFlag+1)%3
-            for ii in range(self.nions[self.page]):
-                Plotting(self,ii,modify=False,Print=True)
+            for jj in range(len(self.figs)):
+                self.page = jj
+                for ii in range(self.nions[self.page]):
+                    Plotting(self,ii,modify=False,Print=True)
             
             #replot with toggled index
         if event.key == '?':
@@ -480,7 +491,6 @@ class Plotting:
         if Print == False:
             if modify == True: #modify is whether or not the continuum is being adjusted
                 #re-eval continuum
-                pdb.set_trace()
                 parent.ions[parent.keys[key_idx]]['pco']=L.Legendre.fit(wave[wc],flux[wc],order,w=weight[wc])
                 parent.ions[parent.keys[key_idx]]['cont'] = parent.ions[parent.keys[key_idx]]['pco'](wave)
                 cont = parent.ions[parent.keys[key_idx]]['cont']
@@ -498,7 +508,7 @@ class Plotting:
             parent.axesL[parent.page][ii].step(vel,flux,color='k',where='mid');parent.axesL[parent.page][ii].step(vel,error,color='r',where='mid')
             parent.axesL[parent.page][ii].step(vel,cont,color='b',where='mid')
             #replot right (flux; error)
-            parent.axesR[parent.page][ii].step(vel,flux/cont,color='k',where='mid');parent.axesR[parent.page][ii].step(vel,error/cont,color='b',where='mid')
+            parent.axesR[parent.page][ii].step(vel,flux/cont,color='k',where='mid');parent.axesR[parent.page][ii].step(vel,error/cont,color='r',where='mid')
             parent.axesR[parent.page][ii].axhline(y=1,xmin=window_lim[0],xmax=window_lim[1],ls='--',c='b')
             
             #plotting grayed spectra
