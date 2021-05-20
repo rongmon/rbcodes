@@ -705,11 +705,16 @@ class Transitions:
         # Now use a palette to switch to dark colors:
         palette = QPalette()
         palette.setColor(QPalette.Window, QColor(53, 53, 53))
+        palette.setColor(QPalette.WindowText, QtCore.Qt.white)        
         palette.setColor(QPalette.Base, QColor(25, 25, 25))
         palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
         palette.setColor(QPalette.Button, QColor(53, 53, 53))
+        palette.setColor(QPalette.ButtonText, QtCore.Qt.white)
+        palette.setColor(QPalette.BrightText, QtCore.Qt.red)
         palette.setColor(QPalette.Link, QColor(42, 130, 218))
         palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+        palette.setColor(QPalette.Text, QtCore.Qt.white)
+
         app.setPalette(palette)
         main = mainWindow(Abs,intervening=intervening)
         main.resize(1400,900)
