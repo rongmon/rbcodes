@@ -17,34 +17,44 @@ import matplotlib as mpl
 mpl.rcParams['lines.linewidth'] = .9
 clr=rt.rb_set_color()
 
-HELP = '''
-            The LHS shows the spectrum with a Legengre polynomial continuum fit overlaid.
-                Points excluded from continuum fit are gray.
-            The RHS shows the normalized spectrum and velocity limits for measurements.
-            Mouse Clicks
+HELP =  '''
+            LHS/RHS = Left Hand Side/Right Hand Side
+            LMB/RMB = Left Mouse Button/Right Mouse Button
+            
+            LHS shows raw spectrum with overlaid legendre poly for continuum fitting
+            ---grayed regions indicate masked regions
+            
+            RHS shows normalized spectrum with velocity limits
+            
+
+            ------------------------------Mouse Clicks------------------------------------
+            
             LHS LMB: Add wavelengths within region set by two clicks to continuum fit.
             LHS RMB: Remove wavelengths from continuum fit.
             RHS LMB: Set lower velocity limit
             RHS RMB: Set upper velocity limit
+            -----------------------------------------------------------------------------------
             
-            Keyboard Commands
-            v: Move mouse to desired subplot
+            
+            ----------------------------Keyboard Commands-----------------------------
+            v: place mouse on desired subplot
                 LHS: manually enter regions to mask continuum 
                 RHS: manually enter EW intergration limits
-                
-            Q: quit
+            V (RHS only): Use active subplot velocity limits for all RHS plots
+            
             left arrow: Increase Polynomial Order [default 4]
             right arrow: Decrease Polynomial Order [default 4]
-                --uses the last modified/ selected LHS spectra
-                ---if no modifications, click on the spectra of which the order of fit should be changed
-            V: Initializes for all transitions to use the same velocity limits for integration
-                --Must be followed by clicking RHS on any spectra to define the velocity limits
-            m: Measure EW/N for current subplot axes
-            M: If all subplot axes on page have defined limits, measures EW/N for all ions on page
-            1/2/0 : While on RHS, flag absorber as (1) upper limit , (2) lower limit, or (0) neither.
-            t : Cycle text printed on absorbers. Displays logN, or EW
-                    Display logN and EW as detection or limit based on flag above
-            If Specified it can plot any intervening absorber list.
+
+            m: Measure EW/N for active subplot
+            M: Measure EW/N for ALL subplots
+            
+            1/2/0 (RHS only): flag absorber as
+                              (0) positive detection
+                              (1) upper limit 
+                              (2) lower limit
+            t (RHS only): Cycle text printed on absorbers. Displays logN, or EW
+            ------------------------------------------------------------------------------
+
                     '''
 
 
