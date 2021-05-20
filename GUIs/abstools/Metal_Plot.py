@@ -324,7 +324,7 @@ class mainWindow(QtWidgets.QTabWidget):
         if event.key == 'left':
             if self.Lidx is not None:
                 key_idx = self.page*6+self.Lidx
-#                 if self.page == 0:
+#                if self.page == 0:
                 self.ions[self.keys[key_idx]]['order'] = self.ions[self.keys[key_idx]]['order']-1
                 Plotting(self,self.Lidx,modify=True)
             else:
@@ -412,22 +412,22 @@ class mainWindow(QtWidgets.QTabWidget):
                         
                         
                     
-           '''Right hand side for picking velocity limits for EW measurements'''
-            if self.Ridx is not None:
-                key_idx = (self.page*6)+self.Ridx
+        '''Right hand side for picking velocity limits for EW measurements'''
+        if self.Ridx is not None:
+            key_idx = (self.page*6)+self.Ridx
 
-                    #if left click then define leftward vel limit
-                if event.button == 1:
-                    self.EWlim[0] = event.xdata#used for plotting all with same range 'V' command
-                    self.ions[self.keys[key_idx]]['EWlims'][0] = event.xdata
-                    #plot selected limits
-                    Plotting(self,self.Ridx,modify=False,Print=False)
+            #if left click then define leftward vel limit
+            if event.button == 1:
+                self.EWlim[0] = event.xdata#used for plotting all with same range 'V' command
+                self.ions[self.keys[key_idx]]['EWlims'][0] = event.xdata
+                #plot selected limits
+                Plotting(self,self.Ridx,modify=False,Print=False)
 
-                    #if right click define rightward vel limit
-                elif event.button == 3:
-                    self.EWlim[1] = event.xdata
-                    self.ions[self.keys[key_idx]]['EWlims'][1] = event.xdata
-                    Plotting(self,self.Ridx,modify=False,Print=False)
+            #if right click define rightward vel limit
+            elif event.button == 3:
+                self.EWlim[1] = event.xdata
+                self.ions[self.keys[key_idx]]['EWlims'][1] = event.xdata
+                Plotting(self,self.Ridx,modify=False,Print=False)
 
                            
 
