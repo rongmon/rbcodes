@@ -565,7 +565,11 @@ class Plotting:
             plotText(parent,parent.ions[parent.keys[key_idx]])
             text = parent.ions[parent.keys[key_idx]]['text']
             xlim = parent.ions[parent.keys[key_idx]]['EWlims'][0]
-            EWtoggle = parent.axesR[parent.page][ii].text(-850,1.8,text)
+            #EWtoggle = parent.axesR[parent.page][ii].text(-850,1.8,text)
+            EWtoggle = parent.axesR[parent.page][ii].text(x=0.05, y=0.815, s=text, fontsize=12, transform=parent.axesR[parent.page][ii].transAxes)
+
+
+
             parent.ions[parent.keys[key_idx]]['EW_text'] = EWtoggle
             parent.figs[parent.page].canvas.draw()
             
