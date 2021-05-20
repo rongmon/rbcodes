@@ -17,6 +17,11 @@ import matplotlib as mpl
 mpl.rcParams['lines.linewidth'] = .9
 clr=rt.rb_set_color()
 
+
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtGui import QPalette, QColor
+
+
 HELP =  '''
             LHS/RHS = Left Hand Side/Right Hand Side
             LMB/RMB = Left Mouse Button/Right Mouse Button
@@ -694,6 +699,18 @@ class HelpWindow(QtWidgets.QWidget):
 class Transitions:
     def __init__(self,Abs,intervening=False):
         app = QtWidgets.QApplication(sys.argv)
+        # Force the style to be the same on all OSs:
+        app.setStyle("Fusion")
+
+        # Now use a palette to switch to dark colors:
+        palette = QPalette()
+        palette.setColor(QPalette.Window, QColor(53, 53, 53))
+        palette.setColor(QPalette.Base, QColor(25, 25, 25))
+        palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+        palette.setColor(QPalette.Button, QColor(53, 53, 53))
+        palette.setColor(QPalette.Link, QColor(42, 130, 218))
+        palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+        app.setPalette(palette)
         main = mainWindow(Abs,intervening=intervening)
         main.resize(1400,900)
 
