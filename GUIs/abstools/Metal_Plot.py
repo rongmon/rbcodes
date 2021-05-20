@@ -378,86 +378,57 @@ class mainWindow(QtWidgets.QTabWidget):
          
         if event.button in [1,3]:
             '''Left hand side is for fitting'''
-            #check all axes
-            check = []; 
-            #this statement only checks main list wat appens if tere are two?
-            for axes in self.axesL: check.append(event.inaxes in axes)
-            if event.inaxes is not None and check: 
-                self.Lidx = None
-                for qq in range(len(self.axesL)):
-                    if event.inaxes in self.axesL[qq]:
-                        self.page = qq
-                    
-                #Find the specific subplot
-                for ii in range(len(self.axesL[self.page])):
-                    if (self.axesL[self.page][ii]==event.inaxes): self.Lidx = ii
-                        
+           
                 # if not first canvas, +6 per pae is needed to appropraitely index the ions
-                if self.Lidx is not None:
+            if self.Lidx is not None:
+
+                key_idx = (self.page*6)+self.Lidx
+                vel = self.ions[self.keys[key_idx]]['vel']
+                name = self.ions[self.keys[key_idx]]['name']
+
+                if self.vclim is None:
+                    self.vclim = [event.xdata]
+                    self.axesL[self.page][self.Lidx].plot(event.xdata,event.ydata,'ro',ms=5)
+                    if self.page == 0: self.figs[self.page].canvas.draw()
+                    else: self.figs[self.page].canvas.draw()
+
+
+                else:
+                    vclim = np.sort(np.append(self.vclim,event.xdata))
+                    self.vclim = None
+                    wc = self.ions[self.keys[key_idx]]['wc']
+
+                    if event.button == 1:#if left click add to masks
+                        wc=((vel<vclim[0]) | (vel>vclim[1])) & wc
+                    else: #remove mask
+                        wc=((vel>vclim[0]) & (vel<vclim[1])) | wc
+
+
+                    #update wc for plotting
+                    self.ions[self.keys[key_idx]]['wc'] = wc
+
+                    #replot
+                    Plotting(self,self.Lidx,modify=True)
+                        
+                        
                     
-                    key_idx = (self.page*6)+self.Lidx
-                    vel = self.ions[self.keys[key_idx]]['vel']
-                    name = self.ions[self.keys[key_idx]]['name']
+           '''Right hand side for picking velocity limits for EW measurements'''
+            if self.Ridx is not None:
+                key_idx = (self.page*6)+self.Ridx
 
-                    if self.vclim is None:
-                        self.vclim = [event.xdata]
-                        self.axesL[self.page][self.Lidx].plot(event.xdata,event.ydata,'ro',ms=5)
-                        if self.page == 0: self.figs[self.page].canvas.draw()
-                        else: self.figs[self.page].canvas.draw()
-                        
-                        
-                    else:
-                        vclim = np.sort(np.append(self.vclim,event.xdata))
-                        self.vclim = None
-                        wc = self.ions[self.keys[key_idx]]['wc']
-                        
-                        if event.button == 1:#if left click add to masks
-                            wc=((vel<vclim[0]) | (vel>vclim[1])) & wc
-                        else: #remove mask
-                            wc=((vel>vclim[0]) & (vel<vclim[1])) | wc
-                            
-            
-                        #update wc for plotting
-                        self.ions[self.keys[key_idx]]['wc'] = wc
-                        
-                        #replot
-                        Plotting(self,self.Lidx,modify=True)
-                        
-                        
-                    
-                '''Right hand side for picking velocity limits for EW measurements'''
-            check = []; 
-            for axes in self.axesR: check.append(event.inaxes in axes)
-            if event.inaxes is not None and check:
-                self.Ridx = None
-                
-                #identify page
-                for qq in range(len(self.axesR)):
-                    if event.inaxes in self.axesR[qq]:
-                        self.Ridx = None
-                        self.page = qq
+                    #if left click then define leftward vel limit
+                if event.button == 1:
+                    self.EWlim[0] = event.xdata#used for plotting all with same range 'V' command
+                    self.ions[self.keys[key_idx]]['EWlims'][0] = event.xdata
+                    #plot selected limits
+                    Plotting(self,self.Ridx,modify=False,Print=False)
 
-                # get subplot index
-                for ii in range(len(self.axesR[self.page])):
-                    if (self.axesR[self.page][ii]==event.inaxes): self.Ridx = ii
-                        
-                
-                if self.Ridx is not None:
-                    key_idx = (self.page*6)+self.Ridx
+                    #if right click define rightward vel limit
+                elif event.button == 3:
+                    self.EWlim[1] = event.xdata
+                    self.ions[self.keys[key_idx]]['EWlims'][1] = event.xdata
+                    Plotting(self,self.Ridx,modify=False,Print=False)
 
-                        #if left click then define leftward vel limit
-                    if event.button == 1:
-                        self.EWlim[0] = event.xdata#used for plotting all with same range 'V' command
-                        self.ions[self.keys[key_idx]]['EWlims'][0] = event.xdata
-                        #plot selected limits
-                        Plotting(self,self.Ridx,modify=False,Print=False)
-
-                        #if right click define rightward vel limit
-                    elif event.button == 3:
-                        self.EWlim[1] = event.xdata
-                        self.ions[self.keys[key_idx]]['EWlims'][1] = event.xdata
-                        Plotting(self,self.Ridx,modify=False,Print=False)
-                            
                            
 
 class Plotting:
