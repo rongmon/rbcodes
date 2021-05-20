@@ -208,7 +208,7 @@ class mainWindow(QtWidgets.QTabWidget):
                 print(Table_e)
 
         button = QPushButton("SAVE",self)
-        button.setGeometry(500,30,200,30)
+        button.setGeometry(430,30,200,30)
         button.clicked.connect(lambda: save(self))
 
 #--------------------------------------------------------------#
@@ -237,11 +237,22 @@ class mainWindow(QtWidgets.QTabWidget):
                     AddPage(self)
                     
         add_ion_button = QPushButton("Add Ion",self)
-        add_ion_button.setGeometry(700,30,200,30)
+        add_ion_button.setGeometry(630,30,200,30)
         add_ion_button.clicked.connect(lambda: NewTransition(self))
 
 #--------------------------------------------------------------------#  
 
+#----------------------------HELP WINDOW-----------------------------#
+        def opensub(self):
+            self.sub = HelpWindow()
+            self.sub.show()
+            
+        openButton = QPushButton("Help",  self)
+        openButton.setGeometry(830,30,200,30)
+        openButton.clicked.connect(lambda: opensub(self))
+#--------------------------------------------------------------------#
+
+#----------------------subplot locator-------------------------------#
     def onmotion(self,event):
         if event.xdata != None and event.ydata != None:
             for qq in range(len(self.axesL)):
@@ -366,10 +377,6 @@ class mainWindow(QtWidgets.QTabWidget):
                 for ii in range(self.nions[self.page]):
                     Plotting(self,ii,modify=False,Print=True)
             
-            #replot with toggled index
-        if event.key == '?':
-            print(HELP)
-    
 
         
 #------------------------------click button events----------------------------#        
@@ -664,6 +671,14 @@ class initialize:
         # Set up connectivity and Need to set click focus for keyboard functionality
         parent.figs[parent.page].canvas.setFocusPolicy( QtCore.Qt.ClickFocus )
         parent.figs[parent.page].canvas.setFocus()            
+        
+#creates a separate window to display key and click commands        
+class HelpWindow(QtWidgets.QWidget):
+
+    def __init__(self,parent=None):
+        super(HelpWindow, self).__init__(parent)
+        self.resize(400,500)
+        label = QtWidgets.QLabel(HELP,self)
         
 #Initial inputs and callable class to run proram        
 class Transitions:
