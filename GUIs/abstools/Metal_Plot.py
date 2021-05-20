@@ -254,13 +254,13 @@ class mainWindow(QtWidgets.QTabWidget):
                         for pos in ['top','bottom','left','right']:
                             self.old_axes.spines[pos].set_edgecolor('black')
                             self.old_axes.spines[pos].set_linewidth(0.5)
-                            self.figs[self.page].canvas.draw()
                     if self.old_axes != self.axesL[self.page][self.Lidx]:
                         for pos in ['top','bottom','left','right']:
                             self.axesL[self.page][self.Lidx].spines[pos].set_edgecolor('#01DF01')
                             self.axesL[self.page][self.Lidx].spines[pos].set_linewidth(2)
-                            self.figs[self.page].canvas.draw()
                             self.old_axes = self.axesL[self.page][self.Lidx]
+                        self.figs[self.page].canvas.draw()
+
                     break
 
                 elif (self.axesR[self.page][ii]==event.inaxes):
@@ -269,13 +269,13 @@ class mainWindow(QtWidgets.QTabWidget):
                         for pos in ['top','bottom','left','right']:
                             self.old_axes.spines[pos].set_edgecolor('black')
                             self.old_axes.spines[pos].set_linewidth(0.5)
-                            self.figs[self.page].canvas.draw()
                     if self.old_axes != self.axesR[self.page][self.Ridx]:
                         for pos in ['top','bottom','left','right']:
                             self.axesR[self.page][self.Ridx].spines[pos].set_edgecolor('#01DF01')
                             self.axesR[self.page][self.Ridx].spines[pos].set_linewidth(2)
-                            self.figs[self.page].canvas.draw()
                             self.old_axes = self.axesR[self.page][self.Ridx]
+                        self.figs[self.page].canvas.draw()
+
                     break
 
 #----------------------key button events-----------------------------#            
