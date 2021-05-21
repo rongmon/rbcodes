@@ -24,7 +24,7 @@ class Absorber:
     
     #defining variables to be used in the transition plotting GUI
     def Transition(self,ion_dict,line_dat,wave,flux,error,z,mask,window_lim,nofrills=False):
-            # Edit RB May21, 2020: added nofrills keyword to toggle between the continuum property. 
+            # Edit RB May21, 2020: added nofrills keyword to toggle between initializing the continuum fields. 
             #        Added to avoid issues of calling Absorber class very near to the edge of the detector.
             #        Does not apply when calling abstools.
 
