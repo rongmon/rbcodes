@@ -467,7 +467,7 @@ class Plotting:
         weight = parent.ions[parent.keys[key_idx]]['weight']
         name = parent.ions[parent.keys[key_idx]]['name']
         #L = parent.ions[parent.keys[key_idx]].L
-        wc =np.array(parent.ions[parent.keys[key_idx]]['wc']) 
+        wc =np.array(parent.ions[parent.keys[key_idx]]['wc'])&(error != 0) #error !=0 is a bad pixel mask 
         cont = parent.ions[parent.keys[key_idx]]['cont']
         window_lim = parent.ions[parent.keys[key_idx]]['window_lim']
         order = parent.ions[parent.keys[key_idx]]['order']
