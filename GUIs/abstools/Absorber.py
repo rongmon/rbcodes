@@ -23,7 +23,10 @@ c =  299792.458
 class Absorber:
     
     #defining variables to be used in the transition plotting GUI
-    def Transition(self,ion_dict,line_dat,wave,flux,error,z,mask,window_lim):
+    def Transition(self,ion_dict,line_dat,wave,flux,error,z,mask,window_lim,nofrills=False):
+            # Edit RB May21, 2020: added nofrills keyword to toggle between the continuum property. 
+            #        Added to avoid issues of calling Absorber class very near to the edge of the detector.
+            #        Does not apply when calling abstools.
 
             # VARIABLE INITIALIZATION
             ion_dict['f'] = line_dat['fval']
@@ -47,13 +50,15 @@ class Absorber:
             order = order of polynomial
 
             lets also give each ion object the Legendre function for ease of use during plotting'''
-            ion_dict['wc'] = ((ion_dict['vel']<mask[0])|(ion_dict['vel']>mask[1]))
-            ion_dict['weight'] = 1/(ion_dict['error']**2)
-            ion_dict['order'] = 4 #order of poly fit
-            ion_dict['pco']=L.Legendre.fit(ion_dict['wave'][ion_dict['wc']],ion_dict['flux'][ion_dict['wc']],ion_dict['order'],w=ion_dict['weight'][ion_dict['wc']])
-            ion_dict['cont'] = ion_dict['pco'](ion_dict['wave'])
-            #resett the wc so the plotter can mask as many absorbers as needed for fixing
-            ion_dict['wc'] = [True]*len(ion_dict['wc'])
+
+            if nofrills==False:
+                ion_dict['wc'] = ((ion_dict['vel']<mask[0])|(ion_dict['vel']>mask[1]))
+                ion_dict['weight'] = 1/(ion_dict['error']**2)
+                ion_dict['order'] = 4 #order of poly fit
+                ion_dict['pco']=L.Legendre.fit(ion_dict['wave'][ion_dict['wc']],ion_dict['flux'][ion_dict['wc']],ion_dict['order'],w=ion_dict['weight'][ion_dict['wc']])
+                ion_dict['cont'] = ion_dict['pco'](ion_dict['wave'])
+                #resett the wc so the plotter can mask as many absorbers as needed for fixing
+                ion_dict['wc'] = [True]*len(ion_dict['wc'])
 
 
             '''Property initializations:'''
@@ -64,7 +69,7 @@ class Absorber:
     
     
     
-    def __init__(self,z,wave,flux,error,lines=None,mask_init=[-200,200],window_lim=[-1000,1000],load_file = False):
+    def __init__(self,z,wave,flux,error,lines=None,mask_init=[-200,200],window_lim=[-1000,1000],load_file = False,nofrills=False):
         mask = mask_init
         self.z =z
         self.ions = {}
@@ -78,7 +83,7 @@ class Absorber:
         
                 self.ions[line_dat['name']] = {}
                 ion_dict = self.ions[line_dat['name']]
-                self.Transition(ion_dict,line_dat,wave,flux,error,z,mask,window_lim)
+                self.Transition(ion_dict,line_dat,wave,flux,error,z,mask,window_lim,nofrills=nofrills)
                                 
             #last dictionary item for full spectra data                    
             self.ions['Target'] = {}
