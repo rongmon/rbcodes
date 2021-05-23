@@ -2,7 +2,7 @@ import numpy as np
 from IGM import compute_EW
 from PyQt5 import QtCore, QtGui, QtWidgets
 from GUIs.abstools import Absorber
-from PyQt5.QtWidgets import QStyleFactory, QPushButton,QLineEdit,QMainWindow,QInputDialog
+from PyQt5.QtWidgets import QStyleFactory, QPushButton,QLineEdit,QMainWindow,QInputDialog,QLabel
 from matplotlib.backends.backend_qt5agg import (
     FigureCanvasQTAgg,
     NavigationToolbar2QT as NavigationToolbar,
@@ -21,6 +21,8 @@ clr=rt.rb_set_color()
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QPalette, QColor
 
+from astropy.table import Table
+from astropy.io import ascii
 
 HELP =  '''
             LHS/RHS = Left Hand Side/Right Hand Side
@@ -177,7 +179,7 @@ class mainWindow(QtWidgets.QTabWidget):
             self.axesL[0][ii] = self.figs[0].add_subplot(6,2,2*ii+1)
             self.axesR[0][ii] = self.figs[0].add_subplot(6,2,2*(ii+1))
             self.figs[self.page].subplots_adjust(hspace=0.01)
-            Plotting(self,ii)
+            Plotting(self,ii,modify=True)
             
          # Set up connectivity
         self.cid1 = self.figs[0].canvas.mpl_connect("button_press_event", self.onclick)
@@ -189,42 +191,12 @@ class mainWindow(QtWidgets.QTabWidget):
 
                        
 #---------------------Save Button/function----------------# 
-        def save(self):
-            from astropy.table import Table
-            from astropy.io import ascii
-            Table_e = Table()
-            Table_e['Transitions'] = self.keys
-            EW=[];EWsig=[];N=[];Nsig=[];Vel = []
-            EWlims_low = []; EWlims_high = []
-            for ion in self.keys:
-                EW.append(np.round(self.ions[ion]['EW']*1000,2))
-                EWsig.append(np.round(self.ions[ion]['EWsig']*1000,2))
-                N.append(np.round(np.log10(self.ions[ion]['N']),2))
-                Nsig.append(np.round(np.log10(self.ions[ion]['Nsig']),2))
-                Vel.append(np.round(self.ions[ion]['med_vel'],2))
-                EWlims_low.append(np.round(self.ions[ion]['EWlims'][0],2))
-                EWlims_high.append(np.round(self.ions[ion]['EWlims'][1],2))
-            Table_e['EW'] = EW; Table_e['EWsig'] = EWsig; Table_e['Lower Limit']=EWlims_low
-            Table_e['Upper Limit'] = EWlims_high
-            Table_e['N'] = N; Table_e['Nsig'] = Nsig; Table_e['Vel']=Vel
-         
-            pfile,ok = QInputDialog.getText(self,'Input Pickle Path','Input path to save pickle file: ')
-            Tablefile,ok2 = QInputDialog.getText(self,'Save Values','Input path to save tabulated measurements (.dat): ')
-            if ok:
-                #saved = fileDat(self,self.ions)
-                with open(pfile,'wb') as pklfile:
-                    pickle.dump(self.ions,pklfile,protocol=pickle.HIGHEST_PROTOCOL)
-            else:
-                print('Pickle File Not Saved. Data Will Be Lost')
-            if ok2:
-                ascii.write(Table_e, Tablefile, overwrite=True)
-                print(Table_e)
-            else:
-                print(Table_e)
-
-        button = QPushButton("SAVE",self)
-        button.setGeometry(430,30,200,30)
-        button.clicked.connect(lambda: save(self))
+        def onsave(self):
+            self.savepg = SavePage(self)
+            self.savepg.show()
+        openButton = QPushButton("Save",  self)
+        openButton.setGeometry(430,30,200,30)
+        openButton.clicked.connect(lambda: onsave(self))
 
 #--------------------------------------------------------------#
             
@@ -246,7 +218,7 @@ class mainWindow(QtWidgets.QTabWidget):
                     self.axesR[self.page][ii] = self.figs[self.page].add_subplot(6,2,2*(ii+1))
                     self.figs[self.page].subplots_adjust(hspace=0.01)
                     self.nions[self.page] = self.nions[self.page]+1
-                    Plotting(self,ii)
+                    Plotting(self,ii,modify=True)
                     
                 else: # need to add a new page
                     AddPage(self)
@@ -254,10 +226,11 @@ class mainWindow(QtWidgets.QTabWidget):
         add_ion_button = QPushButton("Add Ion",self)
         add_ion_button.setGeometry(630,30,200,30)
         add_ion_button.clicked.connect(lambda: NewTransition(self))
+        
+#--------------------------------------------------------------------# 
 
-#--------------------------------------------------------------------#  
 
-#----------------------------HELP WINDOW-----------------------------#
+#-------HELP------#
         def opensub(self):
             self.sub = HelpWindow()
             self.sub.show()
@@ -265,9 +238,9 @@ class mainWindow(QtWidgets.QTabWidget):
         openButton = QPushButton("Help",  self)
         openButton.setGeometry(830,30,200,30)
         openButton.clicked.connect(lambda: opensub(self))
-#--------------------------------------------------------------------#
 
-#----------------------subplot locator-------------------------------#
+        
+        
     def onmotion(self,event):
         if event.xdata != None and event.ydata != None:
             for qq in range(len(self.axesL)):
@@ -280,13 +253,13 @@ class mainWindow(QtWidgets.QTabWidget):
                         for pos in ['top','bottom','left','right']:
                             self.old_axes.spines[pos].set_edgecolor('black')
                             self.old_axes.spines[pos].set_linewidth(0.5)
+                        self.figs[self.page].canvas.draw()
                     if self.old_axes != self.axesL[self.page][self.Lidx]:
                         for pos in ['top','bottom','left','right']:
                             self.axesL[self.page][self.Lidx].spines[pos].set_edgecolor('#01DF01')
                             self.axesL[self.page][self.Lidx].spines[pos].set_linewidth(2)
-                            self.old_axes = self.axesL[self.page][self.Lidx]
                         self.figs[self.page].canvas.draw()
-
+                        self.old_axes = self.axesL[self.page][self.Lidx]
                     break
 
                 elif (self.axesR[self.page][ii]==event.inaxes):
@@ -295,14 +268,15 @@ class mainWindow(QtWidgets.QTabWidget):
                         for pos in ['top','bottom','left','right']:
                             self.old_axes.spines[pos].set_edgecolor('black')
                             self.old_axes.spines[pos].set_linewidth(0.5)
+                        self.figs[self.page].canvas.draw()
                     if self.old_axes != self.axesR[self.page][self.Ridx]:
                         for pos in ['top','bottom','left','right']:
                             self.axesR[self.page][self.Ridx].spines[pos].set_edgecolor('#01DF01')
                             self.axesR[self.page][self.Ridx].spines[pos].set_linewidth(2)
-                            self.old_axes = self.axesR[self.page][self.Ridx]
                         self.figs[self.page].canvas.draw()
-
+                        self.old_axes = self.axesR[self.page][self.Ridx]
                     break
+
 
 #----------------------key button events-----------------------------#            
     
@@ -350,7 +324,7 @@ class mainWindow(QtWidgets.QTabWidget):
         if event.key == 'left':
             if self.Lidx is not None:
                 key_idx = self.page*6+self.Lidx
-#                if self.page == 0:
+#                 if self.page == 0:
                 self.ions[self.keys[key_idx]]['order'] = self.ions[self.keys[key_idx]]['order']-1
                 Plotting(self,self.Lidx,modify=True)
             else:
@@ -371,15 +345,16 @@ class mainWindow(QtWidgets.QTabWidget):
 
             
         
-        #use same range for all ion Velocity limits 
+        #use same range for all ion Velocity limits and directly measured by following with clicks bounds on a single subplot
         if event.key == 'V':
             EWlims = self.ions[self.keys[self.Ridx+6*self.page]]['EWlims']
             for jj in range(len(self.figs)):
                 self.page = jj
                 for ii in range(self.nions[self.page]):
+
                     self.ions[self.keys[ii+self.page*6]]['EWlims'] = EWlims
                     Plotting(self,ii,modify=False,Print=False)
-                    
+
         if event.key in ['0','1','2']: #detection, upperlimit, lower limit
             key_idx = self.page*6 +self.Ridx
             self.ions[self.keys[key_idx]]['flag'] = int(event.key)
@@ -392,6 +367,7 @@ class mainWindow(QtWidgets.QTabWidget):
                 for ii in range(self.nions[self.page]):
                     Plotting(self,ii,modify=False,Print=True)
             
+    
 
         
 #------------------------------click button events----------------------------#        
@@ -400,7 +376,7 @@ class mainWindow(QtWidgets.QTabWidget):
          
         if event.button in [1,3]:
             '''Left hand side is for fitting'''
-           
+                        
                 # if not first canvas, +6 per pae is needed to appropraitely index the ions
             if self.Lidx is not None:
 
@@ -434,22 +410,25 @@ class mainWindow(QtWidgets.QTabWidget):
                         
                         
                     
-        '''Right hand side for picking velocity limits for EW measurements'''
-        if self.Ridx is not None:
-            key_idx = (self.page*6)+self.Ridx
+                '''Right hand side for picking velocity limits for EW measurements'''
+            check = []; 
+                        
+                
+            if self.Ridx is not None:
+                key_idx = (self.page*6)+self.Ridx
 
-            #if left click then define leftward vel limit
-            if event.button == 1:
-                self.EWlim[0] = event.xdata#used for plotting all with same range 'V' command
-                self.ions[self.keys[key_idx]]['EWlims'][0] = event.xdata
-                #plot selected limits
-                Plotting(self,self.Ridx,modify=False,Print=False)
+                    #if left click then define leftward vel limit
+                if event.button == 1:
+                    self.EWlim[0] = event.xdata#used for plotting all with same range 'V' command
+                    self.ions[self.keys[key_idx]]['EWlims'][0] = event.xdata
+                    #plot selected limits
+                    Plotting(self,self.Ridx,modify=False,Print=False)
 
-            #if right click define rightward vel limit
-            elif event.button == 3:
-                self.EWlim[1] = event.xdata
-                self.ions[self.keys[key_idx]]['EWlims'][1] = event.xdata
-                Plotting(self,self.Ridx,modify=False,Print=False)
+                    #if right click define rightward vel limit
+                elif event.button == 3:
+                    self.EWlim[1] = event.xdata
+                    self.ions[self.keys[key_idx]]['EWlims'][1] = event.xdata
+                    Plotting(self,self.Ridx,modify=False,Print=False)
 
                            
 
@@ -467,7 +446,7 @@ class Plotting:
         weight = parent.ions[parent.keys[key_idx]]['weight']
         name = parent.ions[parent.keys[key_idx]]['name']
         #L = parent.ions[parent.keys[key_idx]].L
-        wc =np.array(parent.ions[parent.keys[key_idx]]['wc'])&(error != 0) #error !=0 is a bad pixel mask 
+        wc =np.array(parent.ions[parent.keys[key_idx]]['wc']&(error != 0)) #error != 0 is a bad pixel mask 
         cont = parent.ions[parent.keys[key_idx]]['cont']
         window_lim = parent.ions[parent.keys[key_idx]]['window_lim']
         order = parent.ions[parent.keys[key_idx]]['order']
@@ -476,34 +455,34 @@ class Plotting:
 
         #--------------------------------------------------------------#
         if Print == False:
-            if modify == True: #modify is whether or not the continuum is being adjusted
+            #if modify == True, adjustments on LHS(continuum) are needed otherwise, only replot the RHS
+            if modify == True: 
                 #re-eval continuum
-
                 parent.ions[parent.keys[key_idx]]['pco']=L.Legendre.fit(wave[wc],flux[wc],order,w=weight[wc])
                 parent.ions[parent.keys[key_idx]]['cont'] = parent.ions[parent.keys[key_idx]]['pco'](wave)
                 cont = parent.ions[parent.keys[key_idx]]['cont']
+                
+                #bad pixel flag could mess this up! need to test
                 if wc[0] == True:
                     gray_idx = np.where(np.diff(wc,prepend=np.nan))[0][1:]
                 else:
                     gray_idx = np.where(np.diff(wc,prepend=np.nan))[0]
                     
+                parent.axesL[parent.page][ii].clear()
+                parent.axesL[parent.page][ii].step(vel,flux,color='k',where='mid');parent.axesL[parent.page][ii].step(vel,error,color='r',where='mid')
+                parent.axesL[parent.page][ii].step(vel,cont,color='b',where='mid')
+                for zz in range(int(len(gray_idx)/2)):
+                    parent.axesL[parent.page][ii].step(vel[gray_idx[zz*2]:gray_idx[2*zz+1]],flux[gray_idx[2*zz]:gray_idx[2*zz+1]],vel[gray_idx[2*zz]:gray_idx[2*zz+1]],error[gray_idx[2*zz]:gray_idx[2*zz+1]],color='lightgray',linewidth=1.3,alpha=1)
+                    
 
             #clear axes to redraw modifications
-            parent.axesL[parent.page][ii].clear()
             parent.axesR[parent.page][ii].clear()
 
-            #replot left (flux; error)
-            parent.axesL[parent.page][ii].step(vel,flux,color='k',where='mid');parent.axesL[parent.page][ii].step(vel,error,color='r',where='mid')
-            parent.axesL[parent.page][ii].step(vel,cont,color='b',where='mid')
+
             #replot right (flux; error)
             parent.axesR[parent.page][ii].step(vel,flux/cont,color='k',where='mid');parent.axesR[parent.page][ii].step(vel,error/cont,color='r',where='mid')
             parent.axesR[parent.page][ii].axhline(y=1,xmin=window_lim[0],xmax=window_lim[1],ls='--',c='b')
             
-            #plotting grayed spectra
-            if modify == True:
-                for zz in range(int(len(gray_idx)/2)):
-                    parent.axesL[parent.page][ii].step(vel[gray_idx[zz*2]:gray_idx[2*zz+1]],flux[gray_idx[2*zz]:gray_idx[2*zz+1]],vel[gray_idx[2*zz]:gray_idx[2*zz+1]],error[gray_idx[2*zz]:gray_idx[2*zz+1]],color='lightgray',linewidth=1.3,alpha=1)
-
 
             #clear y ticks and label plots
             parent.axesL[parent.page][ii].set_yticks([]); #parent.axesR[i][ii].set_yticks([])
@@ -552,11 +531,7 @@ class Plotting:
             plotText(parent,parent.ions[parent.keys[key_idx]])
             text = parent.ions[parent.keys[key_idx]]['text']
             xlim = parent.ions[parent.keys[key_idx]]['EWlims'][0]
-            #EWtoggle = parent.axesR[parent.page][ii].text(-850,1.8,text)
-            EWtoggle = parent.axesR[parent.page][ii].text(x=0.05, y=0.815, s=text, fontsize=12, transform=parent.axesR[parent.page][ii].transAxes)
-
-
-
+            EWtoggle = parent.axesR[parent.page][ii].text(-850,1.8,text)
             parent.ions[parent.keys[key_idx]]['EW_text'] = EWtoggle
             parent.figs[parent.page].canvas.draw()
             
@@ -680,14 +655,15 @@ class initialize:
             parent.axesL[parent.page][ii] = parent.figs[parent.page].add_subplot(6,2,2*ii+1)
             parent.axesR[parent.page][ii] = parent.figs[parent.page].add_subplot(6,2,2*(ii+1))
             parent.figs[parent.page].subplots_adjust(hspace=0.01)
-            Plotting(parent,ii)
+            Plotting(parent,ii,modify=True)
 
 
         # Set up connectivity and Need to set click focus for keyboard functionality
         parent.figs[parent.page].canvas.setFocusPolicy( QtCore.Qt.ClickFocus )
         parent.figs[parent.page].canvas.setFocus()            
-        
-#creates a separate window to display key and click commands        
+
+
+
 class HelpWindow(QtWidgets.QWidget):
 
     def __init__(self,parent=None):
@@ -695,11 +671,94 @@ class HelpWindow(QtWidgets.QWidget):
         self.resize(400,500)
         label = QtWidgets.QLabel(HELP,self)
         
+class SavePage(QtWidgets.QWidget):
+    def __init__(self,parentvals,parent=None):
+        super(SavePage, self).__init__(parent)
+        self.resize(700,400)
+        
+        def onpdf(self,parentvals):
+            # need to eliminate highlighted axes
+            for pos in ['top','bottom','left','right']:
+                parentvals.old_axes.spines[pos].set_edgecolor('black')
+                parentvals.old_axes.spines[pos].set_linewidth(0.5)
+            figurefile = self.pdfline.text()
+            i = 1
+            for figures in parentvals.figs:
+                figures.savefig(figurefile[:-4]+str(i)+'.pdf',bbox_inches='tight')
+                i = i+1
+            self.pdfsave.setStyleSheet('background-color : green')
+        def ontable(self,parentvals,Table_e):
+            savefile = self.tableline.text()
+            ascii.write(Table_e,savefile,overwrite=True)
+            #how to display to user it has been saved?
+            self.tablesave.setStyleSheet("background-color : green")
+
+            
+        def onpickle(self,parentvals):
+            pfile = self.pickleline.text()
+            with open(pfile,'wb') as pklfile:
+                pickle.dump(parentvals.ions,pklfile,protocol=pickle.HIGHEST_PROTOCOL)
+            self.picklesave.setStyleSheet('background-color : green')
+            
+        # want to print out table to the user regardless of whether it is saved
+        Table_e = Table()
+        Table_e['Transitions'] = parentvals.keys
+        EW=[];EWsig=[];N=[];Nsig=[];Vel = []
+        EWlims_low = []; EWlims_high = []
+        for ion in parentvals.keys:
+            EW.append(np.round(parentvals.ions[ion]['EW']*1000,2))
+            EWsig.append(np.round(parentvals.ions[ion]['EWsig']*1000,2))
+            N.append(np.round(np.log10(parentvals.ions[ion]['N']),2))
+            Nsig.append(np.round(np.log10(parentvals.ions[ion]['Nsig']),2))
+            Vel.append(np.round(parentvals.ions[ion]['med_vel'],2))
+            EWlims_low.append(np.round(parentvals.ions[ion]['EWlims'][0],2))
+            EWlims_high.append(np.round(parentvals.ions[ion]['EWlims'][1],2))
+        Table_e['EW'] = EW; Table_e['EWsig'] = EWsig; Table_e['Vmin']=EWlims_low
+        Table_e['Vmax'] = EWlims_high
+        Table_e['N'] = N; Table_e['Nsig'] = Nsig; Table_e['Vel']=Vel
+        print(Table_e)
+        
+        #pdf save
+        pdflabel = QLabel("Enter path and filename: (e.g. pathname\Ions.pdf)",self)
+        pdflabel.setGeometry(100,100,400,30)
+        
+        self.pdfline = QLineEdit(self)
+        self.pdfline.setText('Spectrum_Analysis_z_'+str(parentvals.z)+'_Ions.pdf')
+        self.pdfline.setGeometry(100,125,300,30)
+        
+        self.pdfsave = QPushButton("save PDF",self)
+        self.pdfsave.setGeometry(410,125,200,30)
+        self.pdfsave.clicked.connect(lambda: onpdf(self,parentvals))
+        #table save
+        tablelabel = QLabel("Enter path and filename: (e.g. pathname\Table.dat)",self)
+        tablelabel.setGeometry(100,175,400,30)
+        
+        self.tableline = QLineEdit(self)
+        self.tableline.setText("Spectrum_Analysis_z_"+str(parentvals.z)+"_Measurement_Table.dat")
+        self.tableline.setGeometry(100,200,300,30)
+        
+        self.tablesave = QPushButton("Save Table",self)
+        self.tablesave.setGeometry(410,200,200,30)
+        self.tablesave.clicked.connect(lambda: ontable(self,parentvals,Table_e))
+        
+        #pickle save
+        picklelabel = QLabel("Enter path and filename: (e.g. pathname\Table.p)",self)
+        picklelabel.setGeometry(100,250,400,30)
+        
+        self.pickleline = QLineEdit(self)
+        self.pickleline.setText("Spectrum_Analysis_z_"+str(parentvals.z)+".p")
+        self.pickleline.setGeometry(100,275,300,30)
+        
+        self.picklesave = QPushButton("Save Progress",self)
+        self.picklesave.setGeometry(410,275,200,30)
+        self.picklesave.clicked.connect(lambda: onpickle(self,parentvals))
+
+        
 #Initial inputs and callable class to run proram        
 class Transitions:
     def __init__(self,Abs,intervening=False):
         app = QtWidgets.QApplication(sys.argv)
-        # Force the style to be the same on all OSs:
+         # Force the style to be the same on all OSs:
         app.setStyle("Fusion")
 
         # Now use a palette to switch to dark colors:
@@ -721,4 +780,3 @@ class Transitions:
 
         main.show()
         sys.exit(app.exec_())
-        
