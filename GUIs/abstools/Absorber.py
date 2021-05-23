@@ -57,8 +57,6 @@ class Absorber:
                 ion_dict['order'] = 4 #order of poly fit
                 ion_dict['pco']=L.Legendre.fit(ion_dict['wave'][ion_dict['wc']],ion_dict['flux'][ion_dict['wc']],ion_dict['order'],w=ion_dict['weight'][ion_dict['wc']])
                 ion_dict['cont'] = ion_dict['pco'](ion_dict['wave'])
-                #resett the wc so the plotter can mask as many absorbers as needed for fixing
-                ion_dict['wc'] = [True]*len(ion_dict['wc'])
 
 
             '''Property initializations:'''
