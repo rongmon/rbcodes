@@ -2,13 +2,17 @@ import numpy as np
 from IGM import rb_setline as line       
 from utils import rb_utility as rt
 import matplotlib as mpl
+#mpl.use('TkAgg')
 mpl.rcParams['lines.linewidth'] = .9
 clr=rt.rb_set_color()
 from GUIs.abstools import Absorber as A
-
 import matplotlib.pyplot as plt 
 plt.style.use('dark_background')
+
 import sys
+from PyQt5.QtWidgets import (QApplication, QWidget, QPushButton, 
+QLineEdit, QInputDialog)
+
 
 def prepare_absorber_object(z_abs,wave,flux,error,line_flg='LLS',vlim=[-1000,1000]):
     
@@ -37,6 +41,7 @@ def prepare_absorber_object(z_abs,wave,flux,error,line_flg='LLS',vlim=[-1000,100
 
 class vStack(object):
     def __init__(self,wave,flux,error,line_flg,zabs=0,vlim=[-1000.,1000.]):  
+
         self.zabs=zabs
         self.vlim=vlim
         self.ions=prepare_absorber_object(zabs,wave,flux,error,line_flg='LLS')
@@ -51,7 +56,7 @@ class vStack(object):
         #Flag to know if it is a detection or not
         #Set everything by default to non-detection
         for i in (self.keys):
-        	self.ions[i]['flag']=2
+            self.ions[i]['flag']=0
         
         
         #-----Sorting out how many pages are needed---------#
@@ -84,7 +89,23 @@ class vStack(object):
         # global axesL,axesR,spec,pfile
         if event.key=='Q':
             plt.close()
+            sys.exit()
             # print 'Ending setv'
+        #set up custom y-limit
+        elif event.key=='Y':
+            if event.inaxes in self.axes:
+                i=np.where(event.inaxes==self.axes)[0][0]+self.plotppage*(self.page-1)
+                Windowname='Manual y-Limits'
+                instruction_text='Input range (e.g. 0.,2.)'
+                temp=input_txt_dlg(Windowname,instruction_text)
+                yrangetext=temp.filename
+
+                yrange = yrangetext.split(',')
+                yrange = np.array(yrange).astype('float32')
+                self.vPlot(ploti=i,yrange=[yrange[0],yrange[1]])
+
+
+
         elif event.key=='>':
             self.page+=1
             if self.page>self.npages: 
@@ -98,13 +119,24 @@ class vStack(object):
                 print(self.page)
             # print self.page
             self.vPlot()
-        elif event.key in ['1','2','3']: #Detected,non-detected, blended-detection            
+        #Toggle between detection-non-detection or blended    
+        elif event.key =='w': #Detected,non-detected, blended-detection            
             if event.inaxes in self.axes:
                 i=np.where(event.inaxes==self.axes)[0][0]+self.plotppage*(self.page-1)
-                self.ions[self.keys[i]]['flag']=int(event.key)
+                #set up a dumb toggling cycle
+                temp_flag=self.ions[self.keys[i]]['flag']+1
+
+                if temp_flag==0:
+                    temp_flag =1
+                elif temp_flag==1:
+                    temp_flag==2
+                else:
+                    temp_flag=0
+                self.ions[self.keys[i]]['flag']= temp_flag#
+                #print(self.ions[self.keys[i]]['flag'])
                 self.vPlot(ploti=i,comment=False)
         elif event.key=='S':
-        	self.Print_Selected_LineList()
+            self.Print_Selected_LineList()
 
         elif event.key=='?':
             print('''
@@ -115,10 +147,11 @@ class vStack(object):
             >: next page
             <: previous page
             S: Save the List of identified absorbers. [Still need to be implemented]
-            1/2/3 : Flag absorber as (1) Detection , (2) Non-Detection, or (3) Blended Detectin.
+            w : Toggle between (1) Detection , (2) Non-Detection.
+            Y : Set custom y-limit
             ''')
 
-    def vPlot(self,ploti=None,comment=False):#spec,i=0):
+    def vPlot(self,ploti=None,comment=False,yrange=None):#spec,i=0):
         # global axesR
         # for line in self.transitions[self.page : self.page+self.plotppage]:
         if ploti is None:
@@ -128,11 +161,11 @@ class vStack(object):
             # ploti=range(self.plotppage)+self.plotppage*(self.page-1)
         # pdb.set_trace()
         for i in ploti:
-            self.plotstuff(i,comment=comment)
+            self.plotstuff(i,comment=comment,yrange=yrange)
         plt.draw()
 
         
-    def plotstuff(self,i,comment=False):
+    def plotstuff(self,i,comment=False,yrange=False):
         ax=self.axes[i % self.plotppage]
         #---------------Define variables for readability--------------#
         vel = self.ions[self.keys[i]]['vel']
@@ -155,34 +188,35 @@ class vStack(object):
         ax.step(vel,flux/np.nanmean(flux),where='mid',color=clr['teal'])
         ax.step(vel,error/np.nanmean(flux),where='mid',color=clr['orange2'])
         
-        ax.axhline(1)
-        ax.axvline(0,color='k',linestyle='dotted')
+        ax.axhline(1,color=clr['light_gray'],linestyle='dotted')
+        ax.axvline(0,color=clr['light_gray'],linestyle='dotted')
         ax.text(x=0.05, y=0.815, s=name, fontsize=10, transform=ax.transAxes,color=clr['red'])
         ax.text(x=0.75, y=0.815, s='f0: '+str(f0), fontsize=10, transform=ax.transAxes,color=clr['red'])
         
         if comment != False:
             ax.text(x=0.85, y=0.815, s=comment, fontsize=12, transform=ax.transAxes,color=clr['teal'])
-            
+        if yrange != False:
+            ax.set_ylim(yrange)
 
         
         if flag is not None: #Display some measurement
-            text=self.plotText(flag=flag)
+            textout=self.plotText(flag=flag)
+            #print(flag)
             if flag==1:
-            	textcolor=clr['yellow']
+                textcolor=clr['yellow']
             else:
-            	textcolor=clr['light_gray']
-            ax.text(x=0.05, y=0.01, s=text, fontsize=12, transform=ax.transAxes,color=textcolor)
+                textcolor=clr['light_gray']
+            ax.text(x=0.05, y=0.01, s=textout, fontsize=12, transform=ax.transAxes,color=textcolor)
         plt.draw()
 
     
     
     def plotText(self,flag=1):
         if flag==1:
-            text='Deteaction'       # Upper Limit
+            text='Detection'       
+        elif flag==0:
+            text='Non-Detection'      
         elif flag==2:
-            text='Non-Detection'       # Upper Limit
-        # Lower Limit [only for logN]
-        elif flag==3:
             text ='Blended-detection'
         return text
        
@@ -190,40 +224,76 @@ class vStack(object):
     def Print_Selected_LineList(self):
 
         pfile='LineList_Identified.log'
+        print('-----------------------------')
+
+        print('                             ')
+        print('                             ')
+
         #uname=input('Saving to '+pfile+'. Return to confirm, or enter a new name or c to cancel: ' )
         
         #if uname=='c':
         #    return
         #elif uname!='':
         #    pfile=uname
+        Windowname='Save LineList'
+        instruction='Enter filename:'
+
+        temp=input_txt_dlg(Windowname,instruction,default_text=pfile)
+        pfile=temp.filename
+        print('-----------------------------')
+
+        print('Saving to: '+pfile)
         #import pandas as pd
+        from astropy.io import ascii
+        from astropy.table import Table
+
 
         # Create a pandas dataframe for objects marked as detections or blends
         #loop through ions and extract all the identified lines
-
+        lst1 = []
+        lst2=[]
+        lst3=[]
         for i in (self.keys):
-        	#name = self.ions[self.keys[i]]['name']
-        	if self.ions[i]['flag']==1:
-        		print(self.ions[i]['name']+' '+np.str('%.6f' % self.ions[i]['lam_0_z'])+' '+np.str(self.ions[i]['z']))
-        
-    #logfile=get(handles.logfile,'String');
-    #logname=[handles.PathName  logfile];
-    #fileID = fopen(logname,'a+');
-    #%fprintf(fileID,'%6s %12s\n','x','exp(x)');
-    #%fprintf(fileID,'%6.2f %12.8f\n',A);
-    
-    
-    #display('Start Printing Line Lists')
-   #z_abs=str2double(get(handles.z_guess,'String'));
-   #     for ind=1:length(handles.l_str.species)
-   #         ss=get(handles.hcb(ind));
-   #         if ss.Value==1
-   #             tab=[ss.String  '  '  num2str(handles.l_str.lambda(ind)*(1.+z_abs))  ' '  num2str(z_abs)];
-   #             formatspec=['%'  num2str(length(tab))  's\n'];
-   #            fprintf(formatspec,tab);
-   #             fprintf(fileID,formatspec,tab);
-   #             
-   #         end
-   #     end
-   #fclose(fileID);  
+            #name = self.ions[self.keys[i]]['name']
+            if self.ions[i]['flag']==1:
+                #print(self.ions[i]['name']+' '+np.str('%.6f' % self.ions[i]['lam_0_z'])+' '+np.str(self.ions[i]['z']))
+                zip1=self.ions[i]['name']
+                zip2=np.str('%.6f' % self.ions[i]['lam_0_z'])#self.ions[i]['lam_0_z']#
+                zip3=self.ions[i]['z']#np.str(self.ions[i]['z'])
+                lst1.append(zip1)
+                lst2.append(zip2)
+                lst3.append(zip3)
 
+
+        df = Table([lst1, lst2, lst3], names=('Name', 'wave_obs','zabs'))
+        ascii.write(df, pfile, delimiter=' ',overwrite=True)
+        
+
+class popup_windows(QWidget):
+    def __init__(self,Windowname,instruction,default_text='test'):
+        super().__init__()
+        filename=self.initUI(Windowname,instruction,default_text=default_text)
+
+        self.filename=filename
+
+    def initUI(self,Windowname,instruction,default_text='test'):
+
+        text, ok = QInputDialog.getText(self, Windowname, instruction)
+        #self.tableline.setText("Spectrum_Analysis_z_"+str(parentvals.z)+"_Measurement_Table.dat")
+
+        if ok:
+            self.filename=text
+        return text
+
+
+
+#Initial inputs and callable class to run proram        
+class input_txt_dlg:
+    def __init__(self,Windowname,instruction,default_text='test'):
+        app = QApplication(sys.argv)
+        main = popup_windows(Windowname,instruction,default_text=default_text)
+        self.filename=main.filename
+        #main.show()
+        #sys.exit(app.exec_())
+
+        
