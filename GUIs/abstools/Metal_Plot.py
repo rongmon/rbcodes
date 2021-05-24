@@ -519,7 +519,11 @@ class Plotting:
                 outlist=grab_intervening_linelist(parent.intervening,np.double(parent.z),lam_0,wave)
                 plot_intervening_lines( parent.axesR[parent.page][ii],outlist,np.max(vel))
 
-
+            #plot fvals
+            xloc = parent.axesR[parent.page][ii].get_xlim()[1]
+            yloc = parent.axesR[parent.page][ii].get_ylim()[1]
+            parent.axesR[parent.page][ii].text(xloc*0.8,yloc*0.9,'f: '+str(fval))
+            
             #redraw MUST BE LAST ITEM IN LIST
             parent.figs[parent.page].canvas.draw()
 
