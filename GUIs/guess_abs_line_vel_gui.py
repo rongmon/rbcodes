@@ -254,14 +254,17 @@ class vStack(object):
         
 
 class popup_windows(QWidget):
-    def __init__(self,Windowname,instruction):
+    def __init__(self,Windowname,instruction,default_text='test'):
         super().__init__()
-        filename=self.initUI(Windowname,instruction)
+        filename=self.initUI(Windowname,instruction,default_text=default_text)
+
         self.filename=filename
 
-    def initUI(self,Windowname,instruction):
+    def initUI(self,Windowname,instruction,default_text=test):
 
         text, ok = QInputDialog.getText(self, Windowname, instruction)
+        #self.tableline.setText("Spectrum_Analysis_z_"+str(parentvals.z)+"_Measurement_Table.dat")
+
         if ok:
             self.filename=text
         return text
@@ -270,9 +273,9 @@ class popup_windows(QWidget):
 
 #Initial inputs and callable class to run proram        
 class input_txt_dlg:
-    def __init__(self,Windowname,instruction):
+    def __init__(self,Windowname,instruction,default_text='Test'):
         app = QApplication(sys.argv)
-        main = popup_windows(Windowname,instruction)
+        main = popup_windows(Windowname,instruction,default_text=default_text)
         self.filename=main.filename
         #main.show()
         #sys.exit(app.exec_())
