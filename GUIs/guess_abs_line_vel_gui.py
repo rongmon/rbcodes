@@ -91,6 +91,21 @@ class vStack(object):
             plt.close()
             sys.exit()
             # print 'Ending setv'
+        #set up custom y-limit
+        elif event.key=='Y':
+            if event.inaxes in self.axes:
+                i=np.where(event.inaxes==self.axes)[0][0]+self.plotppage*(self.page-1)
+                Windowname='Manual y-Limits'
+                instruction_text='Input range (e.g. 0.,2.)'
+                temp=input_txt_dlg(Windowname,instruction_text)
+                yrangetext=temp.filename
+
+                yrange = yrangetext.split(',')
+                yrange = np.array(yrange).astype('float32')
+                self.vPlot(ploti=i,yrange=[yrange[0],yrange[1]])
+
+
+
         elif event.key=='>':
             self.page+=1
             if self.page>self.npages: 
@@ -118,7 +133,6 @@ class vStack(object):
                 else:
                     temp_flag=0
                 self.ions[self.keys[i]]['flag']= temp_flag#
-                print(temp_flag)
                 #print(self.ions[self.keys[i]]['flag'])
                 self.vPlot(ploti=i,comment=False)
         elif event.key=='S':
@@ -134,9 +148,10 @@ class vStack(object):
             <: previous page
             S: Save the List of identified absorbers. [Still need to be implemented]
             w : Toggle between (1) Detection , (2) Non-Detection.
+            Y : Set custom y-limit
             ''')
 
-    def vPlot(self,ploti=None,comment=False):#spec,i=0):
+    def vPlot(self,ploti=None,comment=False,yrange=None):#spec,i=0):
         # global axesR
         # for line in self.transitions[self.page : self.page+self.plotppage]:
         if ploti is None:
@@ -146,11 +161,11 @@ class vStack(object):
             # ploti=range(self.plotppage)+self.plotppage*(self.page-1)
         # pdb.set_trace()
         for i in ploti:
-            self.plotstuff(i,comment=comment)
+            self.plotstuff(i,comment=comment,yrange=yrange)
         plt.draw()
 
         
-    def plotstuff(self,i,comment=False):
+    def plotstuff(self,i,comment=False,yrange=False):
         ax=self.axes[i % self.plotppage]
         #---------------Define variables for readability--------------#
         vel = self.ions[self.keys[i]]['vel']
@@ -180,7 +195,8 @@ class vStack(object):
         
         if comment != False:
             ax.text(x=0.85, y=0.815, s=comment, fontsize=12, transform=ax.transAxes,color=clr['teal'])
-            
+        if yrange != False:
+            ax.set_ylim(yrange)
 
         
         if flag is not None: #Display some measurement
@@ -222,7 +238,7 @@ class vStack(object):
         Windowname='Save LineList'
         instruction='Enter filename:'
 
-        temp=input_txt_dlg(Windowname,instruction)
+        temp=input_txt_dlg(Windowname,instruction,default_text=pfile)
         pfile=temp.filename
         print('-----------------------------')
 
@@ -260,7 +276,7 @@ class popup_windows(QWidget):
 
         self.filename=filename
 
-    def initUI(self,Windowname,instruction,default_text=test):
+    def initUI(self,Windowname,instruction,default_text='test'):
 
         text, ok = QInputDialog.getText(self, Windowname, instruction)
         #self.tableline.setText("Spectrum_Analysis_z_"+str(parentvals.z)+"_Measurement_Table.dat")
@@ -273,7 +289,7 @@ class popup_windows(QWidget):
 
 #Initial inputs and callable class to run proram        
 class input_txt_dlg:
-    def __init__(self,Windowname,instruction,default_text='Test'):
+    def __init__(self,Windowname,instruction,default_text='test'):
         app = QApplication(sys.argv)
         main = popup_windows(Windowname,instruction,default_text=default_text)
         self.filename=main.filename
