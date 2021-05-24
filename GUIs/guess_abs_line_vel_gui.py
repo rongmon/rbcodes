@@ -219,8 +219,10 @@ class vStack(object):
         #    return
         #elif uname!='':
         #    pfile=uname
+        Windowname='Save LineList'
+        instruction='Enter filename:'
 
-        temp=input_save_filename(pfile)
+        temp=input_txt_dlg(Windowname,instruction)
         pfile=temp.filename
         print('-----------------------------')
 
@@ -252,14 +254,14 @@ class vStack(object):
         
 
 class popup_windows(QWidget):
-    def __init__(self,pfile):
+    def __init__(self,Windowname,instruction):
         super().__init__()
-        filename=self.initUI(pfile)
+        filename=self.initUI(Windowname,instruction)
         self.filename=filename
 
-    def initUI(self,pfile):
+    def initUI(self,Windowname,instruction):
 
-        text, ok = QInputDialog.getText(self, 'Save LineList', 'Enter filename:')
+        text, ok = QInputDialog.getText(self, Windowname, instruction)
         if ok:
             self.filename=text
         return text
@@ -267,11 +269,12 @@ class popup_windows(QWidget):
 
 
 #Initial inputs and callable class to run proram        
-class input_save_filename:
-    def __init__(self,pfile):
+class input_txt_dlg:
+    def __init__(self,Windowname,instruction):
         app = QApplication(sys.argv)
-        main = popup_windows(pfile)
+        main = popup_windows(Windowname,instruction)
         self.filename=main.filename
         #main.show()
         #sys.exit(app.exec_())
+
         
