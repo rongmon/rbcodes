@@ -26,7 +26,7 @@ error=a[1].data['error'][0]
 
 z=0.017
 lines=[1215.67,1260,1334,1393.9,1402,1548.3,1550,1526,1670]
-absys=A.Absorber(z,wave,flux,error,lines)   
+absys=A.Absorber(z,wave,flux,error,lines=lines)   
 Abs=absys.ions
 
 # Interevening absorption line list
