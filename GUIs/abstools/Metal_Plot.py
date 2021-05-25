@@ -126,9 +126,9 @@ def plot_intervening_lines(ax,outlist,delv):
                 else:
                     color='b'
                 ax.text(vellist[index],1.05, np.str(outlist['ion'][index])+' '+ np.str(outlist['wrest'][index]),
-                    fontsize=4,rotation=90, rotation_mode='anchor',color=color)
-                ax.text(vellist[index]+25.,1.05, 'z = '+np.str('%.3f' % outlist['zobs'][index]),
-                    fontsize=4,rotation=90, rotation_mode='anchor',color=color)
+                    fontsize=8,rotation=90, rotation_mode='anchor',color=color)
+                ax.text(vellist[index]+50.,1.05, 'z = '+np.str('%.3f' % outlist['zobs'][index]),
+                    fontsize=8,rotation=90, rotation_mode='anchor',color=color)
 
 
 
@@ -452,6 +452,8 @@ class Plotting:
         order = parent.ions[parent.keys[key_idx]]['order']
         EWlims = parent.ions[parent.keys[key_idx]]['EWlims']
         lam_0=parent.ions[parent.keys[key_idx]]['lam_0']
+        fvals=parent.ions[parent.keys[key_idx]]['f']
+
 
         #--------------------------------------------------------------#
         if Print == False:
@@ -520,9 +522,9 @@ class Plotting:
                 plot_intervening_lines( parent.axesR[parent.page][ii],outlist,np.max(vel))
 
             #plot fvals
-            xloc = parent.axesR[parent.page][ii].get_xlim()[1]
-            yloc = parent.axesR[parent.page][ii].get_ylim()[1]
-            parent.axesR[parent.page][ii].text(xloc*0.8,yloc*0.9,'f: '+str(fval))
+            #xloc = parent.axesR[parent.page][ii].get_xlim()[1]
+            #yloc = parent.axesR[parent.page][ii].get_ylim()[1]
+            parent.axesR[parent.page][ii].text(0.85,0.85,'f: '+np.str('%.4f' % fvals),transform=parent.axesR[parent.page][ii].transAxes,color=clr['teal'])
             
             #redraw MUST BE LAST ITEM IN LIST
             parent.figs[parent.page].canvas.draw()
@@ -535,7 +537,7 @@ class Plotting:
             plotText(parent,parent.ions[parent.keys[key_idx]])
             text = parent.ions[parent.keys[key_idx]]['text']
             xlim = parent.ions[parent.keys[key_idx]]['EWlims'][0]
-            EWtoggle = parent.axesR[parent.page][ii].text(-850,1.8,text)
+            EWtoggle = parent.axesR[parent.page][ii].text(.05,0.85,text, transform=parent.axesR[parent.page][ii].transAxes)
             parent.ions[parent.keys[key_idx]]['EW_text'] = EWtoggle
             parent.figs[parent.page].canvas.draw()
             
