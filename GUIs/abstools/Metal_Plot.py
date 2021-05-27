@@ -195,12 +195,25 @@ class mainWindow(QtWidgets.QTabWidget):
 #---------------------Save Button/function----------------# 
         def onsave(self):
             self.savepg = SavePage(self)
-            self.savepg.show()
+            if self.savepg.closewin == None:
+                return None
+            else:
+                self.savepg.show()
         openButton = QPushButton("Save",  self)
         openButton.setGeometry(430,30,200,30)
         openButton.clicked.connect(lambda: onsave(self))
 
 #--------------------------------------------------------------#
+
+
+#----------------------show active page----------------------------------------#
+        self.PageLabel = QtWidgets.QLabel("Page: " + str(self.currentIndex()+1)+"/"+str(len(self.figs)),self)
+        self.PageLabel.setStyleSheet("font: 16pt;color: black;background-color:white")
+        self.PageLabel.setGeometry(630,850,200,30)
+        def getPage(self):
+            self.page = self.currentIndex()
+            self.PageLabel.setText("Page: " + str(self.page+1)+"/"+str(len(self.figs)))
+        self.currentChanged.connect(lambda: getPage(self))
             
 #-------------------Add Ion Button------------------------------# 
         def NewTransition(self):
@@ -713,6 +726,25 @@ class SavePage(QtWidgets.QWidget):
         EW=[];EWsig=[];N=[];Nsig=[];Vel = []
         EWlims_low = []; EWlims_high = []
         for ion in parentvals.keys:
+            
+            #if user has not completed measurements, need to verify they still want to save
+            #if yes, replace Nonetype with NaN, if no return to app
+            for items in parentvals.ions[ion]:
+                if np.any(parentvals.ions[ion][items] == None):
+                    reply = QMessageBox.question(self, 'Message', "Unevaluated ions, proceed to save?",
+                                            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                    if reply == QMessageBox.Yes:
+                        for ions in parentvals.keys:
+                            for item in parentvals.ions[ions]:
+                                if np.any(parentvals.ions[ions][item] == None):
+                                    parentvals.ions[ions][item] = np.NaN
+                    else:
+                        self.closewin = None
+                        return self.closewin
+                else:
+                    self.closewin = False
+                
+                    
             EW.append(np.round(parentvals.ions[ion]['EW']*1000,2))
             EWsig.append(np.round(parentvals.ions[ion]['EWsig']*1000,2))
             N.append(np.round(np.log10(parentvals.ions[ion]['N']),2))
@@ -786,4 +818,4 @@ class Transitions:
         main.resize(1400,900)
 
         main.show()
-        sys.exit(app.exec_())
+        app.exec_()
