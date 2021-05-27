@@ -180,6 +180,8 @@ class mainWindow(QtWidgets.QTabWidget):
             self.axesR[0][ii] = self.figs[0].add_subplot(6,2,2*(ii+1))
             self.figs[self.page].subplots_adjust(hspace=0.01)
             Plotting(self,ii,modify=True)
+        #self.axesL=np.array(self.axesL)
+        #self.axesR=np.array(self.axesR)        
             
          # Set up connectivity
         self.cid1 = self.figs[0].canvas.mpl_connect("button_press_event", self.onclick)
@@ -243,9 +245,12 @@ class mainWindow(QtWidgets.QTabWidget):
         
     def onmotion(self,event):
         if event.xdata != None and event.ydata != None:
+            #i=np.where( (event.inaxes==self.axesL)| (event.inaxes==self.axesR))[0][0]
+            #self.pages=i
             for qq in range(len(self.axesL)):
                 if (event.inaxes in self.axesL[qq]) | (event.inaxes in self.axesR[qq]) :
                     self.page = qq
+            
             for ii in range(len(self.axesL[self.page])):
                 if (self.axesL[self.page][ii]==event.inaxes): 
                     self.Lidx = ii; self.Ridx = None
