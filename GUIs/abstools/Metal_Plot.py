@@ -201,6 +201,16 @@ class mainWindow(QtWidgets.QTabWidget):
         openButton.clicked.connect(lambda: onsave(self))
 
 #--------------------------------------------------------------#
+
+
+#----------------------show active page----------------------------------------#
+        self.PageLabel = QtWidgets.QLabel("Page: " + str(self.currentIndex()+1)+"/"+str(len(self.figs)),self)
+        self.PageLabel.setStyleSheet("font: 16pt;color: black;background-color:white")
+        self.PageLabel.setGeometry(630,850,200,30)
+        def getPage(self):
+            self.page = self.currentIndex()
+            self.PageLabel.setText("Page: " + str(self.page+1)+"/"+str(len(self.figs)))
+        self.currentChanged.connect(lambda: getPage(self))
             
 #-------------------Add Ion Button------------------------------# 
         def NewTransition(self):
@@ -786,4 +796,4 @@ class Transitions:
         main.resize(1400,900)
 
         main.show()
-        sys.exit(app.exec_())
+        app.exec_()
