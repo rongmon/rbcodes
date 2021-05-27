@@ -180,6 +180,8 @@ class mainWindow(QtWidgets.QTabWidget):
             self.axesR[0][ii] = self.figs[0].add_subplot(6,2,2*(ii+1))
             self.figs[self.page].subplots_adjust(hspace=0.01)
             Plotting(self,ii,modify=True)
+        #self.axesL=np.array(self.axesL)
+        #self.axesR=np.array(self.axesR)        
             
          # Set up connectivity
         self.cid1 = self.figs[0].canvas.mpl_connect("button_press_event", self.onclick)
