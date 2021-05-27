@@ -24,6 +24,10 @@ The GUIs folder contains several graphical user interfaces for astrophysics.
 	                     absorption lines at any redshifts, and do simple equivalent width and Gaussian
 	                     fitting. My version of x_specplot routine. Now updated to plot multiple absorbers
 	                     and load previously identified absorbers. 
+			 
+	5) abstools: A complex absorption line analysis GUI to simultaneously continuum fit and 
+		     measure EW/logN of several absorption lines. This is under GUIs/abstools. 
+		     Look up readme file in that folder for a working example.
 
 
 The IGM folder contains several python routines for intergalactic medium and circumgalactic medium calculations.
