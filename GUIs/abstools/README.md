@@ -70,5 +70,8 @@ M.Transitions(absys)
 
 Dependencies:- PyQt5, astropy, rbcodes, numpy, matpltolib, pickle
 
+May 2021.
+
 Brought to you by Sean Clark and Rongmon Bordoloi.
+
 Developed from a basic original code from Tom Cooper.
