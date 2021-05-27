@@ -741,6 +741,9 @@ class SavePage(QtWidgets.QWidget):
                     else:
                         self.closewin = None
                         return self.closewin
+                else:
+                    self.closewin = False
+                
                     
             EW.append(np.round(parentvals.ions[ion]['EW']*1000,2))
             EWsig.append(np.round(parentvals.ions[ion]['EWsig']*1000,2))
