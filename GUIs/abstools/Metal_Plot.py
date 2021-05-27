@@ -114,12 +114,12 @@ def plot_intervening_lines(ax,outlist,delv):
     # Other lines associated with current absorber = blue
     # All other intervening lines = Red
     if outlist['number']>0:
-        print('There are Intervening Lines!')
+        #print('There are Intervening Lines!')
         vellist=outlist['vel']
         relative_vel_z=outlist['delv']
         for index in range(0,outlist['number']):
             if (np.abs(vellist[index]) <delv):
-                print(vellist[index])
+                #print(vellist[index])
 
                 if np.abs(relative_vel_z[index]) >200.:
                     color =clr['pale_red']
