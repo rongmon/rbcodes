@@ -243,38 +243,42 @@ class mainWindow(QtWidgets.QTabWidget):
         
     def onmotion(self,event):
         if event.xdata != None and event.ydata != None:
+            #i=np.where( (event.inaxes==self.axesL)| (event.inaxes==self.axesR))[0][0]
+            #self.pages=i
+            for qq in range(len(self.axesL)):
+                if (event.inaxes in self.axesL[qq]) | (event.inaxes in self.axesR[qq]) :
+                    self.page = qq
             
-            self.page = np.where((np.asarray(self.axesL)==event.inaxes)|(np.asarray(self.axesR)==event.inaxes))[0][0]
-            if len(np.where(np.asarray(self.axesL[self.page]) == event.inaxes)[0]) == 0:
-                self.Lidx = None
-                self.Ridx = np.where(np.asarray(self.axesR[self.page])==event.inaxes)[0][0]
-                
-                if self.old_axes  and (self.old_axes != self.axesR[self.page][self.Ridx]):
-                    for pos in ['top','bottom','left','right']:
-                        self.old_axes.spines[pos].set_edgecolor('black')
-                        self.old_axes.spines[pos].set_linewidth(0.5)
-                    self.figs[self.page].canvas.draw()
-                if self.old_axes != self.axesR[self.page][self.Ridx]:
-                    for pos in ['top','bottom','left','right']:
-                        self.axesR[self.page][self.Ridx].spines[pos].set_edgecolor('#01DF01')
-                        self.axesR[self.page][self.Ridx].spines[pos].set_linewidth(2)
-                    self.figs[self.page].canvas.draw()
-                    self.old_axes = self.axesR[self.page][self.Ridx]
-                
-            else:
-                self.Ridx = None
-                self.Lidx = np.where(np.asarray(self.axesL[self.page]) == event.inaxes)[0][0]
-                if (self.old_axes != None) and (self.old_axes != self.axesL[self.page][self.Lidx]):
-                    for pos in ['top','bottom','left','right']:
-                        self.old_axes.spines[pos].set_edgecolor('black')
-                        self.old_axes.spines[pos].set_linewidth(0.5)
-                        
-                if self.old_axes != self.axesL[self.page][self.Lidx]:
+            for ii in range(len(self.axesL[self.page])):
+                if (self.axesL[self.page][ii]==event.inaxes): 
+                    self.Lidx = ii; self.Ridx = None
+                    if (self.old_axes != None) and (self.old_axes != self.axesL[self.page][self.Lidx]):
+                        for pos in ['top','bottom','left','right']:
+                            self.old_axes.spines[pos].set_edgecolor('black')
+                            self.old_axes.spines[pos].set_linewidth(0.5)
+                        self.figs[self.page].canvas.draw()
+                    if self.old_axes != self.axesL[self.page][self.Lidx]:
                         for pos in ['top','bottom','left','right']:
                             self.axesL[self.page][self.Lidx].spines[pos].set_edgecolor('#01DF01')
                             self.axesL[self.page][self.Lidx].spines[pos].set_linewidth(2)
                         self.figs[self.page].canvas.draw()
                         self.old_axes = self.axesL[self.page][self.Lidx]
+                    break
+
+                elif (self.axesR[self.page][ii]==event.inaxes):
+                    self.Ridx = ii; self.Lidx = None
+                    if self.old_axes  and (self.old_axes != self.axesR[self.page][self.Ridx]):
+                        for pos in ['top','bottom','left','right']:
+                            self.old_axes.spines[pos].set_edgecolor('black')
+                            self.old_axes.spines[pos].set_linewidth(0.5)
+                        self.figs[self.page].canvas.draw()
+                    if self.old_axes != self.axesR[self.page][self.Ridx]:
+                        for pos in ['top','bottom','left','right']:
+                            self.axesR[self.page][self.Ridx].spines[pos].set_edgecolor('#01DF01')
+                            self.axesR[self.page][self.Ridx].spines[pos].set_linewidth(2)
+                        self.figs[self.page].canvas.draw()
+                        self.old_axes = self.axesR[self.page][self.Ridx]
+                    break
 
 
 #----------------------key button events-----------------------------#            
