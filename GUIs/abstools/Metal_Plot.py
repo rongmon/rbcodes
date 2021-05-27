@@ -49,8 +49,8 @@ HELP =  '''
                 RHS: manually enter EW intergration limits
             V (RHS only): Use active subplot velocity limits for all RHS plots
             
-            left arrow: Increase Polynomial Order [default 4]
-            right arrow: Decrease Polynomial Order [default 4]
+            Up arrow: Increase Polynomial Order [default 4]
+            Down arrow: Decrease Polynomial Order [default 4]
 
             m: Measure EW/N for active subplot
             M: Measure EW/N for ALL subplots
@@ -311,8 +311,8 @@ class mainWindow(QtWidgets.QTabWidget):
                     Plotting(self,self.Ridx,modify=False,Print=False)
 
         
-        #right arrow key (directional) increases poly order 
-        if event.key == 'right':
+        #Up arrow key (directional) increases poly order 
+        if event.key == 'up':
             if self.Lidx is not None:
                 key_idx = self.page*6+self.Lidx
                 
@@ -322,7 +322,7 @@ class mainWindow(QtWidgets.QTabWidget):
                 print('click on a left transition window first')
                 
         #reduce polynomial        
-        if event.key == 'left':
+        if event.key == 'down':
             if self.Lidx is not None:
                 key_idx = self.page*6+self.Lidx
 #                 if self.page == 0:
