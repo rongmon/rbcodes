@@ -248,11 +248,11 @@ class mainWindow(QtWidgets.QTabWidget):
 
 #-------HELP------#
         def opensub(self):
-            filename=resource_filename('GUIs','abstools/Help.html')
-            print(filename)
-            webbrowser.open_new_tab(filename)
-#             self.sub = HelpWindow()
-#             self.sub.show()
+            #filename='file://'+resource_filename('GUIs','abstools/Help.html')
+            #print(filename)
+            #webbrowser.open(filename,new=1)
+            self.sub = HelpWindow()
+            self.sub.show()
             
         openButton = QPushButton("Help",  self)
         openButton.setGeometry(830,30,200,30)
@@ -688,12 +688,12 @@ class initialize:
 
 
 
-# class HelpWindow(QtWidgets.QWidget):
+class HelpWindow(QtWidgets.QWidget):
 
-#     def __init__(self,parent=None):
-#         super(HelpWindow, self).__init__(parent)
-#         #self.resize(400,500)
-#         label = QtWidgets.QLabel(HELP,self)
+    def __init__(self,parent=None):
+        super(HelpWindow, self).__init__(parent)
+        self.resize(400,500)
+        label = QtWidgets.QLabel(HELP,self)
 
         
 class SavePage(QtWidgets.QWidget):
