@@ -26,6 +26,12 @@ from astropy.table import Table
 from astropy.io import ascii
 
 HELP =  '''
+        ---------------------------------------------------------------------------
+        This is an interactive 1D absorption line measurement toolbox.
+        This allows for interactive continuum fitting and equivalent width measurement 
+        of CGM/IGM/ISM absorption lines.
+
+       Screen Layout:
             LHS/RHS = Left Hand Side/Right Hand Side
             LMB/RMB = Left Mouse Button/Right Mouse Button
             
@@ -33,35 +39,45 @@ HELP =  '''
             ---grayed regions indicate masked regions
             
             RHS shows normalized spectrum with velocity limits
-            
+        ------------------------------Mouse Clicks------------------------------------
 
-            ------------------------------Mouse Clicks------------------------------------
             
-            LHS LMB: Add wavelengths within region set by two clicks to continuum fit.
-            LHS RMB: Remove wavelengths from continuum fit.
-            RHS LMB: Set lower velocity limit
-            RHS RMB: Set upper velocity limit
-            -----------------------------------------------------------------------------------
+        Useful Mouse Clicks:
             
+            LHS LMB     : Add wavelengths within region set by two clicks to continuum fit.
+            LHS RMB     : Remove wavelengths from continuum fit.
+            RHS LMB     : Set lower velocity limit
+            RHS RMB     : Set upper velocity limit
             
-            ----------------------------Keyboard Commands-----------------------------
-            v: place mouse on desired subplot
-                LHS: manually enter regions to mask continuum 
-                RHS: manually enter EW intergration limits
+        Useful Keystrokes:            
+
+            v           : place mouse on desired subplot
+                                   LHS: manually enter regions to mask continuum 
+                                   RHS: manually enter EW intergration limits
+            
             V (RHS only): Use active subplot velocity limits for all RHS plots
             
-            Up arrow: Increase Polynomial Order [default 4]
-            Down arrow: Decrease Polynomial Order [default 4]
+            Up arrow    : Increase Polynomial Order [default 4]
+            Down arrow  : Decrease Polynomial Order [default 4]
 
-            m: Measure EW/N for active subplot
-            M: Measure EW/N for ALL subplots
+            m           : Measure EW/N for active subplot
+            M           : Measure EW/N for ALL subplots
             
             1/2/0 (RHS only): flag absorber as
                               (0) positive detection
                               (1) upper limit 
                               (2) lower limit
+
             t (RHS only): Cycle text printed on absorbers. Displays logN, or EW
             ------------------------------------------------------------------------------
+            Each tab displays up to 6 transitions. There are maximum 5 tabs allowed.
+            This limits the total number of transitions that can be simultaneously analyized to 30.
+
+
+
+ 
+
+            Written By: Sean Clark, Rongmon Bordoloi [2021]
 
                     '''
 
@@ -692,7 +708,7 @@ class HelpWindow(QtWidgets.QWidget):
 
     def __init__(self,parent=None):
         super(HelpWindow, self).__init__(parent)
-        self.resize(400,500)
+        self.resize(700,800)
         label = QtWidgets.QLabel(HELP,self)
 
         
