@@ -16,7 +16,8 @@ from utils import rb_utility as rt
 import matplotlib as mpl
 mpl.rcParams['lines.linewidth'] = .9
 clr=rt.rb_set_color()
-
+import webbrowser
+from pkg_resources import resource_filename
 
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QPalette, QColor
@@ -688,8 +689,11 @@ class HelpWindow(QtWidgets.QWidget):
 
     def __init__(self,parent=None):
         super(HelpWindow, self).__init__(parent)
-        self.resize(400,500)
+        #self.resize(400,500)
         label = QtWidgets.QLabel(HELP,self)
+        filename=resource_filename('GUIs','abstools/Help.html')
+        print(filename)
+        webbrowser.open_new_tab(filename)
         
 class SavePage(QtWidgets.QWidget):
     def __init__(self,parentvals,parent=None):
