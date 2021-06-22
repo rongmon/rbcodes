@@ -152,7 +152,6 @@ def plot_intervening_lines(ax,outlist,delv):
 class mainWindow(QtWidgets.QTabWidget):
     
     def __init__(self,ions, parent=None,intervening=False):
-    
         #-----full spectra properties---------#
         self.z = ions['Target']['z']; self.flux = ions['Target']['flux']
         self.wave = ions['Target']['wave']; self.error = ions['Target']['error']
@@ -171,6 +170,7 @@ class mainWindow(QtWidgets.QTabWidget):
         self.Manual_Mask = None
         self.pFlag = 1
         self.intervening=intervening
+        self.save = False
         super(mainWindow,self).__init__(parent)
         
 #---------------Initial page setup------------------# 
@@ -179,9 +179,7 @@ class mainWindow(QtWidgets.QTabWidget):
         self.addTab(self.tabs[self.page],self.tab_names[self.page])
         self.figs = [Figure()]
         self.canvas = [FigureCanvasQTAgg(self.figs[self.page])]
-        layout = QtWidgets.QVBoxLayout()
-        layout.addWidget(self.canvas[self.page])
-        self.tabs[self.page].setLayout(layout)
+
         self.nions = [len(self.keys)]
         if self.nions[0] > 6: self.nions[0]=6
         self.page=0
@@ -190,6 +188,47 @@ class mainWindow(QtWidgets.QTabWidget):
         self.figs[0].canvas.setFocusPolicy( QtCore.Qt.ClickFocus )
         self.figs[0].canvas.setFocus()
         
+        
+        
+        #LAYOUT
+        #Top layer is a horizontal layout with help|save|add_ion; middle is canvas; bottom is Page number
+        self.add_ion_button = QPushButton("Add Ion",self)
+        self.add_ion_button.setGeometry(630,30,200,30)
+        self.add_ion_button.clicked.connect(lambda: self.NewTransition(self))
+        
+        self.openButton = QPushButton("Help",  self)
+        self.openButton.setGeometry(830,30,200,30)
+        self.openButton.clicked.connect(lambda: self.opensub(self))
+        
+        self.saveButton = QPushButton("Save",  self)
+        self.saveButton.setGeometry(430,30,200,30)
+        self.saveButton.clicked.connect(lambda: self.onsave(self))
+        
+        self.PageLabel = QtWidgets.QLabel("Page: " + str(self.currentIndex()+1)+"/"+str(len(self.figs)),self)
+        self.PageLabel.setStyleSheet("font: 16pt;color: white;background-color:QColor(53, 53, 53)")
+        
+        self.main_layout = QVBoxLayout()
+        self.top_layout = QHBoxLayout()
+        self.bot_layout = QHBoxLayout()
+        
+        self.spacerItem = QtWidgets.QSpacerItem(5, 10, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        
+        self.top_layout.addItem(self.spacerItem)
+        self.top_layout.addWidget(self.add_ion_button)
+        self.top_layout.addWidget(self.saveButton)
+        self.top_layout.addWidget(self.openButton)
+        self.top_layout.addItem(self.spacerItem)
+        
+        self.bot_layout.addItem(self.spacerItem)
+        self.bot_layout.addWidget(self.PageLabel)
+        self.bot_layout.addItem(self.spacerItem)
+        
+        self.main_layout.addLayout(self.top_layout,stretch=1)
+        self.main_layout.addWidget(self.canvas[0],stretch=8)
+        self.main_layout.addLayout(self.bot_layout,stretch=0.5)
+        self.tabs[self.page].setLayout(self.main_layout)
+        
+        
         #initializing left and right axes
         self.axesL = [list(range(6))]; self.axesR = [list(range(6))]
         for ii in range(self.nions[0]):
@@ -197,8 +236,6 @@ class mainWindow(QtWidgets.QTabWidget):
             self.axesR[0][ii] = self.figs[0].add_subplot(6,2,2*(ii+1))
             self.figs[self.page].subplots_adjust(hspace=0.01)
             Plotting(self,ii,modify=True)
-        #self.axesL=np.array(self.axesL)
-        #self.axesR=np.array(self.axesR)        
             
          # Set up connectivity
         self.cid1 = self.figs[0].canvas.mpl_connect("button_press_event", self.onclick)
@@ -210,74 +247,81 @@ class mainWindow(QtWidgets.QTabWidget):
 
                        
 #---------------------Save Button/function----------------# 
-        def onsave(self):
-            self.savepg = SavePage(self)
-            if self.savepg.closewin == None:
-                return None
-            else:
-                self.savepg.show()
-        openButton = QPushButton("Save",  self)
-        openButton.setGeometry(430,30,200,30)
-        openButton.clicked.connect(lambda: onsave(self))
+        
 
 #--------------------------------------------------------------#
 
-
-#----------------------show active page----------------------------------------#
-        self.PageLabel = QtWidgets.QLabel("Page: " + str(self.currentIndex()+1)+"/"+str(len(self.figs)),self)
-        self.PageLabel.setStyleSheet("font: 16pt;color: black;background-color:white")
-        self.PageLabel.setGeometry(630,850,200,30)
+#         self.PageLabel = QtWidgets.QLabel("Page: " + str(self.currentIndex()+1)+"/"+str(len(self.figs)),self)
+#         self.PageLabel.setStyleSheet("font: 16pt;color: black;background-color:white")
+#         self.PageLabel.setGeometry(630,850,200,30)
+        
+        
+        
         def getPage(self):
             self.page = self.currentIndex()
             self.PageLabel.setText("Page: " + str(self.page+1)+"/"+str(len(self.figs)))
         self.currentChanged.connect(lambda: getPage(self))
             
 #-------------------Add Ion Button------------------------------# 
-        def NewTransition(self):
-        #will run back through absorber class to identify line, obtain slice window, 
-            new_line,ok3 = QInputDialog.getDouble(self,'Add Line','Enter new transition:')#,decimals=4)
-            if ok3:
-                #add new line
-                new_abs = Absorber.Absorber(self.z,self.wave,self.flux,self.error,[new_line])
-                #update initial dictionary
-                self.ions.update(new_abs.ions); self.ions['Target'] = self.ions.pop('Target')# moves Target to last index
-                for key in list(new_abs.ions.keys())[:-1]: self.keys.append(key)
+    def NewTransition(self,parent):
+    #will run back through absorber class to identify line, obtain slice window, 
+        new_line,ok3 = QInputDialog.getDouble(self,'Add Line','Enter new transition:')#,decimals=4)
+        if ok3:
+            #add new line
+            new_abs = Absorber.Absorber(self.z,self.wave,self.flux,self.error,[new_line])
+            #update initial dictionary
+            self.ions.update(new_abs.ions); self.ions['Target'] = self.ions.pop('Target')# moves Target to last index
+            for key in list(new_abs.ions.keys())[:-1]: self.keys.append(key)
+
+#                 self.page = len(self.nions) - 1 #finds current page max
+            if self.nions[self.page] < 6: #proceed with filling page
+                ii = self.nions[self.page]
+                self.axesL[self.page][ii] = self.figs[self.page].add_subplot(6,2,2*(ii)+1)
+                self.axesR[self.page][ii] = self.figs[self.page].add_subplot(6,2,2*(ii+1))
+                self.figs[self.page].subplots_adjust(hspace=0.01)
+                self.nions[self.page] = self.nions[self.page]+1
+                Plotting(self,ii,modify=True)
+
+            else: # need to add a new page
+                AddPage(self)
                     
-                self.page = len(self.nions) - 1 #finds current page max
-                if self.nions[self.page] < 6: #proceed with filling page
-                    ii = self.nions[self.page]
-                    self.axesL[self.page][ii] = self.figs[self.page].add_subplot(6,2,2*(ii)+1)
-                    self.axesR[self.page][ii] = self.figs[self.page].add_subplot(6,2,2*(ii+1))
-                    self.figs[self.page].subplots_adjust(hspace=0.01)
-                    self.nions[self.page] = self.nions[self.page]+1
-                    Plotting(self,ii,modify=True)
-                    
-                else: # need to add a new page
-                    AddPage(self)
-                    
-        add_ion_button = QPushButton("Add Ion",self)
-        add_ion_button.setGeometry(630,30,200,30)
-        add_ion_button.clicked.connect(lambda: NewTransition(self))
+#         self.add_ion_button = QPushButton("Add Ion",self)
+#         self.add_ion_button.setGeometry(630,30,200,30)
+#         self.add_ion_button.clicked.connect(lambda: NewTransition(self))
         
 #--------------------------------------------------------------------# 
 
 
 #-------HELP------#
-        def opensub(self):
-            #filename='file://'+resource_filename('GUIs','abstools/Help.html')
-            #print(filename)
-            #webbrowser.open(filename,new=1)
-            self.sub = HelpWindow()
-            self.sub.show()
+    def onsave(self,parent):
+            self.savepg = SavePage(self)
+            if self.savepg.closewin == None:
+                return None
+            else:
+                self.savepg.show()
+                
+    def opensub(self,parent):
+        self.sub = HelpWindow()
+        self.sub.show()
+
+        #html
+        webbrowser.open_new_tab("C:\\Users\\Sean's PC\\Python Modules\\Help.html")
             
-        openButton = QPushButton("Help",  self)
-        openButton.setGeometry(830,30,200,30)
-        openButton.clicked.connect(lambda: opensub(self))
+#         self.openButton = QPushButton("Help",  self)
+#         self.openButton.setGeometry(830,30,200,30)
+#         self.openButton.clicked.connect(lambda: opensub(self))
 
         
         
     def onmotion(self,event):
+        #self.PageLabel.setText("Page: " + str(self.currentIndex()+1)+"/"+str(len(self.figs)))
+        
         if event.xdata != None and event.ydata != None:
+            #pdb.set_trace()
+            
+#             for qq in range(len(self.axesL)):
+#                 if (event.inaxes in self.axesL[qq]) | (event.inaxes in self.axesR[qq]) :
+#                     self.page = qq
 
             self.page = np.where((np.asarray(self.axesL)==event.inaxes)|(np.asarray(self.axesR)==event.inaxes))[0][0]
             if len(np.where(np.asarray(self.axesL[self.page]) == event.inaxes)[0]) == 0:
@@ -312,6 +356,7 @@ class mainWindow(QtWidgets.QTabWidget):
                         self.old_axes = self.axesL[self.page][self.Lidx]
 
 
+
 #----------------------key button events-----------------------------#            
     
     '''on press is used to reduce the order for the polyfit, toggle measurement displays, measure properties, and assist selecting EW vel bounds'''
@@ -344,7 +389,7 @@ class mainWindow(QtWidgets.QTabWidget):
                     Plotting(self,self.Ridx,modify=False,Print=False)
 
         
-        #Up arrow key (directional) increases poly order 
+        #right arrow key (directional) increases poly order 
         if event.key == 'up':
             if self.Lidx is not None:
                 key_idx = self.page*6+self.Lidx
@@ -508,8 +553,8 @@ class Plotting:
                 parent.axesL[parent.page][ii].step(vel,flux,color='k',where='mid');parent.axesL[parent.page][ii].step(vel,error,color='r',where='mid')
                 parent.axesL[parent.page][ii].step(vel,cont,color='b',where='mid')
                 for zz in range(int(len(gray_idx)/2)):
+                    gray_idx = gray_idx-1
                     parent.axesL[parent.page][ii].step(vel[gray_idx[zz*2]:gray_idx[2*zz+1]],flux[gray_idx[2*zz]:gray_idx[2*zz+1]],vel[gray_idx[2*zz]:gray_idx[2*zz+1]],error[gray_idx[2*zz]:gray_idx[2*zz+1]],color='lightgray',linewidth=1.3,alpha=1)
-                    
 
             #clear axes to redraw modifications
             parent.axesR[parent.page][ii].clear()
@@ -684,11 +729,48 @@ class initialize:
         parent.figs.append(Figure())
         parent.canvas.append(FigureCanvasQTAgg(parent.figs[parent.page]))
         layout = QtWidgets.QVBoxLayout()
-        layout.addWidget(parent.canvas[parent.page])
-        parent.tabs[parent.page].setLayout(layout)
+#         layout.addWidget(parent.canvas[parent.page])
+#         parent.tabs[parent.page].setLayout(layout)
+        
+        self.add_ion_button = QPushButton("Add Ion",parent)
+        self.add_ion_button.setGeometry(630,30,200,30)
+        self.add_ion_button.clicked.connect(lambda: parent.NewTransition(parent))
+        
+        self.openButton = QPushButton("Help",  parent)
+        self.openButton.setGeometry(830,30,200,30)
+        self.openButton.clicked.connect(lambda: parent.opensub(parent))
+        
+        self.saveButton = QPushButton("Save",  parent)
+        self.saveButton.setGeometry(430,30,200,30)
+        self.saveButton.clicked.connect(lambda: parent.onsave(parent))
+        
+        self.PageLabel = QtWidgets.QLabel("Page: " + str(parent.page+1)+"/"+str(len(parent.figs)),parent)
+        self.PageLabel.setStyleSheet("font: 16pt;color: white;background-color:QColor(53, 53, 53)")
+        
+        self.main_layout = QVBoxLayout()
+        self.top_layout = QHBoxLayout()
+        self.bot_layout = QHBoxLayout()
+        
+        self.spacerItem = QtWidgets.QSpacerItem(5, 10, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.top_layout.addItem(self.spacerItem)
+        self.top_layout.addWidget(self.add_ion_button)
+        self.top_layout.addWidget(self.saveButton)
+        self.top_layout.addWidget(self.openButton)
+        self.top_layout.addItem(self.spacerItem)
+        
+        self.bot_layout.addItem(self.spacerItem)
+        self.bot_layout.addWidget(self.PageLabel)
+        self.bot_layout.addItem(self.spacerItem)
+                                   
+        self.main_layout.addLayout(self.top_layout,stretch=1)
+        self.main_layout.addWidget(parent.canvas[parent.page],stretch=7)
+        self.main_layout.addLayout(self.bot_layout,stretch=0.5)
+        parent.tabs[1].setLayout(self.main_layout)
+        
+        
         #len(parent.keys/6 -len(parent.page)) #can you make more general? you ave to
         parent.nions.append(len(parent.keys)-6*parent.page)
-
+        
         #initializing left and right axes
         parent.axesL.append(list(range(6))); parent.axesR.append(list(range(6)))                   
         for ii in range(parent.nions[parent.page]):
@@ -708,9 +790,8 @@ class HelpWindow(QtWidgets.QWidget):
 
     def __init__(self,parent=None):
         super(HelpWindow, self).__init__(parent)
-        self.resize(700,800)
+        self.resize(400,500)
         label = QtWidgets.QLabel(HELP,self)
-
         
 class SavePage(QtWidgets.QWidget):
     def __init__(self,parentvals,parent=None):
@@ -728,28 +809,26 @@ class SavePage(QtWidgets.QWidget):
                 figures.savefig(figurefile[:-4]+str(i)+'.pdf',bbox_inches='tight')
                 i = i+1
             self.pdfsave.setStyleSheet('background-color : green')
+            parentvals.save = True
         def ontable(self,parentvals,Table_e):
             savefile = self.tableline.text()
             ascii.write(Table_e,savefile,overwrite=True)
             #how to display to user it has been saved?
             self.tablesave.setStyleSheet("background-color : green")
-
+            parentvals.save = True
             
         def onpickle(self,parentvals):
             pfile = self.pickleline.text()
             with open(pfile,'wb') as pklfile:
                 pickle.dump(parentvals.ions,pklfile,protocol=pickle.HIGHEST_PROTOCOL)
             self.picklesave.setStyleSheet('background-color : green')
-            
+            parentvals.save = True
         # want to print out table to the user regardless of whether it is saved
         Table_e = Table()
         Table_e['Transitions'] = parentvals.keys
         EW=[];EWsig=[];N=[];Nsig=[];Vel = []
         EWlims_low = []; EWlims_high = []
         for ion in parentvals.keys:
-            
-            #if user has not completed measurements, need to verify they still want to save
-            #if yes, replace Nonetype with NaN, if no return to app
             for items in parentvals.ions[ion]:
                 if np.any(parentvals.ions[ion][items] == None):
                     reply = QMessageBox.question(self, 'Message', "Unevaluated ions, proceed to save?",
@@ -764,8 +843,6 @@ class SavePage(QtWidgets.QWidget):
                         return self.closewin
                 else:
                     self.closewin = False
-                
-                    
             EW.append(np.round(parentvals.ions[ion]['EW']*1000,2))
             EWsig.append(np.round(parentvals.ions[ion]['EWsig']*1000,2))
             N.append(np.round(np.log10(parentvals.ions[ion]['N']),2))
