@@ -94,6 +94,7 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
     vel50=np.interp(0.5,ew50,vel[pix])
     vel16=np.interp(0.16,ew50,vel[pix])
     vel_disp=np.abs(vel50-vel16)
+    vel50_err = vel_disp/np.sqrt(len(ew))
 
 
 
