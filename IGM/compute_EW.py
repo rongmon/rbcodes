@@ -30,8 +30,9 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
     #           output['colerr']      :- 1 sigma error on AOD column density 
     #           output['n']           :- AOD column density as a function of velocity
     #           output['Tau_a']       :- AOD as a function of velocity
-    #           output['med_vel']     :- Median Equivalent Width weighted velocity within lmts
+    #           output['med_vel']     :- velocity centroid (Median Equivalent Width weighted velocity within lmts)
     #           output['vel_disp']    : 1 sigma velocity dispersion
+    #           output['vel50_err']   : error on velocity centroid
     #
     #
     #   Written :- Rongmon Bordoloi                             2nd November 2016
@@ -103,6 +104,7 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
     output["ew_tot"]=ew_tot
     output["err_ew_tot"]=err_ew_tot
     output["vel_disp"]=vel_disp
+    output['vel50_err']=vel50_err
 
 
     if 'f0' in kwargs:
