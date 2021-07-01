@@ -543,7 +543,8 @@ class Plotting:
                 parent.ions[parent.keys[key_idx]]['cont'] = parent.ions[parent.keys[key_idx]]['pco'](wave)
                 cont = parent.ions[parent.keys[key_idx]]['cont']
                 
-                #bad pixel flag could mess this up! need to test
+                #gray_idx is to avoid line plotted through spectra from discontinuity in flux/vel/err from wc mask.
+                #uses np.diff to find where wc (true/false array) changes and plots the line segments instead of the full line with missing values
                 if wc[0] == True:
                     gray_idx = np.where(np.diff(wc,prepend=np.nan))[0][1:]
                 else:
@@ -553,8 +554,8 @@ class Plotting:
                 parent.axesL[parent.page][ii].step(vel,flux,color='k',where='mid');parent.axesL[parent.page][ii].step(vel,error,color='r',where='mid')
                 parent.axesL[parent.page][ii].step(vel,cont,color='b',where='mid')
                 for zz in range(int(len(gray_idx)/2)):
-                    gray_idx = gray_idx-1
-                    parent.axesL[parent.page][ii].step(vel[gray_idx[zz*2]:gray_idx[2*zz+1]],flux[gray_idx[2*zz]:gray_idx[2*zz+1]],vel[gray_idx[2*zz]:gray_idx[2*zz+1]],error[gray_idx[2*zz]:gray_idx[2*zz+1]],color='lightgray',linewidth=1.3,alpha=1)
+                    #gray_idx = gray_idx-1
+                    parent.axesL[parent.page][ii].step(vel[gray_idx[zz*2]:gray_idx[2*zz+1]],flux[gray_idx[2*zz]:gray_idx[2*zz+1]],vel[gray_idx[2*zz]:gray_idx[2*zz+1]],error[gray_idx[2*zz]:gray_idx[2*zz+1]],where='mid',color='lightgray',linewidth=1.3,alpha=1)
 
             #clear axes to redraw modifications
             parent.axesR[parent.page][ii].clear()
