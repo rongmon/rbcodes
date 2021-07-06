@@ -127,7 +127,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         #make longer color list
         clrlist=list(clr.keys())  
 
-        self.combo_options =clrlist# ['yellow','orange','red','green','white']
+        self.combo_options =clrlist[1:]# ['yellow','orange','red','green','white']
         self.line_options = ['LLS','LLS Small','DLA','None']
         
         #---------------Initial page setup------------------# 
@@ -593,7 +593,7 @@ class manage_identified_absorbers(QWidget):
         self.table.setRowCount(2)
         #make longer color list
         clrlist=list(clr.keys()) 
-        self.combo_options = clrlist#['yellow','orange','red','green','white']
+        self.combo_options = clrlist[1:]#['yellow','orange','red','green','white']
         self.line_options = ['LLS','LLS Small','DLA','None']
         
         for i in range(2):
