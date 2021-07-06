@@ -52,6 +52,8 @@ HELP = '''
         'b':   Restricts ymin of the canvas to current mouse height
         'S':   Smoothes the spectra
         'U':   Unsmooth spectra
+        'E':   Two E keystrokes will compute rest frame equivalent width at a defined region
+
         'x':   Sets left x limit (xmin)
         'X':   Sets right x limit (xmax)
         ']':   Shifts canvas to the right
