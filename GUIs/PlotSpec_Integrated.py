@@ -1,5 +1,6 @@
 import numpy as np
 from IGM import compute_EW
+from scipy.interpolate import splrep,splev
 from IGM import rb_setline as line       
 import pdb
 import sys
@@ -122,6 +123,8 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         self.smoothed_spectrum=flux
         self.error=error
         self.zabs=zabs
+        self.lam_lim=[] #For compute_EW running tab
+        self.lam_ylim=[]#For compute_EW running tab
         self.label='None' # Initializing a label
         
         #make longer color list
@@ -388,6 +391,63 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         elif event.key == 'F':
             self.ax.set_xlim(self.init_xlims)
             self.spectrum.canvas.draw()
+
+
+        # Compute Equivalent Width between two points
+        elif event.key=='E':
+            #ekeycounts +=1
+            self.lam_lim=np.append(self.lam_lim,event.xdata)
+            self.lam_ylim=np.append(self.lam_ylim,event.ydata)
+
+    
+            # Keep running tab of all E clicks
+            eclick=len(self.lam_lim);
+
+
+            self.ax.plot(event.xdata,event.ydata,'rs',ms=5,picker=5,label='EW_pt',markeredgecolor='k')
+            #self.fig.canvas.draw()
+
+            if eclick==2:
+                # Check if the wave entries are monotonously increasing
+                tab=self.lam_lim.argsort()
+
+                EW,sig_EW,cont,wave_slice=self.compute_EW(self.wave/(1.+zabs),self.flux,self.lam_lim[tab],self.lam_ylim[tab],self.error)
+                EW=np.array(EW)*1000.
+                sig_EW=np.array(sig_EW)*1000.
+                self.ax.plot(wave_slice,cont,'r--')
+                #ipdb.set_trace()
+                print('---------------------- Equivalent Width -------------------------------------')
+                Wval='EW [mAA]: '+ '%.1f' % EW + ' +/- ' + '%.1f' % sig_EW
+                self.ax.text(np.mean([self.lam_lim]),np.max(self.lam_ylim)+0.2,Wval, rotation=90,verticalalignment='bottom')
+                print(Wval)
+                print('---------------------------------------------------------------------------')
+                self.lam_lim=[]
+                self.lam_ylim=[]
+
+            self.spectrum.canvas.draw() 
+
+
+
+
+    
+    def compute_EW(self,lam,flx,lam_lim,lam_ylim,err_flx):
+        qtq=np.where( ( lam >= lam_lim[0] ) & ( lam <= lam_lim[1] ) )
+        ww=lam[qtq]                 
+        flux1=flx[qtq]
+        spline = splrep(lam_lim,lam_ylim,k=1)
+        continuum = splev(ww,spline)
+        #ax.plot(ww,continuum,'k--')
+        sig_flx1=err_flx[qtq]/continuum
+        flux1=flux1/continuum
+    
+        EW=np.trapz(1.-flux1, x= ww)
+        delw=np.double(ww[2]-ww[1])
+        sig_w=delw*sig_flx1
+        sig_wtot=np.sqrt(np.sum(sig_w**2.))
+        return EW,sig_wtot,continuum,ww
+
+
+
             
     #Update manager brings items from the active zabs layout (below canvas) to an entry in the zabs_manager
     def update_manager(self):
