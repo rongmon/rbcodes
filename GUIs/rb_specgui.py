@@ -1,6 +1,6 @@
 
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import pdb
@@ -8,8 +8,8 @@ import sys
 import os
 
 from linetools.spectra.xspectrum1d import XSpectrum1D  
-from GUIs import rb_plot_spec as r
-
+#from GUIs import rb_plot_spec as r
+from GUIs import PlotSpec_Integrated as r
 
 
 if __name__ == "__main__":
@@ -89,6 +89,8 @@ if __name__ == "__main__":
 
 
     #sp=XSpectrum1D.from_file('PG0832+251_nbin3_coadd.fits') 
-    r.rb_plot_spec(wave,flux/np.nanmedian(flux),error/np.nanmedian(flux))
+    #r.rb_plot_spec(wave,flux/np.nanmedian(flux),error/np.nanmedian(flux))
+    r.rb_plotspec(wave,flux/np.nanmedian(flux),error/np.nanmedian(flux))
+
     plt.show() # show the window
  
