@@ -123,7 +123,11 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         self.error=error
         self.zabs=zabs
         self.label='None' # Initializing a label
-        self.combo_options = ['yellow','orange','red','green','white']
+        
+        #make longer color list
+        clrlist=list(clr.keys())  
+
+        self.combo_options =clrlist# ['yellow','orange','red','green','white']
         self.line_options = ['LLS','LLS Small','DLA','None']
         
         #---------------Initial page setup------------------# 
@@ -587,8 +591,9 @@ class manage_identified_absorbers(QWidget):
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels(('Line Lists','z','Color','Plot','Remove','Hide'))
         self.table.setRowCount(2)
-
-        self.combo_options = ['yellow','orange','red','green','white']
+        #make longer color list
+        clrlist=list(clr.keys()) 
+        self.combo_options = clrlist#['yellow','orange','red','green','white']
         self.line_options = ['LLS','LLS Small','DLA','None']
         
         for i in range(2):
