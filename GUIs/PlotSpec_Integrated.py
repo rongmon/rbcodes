@@ -128,6 +128,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         self.lam_lim=[] #For compute_EW running tab
         self.lam_ylim=[]#For compute_EW running tab
         self.label='None' # Initializing a label
+        self.message='' #Initial text message
         
         #make longer color list
         clrlist=list(clr.keys())  
@@ -281,14 +282,15 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         #another refresh to keep the current flux values but remove the plotted lines
         elif event.key == 'R':
             del self.ax.lines[1:]
+            self.message.remove()
             try:
                 for ii in self.text[-1]:
                     ii.remove()
             except: 
                 pass
             # Give initial axes limits
-            self.ax.set_ylim(self.init_ylims)
-            self.ax.set_xlim(self.init_xlims)
+            #self.ax.set_ylim(self.init_ylims)
+            #self.ax.set_xlim(self.init_xlims)
             
             if self.identified_line_active == True:
                 self.identified_line_active = False
@@ -420,7 +422,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                 #ipdb.set_trace()
                 print('---------------------- Equivalent Width -------------------------------------')
                 Wval='EW [mAA]: '+ '%.1f' % EW + ' +/- ' + '%.1f' % sig_EW
-                self.ax.text(np.mean([self.lam_lim]),np.max(self.lam_ylim)+0.2,Wval, rotation=90,verticalalignment='bottom')
+                self.message=self.ax.text(np.mean([self.lam_lim]),np.max(self.lam_ylim)+0.2,Wval, rotation=90,verticalalignment='bottom')
                 print(Wval)
                 print('---------------------------------------------------------------------------')
                 self.lam_lim=[]
