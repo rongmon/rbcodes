@@ -238,6 +238,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         yr=[0.,np.median(flux)*2.5]
         self.ax.set_ylim(yr)
         self.ax.set_xlim(xr)
+        self.init_ylims = self.ax.get_ylim()
         #---------------------------------------------------
 #         self.ax=ax
         self.vel=np.array([1.])
@@ -275,8 +276,19 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         #another refresh to keep the current flux values but remove the plotted lines
         elif event.key == 'R':
             del self.ax.lines[1:]
-            for ii in self.text[-1]:
-                ii.remove()
+            try:
+                for ii in self.text[-1]:
+                    ii.remove()
+            except: 
+                pass
+            # Give initial axes limits
+            self.ax.set_ylim(self.init_ylims)
+            self.ax.set_xlim(self.init_xlims)
+            
+            if self.identified_line_active == True:
+                self.identified_line_active = False
+                self.Identified_line_plot.setStyleSheet('background-color : QColor(53, 53, 53)')
+                
             self.spectrum.canvas.draw()
 #         # Set top y max
         elif event.key=='t':
@@ -424,6 +436,12 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                     break
                     
     def Refreshed(self,parent):
+        self.ax.set_ylim(self.init_ylims)
+        self.ax.set_xlim(self.init_xlims)
+        
+        if self.identified_line_active == True:
+            self.identified_line_active = False
+            self.Identified_line_plot.setStyleSheet('background-color : QColor(53, 53, 53)')
         if len(self.ax.lines)>1:
             del self.ax.lines[1:]
             self.ax.texts = []
@@ -432,6 +450,8 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                     ii.remove()
             except:
                 pass
+
+            #may need condition to change hide color to gray
             self.spectrum.canvas.draw()
         
     
@@ -523,7 +543,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             self.label=label
             linecolor=clr[color]
             data=line.read_line_list(label)
-            xlim=self.ax.get_xlim()
+            xlim=self.init_xlims
             ylim=self.ax.get_ylim()
             
             tt_temp = []
@@ -534,7 +554,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                     ss=self.ax.transData.transform((0, .9))
                     ydata=[0,ylim[1]]
                     lineplot,=self.ax.plot(xdata,ydata,'--',color=linecolor)                    
-                    tt=self.ax.text(xdata[0],0.75*ylim[1],data[i]['ion']+' '+ np.str(self.zabs),rotation=90)
+                    tt=self.ax.text(xdata[0],0.75*ylim[1],data[i]['ion']+'  z='+ np.str(self.zabs),rotation=90)
                     
                     #append text and plot artist objects
                     tt_temp.append(tt)
@@ -1063,7 +1083,7 @@ class LoadCatalog(QWidget):
                     xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                     ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
                     lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color=color)
-                    tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+' '+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
+                    tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                     parent.identified_lines.append(lineplot)
                     parent.identified_text.append(tt)
                 parent.text = [[]]*len(parent.zabs_list.Zabs.tolist())
@@ -1081,7 +1101,7 @@ class LoadCatalog(QWidget):
                             xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                             ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
                             lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color='white')
-                            tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+' '+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
+                            tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                             parent.identified_lines.append(lineplot)
                             parent.identified_text.append(tt)
 
@@ -1094,7 +1114,7 @@ class LoadCatalog(QWidget):
                 xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                 ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
                 lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color='white')
-                tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+' '+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
+                tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                 parent.identified_lines.append(lineplot)
                 parent.identified_text.append(tt)
                 
@@ -1142,7 +1162,7 @@ class Identified_plotter:
                             xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                             ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
                             lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color=color)
-                            tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+' '+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
+                            tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                             parent.identified_lines.append(lineplot)
                             parent.identified_text.append(tt)
 
@@ -1159,7 +1179,7 @@ class Identified_plotter:
                                     xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                                     ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
                                     lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color='white')
-                                    tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+' '+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
+                                    tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                                     parent.identified_lines.append(lineplot)
                                     parent.identified_text.append(tt)
                 else:
@@ -1168,7 +1188,7 @@ class Identified_plotter:
                         xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                         ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
                         lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color='white')
-                        tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+' '+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
+                        tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                         parent.identified_lines.append(lineplot)
                         parent.identified_text.append(tt)
                                     
