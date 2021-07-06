@@ -1,7 +1,8 @@
 import numpy as np
 from IGM import compute_EW
 from scipy.interpolate import splrep,splev
-from IGM import rb_setline as line       
+from IGM import rb_setline as line   
+from astropy.modeling import models, fitting    
 import pdb
 import sys
 import os
@@ -53,6 +54,8 @@ HELP = '''
         'S':   Smoothes the spectra
         'U':   Unsmooth spectra
         'E':   Two E keystrokes will compute rest frame equivalent width at a defined region
+        'G':   Three keystrokes to fit a Gaussian profile. [Currently not drawing on the spectrum]
+
 
         'x':   Sets left x limit (xmin)
         'X':   Sets right x limit (xmax)
@@ -128,7 +131,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         self.lam_lim=[] #For compute_EW running tab
         self.lam_ylim=[]#For compute_EW running tab
         self.label='None' # Initializing a label
-        self.message='' #Initial text message
+        self.message=[] #Initial text message
         
         #make longer color list
         clrlist=list(clr.keys())  
@@ -282,7 +285,25 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         #another refresh to keep the current flux values but remove the plotted lines
         elif event.key == 'R':
             del self.ax.lines[1:]
-            self.message.remove()
+            try:
+                self.message.remove()
+            except:
+                pass
+            try: 
+                self.message1.remove()
+            except:
+                pass
+            try:
+                self.message2.remove()
+            except:
+                pass
+            try:
+                self.message3.remove()
+            except:
+                pass
+
+
+
             try:
                 for ii in self.text[-1]:
                     ii.remove()
@@ -408,7 +429,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             eclick=len(self.lam_lim);
 
 
-            self.ax.plot(event.xdata,event.ydata,'rs',ms=5,picker=5,label='EW_pt',markeredgecolor='k')
+            self.ax.plot(event.xdata,event.ydata,'rs',ms=5,label='EW_pt',markeredgecolor='k')
             #self.fig.canvas.draw()
 
             if eclick==2:
@@ -427,6 +448,56 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                 print('---------------------------------------------------------------------------')
                 self.lam_lim=[]
                 self.lam_ylim=[]
+
+            self.spectrum.canvas.draw() 
+
+
+        # Fit a Gaussian
+        elif event.key=='G':
+
+            self.FXval=np.append(self.FXval, event.xdata)
+            self.FYval=np.append(self.FYval, event.ydata)
+    
+            fclick=len(self.FXval)    
+            self.ax.plot(event.xdata,event.ydata,'rs',ms=5,label='EW_pt',markeredgecolor='k')
+            self.spectrum.canvas.draw() 
+
+            
+
+            #Start Fitting
+            if fclick==3:
+                # Fit the data using a Gaussian
+                g_init = models.Gaussian1D(amplitude=np.double(self.FYval[1]), mean=np.double(self.FXval[2]), stddev=0.5*(np.double(self.FXval[2])-np.double(self.FXval[0])))
+                fit_g = fitting.LevMarLSQFitter()
+
+                # First fit a quick continuum
+                qtq=np.where( ( (self.wave/(1.+self.zabs)) >= self.FXval[0] ) & ( (self.wave/(1.+self.zabs)) <= self.FXval[2] ) )
+                ww=self.wave[qtq]/(1.+self.zabs)                 
+                flux1=self.flux[qtq]
+                spline = splrep(np.append(self.FXval[0],self.FXval[2]),np.append(self.FYval[0],self.FYval[2]),k=1)
+                continuum = splev(ww,spline)
+    
+                # Check if it is an absorption or emission line
+                if ((self.FYval[1] < self.FYval[0]) & (self.FYval[1] < self.FYval[2])):
+                    ydata=1.- (flux1/continuum)
+                    g = fit_g(g_init, ww, ydata)
+                    Final_fit=(1.-g(ww))*continuum
+                else:
+                    ydata=(flux1/continuum)
+                    g = fit_g(g_init, ww, ydata)
+                    Final_fit=g(ww)*continuum         
+    
+                model_fit=self.ax.plot(ww, Final_fit, 'r-')        
+                values0='amp: '+'%.3f' %  g.parameters[0] 
+                values1='center: '+'%.3f' %  g.parameters[1] 
+                values2='sig: '+'%.3f' %  g.parameters[2] 
+
+                self.message1=self.ax.text(np.mean(ww*(1.+self.zabs)),np.max(self.FYval)+0.2,values0, rotation=90,verticalalignment='bottom')
+                self.message2=self.ax.text(np.mean(ww*(1.+self.zabs))+np.std(ww*(1.+self.zabs)),np.max(self.FYval)+0.2,values1, rotation=90,verticalalignment='bottom')
+                self.message3=self.ax.text(np.mean(ww*(1.+self.zabs))-np.std(ww*(1.+self.zabs)),np.max(self.FYval)+0.2,values2, rotation=90,verticalalignment='bottom')
+
+                self.FXval=[]
+                self.FYval=[]
 
             self.spectrum.canvas.draw() 
 
