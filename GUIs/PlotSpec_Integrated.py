@@ -126,6 +126,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         self.wave=wave
         self.flux=flux
         self.smoothed_spectrum=flux
+        self.smoothed_error=error
         self.error=error
         self.zabs=zabs
         self.lam_lim=[] #For compute_EW running tab
@@ -147,7 +148,8 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         main_layout = QHBoxLayout()
         self.spectrum = Figure()
         self.ax = self.spectrum.add_subplot(111)
-        self.ax.step(self.wave, self.flux, '-',lw=1,color=clr['teal'])
+        self.main_spec=self.ax.step(self.wave, self.flux, '-',lw=0.5,color=clr['white'])
+        self.main_sig=self.ax.step(self.wave, self.error, '-',lw=0.5,color=clr['pale_red'])        
         self.init_xlims = [min(self.wave),max(self.wave)]
         self.canvas = FigureCanvasQTAgg(self.spectrum)
         toolbar = NavigationToolbar(self.canvas, self)
@@ -274,7 +276,9 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         # when the user hits 'r': clear the axes and plot the original spectrum
         if event.key=='r':
             self.ax.cla()
-            self.ax.step(self.wave,self.flux,'-',linewidth=1,color=clr['teal'])
+            self.main_spec=self.ax.step(self.wave,self.flux,'-',linewidth=0.5,color=clr['white'])
+            self.main_sig=self.ax.step(self.wave,self.error,'-',linewidth=0.5,color=clr['pale_red'],zorder=2)
+
             self.ax.set_xlabel('Wavelength')
             self.ax.set_ylabel('Flux')
             xr=[np.min(self.wave),np.max(self.wave)]
@@ -284,31 +288,39 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             self.spectrum.canvas.draw()
         #another refresh to keep the current flux values but remove the plotted lines
         elif event.key == 'R':
-            del self.ax.lines[1:]
-            try:
-                self.message.remove()
-            except:
-                pass
-            try: 
-                self.message1.remove()
-            except:
-                pass
-            try:
-                self.message2.remove()
-            except:
-                pass
-            try:
-                self.message3.remove()
-            except:
-                pass
+            #del self.ax.lines[1:]
+            #try:
+            #    self.message.remove()
+            #except:
+            #    pass
+            #try: 
+            #   self.message1.remove()
+            #except:
+            #   pass
+            #try:
+            #    self.message2.remove()
+            #except:
+            #   pass
+            #try:
+            #   self.message3.remove()
+            #except:
+            #    pass
 
 
 
-            try:
-                for ii in self.text[-1]:
-                    ii.remove()
-            except: 
-                pass
+            #try:
+            #    for ii in self.text[-1]:
+            #        ii.remove()
+            #except: 
+            #    pass
+            xlim=self.ax.get_xlim()
+            ylim=self.ax.get_ylim()
+
+            self.ax.cla()
+            self.specplot()
+            self.ax.set_ylim(ylim)
+            self.ax.set_xlim(xlim)
+
             # Give initial axes limits
             #self.ax.set_ylim(self.init_ylims)
             #self.ax.set_xlim(self.init_xlims)
@@ -337,6 +349,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             self.vel[0] += 2
             Filter_size=np.int(self.vel[0]) 
             self.smoothed_spectrum =convolve(self.flux, Box1DKernel(Filter_size))#medfilt(flux,np.int(Filter_size))
+            self.smoothed_error =convolve(self.error, Box1DKernel(Filter_size))#medfilt(flux,np.int(Filter_size))            
             self.specplot()
             self.spectrum.canvas.draw()  
 #         #Unsmooth Spectrum
@@ -346,8 +359,10 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                 self.vel[0]=1;
             Filter_size=np.int(self.vel[0]) 
             self.smoothed_spectrum =convolve(self.flux, Box1DKernel(Filter_size))#medfilt(flux,np.int(Filter_size))
+            self.smoothed_error =convolve(self.error, Box1DKernel(Filter_size))#medfilt(flux,np.int(Filter_size))            
             self.specplot()
-    
+            self.spectrum.canvas.draw()  
+
         # Set X max
         elif event.key=='X':
             xlim=self.ax.get_xlim()
@@ -616,12 +631,19 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         
 
     def specplot(self):
-        ax=self.spectrum.gca()
-        xlim=ax.get_xlim()
-        ylim=ax.get_ylim()
-        replace = ax.step(self.wave,self.smoothed_spectrum,'-',lw=1,label='smooth',color=clr['teal'])
-        self.ax.lines[0] = replace[0]
-        del self.ax.lines[-1]
+        xlim=self.ax.get_xlim()
+        ylim=self.ax.get_ylim()
+
+        self.ax.cla()
+        self.main_spec = self.ax.step(self.wave,self.smoothed_spectrum,'-',lw=0.5,label='smooth',color=clr['white'])
+        self.main_sig = self.ax.step(self.wave,self.smoothed_error,'-',lw=0.5,label='smooth',color=clr['pale_red'])        
+        #self.main_spec.set_data(self.wave,self.smoothed_spectrum)
+        #self.main_sig.set_data(self.wave,self.smoothed_error)
+        self.ax.set_ylim(ylim)
+        self.ax.set_xlim(xlim)
+
+        #self.ax.lines[0] = self.main_spec[0]
+        #del self.ax.lines[-1]
         self.spectrum.canvas.draw() 
         
 
