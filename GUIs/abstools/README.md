@@ -55,7 +55,7 @@ Second Example shows how to load up a saved analysis file
 
 #First read in the saved file
 import pickle
-pfile='test.p'
+pfile='Spectrum_Analysis_z_0.017.p'
 with open(pfile,'rb') as pklfile:
     absys=pickle.load(pklfile)
 
