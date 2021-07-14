@@ -455,7 +455,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                 # Check if the wave entries are monotonously increasing
                 tab=self.lam_lim.argsort()
 
-                EW,sig_EW,cont,wave_slice=self.compute_EW(self.wave/(1.+self.zabs),self.flux,self.lam_lim[tab],self.lam_ylim[tab],self.error)
+                EW,sig_EW,cont,wave_slice=self.compute_EW(self.wave/(1.+self.zabs),self.flux,self.lam_lim[tab]/(1.+self.zabs),self.lam_ylim[tab],self.error)
                 EW=np.array(EW)*1000.
                 sig_EW=np.array(sig_EW)*1000.
                 self.ax.plot(wave_slice,cont,'r--')
