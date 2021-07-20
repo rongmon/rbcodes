@@ -110,46 +110,50 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
     
     def __init__(self,wave,flux,error,zabs=0,parent=None):
         
-        #Action identifiers and initializing storing containers
+        self.c = 2.9979e5 #spl
+        #initializing storing containers and variables to meet action requirements
         self.zabs_list = pd.DataFrame(data=None,columns = ['Zabs','list','color'])
         self.line_list = pd.DataFrame(data=None,columns = ['Name','Wave_obs','Zabs'])
-        self.zabs_line_plot = []
         self.z_list = []
+        #zabs_line_plot and text are where the mpl line objects and text objects are stored to be removed or hidden
+        self.zabs_line_plot = []
         self.text = []
         self.linelist = []
+        # identified_ lines and text are to store the evaluated detected absorber objects for plotting/hiding
+        self.identified_lines = []
+        self.identified_text = []
+        #action variables to signify whether an event should be carried out
         self.hide = False
         self.row = None
         self.row_remove = False
         self.identified_line_active = False
-        self.identified_lines = []
-        self.identified_text = []
+        
+        #spectrum properties
         self.wave=wave
         self.flux=flux
         self.smoothed_spectrum=flux
-        self.smoothed_error=error
         self.error=error
         self.zabs=zabs
         self.lam_lim=[] #For compute_EW running tab
         self.lam_ylim=[]#For compute_EW running tab
         self.label='None' # Initializing a label
-        self.message=[] #Initial text message
         
         #make longer color list
         clrlist=list(clr.keys())  
 
-        self.combo_options =clrlist[1:]# ['yellow','orange','red','green','white']
+        self.combo_options =clrlist[1:]
         self.line_options = ['LLS','LLS Small','DLA','None']
         
         #---------------Initial page setup------------------# 
         super(mainWindow,self).__init__(parent)
-        self.setWindowTitle('Absorber Idenificaation')
+        self.setWindowTitle('Absorber Idenification')
         
         #Main canvas widgets
         main_layout = QHBoxLayout()
         self.spectrum = Figure()
         self.ax = self.spectrum.add_subplot(111)
-        self.main_spec=self.ax.step(self.wave, self.flux, '-',lw=0.5,color=clr['white'])
-        self.main_sig=self.ax.step(self.wave, self.error, '-',lw=0.5,color=clr['pale_red'],zorder=2)        
+        self.ax.step(self.wave, self.flux, '-',lw=1,color=clr['white'])
+        self.ax.step(self.wave, self.error, '-',lw=1,color=clr['pale_red'])
         self.init_xlims = [min(self.wave),max(self.wave)]
         self.canvas = FigureCanvasQTAgg(self.spectrum)
         toolbar = NavigationToolbar(self.canvas, self)
@@ -166,6 +170,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         
         self.Identified_line_plot = QPushButton("Plot Identified Lines", self)
         self.Identified_line_plot.clicked.connect(lambda: Identified_plotter(self))
+        
         #save layout (bottom of left panel)
         save_layout = QHBoxLayout()
         save_layout.addWidget(self.manage_save)
@@ -202,6 +207,10 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         self.color = self.combo_color_main.currentText()
         color_label = QLabel('Color',self)
         
+        #Message Window for user
+        self.message_window = QLabel("Message Window")
+        self.message_window.setStyleSheet('background-color : black')
+        
         #active values layout (bottom of canvas layout)
         active_elem_layout = QtWidgets.QFormLayout()
         active_elem_layout.addRow(self.zabs_label,self.active_zabs)
@@ -215,19 +224,19 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         plot.clicked.connect(lambda: Redshift_Guess(self))
         refresh = QPushButton("Refresh",self)
         refresh.clicked.connect(lambda: self.Refreshed(self))
-        #Spacer is to reduce the size of Active redshift and transition
+        
+        #Spacer is to reduce the size of Active redshift and transition widgets
         spacer = QHBoxLayout()
         plot_cat = QVBoxLayout()
-        
         spacerItem = QtWidgets.QSpacerItem(100, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        spacer.addItem(spacerItem)
-#         spacer.addWidget(plot)
-        spacer.addLayout(active_elem_layout)
+        spacer.addWidget(self.message_window,stretch=1)
+        spacer.addLayout(active_elem_layout,stretch=1.5)
         plot_cat.addWidget(plot)
         plot_cat.addWidget(catalog)
         plot_cat.addWidget(refresh)
         spacer.addLayout(plot_cat)
-#         spacer.addWidget(catalog)
+        spacer.addItem(spacerItem)
+        spacer.addItem(spacerItem)
         spacer.addItem(spacerItem)
         plot_layout.addLayout(spacer,stretch=1)
 
@@ -242,7 +251,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         self.show()
         #--------------------------end of layouts/widgets initialization------------#
         
-        #Plot spectra
+        #configure canvas axes and viewing window
         self.ax.set_xlabel('Wavelength')
         self.ax.set_ylabel('Flux')
         xr=[min(self.wave),max(self.wave)]
@@ -251,7 +260,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         self.ax.set_xlim(xr)
         self.init_ylims = self.ax.get_ylim()
         #---------------------------------------------------
-#         self.ax=ax
+
         self.vel=np.array([1.])
         self.lam_lim=[]
         self.lam_ylim=[]
@@ -260,7 +269,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
 
 
         
-        #connect
+        #connect keyboard events to the canvas
         self.setParent(parent)
         self.spectrum.canvas.setFocusPolicy( QtCore.Qt.ClickFocus )
         self.spectrum.canvas.setFocus()
@@ -271,102 +280,70 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         except:
             pass
         
+    #keyboard events
     def ontype(self,event):
         zabs=np.double(0.)
         # when the user hits 'r': clear the axes and plot the original spectrum
         if event.key=='r':
             self.ax.cla()
-            self.main_spec=self.ax.step(self.wave,self.flux,'-',linewidth=0.5,color=clr['white'])
-            self.main_sig=self.ax.step(self.wave,self.error,'-',linewidth=0.5,color=clr['pale_red'],zorder=2)
-
+            self.ax.step(self.wave,self.flux,'-',linewidth=1,color=clr['teal'])
             self.ax.set_xlabel('Wavelength')
             self.ax.set_ylabel('Flux')
             xr=[np.min(self.wave),np.max(self.wave)]
             yr=[np.min(self.flux),np.max(self.flux)]
             self.ax.set_ylim([yr[0],yr[1]])
             self.ax.set_xlim([xr[0], xr[1]])
-            if self.identified_line_active == True:
-                self.identified_line_active = False
-                self.Identified_line_plot.setStyleSheet('background-color : QColor(53, 53, 53)')
-
             self.spectrum.canvas.draw()
+            
         #another refresh to keep the current flux values but remove the plotted lines
         elif event.key == 'R':
-            #del self.ax.lines[1:]
-            #try:
-            #    self.message.remove()
-            #except:
-            #    pass
-            #try: 
-            #   self.message1.remove()
-            #except:
-            #   pass
-            #try:
-            #    self.message2.remove()
-            #except:
-            #   pass
-            #try:
-            #   self.message3.remove()
-            #except:
-            #    pass
-
-
-
-            #try:
-            #    for ii in self.text[-1]:
-            #        ii.remove()
-            #except: 
-            #    pass
-            xlim=self.ax.get_xlim()
-            ylim=self.ax.get_ylim()
-
-            #self.ax.cla()
-            self.specplot()
-            self.ax.set_ylim(ylim)
-            self.ax.set_xlim(xlim)
-
+            del self.ax.lines[2:]
+            try:
+                for ii in self.text[-1]:
+                    ii.remove()
+            except: 
+                pass
             # Give initial axes limits
-            #self.ax.set_ylim(self.init_ylims)
-            #self.ax.set_xlim(self.init_xlims)
+            self.ax.set_ylim(self.init_ylims)
+            self.ax.set_xlim(self.init_xlims)
             
             if self.identified_line_active == True:
                 self.identified_line_active = False
                 self.Identified_line_plot.setStyleSheet('background-color : QColor(53, 53, 53)')
-                
+                self.message_window.setText(" ")
             self.spectrum.canvas.draw()
-         # Set top y max
+#         # Set top y max
         elif event.key=='t':
             xlim=self.ax.get_xlim()
             ylim=self.ax.get_ylim()
             self.ax.set_ylim([ylim[0],event.ydata])
             self.ax.set_xlim(xlim)
             self.spectrum.canvas.draw() 
-         # Set top y min
+#         # Set top y min
         elif event.key=='b':
             xlim=self.ax.get_xlim()
             ylim=self.ax.get_ylim()
             self.ax.set_ylim([event.ydata,ylim[1]])
             self.ax.set_xlim(xlim)
             self.spectrum.canvas.draw() 
-         # Smooth spectrum
+#         # Smooth spectrum
         elif event.key=='S':
             self.vel[0] += 2
             Filter_size=np.int(self.vel[0]) 
-            self.smoothed_spectrum =convolve(self.flux, Box1DKernel(Filter_size))#medfilt(flux,np.int(Filter_size))
-            self.smoothed_error =convolve(self.error, Box1DKernel(Filter_size))#medfilt(flux,np.int(Filter_size))            
+            self.smoothed_spectrum =convolve(self.flux, Box1DKernel(Filter_size))
+            self.smoothed_error =convolve(self.error, Box1DKernel(Filter_size))
             self.specplot()
             self.spectrum.canvas.draw()  
-         #Unsmooth Spectrum
+#         #Unsmooth Spectrum
         elif event.key=='U':
             self.vel[0] -= 2
             if self.vel[0] <= 0:
                 self.vel[0]=1;
             Filter_size=np.int(self.vel[0]) 
             self.smoothed_spectrum =convolve(self.flux, Box1DKernel(Filter_size))#medfilt(flux,np.int(Filter_size))
-            self.smoothed_error =convolve(self.error, Box1DKernel(Filter_size))#medfilt(flux,np.int(Filter_size))            
+            self.smoothed_error =convolve(self.error, Box1DKernel(Filter_size))
             self.specplot()
-            self.spectrum.canvas.draw()  
-
+    
         # Set X max
         elif event.key=='X':
             xlim=self.ax.get_xlim()
@@ -448,30 +425,81 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             eclick=len(self.lam_lim);
 
 
-            self.ax.plot(event.xdata,event.ydata,'rs',ms=5,label='EW_pt',markeredgecolor='k')
+            self.ax.plot(event.xdata,event.ydata,'rs',ms=5,picker=5,label='EW_pt',markeredgecolor='k')
             #self.fig.canvas.draw()
 
             if eclick==2:
                 # Check if the wave entries are monotonously increasing
                 tab=self.lam_lim.argsort()
+                
+                #calculate and display column density if EW measurement intersects a line
+                if len(self.ax.lines) > 2:
+                    fval = []
+                    name = []
+                    wrest = []
+                    try:
+                        for item in self.data:
+                            if ((item['wrest']*(1+self.zabs)>self.lam_lim[tab][0]) and (item['wrest']*(1+self.zabs)<self.lam_lim[tab][1])):
+                                fval.append(item['fval'])
+                                name.append(item['ion'])
+                                wrest.append(item['wrest'])
+                    except:
+                        pass
+                    #if only one line is intersected, use that transitions values
+                    if (len(fval)>0 and len(fval)<2):
+                        vel_lims = (np.asarray(self.lam_lim[tab])-wrest[0]*(1+self.zabs))*self.c/(wrest[0]*(1+self.zabs))
+                        EW,sig_EW,cont,wave_slice,N,Nerr = self.compute_EW(self.wave/(1.+self.zabs),self.flux,self.lam_lim[tab]/(1+self.zabs),self.lam_ylim[tab],self.error,fval[0],wrest[0])
+                        EW=np.array(EW)*1000.
+                        sig_EW=np.array(sig_EW)*1000.
+                        self.ax.plot(wave_slice,cont,'r--')
+                        Wval = 'EW [mAA]: '+ '%.1f' % EW + ' +/- ' + '%.1f' % sig_EW + '\n\n'
+                        logNerr = str(np.round(np.log10((N+Nerr)/(N-Nerr)/2),2))
+                        formatName = '$N_{'+name[0]+'}$'
+                        logN = Wval + 'log ' + formatName + ' [$cm^{-2}$]:'  + str(np.round(np.log10(N),2)) + ' +/- ' +logNerr
+                        self.ax.text(np.mean([self.lam_lim])+.05,np.max(self.lam_ylim)+0.2,logN, rotation=90,verticalalignment='bottom')
+                        self.message_window.setText(Wval + 'N '+name[0] + '[1/cm^2]'+': '+str(np.round(np.log10(N),2)) + ' +/- ' +logNerr)
+                        self.lam_lim=[]
+                        self.lam_ylim=[]
+                        
+                    #otherwise, ask user which transition they would like to use
+                    elif len(fval)>1:
+                        self.tab = tab
+                        self.fvals = fval
+                        self.fval_wrest = wrest
+                        self.fval_name = name
+                        self.popup = Popup_col_density(self)
+                        self.popup.show()
+                        
+                    # if no lines are intersected only use EW
+                    else:
+                        EW,sig_EW,cont,wave_slice=self.compute_EW(self.wave/(1.+self.zabs),self.flux,self.lam_lim[tab],self.lam_ylim[tab],self.error)
+                        EW=np.array(EW)*1000.
+                        sig_EW=np.array(sig_EW)*1000.
+                        self.ax.plot(wave_slice,cont,'r--')
 
-                EW,sig_EW,cont,wave_slice=self.compute_EW(self.wave/(1.+self.zabs),self.flux,self.lam_lim[tab]/(1.+self.zabs),self.lam_ylim[tab],self.error)
-                EW=np.array(EW)*1000.
-                sig_EW=np.array(sig_EW)*1000.
-                self.ax.plot(wave_slice,cont,'r--')
-                #ipdb.set_trace()
-                print('---------------------- Equivalent Width -------------------------------------')
-                Wval='EW [mAA]: '+ '%.1f' % EW + ' +/- ' + '%.1f' % sig_EW
-                self.message=self.ax.text(np.mean([self.lam_lim]),np.max(self.lam_ylim)+0.2,Wval, rotation=90,verticalalignment='bottom')
-                print(Wval)
-                print('---------------------------------------------------------------------------')
-                self.lam_lim=[]
-                self.lam_ylim=[]
+                        Wval='EW [mAA]: '+ '%.1f' % EW + ' +/- ' + '%.1f' % sig_EW
+                        self.ax.text(np.mean([self.lam_lim]),np.max(self.lam_ylim)+0.2,Wval, rotation=90,verticalalignment='bottom')
+                        self.message_window.setText(Wval)
+                        self.lam_lim=[]
+                        self.lam_ylim=[]
+                        
+                #if no transitions plotted only evaluate EW 
+                else:
+                    EW,sig_EW,cont,wave_slice=self.compute_EW(self.wave/(1.+self.zabs),self.flux,self.lam_lim[tab],self.lam_ylim[tab],self.error)
+                    EW=np.array(EW)*1000.
+                    sig_EW=np.array(sig_EW)*1000.
+                    self.ax.plot(wave_slice,cont,'r--')
 
+                    Wval='EW [mAA]: '+ '%.1f' % EW + ' +/- ' + '%.1f' % sig_EW
+                    self.ax.text(np.mean([self.lam_lim]),np.max(self.lam_ylim)+0.2,Wval, rotation=90,verticalalignment='bottom')
+                    self.message_window.setText(Wval)
+                    self.lam_lim=[]
+                    self.lam_ylim=[]
+
+                
             self.spectrum.canvas.draw() 
 
-
-        # Fit a Gaussian
+         # Fit a Gaussian
         elif event.key=='G':
 
             self.FXval=np.append(self.FXval, event.xdata)
@@ -521,10 +549,8 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             self.spectrum.canvas.draw() 
 
 
-
-
     
-    def compute_EW(self,lam,flx,lam_lim,lam_ylim,err_flx):
+    def compute_EW(self,lam,flx,lam_lim,lam_ylim,err_flx,fval = -99,wrest=0):
         qtq=np.where( ( lam >= lam_lim[0] ) & ( lam <= lam_lim[1] ) )
         ww=lam[qtq]                 
         flux1=flx[qtq]
@@ -533,11 +559,33 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         #ax.plot(ww,continuum,'k--')
         sig_flx1=err_flx[qtq]/continuum
         flux1=flux1/continuum
-    
+        #flux1 = norm flux
         EW=np.trapz(1.-flux1, x= ww)
         delw=np.double(ww[2]-ww[1])
         sig_w=delw*sig_flx1
         sig_wtot=np.sqrt(np.sum(sig_w**2.))
+        
+        
+        if fval != -99:
+            lambda_r=(lam/(1.+self.zabs))[qtq]
+            vel = ((lam-wrest*(1.0 + self.zabs))*self.c/(wrest*(1.0 + self.zabs)))[qtq]
+            f0=fval
+        #compute apparent optical depth
+            Tau_a =np.log(1./flux1);
+            #compute the median optical depth weighted velcity.
+            Tau50=np.cumsum(Tau_a)/np.max(Tau_a)
+            vel50=np.interp(0.5,Tau50,vel)
+            del_vel_j=np.diff(vel);
+            del_vel_j=np.append([del_vel_j[0]],del_vel_j)
+            # Column density per pixel as a function of velocity
+            nv = Tau_a/((2.654e-15)*f0*lambda_r);# in units cm^-2 / (km s^-1), SS91 
+            n = nv* del_vel_j# column density per bin obtained by multiplying differential Nv by bin width 
+            tauerr = err_flx[qtq]/flux1;
+            nerr = (tauerr/((2.654e-15)*f0*lambda_r))*del_vel_j; 
+            col = np.sum(n);
+            colerr = np.sum((nerr)**2.)**0.5;
+            return EW,sig_wtot,continuum,ww,col,colerr
+        
         return EW,sig_wtot,continuum,ww
 
 
@@ -596,8 +644,9 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         if self.identified_line_active == True:
             self.identified_line_active = False
             self.Identified_line_plot.setStyleSheet('background-color : QColor(53, 53, 53)')
-        if len(self.ax.lines)>1:
-            del self.ax.lines[1:]
+            self.message_window.setText(" ")
+        if len(self.ax.lines)>2:
+            del self.ax.lines[2:]
             self.ax.texts = []
             try:
                 for ii in self.text[-1]:
@@ -633,23 +682,20 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         self.loading = LoadCatalog(parent)
         self.loading.show()
         
-
+    #spec plot is connected to the smoothing/unsmoothing events
+    #flux is always stored as ax.lines[0], error as ax.lines[1]. So we can add two new S/US plots
+    #replace lines[0] and [1], then delete the last two lines added to the ax.lines list to keep the reference as [1] and [0]
     def specplot(self):
-        xlim=self.ax.get_xlim()
-        ylim=self.ax.get_ylim()
-
-        self.ax.cla()
-
-        self.main_spec = self.ax.step(self.wave,self.smoothed_spectrum,'-',lw=0.5,label='smooth',color=clr['white'])
-        self.main_sig = self.ax.step(self.wave,self.smoothed_error,'-',lw=0.5,label='smooth',color=clr['pale_red'],zorder=2)        
-        #self.main_spec.set_data(self.wave,self.smoothed_spectrum)
-        #self.main_sig.set_data(self.wave,self.smoothed_error)
-        self.ax.set_ylim(ylim)
-        self.ax.set_xlim(xlim)
-
-        self.ax.lines[0] = self.main_spec[0]
+        ax=self.spectrum.gca()
+        xlim=ax.get_xlim()
+        ylim=ax.get_ylim()
+        replace_flux = ax.step(self.wave,self.smoothed_spectrum,'-',lw=0.7,label='smooth',color=clr['white'])
+        self.ax.lines[0] = replace_flux[0]
         del self.ax.lines[-1]
-
+        replace_error = ax.step(self.wave,self.smoothed_error,'-',lw=0.7,label='smooth',color=clr['pale_red'])
+        self.ax.lines[1] = replace_error[0]
+        del self.ax.lines[-1]
+        
         self.spectrum.canvas.draw() 
         
 
@@ -660,7 +706,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         
         #this is for 'Z' functionality deletes all lines and plots a new line
         if ((remove == True) & (self.row_remove == False) & (self.hide == False)):
-            del self.ax.lines[1:len(self.ax.lines)]
+            del self.ax.lines[2:len(self.ax.lines)]
             self.ax.texts = []
             self.throw_away = True
             
@@ -706,6 +752,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             self.label=label
             linecolor=clr[color]
             data=line.read_line_list(label)
+            self.data = data
             xlim=self.init_xlims
             ylim=self.ax.get_ylim()
             
@@ -957,7 +1004,7 @@ class Manual_Transition(QWidget):
             
     def transition_change(self,parent):
         
-        del parent.ax.lines[1:]
+        del parent.ax.lines[2:]
         parent.ax.texts = []
         
         parent.label = self.combo_ll.currentText()
@@ -1234,7 +1281,7 @@ class LoadCatalog(QWidget):
         #if zabs_manager already loaded
         if parent.zabs_list.shape[0]>0:
             # clear plotted lines/text from zabs_manager such that the new lines for plot/remove/hide are same color as linelist
-            del parent.ax.lines[1:]; parent.zabs_line_plot = []
+            del parent.ax.lines[2:]; parent.zabs_line_plot = []
             parent.ax.texts = []; parent.texts = []
 
             for z in parent.zabs_list.Zabs.tolist():
@@ -1288,6 +1335,7 @@ class LoadCatalog(QWidget):
             pass
         
         parent.Identified_line_plot.setStyleSheet('background-color : green')
+        parent.message_window.setText(" ")
         parent.identified_line_active = True
         parent.spectrum.canvas.draw()
    
@@ -1303,6 +1351,7 @@ class Identified_plotter:
     def __init__(self,parent):
         if parent.line_list.shape[0]==0:
             parent.Identified_line_plot.setStyleSheet('background-color : red')
+            parent.message_window.setText("No transitions have been identified")
         else:
             #if active remove plots and set indicator back to gray
             if parent.identified_line_active == True:
@@ -1319,14 +1368,13 @@ class Identified_plotter:
                 if parent.zabs_list.shape[0]>0:
                     for z in parent.zabs_list.Zabs.tolist():
                         index = parent.line_list[parent.line_list['Zabs'] == z].index
-                        colorname = parent.zabs_list.color[parent.zabs_list.Zabs == z].values[0]
-                        color =clr[colorname]
+                        color = parent.zabs_list.color[parent.zabs_list.Zabs == z].values[0]
                         ylim=parent.ax.get_ylim()
                         for i in index:
                             xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                             ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
                             lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color=color)
-                            tt = parent.ax.text(xdata[0],0.78*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90,color=color)
+                            tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                             parent.identified_lines.append(lineplot)
                             parent.identified_text.append(tt)
 
@@ -1342,7 +1390,7 @@ class Identified_plotter:
                                 for i in index:
                                     xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                                     ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
-                                    lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color='teal')
+                                    lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color='white')
                                     tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                                     parent.identified_lines.append(lineplot)
                                     parent.identified_text.append(tt)
@@ -1351,7 +1399,7 @@ class Identified_plotter:
                     for i in range(parent.line_list.shape[0]):
                         xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                         ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
-                        lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color='teal')
+                        lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color='white')
                         tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                         parent.identified_lines.append(lineplot)
                         parent.identified_text.append(tt)
@@ -1594,6 +1642,37 @@ class input_txt_dlg:
         main.show()
         sys.exit(app.exec_())        
         
+        
+class Popup_col_density(QWidget):
+    #creates popup displaying the multiple transitions encompassed by EW
+    def __init__(self,parent):
+        super().__init__()
+        self.list = QListWidget(self)
+        self.setWindowTitle('Select Transition')
+        self.resize(250,100)
+        for ii in range(len(parent.fvals)):
+            self.list.addItem(parent.fval_name[ii])
+        
+        self.list.itemDoubleClicked.connect(lambda: self.ion_selected(parent))
+    
+    #
+    def ion_selected(self,parent):
+        item_idx = self.list.currentRow()
+        vel_lims = (np.asarray(parent.lam_lim[parent.tab])-parent.fval_wrest[item_idx]*(1+parent.zabs))*parent.c/(parent.fval_wrest[item_idx]*(1+parent.zabs))
+        EW,sig_EW,cont,wave_slice,N,Nerr = parent.compute_EW(parent.wave/(1.+parent.zabs),parent.flux,parent.lam_lim[parent.tab],parent.lam_ylim[parent.tab],parent.error,parent.fvals[item_idx],parent.fval_wrest[item_idx])
+        EW=np.array(EW)*1000.
+        sig_EW=np.array(sig_EW)*1000.
+        parent.ax.plot(wave_slice,cont,'r--')
+        Wval = 'EW [mAA]: '+ '%.1f' % EW + ' +/- ' + '%.1f' % sig_EW + '\n'
+        logNerr = str(np.round(np.log10((N+Nerr)/(N-Nerr)/2),2))
+        formatName = '$N_{'+parent.fval_name[item_idx]+'}$'
+        logN = Wval + 'log ' + ' [$cm^{-2}$]: ' +str(np.round(np.log10(N),2)) + ' +/- ' +logNerr
+        parent.ax.text(np.mean([parent.lam_lim])+.05,np.max(parent.lam_ylim)+0.2,logN, rotation=90,verticalalignment='bottom')
+        parent.message_window.setText(logN)
+        parent.lam_lim=[]
+        parent.lam_ylim=[]
+        parent.spectrum.canvas.draw()
+        self.close()
         
      
         
