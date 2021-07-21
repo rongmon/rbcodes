@@ -26,7 +26,8 @@ from matplotlib.backends.backend_qt5agg import (
 )
 from matplotlib.figure import Figure
 from GUIs import guess_abs_line_vel_gui as g
-from GUIs.abstools import Absorber as A 
+from GUIs.abstools import Absorber as A
+ 
 
 
 
@@ -51,14 +52,15 @@ HELP = '''
         'b':   Restricts ymin of the canvas to current mouse height
         'S':   Smoothes the spectra
         'U':   Unsmooth spectra
+        'E':   Two E keystrokes will compute rest frame equivalent width at a defined region
+        'G':   Three keystrokes to fit a Gaussian profile. [Currently not drawing on the spectrum]
+
+
         'x':   Sets left x limit (xmin)
         'X':   Sets right x limit (xmax)
         ']':   Shifts canvas to the right
         '[':   Shifts canvas to the left
         'Y':   User can input their own y limits
-        'E':   Two E keystrokes will compute rest frame equivalent width at a defined region
-        'G':   Three keystrokes to fit a Gaussian profile. [Currently not drawing on the spectrum]
-
         'H':   Help Window
         'v':   Opens Separate Vstack GUI for the user to identify detected transitions
                Vstack commands will be discussed below
@@ -129,6 +131,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         self.wave=wave
         self.flux=flux
         self.smoothed_spectrum=flux
+        self.smoothed_error=error
         self.error=error
         self.zabs=zabs
         self.lam_lim=[] #For compute_EW running tab
@@ -149,8 +152,8 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         main_layout = QHBoxLayout()
         self.spectrum = Figure()
         self.ax = self.spectrum.add_subplot(111)
-        self.ax.step(self.wave, self.error, '-',lw=0.5,color=clr['pale_red'],zorder=2)
-        self.ax.step(self.wave, self.flux, '-',lw=0.5,color=clr['white'])
+        self.main_spec=self.ax.step(self.wave, self.flux, '-',lw=0.5,color=clr['white'])
+        self.main_sig=self.ax.step(self.wave, self.error, '-',lw=0.5,color=clr['pale_red'],zorder=2)     
         self.init_xlims = [min(self.wave),max(self.wave)]
         self.canvas = FigureCanvasQTAgg(self.spectrum)
         toolbar = NavigationToolbar(self.canvas, self)
@@ -226,7 +229,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         spacer = QHBoxLayout()
         plot_cat = QVBoxLayout()
         spacerItem = QtWidgets.QSpacerItem(100, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        spacer.addWidget(self.message_window,stretch=1.0)
+        spacer.addWidget(self.message_window,stretch=1)
         spacer.addLayout(active_elem_layout,stretch=1.5)
         plot_cat.addWidget(plot)
         plot_cat.addWidget(catalog)
@@ -280,35 +283,29 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
     #keyboard events
     def ontype(self,event):
         zabs=np.double(0.)
-        # when the user hits 'r': clear the axes (except flux and error) and return to the initial x&y lims
+        # when the user hits 'r': clear the axes and plot the original spectrum
         if event.key=='r':
-            del self.ax.lines[2:]
-            self.lam_lim=[]
-            self.lam_ylim=[]
-            self.FXval=[]
-            self.FYval=[]
-
-            self.ax.texts = []
-            self.ax.set_ylim(self.init_ylims)
-            self.ax.set_xlim(self.init_xlims)
+            self.ax.cla()
+            self.main_spec=self.ax.step(self.wave,self.flux,'-',linewidth=0.5,color=clr['white'])
+            self.main_sig=self.ax.step(self.wave,self.error,'-',linewidth=0.5,color=clr['pale_red'],zorder=2)
+            self.ax.set_xlabel('Wavelength')
+            self.ax.set_ylabel('Flux')
+            xr=[np.min(self.wave),np.max(self.wave)]
+            yr=[np.min(self.flux),np.max(self.flux)]
+            self.ax.set_ylim([yr[0],yr[1]])
+            self.ax.set_xlim([xr[0], xr[1]])
             self.spectrum.canvas.draw()
             
         #another refresh to keep the current flux values but remove the plotted lines
         elif event.key == 'R':
             del self.ax.lines[2:]
-            self.lam_lim=[]
-            self.lam_ylim=[]
-            self.FXval=[]
-            self.FYval=[]
-            try:
-                for ii in self.text[-1]:
-                    ii.remove()
-            except: 
-                pass
-            self.ax.texts = []
-            # Give initial axes limits
-#             self.ax.set_ylim(self.init_ylims)
-#             self.ax.set_xlim(self.init_xlims)
+            xlim=self.ax.get_xlim()
+            ylim=self.ax.get_ylim()
+            #self.ax.cla()
+            self.specplot()
+            self.ax.set_ylim(ylim)
+            self.ax.set_xlim(xlim)
+
             
             if self.identified_line_active == True:
                 self.identified_line_active = False
@@ -475,7 +472,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                         
                     # if no lines are intersected only use EW
                     else:
-                        EW,sig_EW,cont,wave_slice=self.compute_EW(self.wave/(1.+self.zabs),self.flux,self.lam_lim[tab]/(1+self.zabs),self.lam_ylim[tab],self.error)
+                        EW,sig_EW,cont,wave_slice=self.compute_EW(self.wave/(1.+self.zabs),self.flux,self.lam_lim[tab]/(1.+self.zabs),self.lam_ylim[tab],self.error)
                         EW=np.array(EW)*1000.
                         sig_EW=np.array(sig_EW)*1000.
                         self.ax.plot(wave_slice,cont,'r--')
@@ -488,7 +485,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                         
                 #if no transitions plotted only evaluate EW 
                 else:
-                    EW,sig_EW,cont,wave_slice=self.compute_EW(self.wave/(1.+self.zabs),self.flux,self.lam_lim[tab]/(1+self.zabs),self.lam_ylim[tab],self.error)
+                    EW,sig_EW,cont,wave_slice=self.compute_EW(self.wave/(1.+self.zabs),self.flux,self.lam_lim[tab]/(1.+self.zabs),self.lam_ylim[tab],self.error)
                     EW=np.array(EW)*1000.
                     sig_EW=np.array(sig_EW)*1000.
                     self.ax.plot(wave_slice,cont,'r--')
@@ -521,8 +518,8 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                 fit_g = fitting.LevMarLSQFitter()
 
                 # First fit a quick continuum
-                qtq=np.where( ( (self.wave >= self.FXval[0] ) & ( (self.wave <= self.FXval[2] ) )))
-                ww=self.wave[qtq]                 
+                qtq=np.where( ( (self.wave/(1.+self.zabs)) >= self.FXval[0] ) & ( (self.wave/(1.+self.zabs)) <= self.FXval[2] ) )
+                ww=self.wave[qtq]/(1.+self.zabs)                 
                 flux1=self.flux[qtq]
                 spline = splrep(np.append(self.FXval[0],self.FXval[2]),np.append(self.FYval[0],self.FYval[2]),k=1)
                 continuum = splev(ww,spline)
@@ -538,18 +535,13 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                     Final_fit=g(ww)*continuum         
     
                 model_fit=self.ax.plot(ww, Final_fit, 'r-')        
-                values0=' Amp: '+'%.3f' %  g.parameters[0] 
-                values1=' Center: '+'%.3f' %  g.parameters[1] 
-                values2=' Sig: '+'%.3f' %  g.parameters[2] 
+                values0='amp: '+'%.3f' %  g.parameters[0] 
+                values1='center: '+'%.3f' %  g.parameters[1] 
+                values2='sig: '+'%.3f' %  g.parameters[2] 
 
-
-                self.message1=self.ax.text(np.mean(ww),np.max(self.FYval)+0.2,values0, rotation=90,verticalalignment='bottom')
-                self.message2=self.ax.text(np.mean(ww)+np.std(ww),np.max(self.FYval)+0.2,values1, rotation=90,verticalalignment='bottom')
-                self.message3=self.ax.text(np.mean(ww)-np.std(ww),np.max(self.FYval)+0.2,values2, rotation=90,verticalalignment='bottom')
-
-
-
-                self.message_window.setText(values0+'\n'+values1+'\n'+values2+'\n\n')
+                self.message1=self.ax.text(np.mean(ww*(1.+self.zabs)),np.max(self.FYval)+0.2,values0, rotation=90,verticalalignment='bottom')
+                self.message2=self.ax.text(np.mean(ww*(1.+self.zabs))+np.std(ww*(1.+self.zabs)),np.max(self.FYval)+0.2,values1, rotation=90,verticalalignment='bottom')
+                self.message3=self.ax.text(np.mean(ww*(1.+self.zabs))-np.std(ww*(1.+self.zabs)),np.max(self.FYval)+0.2,values2, rotation=90,verticalalignment='bottom')
 
                 self.FXval=[]
                 self.FYval=[]
@@ -560,15 +552,13 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
     
     def compute_EW(self,lam,flx,lam_lim,lam_ylim,err_flx,fval = -99,wrest=0):
         qtq=np.where( ( lam >= lam_lim[0] ) & ( lam <= lam_lim[1] ) )
-        ww=lam[qtq]  
-
+        ww=lam[qtq]                 
         flux1=flx[qtq]
         spline = splrep(lam_lim,lam_ylim,k=1)
         continuum = splev(ww,spline)
-        #ax.plot(ww,continuum,'k--')
         sig_flx1=err_flx[qtq]/continuum
         flux1=flux1/continuum
-        
+
         #Removing any NAN values 
         sq=np.isnan(flux1);
         tmp_flx=sig_flx1[sq]
@@ -582,8 +572,8 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         q=np.where(flux1<=0.);
         tmp_flx=sig_flx1[q]+0.01
         flux1[q]=tmp_flx;
-        
-        
+
+
         EW=np.trapz(1.-flux1, x= ww)
         delw=np.double(ww[2]-ww[1])
         sig_w=delw*sig_flx1
@@ -608,10 +598,9 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             nerr = (tauerr/((2.654e-15)*f0*lambda_r))*del_vel_j; 
             col = np.sum(n);
             colerr = np.sum((nerr)**2.)**0.5;
-            ww = ww*(1+self.zabs)
-            return EW,sig_wtot,continuum,ww,col,colerr
-        ww = ww*(1+self.zabs)
-        return EW,sig_wtot,continuum,ww
+            return EW,sig_wtot,continuum,ww*(1.0 + self.zabs),col,colerr
+        
+        return EW,sig_wtot,continuum,ww*(1.0 + self.zabs)
 
 
 
@@ -665,11 +654,6 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
     def Refreshed(self,parent):
         self.ax.set_ylim(self.init_ylims)
         self.ax.set_xlim(self.init_xlims)
-        self.lam_lim=[]
-        self.lam_ylim=[]
-        self.FXval=[]
-        self.FYval=[]
-
         
         if self.identified_line_active == True:
             self.identified_line_active = False
@@ -716,15 +700,19 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
     #flux is always stored as ax.lines[0], error as ax.lines[1]. So we can add two new S/US plots
     #replace lines[0] and [1], then delete the last two lines added to the ax.lines list to keep the reference as [1] and [0]
     def specplot(self):
-        ax=self.spectrum.gca()
-        xlim=ax.get_xlim()
-        ylim=ax.get_ylim()
-        replace_flux = ax.step(self.wave,self.smoothed_spectrum,'-',lw=0.5,label='smooth',color=clr['white'])
-        self.ax.lines[1] = replace_flux[0]
-        del self.ax.lines[-1]
-        replace_error = ax.step(self.wave,self.smoothed_error,'-',lw=0.5,label='smooth',color=clr['pale_red'],zorder=2)
-        self.ax.lines[0] = replace_error[0]
-        del self.ax.lines[-1]
+        xlim=self.ax.get_xlim()
+        ylim=self.ax.get_ylim()
+
+        self.ax.cla()
+
+        self.main_spec = self.ax.step(self.wave,self.smoothed_spectrum,'-',lw=0.5,label='smooth',color=clr['white'])
+        self.main_sig = self.ax.step(self.wave,self.smoothed_error,'-',lw=0.5,label='smooth',color=clr['pale_red'],zorder=2)        
+        #self.main_spec.set_data(self.wave,self.smoothed_spectrum)
+        #self.main_sig.set_data(self.wave,self.smoothed_error)
+        self.ax.set_ylim(ylim)
+        self.ax.set_xlim(xlim)
+
+        self.ax.lines[0] = self.main_spec[0]
         
         self.spectrum.canvas.draw() 
         
@@ -1689,12 +1677,14 @@ class Popup_col_density(QWidget):
     def ion_selected(self,parent):
         item_idx = self.list.currentRow()
         vel_lims = (np.asarray(parent.lam_lim[parent.tab])-parent.fval_wrest[item_idx]*(1+parent.zabs))*parent.c/(parent.fval_wrest[item_idx]*(1+parent.zabs))
-        EW,sig_EW,cont,wave_slice,N,Nerr = parent.compute_EW(parent.wave/(1.+parent.zabs),parent.flux,parent.lam_lim[parent.tab]/(1+parent.zabs),parent.lam_ylim[parent.tab],parent.error,parent.fvals[item_idx],parent.fval_wrest[item_idx])
+        
+        EW,sig_EW,cont,wave_slice,N,Nerr = parent.compute_EW(parent.wave/(1.+parent.zabs),parent.flux,parent.lam_lim[parent.tab]/(1.+parent.zabs),parent.lam_ylim[parent.tab],parent.error,parent.fvals[item_idx],parent.fval_wrest[item_idx])
         EW=np.array(EW)*1000.
         sig_EW=np.array(sig_EW)*1000.
         parent.ax.plot(wave_slice,cont,'r--')
         Wval = 'EW [mAA]: '+ '%.1f' % EW + ' +/- ' + '%.1f' % sig_EW + '\n'
         logNerr = str(np.round(np.log10((N+Nerr)/(N-Nerr)/2),2))
+        
         formatName = '$N_{'+parent.fval_name[item_idx]+'}$'
         logN = Wval + 'log ' + ' [$cm^{-2}$]: ' +str(np.round(np.log10(N),2)) + ' +/- ' +logNerr
         parent.ax.text(np.mean([parent.lam_lim])+.05,np.max(parent.lam_ylim)+0.2,logN, rotation=90,verticalalignment='bottom')
@@ -1751,4 +1741,5 @@ class rb_plotspec():
         QtWidgets.QApplication.setQuitOnLastWindowClosed(True)
         app.exec_()
         app.quit()
+
 
