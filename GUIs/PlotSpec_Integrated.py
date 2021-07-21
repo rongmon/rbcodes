@@ -70,8 +70,7 @@ HELP = '''
                the active zabs will display what the redshift should be based on the 
                mouse x location
                
-        'F':   Zooms out to show the full spectra.
-        
+       
         
         --------Vstack GUI Keyboard Events--------
         Upon pressing 'v' in main canvas, a separate window will pop up
@@ -411,11 +410,6 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             self.manT = Manual_Transition(self)
             self.manT.show()
             
-        #Zoom out to FULL spectrum
-        elif event.key == 'F':
-            self.ax.set_xlim(self.init_xlims)
-            self.spectrum.canvas.draw()
-
 
         # Compute Equivalent Width between two points
         elif event.key=='E':
