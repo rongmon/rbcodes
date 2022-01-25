@@ -50,7 +50,7 @@ def lens_sep_to_kpc(delta_arcsec,zabs_list,z_lens,z_source):
     dist= (theta_obs)*DL *(Ds -Dc)/((1.+z_source)* (Ds-DL))
     distlist=dist.to(u.kpc).value
 
-    q=np.where((zabs_list < z_lens))
+    q=np.where((zabs_list <= z_lens))
     distlist[q]=delta_arcsec/arcsec2kpc.value[q]
 
     return distlist
