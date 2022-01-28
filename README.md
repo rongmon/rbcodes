@@ -46,6 +46,7 @@ The IGM folder contains several python routines for intergalactic medium and cir
 	                       algorithm, then allows user to tweak the fit using linetools.fit_continuum 
 	                       routine. Saves the fitted continuum and the 1D spectrum as a xspectrum1D object
 	                       Very helpful to fit a full quasar continuum.	
+	6) lens_sep_to_kpc.py :Function to compute physical separation between sightlines in a lensed quasar 	                       system under the thin lens approximation.
 
 The halo folder contains modules to compute NFW halo profiles
 
