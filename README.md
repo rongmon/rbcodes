@@ -59,6 +59,7 @@ The stat folder contains several statistical codes:
        2) rb_boot.py        :  Bootstrap function
  
 The lensing folder contains code to ray trace positions to source plane for a given deflection matrix.
+
        1) lens_ang_sep.py  :        Inititate the delensing object to load the required deflection matrices
 
 The utils folder contains several utility modules:
