@@ -143,7 +143,7 @@ class Custom_MenuBar(QMenuBar):
 			self.mW.fitsobj.flux = fitsfile['FLUX'].data
 			self.mW.fitsobj.error = fitsfile['ERROR'].data 
 
-			self.mW.sc.plot(self.mW.fitsobj.wave, 
+			self.mW.sc.plot_spec(self.mW.fitsobj.wave, 
 							self.mW.fitsobj.flux, 
 							self.mW.fitsobj.error)
 

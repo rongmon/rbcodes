@@ -36,7 +36,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		#self.fig.canvas.mpl_connect('pick_event', self.onpick)
 
 
-	def plot(self, wave, flux, error):
+	def plot_spec(self, wave, flux, error):
 		self.axes.cla()
 		self.axes.plot(wave, flux, color='black')#, label='Flux')
 		self.axes.plot(wave, error, color='red')# label='Error')
@@ -106,7 +106,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			self.axes.set_xlim([xlim[1], xlim[1] + delx])
 			self.draw()
 
-		elif event.key == 's':
+		elif event.key == 'S':
 			# smooth ydata
 			self.scale += 2
 			self.new_spec = convolve(self.flux, Box1DKernel(self.scale))
@@ -114,7 +114,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			self.replot(self.new_spec, self.new_err)
 			self.draw()
 
-		elif event.key == 'u':
+		elif event.key == 'U':
 			# unsmooth ydata
 			self.scale -= 2
 			if self.scale < 0:
@@ -124,7 +124,24 @@ class MplCanvas(FigureCanvasQTAgg):
 			self.replot(self.new_spec, self.new_err)
 			self.draw()
 
-		elif event.key == 'g':
+		elif event.key == 'Y':
+			# set y-axis limits with precise values
+			ylimdialog = CustomLimDialog(axis='y')
+			if ylimdialog.exec_():
+				ylim = ylimdialog._getlim()
+				self.axes.set_ylim(ylim)
+				self.draw()
+
+		elif event.key == 'W':
+			# set y-axis limits with precise values
+			xlimdialog = CustomLimDialog(axis='x')
+			if xlimdialog.exec_():
+				xlim = xlimdialog._getlim()
+				self.axes.set_xlim(xlim)
+				self.draw()
+
+
+		elif event.key == 'G':
 			# fit a Gaussian profile
 			self.fxval.append(event.xdata)
 			self.fyval.append(event.ydata)
@@ -133,7 +150,11 @@ class MplCanvas(FigureCanvasQTAgg):
 			self.axes.plot(event.xdata, event.ydata, 'rs', ms=5)
 			self.draw()
 
-			if fclick == 3:
+			if fclick == 1:
+				message = 'You need 3 points to model a Gaussian. Please click 2 more points.'
+			elif fclick == 2:
+				message = 'Please click 1 more point to model a Gaussian.'
+			elif fclick == 3:
 				# fit a Gaussian with 3 data points
 				g_init = models.Gaussian1D(amplitude=self.fyval[1],
 										   mean=self.fxval[2],
@@ -159,8 +180,13 @@ class MplCanvas(FigureCanvasQTAgg):
 					g_final = g(g_wave) * cont
 
 				model_fit = self.axes.plot(g_wave, g_final, 'r-')
+				self.draw()
+				message = (f'Amplitude: {g.parameters[0]:.3f}\n'
+						   f'Mean: {g.parameters[1]:.3f}\n'
+						   f'Sigma: {g.parameters[2]:.3f}')
 
 				self.fxval, self.fyval = [], []
+				print(message)
 
 
 	def replot(self, new_spec, new_err):
@@ -175,5 +201,40 @@ class MplCanvas(FigureCanvasQTAgg):
 		del self.axes.lines[-2:]
 
 
-			
+class CustomLimDialog(QtWidgets.QDialog):
+	def __init__(self, axis='y'):
+		super().__init__()
 
+		self.setWindowTitle('Set precise limits on flux range')
+		QBtn = QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+		self.buttonbox = QtWidgets.QDialogButtonBox(QBtn)
+
+		self.layout = QtWidgets.QGridLayout()
+		if axis == 'x':
+			lb_min = QtWidgets.QLabel('X-Axis Min')
+			lb_max = QtWidgets.QLabel('X-Axis Max')
+		if axis == 'y':
+			lb_min = QtWidgets.QLabel('Y-Axis Min')
+			lb_max = QtWidgets.QLabel('Y-Axis Max')
+		else:
+			pass
+
+		self.le_min = QtWidgets.QLineEdit()
+		self.le_min.setPlaceholderText('Desired minimum value')
+		self.le_max = QtWidgets.QLineEdit()
+		self.le_max.setPlaceholderText('Desired maximum value')
+
+		self.layout.addWidget(lb_min, 0, 0)
+		self.layout.addWidget(lb_max, 1, 0)
+		self.layout.addWidget(self.le_min, 0, 1)
+		self.layout.addWidget(self.le_max, 1, 1)
+		self.layout.addWidget(self.buttonbox, 2, 1)
+
+		self.setLayout(self.layout)
+
+		self.buttonbox.accepted.connect(self.accept)
+		self.buttonbox.rejected.connect(self.reject)
+		
+		
+	def _getlim(self):
+		return [float(self.le_min.text()), float(self.le_max.text())]
