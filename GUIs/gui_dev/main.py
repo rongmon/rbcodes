@@ -2,11 +2,12 @@ import sys
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QStatusBar, QVBoxLayout, QLabel
 from PyQt5 import QtCore
-from menu_toolbars import Custom_ToolBar, Custom_MenuBar
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
-
+from menu_toolbars import Custom_ToolBar, Custom_MenuBar
 from spec_plot import MplCanvas
+from utils import FitsObj
+
 
 class MainWindow(QMainWindow):
 	'''This is the main window of this GUI
@@ -15,6 +16,10 @@ class MainWindow(QMainWindow):
 	def __init__(self):
 		super().__init__()
 
+		#----------- External data ----------------------------
+		# save a fits copy in the main window
+		self.fitsobj = FitsObj([],[],[])
+
 		# --------- Assembling All Widgets ------------------- 
 		#placeholder to hold the central widget in main window
 		widget = QWidget()
@@ -22,7 +27,6 @@ class MainWindow(QMainWindow):
 
 		self.sc = MplCanvas(self, width=10, height=8, dpi=100)
 		mpl_toolbar = NavigationToolbar(self.sc, self)
-		#self.sc.axes.imshow('cat.jpg')
 
 		l_in = QLabel('User Input >> guess z')
 		l_in.setAlignment(QtCore.Qt.AlignCenter)

@@ -1,12 +1,14 @@
 import sys
 
 from astropy.io import fits
+from astropy.table import Table
 
 from PyQt5.QtCore import Qt, QSize, QUrl
 from PyQt5.QtWidgets import QAction, QToolBar, QStatusBar, QMenuBar, QFileDialog
 from PyQt5.QtGui import QKeySequence, QDesktopServices
 
 from user_manual import UserManualDialog
+from utils import FitsObj
 
 
 class Custom_ToolBar(QToolBar):
@@ -61,6 +63,8 @@ class Custom_MenuBar(QMenuBar):
 
 		savespec_act = self._create_action_in_menu('Save Spectrum',
 												   'Save a spectrum fits file to local folder')
+		savespec_act.triggered.connect(self._save_spec)
+
 		loadz_act = self._create_action_in_menu('Load redshift',
 												'Load redshift list file from local folder')
 		savez_act = self._create_action_in_menu('Save redshift',
@@ -135,9 +139,30 @@ class Custom_MenuBar(QMenuBar):
 			# read fits file
 			fitsfile = fits.open(file)
 			# find wavelength, flux, error
+			self.mW.fitsobj.wave = fitsfile['WAVELENGTH'].data
+			self.mW.fitsobj.flux = fitsfile['FLUX'].data
+			self.mW.fitsobj.error = fitsfile['ERROR'].data 
 
-			wave = fitsfile['WAVELENGTH'].data
-			flux = fitsfile['FLUX'].data
-			error = fitsfile['ERROR'].data 
+			self.mW.sc.plot(self.mW.fitsobj.wave, 
+							self.mW.fitsobj.flux, 
+							self.mW.fitsobj.error)
 
-			self.mW.sc.plot(wave, flux, error)
+	def _save_spec(self):
+		'''Save spec fits file with our own fits format
+		'''
+		filename, check = QFileDialog.getSaveFileName(None,
+			'Save 1 spectrum FITS file',
+			'',
+			'Fits Files (*.fits')
+		if check:
+			table = Table()
+			table['WAVELENGTH'] = self.mW.fitsobj.wave
+			table['FLUX'] = self.mW.fitsobj.flux
+			table['ERROR'] = self.mW.fitsobj.error
+			print(filename)
+			table.write(filename, format='fits')
+			'''Output fits format
+			table[1].data['WAVELENGTH']
+			table[1].data['FLUX']
+			table[1].data['ERROR']
+			'''
