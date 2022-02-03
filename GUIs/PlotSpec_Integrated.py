@@ -138,7 +138,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         clrlist=list(clr.keys())  
 
         self.combo_options =clrlist[1:]
-        self.line_options = ['LLS','LLS Small','DLA','None']
+        self.line_options = ['LLS','LLS Small','DLA','LBG','Gal','None']
         
         #---------------Initial page setup------------------# 
         super(mainWindow,self).__init__(parent)
@@ -817,7 +817,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
 
 
     def get_linelist(self):
-        items = ( "LLS", "LLS Small", "DLA","None")
+        items = ( "LLS", "LLS Small", "DLA","LBG","Gala","None")
 
         item, ok = QInputDialog.getItem(self, "Select Linelist", 
             "Line Lists", items, 0, False)            
@@ -848,7 +848,7 @@ class manage_identified_absorbers(QWidget):
         #make longer color list
         clrlist=list(clr.keys()) 
         self.combo_options = clrlist[1:]#['yellow','orange','red','green','white']
-        self.line_options = ['LLS','LLS Small','DLA','None']
+        self.line_options = ['LLS','LLS Small','DLA','LBG','Gal','None']
         
         for i in range(2):
             combo = QComboBox()
@@ -996,7 +996,7 @@ class Manual_Transition(QWidget):
         super().__init__()
         self.resize(200,900)
         self.layout = QVBoxLayout()
-        self.line_options = ['LLS','LLS Small','DLA','None']
+        self.line_options = ['LLS','LLS Small','DLA','LBG','Gal','None']
         self.combo_ll = QComboBox()
         for items in self.line_options:
             self.combo_ll.addItem(items)
