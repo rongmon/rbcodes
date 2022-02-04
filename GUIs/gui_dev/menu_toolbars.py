@@ -1,19 +1,22 @@
 import sys
+import os
+import pandas as pd
 
-from astropy.io import fits
+from astropy.io import fits, ascii
 from astropy.table import Table
 
-from PyQt5.QtCore import Qt, QSize, QUrl
+from PyQt5.QtCore import Qt, QSize, QUrl, pyqtSignal
 from PyQt5.QtWidgets import QAction, QToolBar, QStatusBar, QMenuBar, QFileDialog
 from PyQt5.QtGui import QKeySequence, QDesktopServices
 
 from user_manual import UserManualDialog
 from utils import FitsObj
 
+WORKING_DIR = os.path.abspath(os.getcwd()) + './example-data'
+LINELIST_DIR = os.path.dirname(os.path.abspath(__file__)) + '/lines'
 
 class Custom_ToolBar(QToolBar):
-	'''Our personalized custom Toolbar
-	'''
+	#Our personalized custom Toolbar
 	def __init__(self, mainWindow):
 		super().__init__()
 		self.mW = mainWindow
@@ -29,27 +32,34 @@ class Custom_ToolBar(QToolBar):
 		self.addAction(btn2)
 
 	def _create_button(self, buttonName='', buttonTip=''):
-		'''Create buttons wrapper
-		Parameters:
-		----------
-		buttonName (str):		Name of the action
-		buttonTip (str):		Brief notes for this button
-
-		Return:
-		------
-		btn (QAction):			implemented button ready to be added
-		'''
+		#Create buttons wrapper
 		btn = QAction(buttonName, self.mW)
 		btn.setStatusTip(buttonTip)
 
 		return btn
 
 class Custom_MenuBar(QMenuBar):
-	'''Create our Custom Menu bar
-	'''
+
+	send_fitsobj = pyqtSignal(object)
+	send_linelist = pyqtSignal(object)
+	send_newlinelist = pyqtSignal(object)
+	send_z_est = pyqtSignal(object)
+	send_filename = pyqtSignal(str)
+
+	#Create our Custom Menu bar
 	def __init__(self, mainWindow):
 		super().__init__()
 		self.mW = mainWindow
+		self.fitsobj = mainWindow.fitsobj
+		self.linelist = mainWindow.linelist
+		self.newlinelist = mainWindow.newlinelist
+		self.z_est = mainWindow.z_est
+
+		#------------------- Necessary Variable -------------------
+		self.newlinelist = []
+
+
+		#------------------- Menu Layout --------------------------
 
 		# 1st level menu
 		filemenu = self.addMenu('&File')
@@ -67,12 +77,19 @@ class Custom_MenuBar(QMenuBar):
 
 		loadz_act = self._create_action_in_menu('Load redshift',
 												'Load redshift list file from local folder')
+		loadz_act.triggered.connect(self._load_z)
 		savez_act = self._create_action_in_menu('Save redshift',
 												'Save redshift list file to local folder')
+
+
 		loadlinelist_act = self._create_action_in_menu('Load LineList',
 													   'Load LineList file to local folder')
+		loadlinelist_act.triggered.connect(self._load_linelist)
+
 		savelinelist_act = self._create_action_in_menu('Save LineList',
 													   'Save LineList file to local folder')
+		savelinelist_act.triggered.connect(self._save_linelist)
+
 		self._add_actions_to_menu(filemenu, [loadspec_act, savespec_act, loadz_act, savez_act, loadlinelist_act, savelinelist_act])
 
 		# Edit - 2nd level menu
@@ -88,81 +105,129 @@ class Custom_MenuBar(QMenuBar):
 		contact_act.triggered.connect(lambda: QDesktopServices.openUrl(QUrl('https://github.com/rongmon/rbcodes')))
 		self._add_actions_to_menu(helpmenu, [about_act, contact_act])
 		
-
-		
-
 	def _create_action_in_menu(self, actionName='', actionTip=''):
-		'''Create buttons wrapper
-		Parameters:
-		----------
-		parentMenu (QMenu):		parent QMenu object which attaches the btn
-		buttonName (str):		Name of the action
-		buttonTip (str):		Brief notes for this button
-
-		Return:
-		------
-		action (QAction):			implemented button ready to be added
-		'''
+		#Create buttons wrapper
 		action = QAction(actionName, self.mW)
 		action.setStatusTip(actionTip)
 		return action
 
 	def _add_actions_to_menu(self, parentMenu, actions):
-		'''Add multiple actions to specific menu
-		Parameters:
-		----------
-		parentMenu (QMenu):			parent QMenu consisting all corresponding actions
-		action (list of QAction):	list of QAction ready to be added to parentMenu
-
-		Return:
-			None
-		'''
+		#Add multiple actions to specific menu
 		for i in range(len(actions)):
 			parentMenu.addAction(actions[i])	
 
 	def _open_user_manual(self):
-		'''Open User manual to help
-		'''
+		#Open User manual to help
 		manual = UserManualDialog()
 		manual.exec_()
 
 	def _load_spec(self):
-		'''Read spec fits file
-		'''
-		file, check = QFileDialog.getOpenFileName(None,
+		#Read spec fits file
+		filepath, check = QFileDialog.getOpenFileName(None,
 			'Load 1 spectrum FITS file',
-			'',
+			WORKING_DIR,
 			'Fits Files (*.fits)')
 		if check:
 			#print(type(file), file)
 
 			# read fits file
-			fitsfile = fits.open(file)
+			fitsfile = fits.open(filepath)
 			# find wavelength, flux, error
-			self.mW.fitsobj.wave = fitsfile['WAVELENGTH'].data
-			self.mW.fitsobj.flux = fitsfile['FLUX'].data
-			self.mW.fitsobj.error = fitsfile['ERROR'].data 
+			self.fitsobj.wave = fitsfile['WAVELENGTH'].data
+			self.fitsobj.flux = fitsfile['FLUX'].data
+			self.fitsobj.error = fitsfile['ERROR'].data 
 
-			self.mW.sc.plot_spec(self.mW.fitsobj.wave, 
-							self.mW.fitsobj.flux, 
-							self.mW.fitsobj.error)
+			self.send_fitsobj.emit(self.fitsobj)
+
+			filename = self._get_filename(filepath, extension=False)
+			print(filename)
+
+			self.mW.sc.plot_spec(self.fitsobj.wave, 
+							self.fitsobj.flux, 
+							self.fitsobj.error,
+							filename)
+
+
+
+
 
 	def _save_spec(self):
-		'''Save spec fits file with our own fits format
-		'''
-		filename, check = QFileDialog.getSaveFileName(None,
+		#Save spec fits file with our own fits format
+
+		filepath, check = QFileDialog.getSaveFileName(None,
 			'Save 1 spectrum FITS file',
 			'',
 			'Fits Files (*.fits')
 		if check:
 			table = Table()
-			table['WAVELENGTH'] = self.mW.fitsobj.wave
-			table['FLUX'] = self.mW.fitsobj.flux
-			table['ERROR'] = self.mW.fitsobj.error
-			print(filename)
-			table.write(filename, format='fits')
+			table['WAVELENGTH'] = self.fitsobj.wave
+			table['FLUX'] = self.fitsobj.flux
+			table['ERROR'] = self.fitsobj.error
+			print(filepath)
+			table.write(filepath, format='fits')
 			'''Output fits format
 			table[1].data['WAVELENGTH']
 			table[1].data['FLUX']
 			table[1].data['ERROR']
 			'''
+	def _load_linelist(self):
+		#Load linelist from lines folder
+		filepath, check = QFileDialog.getOpenFileName(None,
+			'Load 1 linelist',
+			LINELIST_DIR,
+			'ASCII Files (*.ascii)')
+		if check:
+			rawdata = ascii.read(filepath)
+			self.linelist = rawdata.to_pandas()
+
+			self.send_linelist.emit(self.linelist)
+
+			filename = self._get_filename(filepath, extension=False)
+			self.send_filename.emit(filename)
+
+	def _save_linelist(self):
+		#Save linelist to lines folder
+		filepath, check = QFileDialog.getSaveFileName(None,
+			'Save the current linelist',
+			LINELIST_DIR,
+			'ASCII FIles (*.ascii')
+		if check:
+			linetable = Table.from_pandas(self.newlinelist)
+			print(filepath)
+			linetable.write(filepath, format='ascii')
+
+	def _load_z(self):
+		#Load estimated redshift working file
+		filepath, check = QFileDialog.getOpenFileName(None,
+			'Load estimated redshifts',
+			'',
+			'TEXT Files (*.txt)')
+		if check:
+			self.z_est = pd.read_csv(filepath, sep=',')
+			
+			self.send_z_est.emit(self.z_est)
+
+			filename = self._get_filename(filepath, extension=False)
+			print(filename)
+
+	def _save_z(self):
+		#Save current estimated redshifts so far
+		filepath, check = QFileDialog.getSaveFileName(None,
+			'Save the current estimated redshifts',
+			'',
+			'TEXT Files (*.txt')
+		if check:
+			self.z_est.to_csv(filepath, index=False)
+
+	def _get_filename(self, filepath, extension=False):
+		# return the filename and ready to pass to other widgets
+		base = os.path.basename(filepath)
+		if extension:
+			return base
+		else:
+			return os.path.splitext(base)[0]
+
+#	@QtCore.pyqtSlot()
+#	def on_send_fitsobj(self):
+#		self.send_fitsobj.emit(self.fitsobj)
+
