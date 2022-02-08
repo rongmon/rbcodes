@@ -28,6 +28,10 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.init_xlims, self.init_ylims = [],[]
 		self.gxval, self.gyval = [], []
 		self.scale = 1.
+		self.lineindex = 0
+		self.linelist = []
+		self.lineplot = None
+		self.estZ = 0.
 		super().__init__(self.fig)
 
 		# connect funcitons to events
@@ -49,6 +53,8 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axes.set_title(filename)
 		self.draw()
 
+		self.send_message.emit(f'You are currently working on {filename} spectrum.')
+
 		# update intiial plotting parameters
 		self.wave, self.flux, self.error = wave, flux, error
 		self.init_xlims = self.axes.get_xlim()
@@ -59,7 +65,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		Note:
 			Always Update to help mannual for new keyboard events
 		'''
-		print(event.key)
+		#print(event.key)
 		if event.key == 'r':
 			# reset flux/err and clear all lines
 			del self.axes.lines[2:]	# delete everything except flux/err
@@ -70,6 +76,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			self.axes.set_ylim(self.init_ylims)
 			self.axes.set_xlim(self.init_xlims)
 			self.draw()
+			self.send_message.emit('You reset the canvas!!!')
 
 		elif event.key == 't':
 			# set y axis max value
@@ -155,10 +162,10 @@ class MplCanvas(FigureCanvasQTAgg):
 
 			if fclick == 1:
 				message = 'You need 3 points to model a Gaussian. Please click 2 more points.'
-				print(message)
+				self.send_message.emit(message)
 			elif fclick == 2:
 				message = 'Please click 1 more point to model a Gaussian.'
-				print(message)
+				self.send_message.emit(message)
 			elif fclick == 3:
 				# sort xdata before fitting
 				x_sort = np.argsort(self.gxval)
@@ -174,7 +181,9 @@ class MplCanvas(FigureCanvasQTAgg):
 				c_range = np.where((self.wave>=gxval[0]) & (self.wave <= gxval[2]))
 				g_wave = self.wave[c_range]
 				g_flux = self.flux[c_range]
-				spline = splrep(gxval, gyval, k=1)
+				spline = splrep([gxval[0], gxval[-1]], 
+								[gyval[0], gyval[-1]], 
+								k=1)
 				cont = splev(g_wave, spline)
 				# 2. check if it is an absorption or emission line
 				if ((gyval[1] < gyval[0]) & (gyval[1] < gyval[2])):
@@ -188,12 +197,13 @@ class MplCanvas(FigureCanvasQTAgg):
 
 				model_fit = self.axes.plot(g_wave, g_final, 'r-')
 				self.draw()
-				message = (f'Amplitude: {g.parameters[0]:.3f}\n'
+				message = (f'A Gaussian model you fit has the following parameters:\n'
+						   f'Amplitude: {g.parameters[0]:.3f}\n'
 						   f'Mean: {g.parameters[1]:.3f}\n'
 						   f'Sigma: {g.parameters[2]:.3f}')
 
 				self.gxval, self.gyval = [], []
-				print(message)
+				self.send_message.emit(message)
 
 		elif event.key == 'D':
 			# delete previous unwanted points for Gaussian profile fitting
@@ -226,6 +236,52 @@ class MplCanvas(FigureCanvasQTAgg):
 		diffyval = gyval - event.ydata
 		distance = np.array([np.sqrt(diffxval[i]**2 + diffyval[i]**2) for i in range(len(gxval))])
 		return distance
+
+
+	def _plot_lines(self, lineindex, estZ=0.):
+		axes = self.figure.gca()
+		xlim, ylim = axes.get_xlim(), axes.get_ylim()
+		while self.axes.texts:
+			self.axes.texts.pop()
+		while self.axes.collections:
+			self.axes.collections.pop()
+
+		if lineindex < 0:
+			self.axes.vlines(x=self.linelist['wave'].to_numpy() * (1+estZ),
+							 ymin=ylim[0], ymax=ylim[-1], color='blue', linestyle='dashed')
+		else:
+			self.axes.vlines(x=self.linelist.at[lineindex, 'wave'] * (1+estZ),
+							 ymin=ylim[0], ymax=ylim[-1], color='blue', linestyle='dashed')
+			self.axes.text(x=self.linelist.at[lineindex, 'wave'] * (1+estZ),
+						   y=ylim[-1]*0.6,
+						   s=self.linelist.at[lineindex, 'name'],
+						   color='blue', fontsize=15, rotation='vertical')
+
+		self.axes.set_xlim(xlim)
+		self.axes.set_ylim(ylim)
+		self.draw()
+		#print('vlines num: ', len(self.axes.collections))
+		
+
+
+	def on_lineindex_slot(self, sent_lineindex):
+		#self.lineindex = sent_lineindex
+		if sent_lineindex == 0:
+			pass
+		elif sent_lineindex == 1:
+			self._plot_lines(-1)
+		else:
+			self.lineindex = sent_lineindex - 2
+			self._plot_lines(self.lineindex)
+
+
+
+	def on_linelist_slot(self, sent_linelist):
+		self.linelist = sent_linelist
+		#print(self.linelist)	
+
+
+
 
 
 class CustomLimDialog(QtWidgets.QDialog):
@@ -262,6 +318,6 @@ class CustomLimDialog(QtWidgets.QDialog):
 		self.buttonbox.accepted.connect(self.accept)
 		self.buttonbox.rejected.connect(self.reject)
 		
-		
+
 	def _getlim(self):
 		return [float(self.le_min.text()), float(self.le_max.text())]

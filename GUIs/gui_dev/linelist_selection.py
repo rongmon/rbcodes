@@ -2,12 +2,15 @@ import sys
 import pandas as pd
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QLabel, QComboBox, QLineEdit
+from PyQt5.QtCore import pyqtSignal
 
 from PyQt5 import QtCore
 from PyQt5 import QtGui
 
-class lineListWidget(QWidget):
-	def __init__(self, menubar):
+class LineListWidget(QWidget):
+	send_lineindex = pyqtSignal(int)
+
+	def __init__(self):
 		super().__init__()
 
 		self.linelist_name = ''
@@ -24,32 +27,40 @@ class lineListWidget(QWidget):
 		# Selected line-list name
 		self.l_lln = QLineEdit()
 		self.l_lln.setReadOnly(True)
+		self.l_lln.setMaximumWidth(120)
 		layout.addWidget(self.l_lln, 1, 0)
-		menubar.send_filename.connect(self.on_linelist_name_slot)
+		#menubar.send_filename.connect(self.on_linelist_name_slot)
 
 		# Ion Names in this selected line-list
 		# Note: 'ALL' is in index 0
 		self.l_combobox = QComboBox()
+		self.l_combobox.setFixedWidth(150)
 		layout.addWidget(self.l_combobox, 1, 1)
-		menubar.send_linelist.connect(self.on_linelist_slot)
+		#menubar.send_linelist.connect(self.on_linelist_slot)
 		self.l_combobox.currentIndexChanged.connect(self._index_changed)
 		self.l_combobox.currentTextChanged.connect(self._text_changed)
 
 		# 3 textedit box
 		self.estZ = QLineEdit()
 		self.estZ.setPlaceholderText('Guess redshift')
+		self.estZ.setMaximumWidth(100)
 		self.conf = QLineEdit()
 		self.conf.setPlaceholderText('% Confident?')
+		self.conf.setMaximumWidth(150)
 		self.flag = QLineEdit()
 		self.flag.setPlaceholderText('Additional Info?')
 		layout.addWidget(self.estZ)
 		layout.addWidget(self.conf)
 		layout.addWidget(self.flag)
+
 		
 
 		
 		layout.setAlignment(QtCore.Qt.AlignLeft)
 		self.setLayout(layout)
+
+	def zprint(self):
+		print(self.estZ.text())
 
 	# data receiption
 	def on_linelist_name_slot(self, sent_linelist_name):
@@ -61,15 +72,17 @@ class lineListWidget(QWidget):
 
 	# combobox events
 	def _index_changed(self, i): # i is an int
-		print(type(i))
-		print(i)
+		#print(type(i))
+		#print(i)
 		if i < 2:
 			print(self.linelist)
 		else:
 			print(self.linelist.loc[i-2])
+		self.send_lineindex.emit(i)
+
 	def _text_changed(self, s): # s is a str
-		print(type(s))
-		print(s)
+		#print(type(s))
+		#print(s)
 		tmp_df = self.linelist.set_index('name')
-		if s not in ['NONE', 'ALL'] :
-			print(tmp_df.loc[s])
+		#if s not in ['NONE', 'ALL'] :
+			#print(tmp_df.loc[s])

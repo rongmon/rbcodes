@@ -140,16 +140,12 @@ class Custom_MenuBar(QMenuBar):
 			self.send_fitsobj.emit(self.fitsobj)
 
 			filename = self._get_filename(filepath, extension=False)
-			print(filename)
+			#print(filename)
 
 			self.mW.sc.plot_spec(self.fitsobj.wave, 
 							self.fitsobj.flux, 
 							self.fitsobj.error,
 							filename)
-
-
-
-
 
 	def _save_spec(self):
 		#Save spec fits file with our own fits format
@@ -175,10 +171,39 @@ class Custom_MenuBar(QMenuBar):
 		filepath, check = QFileDialog.getOpenFileName(None,
 			'Load 1 linelist',
 			LINELIST_DIR,
-			'ASCII Files (*.ascii)')
+			'ASCII Files (*.ascii);; LST Files (*.lst)')
 		if check:
-			rawdata = ascii.read(filepath)
-			self.linelist = rawdata.to_pandas()
+			if filepath.endswith('.ascii'):
+				rawdata = ascii.read(filepath)
+				self.linelist = rawdata.to_pandas()
+			elif filepath.endswith('.lst'):
+				if filepath.endswith('gal_vac.lst'):
+					with open(filepath, 'r') as f:
+						colnames = f.readline().replace(' ', '')[:-1].split(',')
+						#self.linelist = pd.DataFrame(columns=colnames)
+						lines = f.readlines()
+					self.linelist = pd.DataFrame(columns=['wave', 'ID', 'name'])
+					for line in lines:
+						tmp = line.replace(' ', '')[:-1].split(',')
+						row = [float(tmp[0]), int(tmp[1]), tmp[2]+'_'+tmp[3]]
+						self.linelist = self.linelist.append({'wave': row[0],
+															  'ID': row[1],
+															  'name': row[2]},
+															  ignore_index=True)
+				elif filepath.endswith('lbg.lst'):
+					with open(filepath, 'r') as f:
+						colnames = f.readline().split()
+						#self.linelist = pd.DataFrame(columns=colnames)
+						lines = f.readlines()
+					self.linelist = pd.DataFrame(columns=['wave', 'ID', 'name'])
+					for line in lines:
+						tmp = line.split()
+						row = [float(tmp[0]), int(tmp[1]), tmp[2]+'_'+tmp[3]]
+						self.linelist = self.linelist.append({'wave': row[0],
+															  'ID': row[1],
+															  'name': row[2]},
+															  ignore_index=True)
+					
 
 			self.send_linelist.emit(self.linelist)
 
@@ -226,8 +251,3 @@ class Custom_MenuBar(QMenuBar):
 			return base
 		else:
 			return os.path.splitext(base)[0]
-
-#	@QtCore.pyqtSlot()
-#	def on_send_fitsobj(self):
-#		self.send_fitsobj.emit(self.fitsobj)
-
