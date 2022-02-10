@@ -1,4 +1,0 @@
-Name,RA,DEC,z,z_err,Confidence,Flag
-qso1,1,1,0.5,0.0001,0.9,Nicely done
-qso2,1.4,22,6.5,0.5,0.1,Not so confident
-qso3,195.1,-22,3.5,0.5.,1E-2,Disgard! Not useful at all
