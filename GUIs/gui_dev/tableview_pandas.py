@@ -10,21 +10,72 @@ class CustomZTable(QtWidgets.QWidget):
 	def __init__(self):
 		super().__init__()
 		self.table = QtWidgets.QTableView()
-		self.estZ = pd.DataFrame(#[[0,0,0,0,0,0,0]],
-			columns=['Name', 'RA', 'DEC', 'Z', 'Z_err', 'Confidence', 'Flag'])
+		self.estZ = pd.DataFrame(#[[0,0,0,0,0,0,0,0]],
+			columns=['Name', 'RA', 'DEC', 'z', 'z_err', 'Confidence', 'Linelist', 'Flag'])
+		self.filename = ''
 
 		self.model = TableModel(self.estZ)
 		self.table.setModel(self.model)
+
+		b_load = QtWidgets.QPushButton('Load')
+		b_load.clicked.connect(self._load_button_clicked)
+		b_save = QtWidgets.QPushButton('Save')
+		b_clear = QtWidgets.QPushButton('Clear')
+		b_clear.clicked.connect(self._clear_button_clicked)
+
+
+		layout_b = QtWidgets.QVBoxLayout()
+		layout_b.addWidget(b_load)
+		layout_b.addWidget(b_save)
+		layout_b.addWidget(b_clear)
+
+
 		layout = QtWidgets.QHBoxLayout()
 		layout.addWidget(self.table)
+		layout.addLayout(layout_b)
 		layout.setAlignment(Qt.AlignCenter)
 		self.setLayout(layout)
+		self.setFixedHeight(200)
 
-	def on_sent_estZ(self, sent_z_est):
-		self.estZ = sent_z_est
-		#self.model = TableModel(self.estZ)
-		#self.table.setModel(self.model)
-		print(self.estZ)
+	def _on_sent_estZ(self, sent_z_est):
+		if self.estZ.shape[0] == 0:
+			self.estZ = self.estZ.append(sent_z_est, ignore_index=True)
+
+		self._update_table()
+		#print(self.estZ)
+
+	def _on_sent_data(self, sent_data):
+		#print(self.estZ.iloc[0].to_dict())
+		#print(sent_data['Name'] in self.estZ['Name'])
+
+		if sent_data['Name'] in self.estZ['Name'].values:
+			ind = self.estZ[self.estZ['Name'] == sent_data['Name']].index.values[0]
+			s = self.estZ.iloc[ind].to_dict()
+			#print(s)
+			s.update(sent_data)
+			self.estZ.iloc[ind] = s
+		else:
+			self.estZ = self.estZ.append(sent_data, ignore_index=True)
+		self._update_table()
+
+	def _clear_button_clicked(self):
+		self.estZ = pd.DataFrame(#[[0,0,0,0,0,0,0,0]],
+			columns=['Name', 'RA', 'DEC', 'z', 'z_err', 'Confidence', 'Linelist', 'Flag'])
+		self._update_table()
+
+	def _load_button_clicked(self):
+		#Load estimated redshift working file
+		filepath, check = QtWidgets.QFileDialog.getOpenFileName(None,
+			'Load estimated redshifts',
+			'',
+			'TEXT Files (*.txt)')
+		if check:
+			self.estZ = pd.read_csv(filepath, sep=',')
+		self._update_table()
+
+	def _update_table(self):
+		self.model = TableModel(self.estZ)
+		self.table.setModel(self.model)
 
 
 class TableModel(QtCore.QAbstractTableModel):
@@ -33,17 +84,16 @@ class TableModel(QtCore.QAbstractTableModel):
 		self._data = data
 
 	def data(self, index, role):
-		if role == Qt.DisplayRole:
-			value = self._data.iloc[index.row(), index.column()]
-			return str(value)
+		if index.isValid():
+			if role == Qt.DisplayRole or role == Qt.EditRole:
+				value = self._data.iloc[index.row(), index.column()]
+				return str(value)
 
 	def setData(self, index, value, role):
-		row = self._data.index[index.row()]
-		col = self._data.columns[index.column()]
-		if hasattr(value, 'toPyObject'):
-			value = value.toPyObject()
-		self._data.set_value(row, col, value)
-		return True
+		if role == Qt.EditRole:
+			self._data.iloc[index.row(), index.column()] = value
+			return True
+		return False
 
 	def rowCount(self, index):
 		return self._data.shape[0]
@@ -58,5 +108,8 @@ class TableModel(QtCore.QAbstractTableModel):
 
 			if orientation == Qt.Vertical:
 				return str(self._data.index[section])
+
+	def flags(self, index):
+		return Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable
 
 

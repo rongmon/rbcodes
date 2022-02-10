@@ -16,20 +16,28 @@ WORKING_DIR = os.path.abspath(os.getcwd()) + './example-data'
 LINELIST_DIR = os.path.dirname(os.path.abspath(__file__)) + '/lines'
 
 class Custom_ToolBar(QToolBar):
+	send_fitsobj = pyqtSignal(object)
+	send_filename = pyqtSignal(str)
 	#Our personalized custom Toolbar
 	def __init__(self, mainWindow):
 		super().__init__()
 		self.mW = mainWindow
+		self.fitsobj = mainWindow.fitsobj
 
 		self.setWindowTitle('Customizable TooBar')
 		#self.setFixedSize(QSize(200, 50))
 
-		btn1 = self._create_button('Btn1', 'First trial')
-		btn2 = self._create_button('Btn2', 'Second trial')
+		btn_loadf = self._create_button('Read FITS', 'Read a fits file and plot the spectrum')
+		self.addAction(btn_loadf)
+		btn_loadf.triggered.connect(self._load_spec)
 
-		self.addAction(btn1)
+		btn_savef = self._create_button('Save FITS', 'Save the fits file to unified format')
+		self.addAction(btn_savef)
 		self.addSeparator()
-		self.addAction(btn2)
+
+		btn_help = self._create_button('Help', 'Open the user manual for further help')
+		self.addAction(btn_help)
+		btn_help.triggered.connect(self._open_user_manual)	
 
 	def _create_button(self, buttonName='', buttonTip=''):
 		#Create buttons wrapper
@@ -37,6 +45,47 @@ class Custom_ToolBar(QToolBar):
 		btn.setStatusTip(buttonTip)
 
 		return btn
+
+	def _open_user_manual(self):
+		#Open User manual to help
+		manual = UserManualDialog(method=1)
+		manual.exec_()
+
+	def _load_spec(self):
+		#Read spec fits file
+		filepath, check = QFileDialog.getOpenFileName(None,
+			'Load 1 spectrum FITS file',
+			WORKING_DIR,
+			'Fits Files (*.fits)')
+		if check:
+			#print(type(file), file)
+
+			# read fits file
+			fitsfile = fits.open(filepath)
+			# find wavelength, flux, error
+			self.fitsobj.wave = fitsfile['WAVELENGTH'].data
+			self.fitsobj.flux = fitsfile['FLUX'].data
+			self.fitsobj.error = fitsfile['ERROR'].data 
+
+			self.send_fitsobj.emit(self.fitsobj)
+
+			filename = self._get_filename(filepath, extension=False)
+			#print(filename)
+
+			self.mW.sc.plot_spec(self.fitsobj.wave, 
+							self.fitsobj.flux, 
+							self.fitsobj.error,
+							filename)
+		self.send_filename.emit(filename)
+
+	def _get_filename(self, filepath, extension=False):
+		# return the filename and ready to pass to other widgets
+		base = os.path.basename(filepath)
+		if extension:
+			return base
+		else:
+			return os.path.splitext(base)[0]
+
 
 class Custom_MenuBar(QMenuBar):
 

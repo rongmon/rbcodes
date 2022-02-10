@@ -11,17 +11,23 @@ from scipy.interpolate import splrep, splev
 import numpy as np
 
 
-# not necessary if not displaying images
-import matplotlib.image as mpimg
+from guess_transition import GuessTransition
+
+
 
 matplotlib.use('Qt5Agg')
 
 class MplCanvas(FigureCanvasQTAgg):
 	send_message = pyqtSignal(str)
+	send_z_est = pyqtSignal(float)
+	send_gcenter = pyqtSignal(float)
 
-	def __init__(self, parent=None, width=5, height=4, dpi=100):
+	def __init__(self, parent=None, width=5, height=3, dpi=100):
 		self.fig = Figure(figsize=(width, height), dpi=dpi)
+		pad = 0.05
+		self.fig.subplots_adjust(left=pad+0.02, bottom=pad*2, right=0.999, top=0.99)
 		self.axes = self.fig.add_subplot(111)
+		#self.axes.margins(x=0)
 
 		# initialize some plotting parameters
 		self.wave, self.flux, self.error = [],[],[]
@@ -32,15 +38,19 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.linelist = []
 		self.lineplot = None
 		self.estZ = 0.
+		self.guess_ion = 0.
+		self.guess_gcenter = 0.
 		super().__init__(self.fig)
 
 		# connect funcitons to events
 		self.fig.canvas.setFocusPolicy(Qt.ClickFocus)
 		self.fig.canvas.setFocus()
-		self.cid = self.fig.canvas.mpl_connect('key_press_event', self.ontype)
-		#self.fig.canvas.mpl_connect('button_press_event', self.onclick)
+		self.cid_k = self.fig.canvas.mpl_connect('key_press_event', self.ontype)
+		self_cid_m = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
 		#self.fig.canvas.mpl_connect('pick_event', self.onpick)
 
+		#self.fig.tight_layout()
+		#self.fig.subplots_adjust(0.1, 0.1, 0.9, 0.9)
 
 	def plot_spec(self, wave, flux, error, filename):
 		self.axes.cla()
@@ -201,9 +211,10 @@ class MplCanvas(FigureCanvasQTAgg):
 						   f'Amplitude: {g.parameters[0]:.3f}\n'
 						   f'Mean: {g.parameters[1]:.3f}\n'
 						   f'Sigma: {g.parameters[2]:.3f}')
-
+				self.guess_gcenter = g.parameters[1]
 				self.gxval, self.gyval = [], []
 				self.send_message.emit(message)
+				self.send_gcenter.emit(self.guess_gcenter)
 
 		elif event.key == 'D':
 			# delete previous unwanted points for Gaussian profile fitting
@@ -217,6 +228,21 @@ class MplCanvas(FigureCanvasQTAgg):
 				del self.axes.lines[-4:]			
 			self.draw()
 
+		#elif event.key == 'J':
+		#	self.xdata = event.xdata
+		#	self.guess_ion = GuessTransition(self.linelist, event.xdata)
+		#	self.guess_ion.show()
+
+	def onclick(self, event):
+		'''Mouse click
+			Left == 1; Right == 3
+		'''
+		if event.button == 3:
+			#self.xdata = event.xdata
+			self.guess_ion = GuessTransition(self.linelist, self.guess_gcenter)
+			self.guess_ion.show()
+			self.guess_ion.send_z_cal.connect(self._on_estZ_changed)
+			#print(self.estZ)
 
 	def replot(self, new_spec, new_err):
 		'''Re-plot smoothed/unsmoothed spectrum
@@ -237,18 +263,28 @@ class MplCanvas(FigureCanvasQTAgg):
 		distance = np.array([np.sqrt(diffxval[i]**2 + diffyval[i]**2) for i in range(len(gxval))])
 		return distance
 
-
-	def _plot_lines(self, lineindex, estZ=0.):
-		axes = self.figure.gca()
-		xlim, ylim = axes.get_xlim(), axes.get_ylim()
+	def _clear_plotted_lines(self):
 		while self.axes.texts:
 			self.axes.texts.pop()
 		while self.axes.collections:
 			self.axes.collections.pop()
+		self.draw()
+
+	def _plot_lines(self, lineindex, estZ=0.):
+		axes = self.figure.gca()
+		xlim, ylim = axes.get_xlim(), axes.get_ylim()
+		self._clear_plotted_lines()
 
 		if lineindex < 0:
-			self.axes.vlines(x=self.linelist['wave'].to_numpy() * (1+estZ),
+			print(self.linelist)
+			tmp_lines = self.linelist['wave'].to_numpy() * (1+estZ)
+			self.axes.vlines(x=tmp_lines,
 							 ymin=ylim[0], ymax=ylim[-1], color='blue', linestyle='dashed')
+			for row in range(self.linelist.shape[0]):
+				self.axes.text(x=tmp_lines[row],
+							   y=ylim[-1]*0.6,
+							   s=self.linelist.at[row, 'name'],
+							   color='blue', fontsize=15, rotation='vertical')
 		else:
 			self.axes.vlines(x=self.linelist.at[lineindex, 'wave'] * (1+estZ),
 							 ymin=ylim[0], ymax=ylim[-1], color='blue', linestyle='dashed')
@@ -262,24 +298,30 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.draw()
 		#print('vlines num: ', len(self.axes.collections))
 		
-
+	def on_linelist_slot(self, sent_linelist):
+		self.linelist = sent_linelist
+		self._clear_plotted_lines()
+		#print(self.linelist)
 
 	def on_lineindex_slot(self, sent_lineindex):
 		#self.lineindex = sent_lineindex
 		if sent_lineindex == 0:
 			pass
 		elif sent_lineindex == 1:
-			self._plot_lines(-1)
+			self.lineindex = -1
+			self._plot_lines(self.lineindex)
 		else:
 			self.lineindex = sent_lineindex - 2
 			self._plot_lines(self.lineindex)
 
 
 
-	def on_linelist_slot(self, sent_linelist):
-		self.linelist = sent_linelist
-		#print(self.linelist)	
+		
 
+	def _on_estZ_changed(self, newz):
+		self.estZ = newz
+		self.send_z_est.emit(self.estZ)
+		#print(self.estZ)
 
 
 

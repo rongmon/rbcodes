@@ -43,8 +43,8 @@ class MainWindow(QMainWindow):
 		# --------- Define all necessary widgets ------------------- 
 		#placeholder to hold the central widget in main window
 		widget = QWidget()
-		#widget.setMinimumSize(1200, 800)
-		widget.setFixedSize(1600, 900)
+		widget.setMinimumSize(1000, 800)
+		#widget.setFixedSize(1600, 900)
 
 		widget_z = LineListWidget()
 		table_z = CustomZTable()
@@ -58,7 +58,7 @@ class MainWindow(QMainWindow):
 		if use_pyqtgraph:
 			self.sc = SpecCanvas()
 		else:
-			self.sc = MplCanvas(width=10, height=8, dpi=100)
+			self.sc = MplCanvas(width=15, height=9, dpi=100)
 			mpl_toolbar = NavigationToolbar(self.sc, self)
 			layout.addWidget(mpl_toolbar)
 		
@@ -82,17 +82,25 @@ class MainWindow(QMainWindow):
 		#menubar.send_z_est.connect(self.on_z_est_slot)
 		#print(self.fitsobj.wave)
 		# 2. menubar ==> widget_z
-		menubar.send_filename.connect(widget_z.on_linelist_name_slot)
-		menubar.send_linelist.connect(widget_z.on_linelist_slot)
+		#menubar.send_filename.connect(widget_z.on_linelist_name_slot)
+		#menubar.send_linelist.connect(widget_z.on_linelist_slot)
 		# 3. menubar ==> sc (SpecCanvas)
-		menubar.send_linelist.connect(self.sc.on_linelist_slot)
+		#menubar.send_linelist.connect(self.sc.on_linelist_slot)
 		# 4. menubar ==> table_z
-		menubar.send_z_est.connect(table_z.on_sent_estZ)
+		menubar.send_z_est.connect(table_z._on_sent_estZ)
 		# 5. widget_z ==> sc (SpecCanvas)
+		widget_z.send_linelist.connect(self.sc.on_linelist_slot)
 		widget_z.send_lineindex.connect(self.sc.on_lineindex_slot)
 		widget_z.estZ.returnPressed.connect(lambda z=widget_z.estZ: self.passing_estZ(z))
 		# 6. sc (SpecCanvas) ==> mbox (MessageBox)
 		self.sc.send_message.connect(mbox.on_sent_message)
+		# 7. sc (SpecCanvas) ==> widget_z.estZ
+		self.sc.send_z_est.connect(widget_z._on_estZ_changed)
+		# 8. toolbar ==> widget_z
+		toolbar.send_filename.connect(widget_z._on_sent_filename)
+		# 9. widget_z ==> table_z
+		widget_z.send_data.connect(table_z._on_sent_data)
+
 
 
 	def _location_on_screen(self):
