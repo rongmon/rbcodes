@@ -80,6 +80,11 @@ def read_line_list(label):
         filename=resource_filename('IGM','lines/lls_sub.lst')
     elif label == 'DLA':
         filename=resource_filename('IGM','lines/dla.lst')
+    elif label == 'LBG':
+        filename=resource_filename('IGM','lines/lbg.lst')
+    elif label == 'Gal':
+        filename=resource_filename('IGM','lines/gal_vac.lst')
+
     else:
         print('Give Correct LineList')
 
@@ -95,6 +100,19 @@ def read_line_list(label):
             source['ion'] = s['col1'][line]+' '+np.str(np.int(s['col2'][line]))
             source['fval']=float(s['col3'][line])
             source['gamma']=float(s['col4'][line])
+
+            data.append(source)
+
+    elif ((label =='LBG') | (label =='Gal')):
+
+        s=ascii.read(filename)
+
+        for line in range(0,len(s['wrest'])):
+            source = {}
+            source['wrest'] = float(s['wrest'][line])
+            source['ion'] = s['name'][line]+' '+s['transition'][line]
+            source['fval']=float(s['ID'][line])
+            source['gamma']=float(s['ID'][line])
 
             data.append(source)
 
