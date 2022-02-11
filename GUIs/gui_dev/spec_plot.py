@@ -13,6 +13,21 @@ import numpy as np
 
 from guess_transition import GuessTransition
 
+'''
+from scipy.optimize import curve_fit
+def double_gauss(x, params):
+	(c1, mu1, sig1, c2, mu2, sig2) = params
+	out = c1 * np.exp(-(x-mu1)**2 / (2. * sig1**2)) \
+		+ c2 * np.exp(-(x-mu2)**2 / (2. * sig2**2))
+	return out
+
+def double_gauss_fit(params_y):
+	parmas = params_y[0]
+	y = params_y[1]
+	fit = double_gauss(x, params)
+	return (fit - y)
+	'''
+
 
 
 matplotlib.use('Qt5Agg')
@@ -39,7 +54,10 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.lineplot = None
 		self.estZ = 0.
 		self.guess_ion = 0.
-		self.guess_gcenter = 0.
+		self.guess_gcenter = -1.
+		self.gauss_num = 1
+		self.gauss_profiles = []
+
 		super().__init__(self.fig)
 
 		# connect funcitons to events
@@ -166,6 +184,9 @@ class MplCanvas(FigureCanvasQTAgg):
 			self.gxval = np.append(self.gxval, event.xdata)
 			self.gyval = np.append(self.gyval, event.ydata)
 
+			if self.gauss_num > 1:
+				dgxval, dgyval = [],[]
+
 			fclick = len(self.gxval)
 			self.axes.plot(self.gxval[-1], self.gyval[-1], 'rs', ms=5)
 			self.draw()
@@ -216,6 +237,33 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.send_message.emit(message)
 				self.send_gcenter.emit(self.guess_gcenter)
 
+				if self.gauss_num == 2:
+					self.gauss_profiles = np.append(self.gauss_profiles, g.parameters, axis=0)
+					dgxval = np.append(dgxval, gxval, axis=0)
+					dgyval = np.append(dgyval, gyval, axis=0)
+					x_sort = np.argsort(dgxval)
+					dgxval = dgxval[x_sort]
+					dgyval = dgyval[x_sort]
+					c_range = np.where((self.wave>=dgxval[0]) & (self.wave <= dgxval[-1]))
+					dg_wave = self.wave[c_range]
+					dg_flux = self.flux[c_range]
+
+					print(self.gauss_profiles)
+					'''
+					from scipy.optimize import leastsq
+					x = dgxval.copy()
+					y = dgyval.copy()
+					params = self.gauss_profiles.copy()
+					print(x)
+					fit = leastsq(double_gauss_fit, [params,y])
+					print(fit)
+					#self.axes.plot(dg_wave, self.double_gauss(dg_wave, dgyfit[0]), color='green')
+					#self.draw()
+					'''
+
+				else:
+					self.gauss_profiles = []
+
 		elif event.key == 'D':
 			# delete previous unwanted points for Gaussian profile fitting
 			fclick = len(self.gxval)
@@ -228,6 +276,8 @@ class MplCanvas(FigureCanvasQTAgg):
 				del self.axes.lines[-4:]			
 			self.draw()
 
+			self.gauss_profiles = []
+
 		#elif event.key == 'J':
 		#	self.xdata = event.xdata
 		#	self.guess_ion = GuessTransition(self.linelist, event.xdata)
@@ -238,11 +288,25 @@ class MplCanvas(FigureCanvasQTAgg):
 			Left == 1; Right == 3
 		'''
 		if event.button == 3:
-			#self.xdata = event.xdata
-			self.guess_ion = GuessTransition(self.linelist, self.guess_gcenter)
-			self.guess_ion.show()
-			self.guess_ion.send_z_cal.connect(self._on_estZ_changed)
+			if self.gauss_num < 2:
+				self.send_message.emit(f'Currently, we need {self.gauss_num} Gaussian to guess the line position.')
+				
+				#self.xdata = event.xdata
+				if self.guess_gcenter < 0:
+					self.send_message.emit(f'Please fit a Gaussian profile FIRST\n'
+											f'to locate the line CENTER!!!')
+				else:
+					self.guess_ion = GuessTransition(self.linelist, self.guess_gcenter)
+					self.guess_ion.show()
+					self.guess_ion.send_z_cal.connect(self._on_estZ_changed)
 			#print(self.estZ)
+			else:
+				self.send_message.emit(f'Currently, we need {self.gauss_num} Gaussians to guess the line positions.')
+				if self.guess_gcenter < 0:
+					self.send_message.emit(f'Please fit {self.gauss_num} Gaussian profiles FIRST\n'
+											f'to locate the line CENTERS!!!')
+				else:
+					pass
 
 	def replot(self, new_spec, new_err):
 		'''Re-plot smoothed/unsmoothed spectrum
@@ -322,6 +386,11 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.estZ = newz
 		self.send_z_est.emit(self.estZ)
 		#print(self.estZ)
+
+	def _on_sent_gauss_num(self, sent_gauss_num):
+		self.gauss_num = int(sent_gauss_num)
+
+
 
 
 

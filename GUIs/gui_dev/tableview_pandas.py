@@ -20,6 +20,7 @@ class CustomZTable(QtWidgets.QWidget):
 		b_load = QtWidgets.QPushButton('Load')
 		b_load.clicked.connect(self._load_button_clicked)
 		b_save = QtWidgets.QPushButton('Save')
+		b_save.clicked.connect(self._save_button_clicked)
 		b_clear = QtWidgets.QPushButton('Clear')
 		b_clear.clicked.connect(self._clear_button_clicked)
 
@@ -66,12 +67,23 @@ class CustomZTable(QtWidgets.QWidget):
 	def _load_button_clicked(self):
 		#Load estimated redshift working file
 		filepath, check = QtWidgets.QFileDialog.getOpenFileName(None,
-			'Load estimated redshifts',
+			'Load estimated redshifts from csv',
 			'',
-			'TEXT Files (*.txt)')
+			'CSV Files (*.csv)')
 		if check:
 			self.estZ = pd.read_csv(filepath, sep=',')
 		self._update_table()
+
+	def _save_button_clicked(self):
+		filepath, check = QtWidgets.QFileDialog.getSaveFileName(None,
+			'Save estimated redshifts to csv',
+			'',
+			'CSV Files (*.csv)')
+		if check:
+			self.estZ.to_csv(filepath,
+							 sep=',',
+							 header=True,
+							 index=False)
 
 	def _update_table(self):
 		self.model = TableModel(self.estZ)

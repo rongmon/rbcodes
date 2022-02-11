@@ -1,6 +1,7 @@
 import sys
 import os
 import pandas as pd
+import numpy as np
 
 from astropy.io import fits, ascii
 from astropy.table import Table
@@ -33,6 +34,7 @@ class Custom_ToolBar(QToolBar):
 
 		btn_savef = self._create_button('Save FITS', 'Save the fits file to unified format')
 		self.addAction(btn_savef)
+		btn_savef.triggered.connect(self._save_spec)
 		self.addSeparator()
 
 		btn_help = self._create_button('Help', 'Open the user manual for further help')
@@ -63,9 +65,27 @@ class Custom_ToolBar(QToolBar):
 			# read fits file
 			fitsfile = fits.open(filepath)
 			# find wavelength, flux, error
-			self.fitsobj.wave = fitsfile['WAVELENGTH'].data
-			self.fitsobj.flux = fitsfile['FLUX'].data
-			self.fitsobj.error = fitsfile['ERROR'].data 
+			if 'FLUX' in fitsfile:
+				self.fitsobj.wave = fitsfile['WAVELENGTH'].data
+				self.fitsobj.flux = fitsfile['FLUX'].data
+				self.fitsobj.error = fitsfile['ERROR'].data 
+			else:
+				for i in range(len(fitsfile)):
+					search_list = np.array(fitsfile[i].header.cards)
+					if 'flux' in search_list:
+						self.fitsobj.flux = fitsfile[i].data['flux']
+					elif 'FLUX' in search_list:
+						self.fitsobj.flux = fitsfile[i].data['FLUX']
+
+					if 'loglam' in search_list:
+						self.fitsobj.wave = 10**(fitsfile[i].data['loglam'])
+					elif 'WAVELENGTH' in search_list:
+						self.fitsobj.wave = fitsfile[i].data['WAVELENGTH']
+
+					if 'ivar' in search_list:
+						self.fitsobj.error = 1. / np.sqrt(fitsfile[i].data['ivar'])
+					elif 'ERROR' in search_list:
+						self.fitsobj.error = fitsfile[i].data['ERROR']
 
 			self.send_fitsobj.emit(self.fitsobj)
 
@@ -77,6 +97,21 @@ class Custom_ToolBar(QToolBar):
 							self.fitsobj.error,
 							filename)
 		self.send_filename.emit(filename)
+
+	def _save_spec(self):
+		#Save spec fits file with our own fits format
+
+		filepath, check = QFileDialog.getSaveFileName(None,
+			'Save 1 spectrum FITS file',
+			'',
+			'Fits Files (*.fits')
+		if check:
+			table = Table()
+			table['WAVELENGTH'] = self.fitsobj.wave
+			table['FLUX'] = self.fitsobj.flux
+			table['ERROR'] = self.fitsobj.error
+			print('Saving a fits file to [{}]'.format(filepath))
+			table.write(filepath, format='fits')
 
 	def _get_filename(self, filepath, extension=False):
 		# return the filename and ready to pass to other widgets

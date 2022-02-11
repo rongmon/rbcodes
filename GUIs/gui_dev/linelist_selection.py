@@ -13,6 +13,7 @@ class LineListWidget(QWidget):
 	send_lineindex = pyqtSignal(int)
 	send_linelist = pyqtSignal(object)
 	send_data = pyqtSignal(object)
+	send_gauss_num = pyqtSignal(int)
 
 	def __init__(self):
 		super().__init__()
@@ -25,9 +26,10 @@ class LineListWidget(QWidget):
 		layout = QGridLayout()
 		layout.addWidget(QLabel('LineList Name'), 0, 0)
 		layout.addWidget(QLabel('Ion Name'), 0, 1)
-		layout.addWidget(QLabel('Estimated z'), 0, 2)
-		layout.addWidget(QLabel('Confidence'), 0, 3)
-		layout.addWidget(QLabel('Flag'), 0, 4)
+		layout.addWidget(QLabel('#Gauss'), 0, 2)
+		layout.addWidget(QLabel('Estimated z'), 0, 3)
+		layout.addWidget(QLabel('Confidence'), 0, 4)
+		layout.addWidget(QLabel('Flag'), 0, 5)
 
 		# Selected line-list name
 		#self.l_lln = QLineEdit()
@@ -44,27 +46,34 @@ class LineListWidget(QWidget):
 		# Ion Names in this selected line-list
 		# Note: 'ALL' is in index 0
 		self.l_combobox = QComboBox()
-		self.l_combobox.setFixedWidth(150)
+		self.l_combobox.setFixedWidth(100)
 		layout.addWidget(self.l_combobox, 1, 1)
 		#menubar.send_linelist.connect(self.on_linelist_slot)
 		self.l_combobox.currentIndexChanged.connect(self._index_changed)
 		self.l_combobox.currentTextChanged.connect(self._text_changed)
+
+		self.gauss_num = QComboBox()
+		self.gauss_num.setFixedWidth(50)
+		self.gauss_num.addItems(['1', '2'])
+		self.gauss_num.setCurrentIndex(0)
+		self.gauss_num.activated.connect(self._on_gauss_num_acticated)
+		layout.addWidget(self.gauss_num, 1,2)
 
 		# 3 textedit box
 		self.estZ = QLineEdit()
 		self.estZ.setPlaceholderText('Guess redshift')
 		self.estZ.setMaximumWidth(100)
 		self.conf = QLineEdit()
-		self.conf.setPlaceholderText('% Confident?')
+		self.conf.setPlaceholderText('[0, 1.]')
 		self.conf.setMaximumWidth(150)
 		self.flag = QLineEdit()
 		self.flag.setPlaceholderText('Additional Info?')
 		button = QPushButton('Add to Table below')
 		button.clicked.connect(self._on_button_clicked)
-		layout.addWidget(self.estZ, 1,2)
-		layout.addWidget(self.conf, 1,3)
-		layout.addWidget(self.flag, 1,4)
-		layout.addWidget(button, 1,5)
+		layout.addWidget(self.estZ, 1,3)
+		layout.addWidget(self.conf, 1,4)
+		layout.addWidget(self.flag, 1,5)
+		layout.addWidget(button, 1,6)
 
 		
 
@@ -132,3 +141,6 @@ class LineListWidget(QWidget):
 				'Flag': self.flag.text()}
 		#print(data)
 		self.send_data.emit(data)
+
+	def _on_gauss_num_acticated(self):
+		self.send_gauss_num.emit(int(self.gauss_num.currentText()))

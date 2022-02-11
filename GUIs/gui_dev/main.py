@@ -37,8 +37,8 @@ class MainWindow(QMainWindow):
 		toolbar = Custom_ToolBar(self)
 		self.addToolBar(toolbar)
 
-		menubar = Custom_MenuBar(self)
-		self.setMenuBar(menubar)		
+		#menubar = Custom_MenuBar(self)
+		#self.setMenuBar(menubar)		
 
 		# --------- Define all necessary widgets ------------------- 
 		#placeholder to hold the central widget in main window
@@ -77,8 +77,8 @@ class MainWindow(QMainWindow):
 
 		# ----------------- Signal connections ---------------
 		# 1. menubr ==> mainWindow		
-		menubar.send_fitsobj.connect(self.on_fitsobj_slot)
-		menubar.send_linelist.connect(self.on_linelist_slot)
+		#menubar.send_fitsobj.connect(self.on_fitsobj_slot)
+		#menubar.send_linelist.connect(self.on_linelist_slot)
 		#menubar.send_z_est.connect(self.on_z_est_slot)
 		#print(self.fitsobj.wave)
 		# 2. menubar ==> widget_z
@@ -87,10 +87,11 @@ class MainWindow(QMainWindow):
 		# 3. menubar ==> sc (SpecCanvas)
 		#menubar.send_linelist.connect(self.sc.on_linelist_slot)
 		# 4. menubar ==> table_z
-		menubar.send_z_est.connect(table_z._on_sent_estZ)
+		#menubar.send_z_est.connect(table_z._on_sent_estZ)
 		# 5. widget_z ==> sc (SpecCanvas)
 		widget_z.send_linelist.connect(self.sc.on_linelist_slot)
 		widget_z.send_lineindex.connect(self.sc.on_lineindex_slot)
+		widget_z.send_gauss_num.connect(self.sc._on_sent_gauss_num)
 		widget_z.estZ.returnPressed.connect(lambda z=widget_z.estZ: self.passing_estZ(z))
 		# 6. sc (SpecCanvas) ==> mbox (MessageBox)
 		self.sc.send_message.connect(mbox.on_sent_message)
