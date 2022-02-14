@@ -101,3 +101,42 @@ def rb_set_color():
    clr['light_gray']=[.8,.8,.8]
 
    return clr
+
+def rb_colorbar(mappable,**kwargs):
+    
+    if 'labelpad' in kwargs:
+        labelpad=kwargs['labelpad']
+    else:
+        labelpad=-60
+    
+    if 'label_text' in kwargs:
+        label_text=kwargs['label_text']
+    else:
+        label_text=''
+
+    if 'fontsize' in kwargs:
+        fontsize=kwargs['fontsize']
+    else:
+        fontsize=16
+
+       
+        
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    import matplotlib.pyplot as plt
+    last_axes = plt.gca()
+    ax = mappable.axes
+    fig = ax.figure
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("top", size="5%", pad=0.05)
+    cbar = fig.colorbar(mappable, cax=cax,orientation="horizontal")
+    cbar.set_label(label_text,
+        labelpad=labelpad, y=2.5, rotation=0,fontsize=fontsize)
+        
+        
+    
+    cax.xaxis.set_ticks_position("top")
+    cax.grid(False)
+
+ 
+    plt.sca(last_axes)
+    return cbar
