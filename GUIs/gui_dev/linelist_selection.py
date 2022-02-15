@@ -28,8 +28,9 @@ class LineListWidget(QWidget):
 		layout.addWidget(QLabel('Ion Name'), 0, 1)
 		layout.addWidget(QLabel('#Gauss'), 0, 2)
 		layout.addWidget(QLabel('Estimated z'), 0, 3)
-		layout.addWidget(QLabel('Confidence'), 0, 4)
-		layout.addWidget(QLabel('Flag'), 0, 5)
+		layout.addWidget(QLabel('z error'), 0, 4)
+		layout.addWidget(QLabel('Confidence'), 0, 5)
+		layout.addWidget(QLabel('Flag'), 0, 6)
 
 		# Selected line-list name
 		#self.l_lln = QLineEdit()
@@ -46,8 +47,10 @@ class LineListWidget(QWidget):
 		# Ion Names in this selected line-list
 		# Note: 'ALL' is in index 0
 		self.l_combobox = QComboBox()
-		self.l_combobox.setFixedWidth(100)
+		self.l_combobox.setFixedWidth(150)
 		layout.addWidget(self.l_combobox, 1, 1)
+		self.l_combobox.addItem('NONE')
+		self.l_combobox.setCurrentIndex(0)
 		#menubar.send_linelist.connect(self.on_linelist_slot)
 		self.l_combobox.currentIndexChanged.connect(self._index_changed)
 		self.l_combobox.currentTextChanged.connect(self._text_changed)
@@ -63,6 +66,9 @@ class LineListWidget(QWidget):
 		self.estZ = QLineEdit()
 		self.estZ.setPlaceholderText('Guess redshift')
 		self.estZ.setMaximumWidth(100)
+		self.estZstd = QLineEdit()
+		self.estZstd.setPlaceholderText('z Error')
+		self.estZstd.setMaximumWidth(100)
 		self.conf = QLineEdit()
 		self.conf.setPlaceholderText('[0, 1.]')
 		self.conf.setMaximumWidth(150)
@@ -71,9 +77,10 @@ class LineListWidget(QWidget):
 		button = QPushButton('Add to Table below')
 		button.clicked.connect(self._on_button_clicked)
 		layout.addWidget(self.estZ, 1,3)
-		layout.addWidget(self.conf, 1,4)
-		layout.addWidget(self.flag, 1,5)
-		layout.addWidget(button, 1,6)
+		layout.addWidget(self.estZstd, 1, 4)
+		layout.addWidget(self.conf, 1,5)
+		layout.addWidget(self.flag, 1,6)
+		layout.addWidget(button, 1,7)
 
 		
 
@@ -92,22 +99,12 @@ class LineListWidget(QWidget):
 		#self.l_combobox.addItems(['NONE', 'ALL'] + self.linelist['name'].tolist())
 		#print(self.linelist)
 
-	# combobox events
+	# line combobox events
 	def _index_changed(self, i): # i is an int
-		#print(type(i))
-		#print(i)
-		#if i < 2:
-		#	print(self.linelist)
-		#else:
-		#	print(self.linelist.loc[i-2])
 		self.send_lineindex.emit(i)
 
 	def _text_changed(self, s): # s is a str
-		#print(type(s))
-		#print(s)
 		tmp_df = self.linelist.set_index('name')
-		#if s not in ['NONE', 'ALL'] :
-			#print(tmp_df.loc[s])
 
 	def _linelist_changed(self, s):
 		llist = pd.DataFrame(columns=['wave', 'name'])
@@ -115,27 +112,43 @@ class LineListWidget(QWidget):
 			pass
 		else:
 			tmp = read_line_list(s)
-		for li in tmp:
-			newrow = {'wave': li['wrest'], 'name': li['ion']}
-			llist = llist.append(newrow, ignore_index=True)
+
+		#need a line to append wrest to name if it doesn't have one
+		if any(map(str.isdigit, tmp[1]['ion'])):
+			# if name column has wrest
+			for li in tmp:
+				newrow = {'wave': li['wrest'], 'name': li['ion']}
+				llist = llist.append(newrow, ignore_index=True)
+		else:
+			# if name column doesn't have wrest, need to append
+			for li in tmp:
+				newrow = {'wave': li['wrest'], 'name': li['ion']+' '+str(round(li['wrest']))}
+				llist = llist.append(newrow, ignore_index=True)
 		self.linelist = llist
-		self.l_combobox.clear()
-		self.l_combobox.addItems(['NONE', 'ALL'] + self.linelist['name'].tolist())
-		#self.l_combobox.setCurrentIndex(0)
+		#self.l_combobox.clear()
+		self.l_combobox.addItems(['ALL'] + self.linelist['name'].tolist())
 		#self.l_combobox.setCurrentIndex(1)
 		#print(self.linelist)
 		self.send_linelist.emit(self.linelist)
 
 	def _on_estZ_changed(self, newz):
-		self.estZ.setText(str(newz))
-		print(newz)
+		show_prec = 5
+		self.estZ.setText(str(round(newz[0], show_prec)))
+		self.estZstd.setText(str(round(newz[1], show_prec)))
 
 	def _on_sent_filename(self, sent_filename):
 		self.filename = sent_filename
 
 	def _on_button_clicked(self, sfilename):
+		if self.estZ.text().strip():
+			self.estZ.setText('0')
+		if self.estZstd.text().strip():
+			self.estZstd.setText('0')
+		if self.conf.text().strip():
+			self.conf.setText('0')
 		data = {'Name': self.filename,
 				'z': float(self.estZ.text()),
+				'z_err': float(self.estZstd.text()),
 				'Confidence': float(self.conf.text()),
 				'Linelist': self.l_lln.currentText(),
 				'Flag': self.flag.text()}
