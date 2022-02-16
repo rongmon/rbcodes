@@ -10,13 +10,10 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 
 from menu_toolbars import Custom_ToolBar, Custom_MenuBar
 from spec_plot import MplCanvas
-from spec_plot_pyqtgraph import SpecCanvas
 from linelist_selection import LineListWidget
 from tableview_pandas import CustomZTable
 from message_box import MessageBox
 from utils import FitsObj
-
-use_pyqtgraph = False
 
 class MainWindow(QMainWindow):
 	'''This is the main window of this GUI
@@ -55,12 +52,10 @@ class MainWindow(QMainWindow):
 
 		layout = QVBoxLayout()
 		layout.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
-		if use_pyqtgraph:
-			self.sc = SpecCanvas()
-		else:
-			self.sc = MplCanvas(width=15, height=9, dpi=100)
-			mpl_toolbar = NavigationToolbar(self.sc, self)
-			layout.addWidget(mpl_toolbar)
+
+		self.sc = MplCanvas(width=15, height=9, dpi=100)
+		mpl_toolbar = NavigationToolbar(self.sc, self)
+		layout.addWidget(mpl_toolbar)
 		
 		layout.addWidget(self.sc)
 		layout.addWidget(widget_z)
@@ -116,15 +111,13 @@ class MainWindow(QMainWindow):
 
 	def on_fitsobj_slot(self, sent_fitsobj):
 		self.fitsobj = sent_fitsobj
-		self.update()
-		#print(self.fitsobj.flux)
+
 	def on_linelist_slot(self, sent_linelist):
 		self.linelist = sent_linelist
-		self.update()
-		#print(self.linelist)
+
 	def on_newlinelist_slot(self, sent_newlinelist):
 		self.newlinelist = sent_newlinelist
-		#self.update()
+
 	def on_z_est_slot(self, sent_z_est):
 		self.z_est = sent_z_est
 		self.update()
@@ -137,7 +130,13 @@ class MainWindow(QMainWindow):
 							estZ=self.sc.estZ)
 		#self.sc.estZ = float(estZ)
 		
-
+qss = '''
+	.QLabel {font-size: 8pt}
+	.QComboBox {font-size: 8pt}
+	.QLineEdit {font-size: 8pt}
+	.QPushButton {font-size: 8pt}
+	.QAction {font-size: 8pt}
+'''
 
 
 app = QApplication(sys.argv)
@@ -145,5 +144,7 @@ app = QApplication(sys.argv)
 window = MainWindow()
 window._location_on_screen()
 window.show()
+
+app.setStyleSheet(qss)
 app.exec_()
 app.quit()

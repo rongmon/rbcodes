@@ -7,10 +7,11 @@ from astropy.io import fits, ascii
 from astropy.table import Table
 
 from PyQt5.QtCore import Qt, QSize, QUrl, pyqtSignal
-from PyQt5.QtWidgets import QAction, QToolBar, QStatusBar, QMenuBar, QFileDialog
+from PyQt5.QtWidgets import QAction, QToolBar, QStatusBar, QMenuBar, QFileDialog, QComboBox
 from PyQt5.QtGui import QKeySequence, QDesktopServices
 
 from user_manual import UserManualDialog
+from gui_io import LoadSpec
 from utils import FitsObj
 
 WORKING_DIR = os.path.abspath(os.getcwd()) + './example-data'
@@ -24,13 +25,16 @@ class Custom_ToolBar(QToolBar):
 		super().__init__()
 		self.mW = mainWindow
 		self.fitsobj = mainWindow.fitsobj
+		self.filepaths = []
+		self.filenames = []
 
 		self.setWindowTitle('Customizable TooBar')
 		#self.setFixedSize(QSize(200, 50))
 
 		btn_loadf = self._create_button('Read FITS', 'Read a fits file and plot the spectrum')
 		self.addAction(btn_loadf)
-		btn_loadf.triggered.connect(self._load_spec)
+		#btn_loadf.triggered.connect(self._load_spec)
+		btn_loadf.triggered.connect(self._load_more_specs)
 
 		btn_savef = self._create_button('Save FITS', 'Save the fits file to unified format')
 		self.addAction(btn_savef)
@@ -40,6 +44,14 @@ class Custom_ToolBar(QToolBar):
 		btn_help = self._create_button('Help', 'Open the user manual for further help')
 		self.addAction(btn_help)
 		btn_help.triggered.connect(self._open_user_manual)	
+		self.addSeparator()
+
+		self.f_combobox = QComboBox()
+		self.f_combobox.setFixedWidth(200)
+		self.f_combobox.addItem('No FITS File')
+		self.f_combobox.setCurrentIndex(0)
+		self.f_combobox.currentIndexChanged.connect(self._read_selected_fits)
+		self.addWidget(self.f_combobox)
 
 	def _create_button(self, buttonName='', buttonTip=''):
 		#Create buttons wrapper
@@ -54,7 +66,7 @@ class Custom_ToolBar(QToolBar):
 		manual.exec_()
 
 	def _load_spec(self):
-		#Read spec fits file
+		#Read a single fits file
 		filepath, check = QFileDialog.getOpenFileName(None,
 			'Load 1 spectrum FITS file',
 			WORKING_DIR,
@@ -87,7 +99,7 @@ class Custom_ToolBar(QToolBar):
 					elif 'ERROR' in search_list:
 						self.fitsobj.error = fitsfile[i].data['ERROR']
 
-			self.send_fitsobj.emit(self.fitsobj)
+			
 
 			filename = self._get_filename(filepath, extension=False)
 			#print(filename)
@@ -96,7 +108,30 @@ class Custom_ToolBar(QToolBar):
 							self.fitsobj.flux, 
 							self.fitsobj.error,
 							filename)
-		self.send_filename.emit(filename)
+			self.send_fitsobj.emit(self.fitsobj)
+			self.send_filename.emit(filename)
+
+	def _load_more_specs(self):
+		#Read multiple spec fits file
+		#	only fetch filepath strings, do not open fits files here
+		filepaths, check = QFileDialog.getOpenFileNames(None,
+			'Load multiple FITS files',
+			WORKING_DIR,
+			'Fits Files (*.fits)')
+		if check:
+			filenames = [self._get_filename(fp, extension=False) for fp in filepaths]
+			if len(self.filepaths)>0:
+				newfiles = [fi for fi in filenames if fi not in self.filenames]
+				self.filenames.extend(newfiles)
+				newpaths = [fpi for fpi in filepaths if fpi not in self.filepaths]
+				self.filepaths.extend(newpaths)
+				self.f_combobox.addItems(newfiles)
+				self.f_combobox.setCurrentIndex(len(self.filenames)-len(newfiles)+1)
+			else:
+				self.filenames = filenames
+				self.filepaths = filepaths
+				self.f_combobox.addItems(self.filenames)
+				self.f_combobox.setCurrentIndex(1)
 
 	def _save_spec(self):
 		#Save spec fits file with our own fits format
@@ -120,6 +155,25 @@ class Custom_ToolBar(QToolBar):
 			return base
 		else:
 			return os.path.splitext(base)[0]
+
+	# combobox event
+	def _read_selected_fits(self, i):
+		# default is 0 ==> No fits file
+		# filepaths index = i - 1
+		if i < 1:
+			pass
+		else:
+			loadspec = LoadSpec(self.filepaths[i-1])
+			filename = self.filenames[i-1]
+			self.fitsobj = loadspec._load_spec()
+			
+			self.mW.sc.plot_spec(self.fitsobj.wave, 
+							self.fitsobj.flux, 
+							self.fitsobj.error,
+							filename)
+			
+			self.send_filename.emit(filename)
+			self.send_fitsobj.emit(self.fitsobj)			
 
 
 class Custom_MenuBar(QMenuBar):
