@@ -8,6 +8,7 @@ from matplotlib.figure import Figure
 from astropy.convolution import convolve, Box1DKernel
 from astropy.modeling import models, fitting
 from scipy.interpolate import splrep, splev
+from scipy.optimize import curve_fit
 import numpy as np
 
 
@@ -185,39 +186,63 @@ class MplCanvas(FigureCanvasQTAgg):
 				x_sort = np.argsort(self.gxval)
 				gxval = self.gxval[x_sort]
 				gyval = self.gyval[x_sort]
-				# fit a Gaussian with 3 data points
-				
+
+				c_range = np.where((self.wave>gxval[0]) & (self.wave < gxval[-1]))[0]
+				g_wave = self.wave[c_range]
+				g_flux = self.flux[c_range]
+				g_error = self.error[c_range]
+
+				# fit a Gaussian with 3 data points	
+				'''			
 				g_init = models.Gaussian1D(amplitude=gyval[1],
 										   mean=gxval[1],
 										   stddev=0.5*(gxval[2]-gxval[0]))
 				fit_g = fitting.LevMarLSQFitter(calc_uncertainties=True)
+				'''
+
+
 				# 1. fit a local continuum
-				c_range = np.where((self.wave>=gxval[0]) & (self.wave <= gxval[2]))
-				g_wave = self.wave[c_range]
-				g_flux = self.flux[c_range]
-				g_error = self.error[c_range]
-				spline = splrep([gxval[0], gxval[-1]], 
+				spline = splrep([gxval[0],gxval[-1]], 
 								[gyval[0], gyval[-1]], 
 								k=1)
 				cont = splev(g_wave, spline)
-				errdata = g_error / cont
-				# 2. check if it is an absorption or emission line
-				if ((gyval[1] < gyval[0]) & (gyval[1] < gyval[2])):
-					ydata = 1. - (g_flux / cont)
-					g = fit_g(g_init, g_wave, ydata, weights=1.0/errdata)
-					g_final = (1. - g(g_wave)) * cont
-				else:
-					ydata = g_flux / cont
-					g = fit_g(g_init, g_wave, ydata, weights=1.0/errdata)
-					g_final = g(g_wave) * cont
 
-				model_fit = self.axes.plot(g_wave, g_final, 'r-')
+				# 2. check if it is an absorption or emission line
+				
+				if ((gyval[1] < gyval[0]) & (gyval[1] < gyval[2])):
+					# emission line
+					ydata = 1. - (g_flux / cont)
+					errdata = 1. - (g_error / cont)
+					#g = fit_g(g_init, g_wave, ydata, weights= 1.0/errdata)
+					#g_final = (1. - g(g_wave)) * cont
+
+					popt, pcov = curve_fit(self.gauss, g_wave, ydata, 
+											p0=[gyval[1], gxval[1], 0.5*(gxval[2]-gxval[0])],
+											sigma=errdata
+											)
+					g_final = (1. - self.gauss(g_wave, *popt)) * cont
+
+				else:
+					# absorption line
+					ydata = g_flux / cont
+					errdata = g_error / cont
+					#g = fit_g(g_init, g_wave, ydata, weights= 1.0/errdata,
+					#g_final = g(g_wave) * cont
+					popt, pcov = curve_fit(self.gauss, g_wave, ydata, 
+											p0=[gyval[1], gxval[1], 0.5*(gxval[2]-gxval[0])],
+											sigma=errdata
+											)
+					g_final = self.gauss(g_wave, *popt) * cont
+
+				perr = np.sqrt(np.diag(pcov))
+				model_fit = self.axes.plot(g_wave, g_final, 'r--')
 				
 				self.draw()
-				message = (f'A Gaussian model you fit has the following parameters:\n'
-						   f'Amplitude: {g.parameters[0]:.3f}\n'
+				'''
+				message = ("A Gaussian model you fit has the following parameters:\n"
+						   f"Amplitude: {g.parameters[0]:.3f}\n"
 						   f"Mean: {g.parameters[1]:.3f} with std={g.stds['mean']:.3f}\n"
-						   f'Sigma: {g.parameters[2]:.3f}')
+						   f"Sigma: {g.parameters[2]:.3f}")
 
 				if self.guess_gcenter:
 					self.guess_gcenter[0] = g.parameters[1]
@@ -225,11 +250,25 @@ class MplCanvas(FigureCanvasQTAgg):
 				else:
 					self.guess_gcenter.append(g.parameters[1])
 					self.guess_gcenter.append(g.stds['mean'])
+				'''
+
+				message = ("A Gaussian model you fit has the following parameters:\n"
+						   f"Amplitude: {popt[0]:.3f}\n"
+						   f"Mean: {popt[1]:.3f} with std={perr[1]:.3f}\n"
+						   f"Sigma: {popt[2]:.3f}")
+
+				if self.guess_gcenter:
+					self.guess_gcenter[0] = popt[1]
+					self.guess_gcenter[1] = perr[1]
+				else:
+					self.guess_gcenter.append(popt[1])
+					self.guess_gcenter.append(perr[1])
+
 
 				self.gxval, self.gyval = [], []
 				self.send_message.emit(message)
 				self.send_gcenter.emit(self.guess_gcenter)
-
+				
 
 				if self.gauss_num == 2:
 					self.gauss_profiles = np.append(self.gauss_profiles, g.parameters, axis=0)
@@ -356,7 +395,7 @@ class MplCanvas(FigureCanvasQTAgg):
 	def on_linelist_slot(self, sent_linelist):
 		self.linelist = sent_linelist #.append(sent_linelist, ignore_index=True)
 		#self._clear_plotted_lines()
-		self._plot_lines(-1, 0.)
+		#self._plot_lines(-1, 0.)
 		#print(self.linelist)
 
 	def on_lineindex_slot(self, sent_lineindex):
@@ -384,6 +423,9 @@ class MplCanvas(FigureCanvasQTAgg):
 
 	def _on_sent_gauss_num(self, sent_gauss_num):
 		self.gauss_num = int(sent_gauss_num)
+
+	def gauss(self, x, amp, mu, sigma):
+		return amp * np.exp(-(x-mu)**2/(2. * sigma**2))
 
 
 

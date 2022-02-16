@@ -51,15 +51,14 @@ class LineListWidget(QWidget):
 		layout.addWidget(self.l_combobox, 1, 1)
 		self.l_combobox.addItem('NONE')
 		self.l_combobox.setCurrentIndex(0)
-		#menubar.send_linelist.connect(self.on_linelist_slot)
 		self.l_combobox.currentIndexChanged.connect(self._index_changed)
-		self.l_combobox.currentTextChanged.connect(self._text_changed)
+		#self.l_combobox.currentTextChanged.connect(self._text_changed)
 
 		self.gauss_num = QComboBox()
 		self.gauss_num.setFixedWidth(50)
 		self.gauss_num.addItems(['1', '2'])
 		self.gauss_num.setCurrentIndex(0)
-		self.gauss_num.activated.connect(self._on_gauss_num_acticated)
+		self.gauss_num.activated.connect(self._on_gauss_num_activated)
 		layout.addWidget(self.gauss_num, 1,2)
 
 		# 3 textedit box
@@ -128,6 +127,7 @@ class LineListWidget(QWidget):
 
 		self.l_combobox.addItems(['ALL'] + self.linelist['name'].tolist())
 		self.send_linelist.emit(self.linelist)
+		self.l_combobox.setCurrentIndex(1)
 
 	def _on_estZ_changed(self, newz):
 		show_prec = 5
@@ -152,5 +152,5 @@ class LineListWidget(QWidget):
 				'Flag': self.flag.text()}
 		self.send_data.emit(data)
 
-	def _on_gauss_num_acticated(self):
+	def _on_gauss_num_activated(self):
 		self.send_gauss_num.emit(int(self.gauss_num.currentText()))
