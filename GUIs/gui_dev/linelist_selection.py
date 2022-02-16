@@ -125,10 +125,8 @@ class LineListWidget(QWidget):
 				newrow = {'wave': li['wrest'], 'name': li['ion']+' '+str(round(li['wrest']))}
 				llist = llist.append(newrow, ignore_index=True)
 		self.linelist = llist
-		#self.l_combobox.clear()
+
 		self.l_combobox.addItems(['ALL'] + self.linelist['name'].tolist())
-		#self.l_combobox.setCurrentIndex(1)
-		#print(self.linelist)
 		self.send_linelist.emit(self.linelist)
 
 	def _on_estZ_changed(self, newz):
@@ -140,11 +138,11 @@ class LineListWidget(QWidget):
 		self.filename = sent_filename
 
 	def _on_button_clicked(self, sfilename):
-		if self.estZ.text().strip():
+		if len(self.estZ.text().strip()) < 1:
 			self.estZ.setText('0')
-		if self.estZstd.text().strip():
+		if len(self.estZstd.text().strip()) < 1:
 			self.estZstd.setText('0')
-		if self.conf.text().strip():
+		if len(self.conf.text().strip()) < 1:
 			self.conf.setText('0')
 		data = {'Name': self.filename,
 				'z': float(self.estZ.text()),
@@ -152,7 +150,6 @@ class LineListWidget(QWidget):
 				'Confidence': float(self.conf.text()),
 				'Linelist': self.l_lln.currentText(),
 				'Flag': self.flag.text()}
-		#print(data)
 		self.send_data.emit(data)
 
 	def _on_gauss_num_acticated(self):
