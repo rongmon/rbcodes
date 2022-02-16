@@ -120,10 +120,18 @@ class Custom_ToolBar(QToolBar):
 			'Fits Files (*.fits)')
 		if check:
 			filenames = [self._get_filename(fp, extension=False) for fp in filepaths]
-			self.f_combobox.addItems(filenames)
-			self.filepaths = filepaths
-			self.filenames = filenames
-			self.f_combobox.setCurrentIndex(1)
+			if len(self.filepaths)>0:
+				newfiles = [fi for fi in filenames if fi not in self.filenames]
+				self.filenames.extend(newfiles)
+				newpaths = [fpi for fpi in filepaths if fpi not in self.filepaths]
+				self.filepaths.extend(newpaths)
+				self.f_combobox.addItems(newfiles)
+				self.f_combobox.setCurrentIndex(len(self.filenames)-len(newfiles)+1)
+			else:
+				self.filenames = filenames
+				self.filepaths = filepaths
+				self.f_combobox.addItems(self.filenames)
+				self.f_combobox.setCurrentIndex(1)
 
 	def _save_spec(self):
 		#Save spec fits file with our own fits format

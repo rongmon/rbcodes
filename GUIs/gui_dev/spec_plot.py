@@ -55,8 +55,8 @@ class MplCanvas(FigureCanvasQTAgg):
 
 	def plot_spec(self, wave, flux, error, filename):
 		self.axes.cla()
-		self.axes.plot(wave, flux, color='black')#, label='Flux')
 		self.axes.plot(wave, error, color='red')# label='Error')
+		self.axes.plot(wave, flux, color='black')#, label='Flux')
 		#self.axes.legend(loc='upper right')
 		self.axes.set_ylim([-np.min(flux)*0.01, np.median(flux)*3])
 		self.axes.set_xlabel('Wavelength')
@@ -230,7 +230,6 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.send_message.emit(message)
 				self.send_gcenter.emit(self.guess_gcenter)
 
-				print(self.guess_gcenter)
 
 				if self.gauss_num == 2:
 					self.gauss_profiles = np.append(self.gauss_profiles, g.parameters, axis=0)
@@ -301,8 +300,8 @@ class MplCanvas(FigureCanvasQTAgg):
 		axes = self.figure.gca()
 		xlim = axes.get_xlim()
 		ylim = axes.get_ylim()
-		self.axes.lines[0] = axes.plot(self.wave, self.new_spec, color='black')#, label='Flux')
-		self.axes.lines[1] = axes.plot(self.wave, self.new_err, color='red')# label='Error')
+		self.axes.lines[0] = axes.plot(self.wave, self.new_err, color='red')# label='Error')
+		self.axes.lines[1] = axes.plot(self.wave, self.new_spec, color='black')#, label='Flux')
 		#self.axes.legend(loc='upper right')
 		del self.axes.lines[-2:]
 
