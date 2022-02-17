@@ -59,7 +59,7 @@ class MainWindow(QMainWindow):
 		
 		layout.addWidget(self.sc)
 		layout.addWidget(widget_z)
-		#ayout.addWidget(table_z)
+		#layout.addWidget(table_z)
 		#layout.addWidget(mbox)
 		layout.addLayout(sublayout)
 		widget.setLayout(layout)
@@ -96,6 +96,10 @@ class MainWindow(QMainWindow):
 		toolbar.send_filename.connect(widget_z._on_sent_filename)
 		# 9. widget_z ==> table_z
 		widget_z.send_data.connect(table_z._on_sent_data)
+		# 10. toolbar ==> table_z
+		toolbar.send_filename.connect(table_z._move_current_filename_top)
+		# 11. toolbar ==> sc (SpecCanvas)
+		toolbar.send_filename.connect(self.sc._update_lines_for_newfile)
 
 
 

@@ -16,6 +16,7 @@ class CustomZTable(QtWidgets.QWidget):
 
 		self.model = TableModel(self.estZ)
 		self.table.setModel(self.model)
+		self.table.setSortingEnabled(True)
 
 		b_load = QtWidgets.QPushButton('Load')
 		b_load.clicked.connect(self._load_button_clicked)
@@ -58,6 +59,17 @@ class CustomZTable(QtWidgets.QWidget):
 		else:
 			self.estZ = self.estZ.append(sent_data, ignore_index=True)
 		self._update_table()
+
+	def _move_current_filename_top(self, sent_filename):
+		checklist = self.estZ[self.estZ['Name'] == sent_filename].index.tolist()
+		if checklist:
+			target_idx = checklist[0]
+			new_index = self.estZ.index.tolist()
+			# swap index
+			new_index[0], new_index[target_idx] = target_idx, 0
+			self.estZ = self.estZ.reindex(new_index)
+			self.estZ.reset_index(inplace=True, drop=True)
+			self._update_table()
 
 	def _clear_button_clicked(self):
 		self.estZ = pd.DataFrame(#[[0,0,0,0,0,0,0,0]],
@@ -124,4 +136,8 @@ class TableModel(QtCore.QAbstractTableModel):
 	def flags(self, index):
 		return Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable
 
-
+	def sort(self, Ncol, order):
+		self.layoutAboutToBeChanged.emit()
+		self._data = self._data.sort_values(self._data.columns[Ncol],
+											ascending=not order)
+		self.layoutChanged.emit()
