@@ -1,5 +1,6 @@
 import sys
 import pandas as pd
+from numpy import floor, log10
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QLabel, QComboBox, QLineEdit, QPushButton
 from PyQt5.QtCore import pyqtSignal
@@ -21,6 +22,7 @@ class LineListWidget(QWidget):
 		self.linelist_name = ''
 		self.linelist = []
 		self.filename = ''
+		self.newz = []
 
 		# Widget column names
 		layout = QGridLayout()
@@ -108,31 +110,32 @@ class LineListWidget(QWidget):
 	def _linelist_changed(self, s):
 		llist = pd.DataFrame(columns=['wave', 'name'])
 		if s in 'NONE':
-			pass
+			self.send_linelist.emit(s)
 		else:
 			tmp = read_line_list(s)
 
-		#need a line to append wrest to name if it doesn't have one
-		if any(map(str.isdigit, tmp[1]['ion'])):
-			# if name column has wrest
-			for li in tmp:
-				newrow = {'wave': li['wrest'], 'name': li['ion']}
-				llist = llist.append(newrow, ignore_index=True)
-		else:
-			# if name column doesn't have wrest, need to append
-			for li in tmp:
-				newrow = {'wave': li['wrest'], 'name': li['ion']+' '+str(round(li['wrest']))}
-				llist = llist.append(newrow, ignore_index=True)
-		self.linelist = llist
+			#need a line to append wrest to name if it doesn't have one
+			if any(map(str.isdigit, tmp[1]['ion'])):
+				# if name column has wrest
+				for li in tmp:
+					newrow = {'wave': li['wrest'], 'name': li['ion']}
+					llist = llist.append(newrow, ignore_index=True)
+			else:
+				# if name column doesn't have wrest, need to append
+				for li in tmp:
+					newrow = {'wave': li['wrest'], 'name': li['ion']+' '+str(round(li['wrest']))}
+					llist = llist.append(newrow, ignore_index=True)
+			self.linelist = llist
 
-		self.l_combobox.addItems(['ALL'] + self.linelist['name'].tolist())
-		self.send_linelist.emit(self.linelist)
-		self.l_combobox.setCurrentIndex(1)
+			self.l_combobox.addItems(['ALL'] + self.linelist['name'].tolist())
+			self.send_linelist.emit(self.linelist)
+			self.l_combobox.setCurrentIndex(1)
 
 	def _on_estZ_changed(self, newz):
-		show_prec = 5
-		self.estZ.setText(str(round(newz[0], show_prec)))
-		self.estZstd.setText(str(round(newz[1], show_prec)))
+		show_sigfig = 5
+		self.newz = newz
+		self.estZ.setText(str(self.round_to_sigfig(newz[0], show_sigfig)))
+		self.estZstd.setText(str(self.round_to_sigfig(newz[1], show_sigfig)))
 
 	def _on_sent_filename(self, sent_filename):
 		self.filename = sent_filename
@@ -145,8 +148,8 @@ class LineListWidget(QWidget):
 		if len(self.conf.text().strip()) < 1:
 			self.conf.setText('0')
 		data = {'Name': self.filename,
-				'z': float(self.estZ.text()),
-				'z_err': float(self.estZstd.text()),
+				'z': self.newz[0], #float(self.estZ.text()),
+				'z_err': self.newz[1], #float(self.estZstd.text()),
 				'Confidence': float(self.conf.text()),
 				'Linelist': self.l_lln.currentText(),
 				'Flag': self.flag.text()}
@@ -154,3 +157,6 @@ class LineListWidget(QWidget):
 
 	def _on_gauss_num_activated(self):
 		self.send_gauss_num.emit(int(self.gauss_num.currentText()))
+
+	def round_to_sigfig(self, num=0., sigfig=1):
+		return round(num, sigfig - int(floor(log10(abs(num)))) - 1)

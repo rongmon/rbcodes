@@ -33,7 +33,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.init_xlims, self.init_ylims = [],[]
 		self.gxval, self.gyval = [], []
 		self.scale = 1.
-		self.lineindex = 0
+		self.lineindex = -2
 		self.linelist = [] #pd.DataFrame(columns=['wave', 'name'])
 		self.estZ = 0.
 		self.estZstd = 0.
@@ -393,10 +393,12 @@ class MplCanvas(FigureCanvasQTAgg):
 		#print('vlines num: ', len(self.axes.collections))
 		
 	def on_linelist_slot(self, sent_linelist):
-		self.linelist = sent_linelist #.append(sent_linelist, ignore_index=True)
-		#self._clear_plotted_lines()
-		#self._plot_lines(-1, 0.)
-		#print(self.linelist)
+		# if no linelist selected, a str is passed along
+		if type(sent_linelist) is str:
+			self._clear_plotted_lines()
+		else:
+			self.linelist = sent_linelist
+			self._plot_lines(-1)
 
 	def on_lineindex_slot(self, sent_lineindex):
 		#print(sent_lineindex == 1)
@@ -408,10 +410,6 @@ class MplCanvas(FigureCanvasQTAgg):
 		else:
 			self.lineindex = sent_lineindex - 2
 			self._plot_lines(self.lineindex)
-
-
-
-		
 
 	def _on_estZ_changed(self, newz):
 		self.estZ = newz[0]
@@ -426,6 +424,12 @@ class MplCanvas(FigureCanvasQTAgg):
 
 	def gauss(self, x, amp, mu, sigma):
 		return amp * np.exp(-(x-mu)**2/(2. * sigma**2))
+
+	def _update_lines_for_newfile(self, sent_filename):
+		if len(self.linelist) > 0:
+			# default value of self.linindex = -2
+			if self.lineindex > -2:
+				self._plot_lines(self.lineindex)
 
 
 
