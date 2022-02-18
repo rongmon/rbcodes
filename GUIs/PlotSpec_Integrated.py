@@ -527,9 +527,9 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                     g = fit_g(g_init, ww, ydata)
                     Final_fit=(1.-g(ww))*continuum
                 else:
-                    ydata=(flux1/continuum)
+                    ydata=(flux1/continuum)-1
                     g = fit_g(g_init, ww, ydata)
-                    Final_fit=g(ww)*continuum         
+                    Final_fit=(1.+g(ww))*continuum         
     
                 model_fit=self.ax.plot(ww, Final_fit, 'r-')        
                 values0=' Amp: '+'%.3f' %  g.parameters[0] 
