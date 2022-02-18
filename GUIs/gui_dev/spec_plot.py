@@ -224,15 +224,15 @@ class MplCanvas(FigureCanvasQTAgg):
 
 				else:
 					# absorption line
-					ydata = g_flux / cont
-					errdata = g_error / cont
+					ydata = (g_flux / cont)-1.
+					errdata = (g_error / cont)-1.
 					#g = fit_g(g_init, g_wave, ydata, weights= 1.0/errdata,
 					#g_final = g(g_wave) * cont
 					popt, pcov = curve_fit(self.gauss, g_wave, ydata, 
 											p0=[gyval[1], gxval[1], 0.5*(gxval[2]-gxval[0])],
 											sigma=errdata
 											)
-					g_final = self.gauss(g_wave, *popt) * cont
+					g_final = (self.gauss(g_wave, *popt)+1.) * cont
 
 				perr = np.sqrt(np.diag(pcov))
 				model_fit = self.axes.plot(g_wave, g_final, 'r--')
