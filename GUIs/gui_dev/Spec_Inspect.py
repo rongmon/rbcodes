@@ -44,15 +44,17 @@ class Spec_Inspect(object):
 
         self.ax[1].cla()
         
+        
         if one_d_only==False:
             self.ax[0].cla()
             im = self.ax[0].imshow(self.two_d_spec,origin = 'lower', vmin = -10, vmax = 65)
-            self.fig.colorbar(im, ax=self.ax[0], label='Interactive colorbar',location='top')
+            xlim=self.ax[0].get_xlim()
+            #self.fig.colorbar(im, ax=self.ax[0], label='Interactive colorbar',location='top')
+            self.ax[0].hlines(self.extration_y[0],xlim[0],xlim[1],colors='r', linestyles='dashed',label='ext_pt_min')
+            self.ax[0].hlines(self.extration_y[1],xlim[0],xlim[1],colors='r', linestyles='dashed',label='ext_pt_min')
+
 
         sp=self.ax[1].plot(self.active_1d_spec)
-        xlim=self.ax[0].get_xlim()
-        self.extr_y_min=self.ax[0].hlines(self.extration_y[0],xlim[0],xlim[1],colors='r', linestyles='dashed',label='ext_pt_min')
-        self.extr_y_max=self.ax[0].hlines(self.extration_y[1],xlim[0],xlim[1],colors='r', linestyles='dashed',label='ext_pt_min')
 
         self.ax[0].set_aspect('auto')
 
@@ -63,26 +65,24 @@ class Spec_Inspect(object):
 
         if event.key=='c':
             #Figure out the min max of extraction box
-            self.ax[0].plot(event.xdata,event.ydata,'r+')
+            vline=self.ax[0].plot(event.xdata,event.ydata,'r+')
             plt.draw()
 
             self.temp_extraction_y=np.append(self.temp_extraction_y,event.ydata)
 
-
-
-            print(event.xdata,event.ydata,event.key,event.x,event.y)
-            print(len(self.temp_extraction_y))
-
             if len(self.temp_extraction_y)==2:
                 #First remove previous extraction window lines HOW?
+
+                while self.ax[0].collections:
+                    self.ax[0].collections.pop()
+                    
 
                 ext_min_y=int(np.round(min(self.temp_extraction_y)))
                 ext_max_y=int(np.round(max(self.temp_extraction_y)))
                 xlim=self.ax[0].get_xlim()
                 self.ax[0].hlines(ext_min_y,xlim[0],xlim[1],colors='r', linestyles='dashed',label='ext_pt_min')
                 self.ax[0].hlines(ext_max_y,xlim[0],xlim[1],colors='r', linestyles='dashed',label='ext_pt_max')
-                #print(self.extration_y,event.x,event.y)
-                self.active_two_d_spec=self.active_two_d_spec[ext_min_y:ext_max_y,:]
+                self.active_two_d_spec=self.two_d_spec[ext_min_y:ext_max_y,:]
                 self.active_1d_spec=extract_1_d(self.active_two_d_spec)
                 self.master_plotter(one_d_only=True)
     
