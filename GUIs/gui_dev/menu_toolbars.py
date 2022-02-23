@@ -20,6 +20,7 @@ LINELIST_DIR = os.path.dirname(os.path.abspath(__file__)) + '/lines'
 class Custom_ToolBar(QToolBar):
 	send_fitsobj = pyqtSignal(object)
 	send_filename = pyqtSignal(str)
+	send_filenames = pyqtSignal(list)
 	#Our personalized custom Toolbar
 	def __init__(self, mainWindow):
 		super().__init__()
@@ -30,6 +31,10 @@ class Custom_ToolBar(QToolBar):
 
 		self.setWindowTitle('Customizable TooBar')
 		#self.setFixedSize(QSize(200, 50))
+
+		btn_loadtxt = self._create_button('Read All', 'Read all fits files from a TXT file. Make sure you run "ls *.fits > filenames.txt" before clicking this!')
+		self.addAction(btn_loadtxt)
+		btn_loadtxt.triggered.connect(self._load_from_txt)
 
 		btn_loadf = self._create_button('Read FITS', 'Read a fits file and plot the spectrum')
 		self.addAction(btn_loadf)
@@ -133,6 +138,34 @@ class Custom_ToolBar(QToolBar):
 				self.f_combobox.addItems(self.filenames)
 				self.f_combobox.setCurrentIndex(1)
 
+	def _load_from_txt(self):
+		# read all fits files saved in a txt file
+		# the txt file should be located within the same folder as fits
+		txtpath, check = QFileDialog.getOpenFileName(None,
+			'Read a TXT file containing all fits filenames in the current folder',
+			WORKING_DIR,
+			'Text Files (*.txt)')
+		if check:
+			with open(txtpath) as f:
+				lines = f.readlines()
+			txt_dirname = os.path.dirname(txtpath)
+			filepaths = [txt_dirname + '/' + line.strip() for line in lines]
+			filenames = [self._get_filename(fp, extension=False) for fp in filepaths]
+
+			if len(self.filepaths)>0:
+				newfiles = [fi for fi in filenames if fi not in self.filenames]
+				self.filenames.extend(newfiles)
+				newpaths = [fpi for fpi in filepaths if fpi not in self.filepaths]
+				self.filepaths.extend(newpaths)
+				self.f_combobox.addItems(newfiles)
+				self.f_combobox.setCurrentIndex(len(self.filenames)-len(newfiles)+1)
+			else:
+				self.filenames = filenames
+				self.filepaths = filepaths
+				self.f_combobox.addItems(self.filenames)
+				self.f_combobox.setCurrentIndex(1)
+
+
 	def _save_spec(self):
 		#Save spec fits file with our own fits format
 
@@ -166,11 +199,16 @@ class Custom_ToolBar(QToolBar):
 			loadspec = LoadSpec(self.filepaths[i-1])
 			filename = self.filenames[i-1]
 			self.fitsobj = loadspec._load_spec()
-			
-			self.mW.sc.plot_spec(self.fitsobj.wave, 
-							self.fitsobj.flux, 
-							self.fitsobj.error,
-							filename)
+			if len(self.fitsobj.flux.shape) > 1:
+				# new plot 2d
+				self.mW.sc.plot_spec2d(self.fitsobj.wave,
+									self.fitsobj.flux,
+									filename)
+			else:
+				self.mW.sc.plot_spec(self.fitsobj.wave, 
+								self.fitsobj.flux, 
+								self.fitsobj.error,
+								filename)
 			
 			self.send_filename.emit(filename)
 			self.send_fitsobj.emit(self.fitsobj)			

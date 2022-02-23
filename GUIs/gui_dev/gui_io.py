@@ -2,7 +2,7 @@ import sys
 from astropy.io import fits
 import numpy as np
 
-from utils import FitsObj
+from utils import FitsObj, FitsObj2d
 # use test.fits from rbcodes/example-data as testing example
 '''
 file = fits.open('test.fits')
@@ -13,6 +13,9 @@ No.    Name      Ver    Type      Cards   Dimensions   Format
   1  ERROR         1 ImageHDU         7   (19663,)   float32
   2  WAVELENGTH    1 ImageHDU         7   (19663,)   float64
   3  CONTINUUM     1 ImageHDU         7   (19663,)   float32
+
+
+NEED TO FIND A BETTER WAY TO TELL IF A FITS FILE HAS 1D(spec) OR 2D(image) DATA
 '''
 
 # This class is used to load spectrum from fits (unknown format) and save spectrum to fits file (our format)
@@ -20,13 +23,23 @@ class LoadSpec():
 	def __init__(self, filepath):
 		self.filepath = filepath
 		self.fitsobj = FitsObj(wave=[], flux=[], error=[])
+		#self.fitsobj2d = FitsObj2d(wave=[], flux2d=[])
 
 
 	def _load_spec(self):
 		# read fits file
 		fitsfile = fits.open(self.filepath)
-		# find wavelength, flux, error
 
+		# check if fits file contains an image
+		if fitsfile[0].header['NAXIS'] > 1:
+			self.fitsobj.flux = fitsfile[0].data
+			wave0,wave1 = fitsfile[0].header['ADCWAVE0'], fitsfile[0].header['ADCWAVE1']
+			self.fitsobj.wave = np.linspace(wave0, wave1, len(self.fitsobj.flux))
+
+			return self.fitsobj
+
+		# if not, find spectral info...
+		# find wavelength, flux, error
 		if 'FLUX' in fitsfile:
 			'''FITS format 1:
 				file['<variable>'].data

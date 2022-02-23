@@ -3,10 +3,13 @@ import sys
 import pandas as pd
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 
 
 class CustomZTable(QtWidgets.QWidget):
+	send_dictdata = pyqtSignal(object)
+
+
 	def __init__(self):
 		super().__init__()
 		self.table = QtWidgets.QTableView()
@@ -49,7 +52,6 @@ class CustomZTable(QtWidgets.QWidget):
 	def _on_sent_data(self, sent_data):
 		#print(self.estZ.iloc[0].to_dict())
 		#print(sent_data['Name'] in self.estZ['Name'])
-
 		if sent_data['Name'] in self.estZ['Name'].values:
 			ind = self.estZ[self.estZ['Name'] == sent_data['Name']].index.values[0]
 			s = self.estZ.iloc[ind].to_dict()
@@ -70,6 +72,10 @@ class CustomZTable(QtWidgets.QWidget):
 			self.estZ = self.estZ.reindex(new_index)
 			self.estZ.reset_index(inplace=True, drop=True)
 			self._update_table()
+			self.send_dictdata.emit(self.estZ.iloc[0].to_dict())
+		else:
+			self.send_dictdata.emit({})
+
 
 	def _clear_button_clicked(self):
 		self.estZ = pd.DataFrame(#[[0,0,0,0,0,0,0,0]],

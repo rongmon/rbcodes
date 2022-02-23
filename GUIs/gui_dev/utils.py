@@ -14,3 +14,9 @@ class FitsObj():
 		self.dec = dec
 		self.z_est = z_est
 		self.flag = flag
+
+class FitsObj2d():
+	def __init__(self, wave, flux2d, error2d=None):
+		self.wave = wave
+		self.flux2d = flux2d
+		self.error2d = error2d

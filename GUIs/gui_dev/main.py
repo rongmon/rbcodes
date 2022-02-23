@@ -100,6 +100,8 @@ class MainWindow(QMainWindow):
 		toolbar.send_filename.connect(table_z._move_current_filename_top)
 		# 11. toolbar ==> sc (SpecCanvas)
 		toolbar.send_filename.connect(self.sc._update_lines_for_newfile)
+		# 12. table_z ==> widget_z
+		table_z.send_dictdata.connect(widget_z._on_sent_dictdata)
 
 
 
