@@ -40,10 +40,11 @@ class MainWindow(QMainWindow):
 		# --------- Define all necessary widgets ------------------- 
 		#placeholder to hold the central widget in main window
 		widget = QWidget()
-		widget.setMinimumSize(1000, 800)
+		#widget.setMinimumSize(1000, 800)
 		#widget.setFixedSize(1600, 900)
 
 		widget_z = LineListWidget()
+		widget_z.setFixedSize(1000,80)
 		table_z = CustomZTable()
 		mbox = MessageBox()
 		sublayout = QHBoxLayout()
@@ -51,13 +52,16 @@ class MainWindow(QMainWindow):
 		sublayout.addWidget(table_z)
 
 		layout = QVBoxLayout()
-		layout.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
+		layout.setAlignment(QtCore.Qt.AlignLeft) #QtCore.Qt.AlignTop | 
 
 		self.sc = MplCanvas(width=15, height=9, dpi=100)
+		self.sc.setMinimumSize(1000,500)
+		sc_layout = QVBoxLayout()
 		mpl_toolbar = NavigationToolbar(self.sc, self)
-		layout.addWidget(mpl_toolbar)
+		sc_layout.addWidget(mpl_toolbar)
+		sc_layout.addWidget(self.sc)
 		
-		layout.addWidget(self.sc)
+		layout.addLayout(sc_layout)
 		layout.addWidget(widget_z)
 		#layout.addWidget(table_z)
 		#layout.addWidget(mbox)

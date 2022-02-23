@@ -156,7 +156,7 @@ class MplCanvas(FigureCanvasQTAgg):
 
 	def plot_spec2d(self, wave, flux, filename):
 		self.fig.clf()
-		self.fig.set_size_inches(w=self.figsize[0], h=self.figsize[-1]*2)
+		#self.fig.set_size_inches(w=self.figsize[0], h=self.figsize[-1]*2)
 		self.ax2d = self.fig.add_subplot(211)
 		self.axes = self.fig.add_subplot(212, sharex = self.ax2d)
 
