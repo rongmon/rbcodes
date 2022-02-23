@@ -22,6 +22,7 @@ class LineListWidget(QWidget):
 		self.linelist_name = ''
 		self.linelist = []
 		self.filename = ''
+		self.filenames = []
 		self.newz = []
 
 		# Widget column names
@@ -84,8 +85,6 @@ class LineListWidget(QWidget):
 		layout.addWidget(button, 1,7)
 
 		
-
-		
 		layout.setAlignment(QtCore.Qt.AlignLeft)
 		self.setLayout(layout)
 
@@ -111,6 +110,9 @@ class LineListWidget(QWidget):
 		llist = pd.DataFrame(columns=['wave', 'name'])
 		if s in 'NONE':
 			self.send_linelist.emit(s)
+			self.l_combobox.clear()
+			self.l_combobox.addItem('NONE')
+			self.l_combobox.setCurrentIndex(0)
 		else:
 			tmp = read_line_list(s)
 
@@ -140,6 +142,9 @@ class LineListWidget(QWidget):
 	def _on_sent_filename(self, sent_filename):
 		self.filename = sent_filename
 
+	def _on_sent_filenames(self, sent_filenames):
+		self.filenames = sent_filenames
+
 	def _on_button_clicked(self, sfilename):
 		if len(self.estZ.text().strip()) < 1:
 			self.estZ.setText('0')
@@ -154,6 +159,30 @@ class LineListWidget(QWidget):
 				'Linelist': self.l_lln.currentText(),
 				'Flag': self.flag.text()}
 		self.send_data.emit(data)
+
+	def _on_sent_dictdata(self, sent_dict):
+		#print(self.filename)
+		#print(sent_dict['Name'])
+		if len(sent_dict) > 0:
+			if len(self.newz) < 2:
+				self.newz.append(float(sent_dict['z']))
+				self.newz.append(float(sent_dict['z_err']))
+			else:
+				self.newz[0] = float(sent_dict['z'])
+				self.newz[1] = float(sent_dict['z_err'])
+
+			show_sigfig = 5
+			self.estZ.setText(str(self.round_to_sigfig(self.newz[0], show_sigfig)))
+			self.estZstd.setText(str(self.round_to_sigfig(self.newz[1], show_sigfig)))
+			self.conf.setText(str(sent_dict['Confidence']))
+			self.flag.setText(sent_dict['Flag'])
+			self.l_lln.setCurrentText(sent_dict['Linelist'])
+		else:
+			self.estZ.clear()
+			self.estZstd.clear()
+			self.conf.clear()
+			self.flag.clear()
+			self.l_lln.setCurrentIndex(0)
 
 	def _on_gauss_num_activated(self):
 		self.send_gauss_num.emit(int(self.gauss_num.currentText()))

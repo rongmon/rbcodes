@@ -22,10 +22,11 @@ class MplCanvas(FigureCanvasQTAgg):
 	send_gcenter = pyqtSignal(list)
 
 	def __init__(self, parent=None, width=5, height=3, dpi=100):
-		self.fig = Figure(figsize=(width, height), dpi=dpi)
+		self.figsize = [width, height]
+		self.fig = Figure(figsize=(self.figsize[0], self.figsize[-1]), dpi=dpi)
 		pad = 0.05
-		self.fig.subplots_adjust(left=pad+0.02, bottom=pad*2, right=0.999, top=0.99)
-		self.axes = self.fig.add_subplot(111)
+		self.fig.subplots_adjust(left=pad+0.02, bottom=pad*3, right=0.999, top=0.99)
+
 		#self.axes.margins(x=0)
 
 		# initialize some plotting parameters
@@ -55,6 +56,8 @@ class MplCanvas(FigureCanvasQTAgg):
 		#self.fig.subplots_adjust(0.1, 0.1, 0.9, 0.9)
 
 	def plot_spec(self, wave, flux, error, filename):
+		self.fig.clf()
+		self.axes = self.fig.add_subplot(111)
 		self.axes.cla()
 		self.axes.plot(wave, error, color='red')# label='Error')
 		self.axes.plot(wave, flux, color='black')#, label='Flux')
@@ -69,9 +72,138 @@ class MplCanvas(FigureCanvasQTAgg):
 
 		# update intiial plotting parameters
 		self.wave, self.flux, self.error = wave, flux, error
+		self.axnum = 1
 		self.init_xlims = self.axes.get_xlim()
 		self.init_ylims = self.axes.get_ylim()
 
+	
+
+	def replot(self, wave, new_spec, new_err):
+		'''Re-plot smoothed/unsmoothed spectrum
+		'''
+		axes = self.figure.gca()
+		xlim = axes.get_xlim()
+		ylim = axes.get_ylim()
+		self.axes.lines[0] = axes.plot(wave, new_err, color='red')# label='Error')
+		self.axes.lines[1] = axes.plot(wave, new_spec, color='black')#, label='Flux')
+		#self.axes.legend(loc='upper right')
+		del self.axes.lines[-2:]
+
+	def _compute_distance(self, gxval, gyval, event):
+		'''Compute the distance between the event xydata and selected point for Gaussian fitting
+		'''
+		diffxval = gxval - event.xdata
+		diffyval = gyval - event.ydata
+		distance = np.array([np.sqrt(diffxval[i]**2 + diffyval[i]**2) for i in range(len(gxval))])
+		return distance
+
+	def _clear_plotted_lines(self):
+		while self.axes.texts:
+			self.axes.texts.pop()
+		while self.axes.collections:
+			self.axes.collections.pop()
+		self.draw()
+
+	def _plot_lines(self, lineindex, estZ=0.):
+		axes = self.figure.gca()
+		xlim, ylim = axes.get_xlim(), axes.get_ylim()
+		self._clear_plotted_lines()
+
+		if lineindex < 0:
+
+			tmp_lines = self.linelist['wave'].to_numpy() * (1+estZ)
+			self.axes.vlines(x=tmp_lines,
+							 ymin=ylim[0], ymax=ylim[-1], color='blue', linestyle='dashed')
+			for row in range(self.linelist.shape[0]):
+				self.axes.text(x=tmp_lines[row],
+							   y=ylim[-1]*0.6,
+							   s=self.linelist.at[row, 'name'],
+							   color='blue', fontsize=15, rotation='vertical')
+			#print(lineindex)
+			#print(self.linelist)
+		else:
+			self.axes.vlines(x=self.linelist.at[lineindex, 'wave'] * (1+estZ),
+							 ymin=ylim[0], ymax=ylim[-1], color='blue', linestyle='dashed')
+			self.axes.text(x=self.linelist.at[lineindex, 'wave'] * (1+estZ),
+						   y=ylim[-1]*0.6,
+						   s=self.linelist.at[lineindex, 'name'],
+						   color='blue', fontsize=15, rotation='vertical')
+
+		self.axes.set_xlim(xlim)
+		self.axes.set_ylim(ylim)
+		self.draw()
+
+		#print(self.axes.texts)
+		#print('vlines num: ', len(self.axes.collections))
+		
+	def gauss(self, x, amp, mu, sigma):
+		return amp * np.exp(-(x-mu)**2/(2. * sigma**2))
+
+#--------------------- Methods for 2D data-------------------------
+
+	def extract_1d(self, flux):
+		return np.sum(flux, axis=0)
+
+	def replot2d(self, wave, new_spec):
+		'''Re-plot smoothed/unsmoothed spectrum
+		'''
+		axes = self.figure.gca()
+		xlim = axes.get_xlim()
+		ylim = axes.get_ylim()
+		self.axes.lines[0] = axes.plot(wave, new_spec, color='black')#, label='Flux')
+		#self.axes.legend(loc='upper right')
+		del self.axes.lines[-1:]
+
+	def plot_spec2d(self, wave, flux, filename):
+		self.fig.clf()
+		self.fig.set_size_inches(w=self.figsize[0], h=self.figsize[-1]*2)
+		self.ax2d = self.fig.add_subplot(211)
+		self.axes = self.fig.add_subplot(212, sharex = self.ax2d)
+
+		# data processing here... this should be generalized
+		flux = np.transpose(flux[:, 2100:2200])
+		self.flux2d = flux
+
+		# sum in dispersion direction to do initial selection
+		self.pix = np.array([1.])
+		tmp = np.sum(flux, axis=1)
+		tmp_cumsum = np.cumsum(tmp) / np.sum(tmp)
+		xlist = np.arange(0, len(tmp_cumsum), 1)
+		self.flux1d = self.extract_1d(flux)
+
+		self.extraction_y = [int(np.interp(0.05, tmp_cumsum, xlist)),
+							int(np.interp(0.95, tmp_cumsum, xlist))]
+		self.tmp_extraction_y = []
+		#print(self.extraction_y)
+		self.flux1d = self.extract_1d(flux[self.extraction_y[0]: self.extraction_y[1], :])
+
+		# plot starting...
+		# 1d spec plot... (keep same varname as axes in plot_spec)
+		self.axes.plot(wave, self.flux1d, color='black')
+		self.axes.set_xlabel('Wavelength')
+		xlim_spec1d = self.axes.get_xlim()
+		self.axes.set_xlim(xlim_spec1d)
+
+		# 2d spec plot...
+		pos_ax2d = self.ax2d.imshow(self.flux2d, origin='lower', vmin=-10, vmax=65,
+						extent=(wave[0], wave[-1], 0, len(flux))
+						)
+		self.ax2d_cb = self.fig.colorbar(pos_ax2d, ax=self.ax2d, location='top')
+		ax2d_xlim = self.ax2d.get_xlim()
+		self.ax2d.hlines(self.extraction_y[0], ax2d_xlim[0], ax2d_xlim[1], color='red', linestyle='dashed')
+		self.ax2d.hlines(self.extraction_y[1], ax2d_xlim[0], ax2d_xlim[1], color='red', linestyle='dashed')
+		self.ax2d.tick_params(labelbottom=False)
+		#self.ax2d.set_xlim(xlim_spec1d)
+		self.ax2d.set_aspect('auto')
+
+		self.draw()
+
+		# update intialized parameters
+		self.wave, self.flux = wave, self.flux1d
+		# a dummy var to tell if ax2d is available later for event.key='C'
+		self.axnum = 2
+
+#------------------- Keyboards/Mouse Events------------------------
 	def ontype(self, event):
 		'''Interactivae keyboard events
 		Note:
@@ -132,8 +264,11 @@ class MplCanvas(FigureCanvasQTAgg):
 			# smooth ydata
 			self.scale += 2
 			self.new_spec = convolve(self.flux, Box1DKernel(self.scale))
-			self.new_err = convolve(self.error, Box1DKernel(self.scale))
-			self.replot(self.new_spec, self.new_err)
+			if len(self.error) > 0:
+				self.new_err = convolve(self.error, Box1DKernel(self.scale))
+				self.replot(self.wave, self.new_spec, self.new_err)
+			else:
+				self.replot2d(self.wave, self.new_spec)
 			self.draw()
 
 		elif event.key == 'U':
@@ -142,8 +277,11 @@ class MplCanvas(FigureCanvasQTAgg):
 			if self.scale < 0:
 				self.scale = 1
 			self.new_spec = convolve(self.flux, Box1DKernel(self.scale))
-			self.new_err = convolve(self.error, Box1DKernel(self.scale))
-			self.replot(self.new_spec, self.new_err)
+			if len(self.error) > 0:
+				self.new_err = convolve(self.error, Box1DKernel(self.scale))
+				self.replot(self.wave, self.new_spec, self.new_err)
+			else:
+				self.replot2d(self.wave, self.new_spec)
 			self.draw()
 
 		elif event.key == 'Y':
@@ -193,14 +331,6 @@ class MplCanvas(FigureCanvasQTAgg):
 				g_error = self.error[c_range]
 
 				# fit a Gaussian with 3 data points	
-				'''			
-				g_init = models.Gaussian1D(amplitude=gyval[1],
-										   mean=gxval[1],
-										   stddev=0.5*(gxval[2]-gxval[0]))
-				fit_g = fitting.LevMarLSQFitter(calc_uncertainties=True)
-				'''
-
-
 				# 1. fit a local continuum
 				spline = splrep([gxval[0],gxval[-1]], 
 								[gyval[0], gyval[-1]], 
@@ -208,7 +338,6 @@ class MplCanvas(FigureCanvasQTAgg):
 				cont = splev(g_wave, spline)
 
 				# 2. check if it is an absorption or emission line
-				
 				if ((gyval[1] < gyval[0]) & (gyval[1] < gyval[2])):
 					# emission line
 					ydata = 1. - (g_flux / cont)
@@ -238,19 +367,6 @@ class MplCanvas(FigureCanvasQTAgg):
 				model_fit = self.axes.plot(g_wave, g_final, 'r--')
 				
 				self.draw()
-				'''
-				message = ("A Gaussian model you fit has the following parameters:\n"
-						   f"Amplitude: {g.parameters[0]:.3f}\n"
-						   f"Mean: {g.parameters[1]:.3f} with std={g.stds['mean']:.3f}\n"
-						   f"Sigma: {g.parameters[2]:.3f}")
-
-				if self.guess_gcenter:
-					self.guess_gcenter[0] = g.parameters[1]
-					self.guess_gcenter[1] = g.stds['mean']
-				else:
-					self.guess_gcenter.append(g.parameters[1])
-					self.guess_gcenter.append(g.stds['mean'])
-				'''
 
 				message = ("A Gaussian model you fit has the following parameters:\n"
 						   f"Amplitude: {popt[0]:.3f}\n"
@@ -300,11 +416,35 @@ class MplCanvas(FigureCanvasQTAgg):
 
 			self.gauss_profiles = []
 
-		#elif event.key == 'J':
-		#	self.xdata = event.xdata
-		#	self.guess_ion = GuessTransition(self.linelist, event.xdata)
-		#	self.guess_ion.show()
+		elif event.key == 'C':
+			# change the size of the extraction box in 2D spec plot
+			if self.axnum > 1:
+				boxlines = self.ax2d.plot(event.xdata, event.ydata, 'r+')
+				self.tmp_extraction_y = np.append(self.tmp_extraction_y, event.ydata)
+				if len(self.tmp_extraction_y) == 2:
+					# delete old hlines
+					while self.ax2d.collections:
+						self.ax2d.collections.pop()
 
+					(ext_min_y, ext_max_y) = (int(np.round(min(self.tmp_extraction_y))),
+											int(np.round(max(self.tmp_extraction_y))))
+					self.ax2d_xlim = self.ax2d.get_xlim()
+					self.ax2d.hlines(ext_min_y, self.ax2d_xlim[0], self.ax2d_xlim[1], color='red', linestyle='dashed')
+					self.ax2d.hlines(ext_max_y, self.ax2d_xlim[0], self.ax2d_xlim[1], color='red', linestyle='dashed')
+					flux2d = self.flux2d[ext_min_y:ext_max_y, :]
+					self.new_spec = self.extract_1d(flux2d)
+					self.replot2d(self.wave, self.new_spec)
+					self.tmp_extraction_y = []
+					while self.ax2d.lines:
+						self.ax2d.lines.pop()
+				self.draw()
+
+
+
+			else:
+				message = "You don't have a 2D Spectrum plot available."
+				self.send_message.emit(message)
+			
 	def onclick(self, event):
 		'''Mouse click
 			Left == 1; Right == 3
@@ -333,65 +473,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				else:
 					pass
 
-	def replot(self, new_spec, new_err):
-		'''Re-plot smoothed/unsmoothed spectrum
-		'''
-		axes = self.figure.gca()
-		xlim = axes.get_xlim()
-		ylim = axes.get_ylim()
-		self.axes.lines[0] = axes.plot(self.wave, self.new_err, color='red')# label='Error')
-		self.axes.lines[1] = axes.plot(self.wave, self.new_spec, color='black')#, label='Flux')
-		#self.axes.legend(loc='upper right')
-		del self.axes.lines[-2:]
-
-
-	def _compute_distance(self, gxval, gyval, event):
-		'''Compute the distance between the event xydata and selected point for Gaussian fitting
-		'''
-		diffxval = gxval - event.xdata
-		diffyval = gyval - event.ydata
-		distance = np.array([np.sqrt(diffxval[i]**2 + diffyval[i]**2) for i in range(len(gxval))])
-		return distance
-
-	def _clear_plotted_lines(self):
-		while self.axes.texts:
-			self.axes.texts.pop()
-		while self.axes.collections:
-			self.axes.collections.pop()
-		self.draw()
-
-	def _plot_lines(self, lineindex, estZ=0.):
-		axes = self.figure.gca()
-		xlim, ylim = axes.get_xlim(), axes.get_ylim()
-		self._clear_plotted_lines()
-
-		if lineindex < 0:
-
-			tmp_lines = self.linelist['wave'].to_numpy() * (1+estZ)
-			self.axes.vlines(x=tmp_lines,
-							 ymin=ylim[0], ymax=ylim[-1], color='blue', linestyle='dashed')
-			for row in range(self.linelist.shape[0]):
-				self.axes.text(x=tmp_lines[row],
-							   y=ylim[-1]*0.6,
-							   s=self.linelist.at[row, 'name'],
-							   color='blue', fontsize=15, rotation='vertical')
-			#print(lineindex)
-			#print(self.linelist)
-		else:
-			self.axes.vlines(x=self.linelist.at[lineindex, 'wave'] * (1+estZ),
-							 ymin=ylim[0], ymax=ylim[-1], color='blue', linestyle='dashed')
-			self.axes.text(x=self.linelist.at[lineindex, 'wave'] * (1+estZ),
-						   y=ylim[-1]*0.6,
-						   s=self.linelist.at[lineindex, 'name'],
-						   color='blue', fontsize=15, rotation='vertical')
-
-		self.axes.set_xlim(xlim)
-		self.axes.set_ylim(ylim)
-		self.draw()
-
-		#print(self.axes.texts)
-		#print('vlines num: ', len(self.axes.collections))
-		
+#-------------------- Slots for External Signals ------------------
 	def on_linelist_slot(self, sent_linelist):
 		# if no linelist selected, a str is passed along
 		if type(sent_linelist) is str:
@@ -422,19 +504,16 @@ class MplCanvas(FigureCanvasQTAgg):
 	def _on_sent_gauss_num(self, sent_gauss_num):
 		self.gauss_num = int(sent_gauss_num)
 
-	def gauss(self, x, amp, mu, sigma):
-		return amp * np.exp(-(x-mu)**2/(2. * sigma**2))
-
 	def _update_lines_for_newfile(self, sent_filename):
 		if len(self.linelist) > 0:
 			# default value of self.linindex = -2
 			if self.lineindex > -2:
 				self._plot_lines(self.lineindex)
+		else:
+			self._clear_plotted_lines()
 
 
-
-
-
+#-------------------- Dialog Box for XY Ranges --------------------
 
 class CustomLimDialog(QtWidgets.QDialog):
 	def __init__(self, axis='y'):

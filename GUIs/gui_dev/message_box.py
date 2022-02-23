@@ -18,6 +18,7 @@ class MessageBox(QWidget):
 		self.te.setPlaceholderText('This meesage box will display important messages.')
 		self.te.setReadOnly(True)
 
+		self.setFixedHeight(200)
 		self.setFixedWidth(250)
 
 		layout = QVBoxLayout()
