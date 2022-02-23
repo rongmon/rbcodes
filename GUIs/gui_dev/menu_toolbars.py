@@ -203,6 +203,7 @@ class Custom_ToolBar(QToolBar):
 				# new plot 2d
 				self.mW.sc.plot_spec2d(self.fitsobj.wave,
 									self.fitsobj.flux,
+									self.fitsobj.error,
 									filename)
 			else:
 				self.mW.sc.plot_spec(self.fitsobj.wave, 

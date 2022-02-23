@@ -35,6 +35,8 @@ class LoadSpec():
 			self.fitsobj.flux = fitsfile[0].data
 			wave0,wave1 = fitsfile[0].header['ADCWAVE0'], fitsfile[0].header['ADCWAVE1']
 			self.fitsobj.wave = np.linspace(wave0, wave1, len(self.fitsobj.flux))
+			# fake error 2d spectrum
+			self.fitsobj.error = self.fitsobj.flux * 0.05
 
 			return self.fitsobj
 

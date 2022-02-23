@@ -154,7 +154,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		#self.axes.legend(loc='upper right')
 		del self.axes.lines[-1:]
 
-	def plot_spec2d(self, wave, flux, filename):
+	def plot_spec2d(self, wave, flux, error, filename):
 		self.fig.clf()
 		#self.fig.set_size_inches(w=self.figsize[0], h=self.figsize[-1]*2)
 		self.ax2d = self.fig.add_subplot(211)
@@ -163,24 +163,34 @@ class MplCanvas(FigureCanvasQTAgg):
 		# data processing here... this should be generalized
 		flux = np.transpose(flux[:, 2100:2200])
 		self.flux2d = flux
+		self.err2d = np.transpose(error[:, 2100:2200])
 
 		# sum in dispersion direction to do initial selection
-		self.pix = np.array([1.])
-		tmp = np.sum(flux, axis=1)
+		#self.pix = np.array([1.])
+		tmp = np.sum(self.flux2d, axis=1)
+		tmpe = np.sum(self.err2d, axis=1)
 		tmp_cumsum = np.cumsum(tmp) / np.sum(tmp)
+		tmpe_cumsum = np.cumsum(tmpe) / np.sum(tmpe)
 		xlist = np.arange(0, len(tmp_cumsum), 1)
-		self.flux1d = self.extract_1d(flux)
+		self.flux1d = self.extract_1d(self.flux2d)
+		self.err1d = self.extract_1d(self.err2d)
+		self.error = self.err1d
 
 		self.extraction_y = [int(np.interp(0.05, tmp_cumsum, xlist)),
 							int(np.interp(0.95, tmp_cumsum, xlist))]
+		self.extraction_ye = [int(np.interp(0.05, tmpe_cumsum, xlist)),
+							int(np.interp(0.95, tmpe_cumsum, xlist))]
 		self.tmp_extraction_y = []
 		#print(self.extraction_y)
-		self.flux1d = self.extract_1d(flux[self.extraction_y[0]: self.extraction_y[1], :])
+		self.flux1d = self.extract_1d(self.flux2d[self.extraction_y[0]: self.extraction_y[1], :])
+		self.err1d = self.extract_1d(self.err2d[self.extraction_ye[0]: self.extraction_ye[1], :])
 
 		# plot starting...
 		# 1d spec plot... (keep same varname as axes in plot_spec)
+		self.axes.plot(wave, self.err1d, color='red')
 		self.axes.plot(wave, self.flux1d, color='black')
 		self.axes.set_xlabel('Wavelength')
+		self.axes.set_ylabel('Flux')
 		xlim_spec1d = self.axes.get_xlim()
 		self.axes.set_xlim(xlim_spec1d)
 
@@ -197,6 +207,8 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.ax2d.set_aspect('auto')
 
 		self.draw()
+		self.init_xlims = self.axes.get_xlim()
+		self.init_ylims = self.axes.get_ylim()
 
 		# update intialized parameters
 		self.wave, self.flux = wave, self.flux1d
@@ -433,7 +445,9 @@ class MplCanvas(FigureCanvasQTAgg):
 					self.ax2d.hlines(ext_max_y, self.ax2d_xlim[0], self.ax2d_xlim[1], color='red', linestyle='dashed')
 					flux2d = self.flux2d[ext_min_y:ext_max_y, :]
 					self.new_spec = self.extract_1d(flux2d)
-					self.replot2d(self.wave, self.new_spec)
+
+					# error has not been updated correspondingly
+					self.replot(self.wave, self.new_spec, self.new_spec*0.05)
 					self.tmp_extraction_y = []
 					while self.ax2d.lines:
 						self.ax2d.lines.pop()
