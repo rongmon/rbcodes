@@ -14,7 +14,7 @@ class CustomZTable(QtWidgets.QWidget):
 		super().__init__()
 		self.table = QtWidgets.QTableView()
 		self.estZ = pd.DataFrame(#[[0,0,0,0,0,0,0,0]],
-			columns=['Name', 'RA', 'DEC', 'z', 'z_err', 'Confidence', 'Linelist', 'Flag'])
+			columns=['Name', 'RA', 'DEC', 'z', 'z_err', 'Confidence', 'Linelist', 'Flag', 'z_guess'])
 		self.filename = ''
 
 		self.model = TableModel(self.estZ)

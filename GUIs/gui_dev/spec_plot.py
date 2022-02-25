@@ -13,6 +13,7 @@ import numpy as np
 
 
 from guess_transition import GuessTransition
+from spec_hist import FluxHistogram
 
 matplotlib.use('Qt5Agg')
 
@@ -25,7 +26,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.figsize = [width, height]
 		self.fig = Figure(figsize=(self.figsize[0], self.figsize[-1]), dpi=dpi)
 		pad = 0.05
-		self.fig.subplots_adjust(left=pad+0.02, bottom=pad*3, right=0.999, top=0.99)
+		self.fig.subplots_adjust(left=pad+0.02, bottom=pad*2, right=0.995, top=0.95)
 
 		#self.axes.margins(x=0)
 
@@ -154,7 +155,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		#self.axes.legend(loc='upper right')
 		del self.axes.lines[-1:]
 
-	def plot_spec2d(self, wave, flux, error, filename):
+	def plot_spec2d(self, wave, flux, error, filename, scale=0):
 		self.fig.clf()
 		#self.fig.set_size_inches(w=self.figsize[0], h=self.figsize[-1]*2)
 		self.ax2d = self.fig.add_subplot(211)
@@ -195,9 +196,18 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axes.set_xlim(xlim_spec1d)
 
 		# 2d spec plot...
-		pos_ax2d = self.ax2d.imshow(self.flux2d, origin='lower', vmin=-10, vmax=65,
-						extent=(wave[0], wave[-1], 0, len(flux))
-						)
+		if scale == 0:
+			pos_ax2d = self.ax2d.imshow(self.flux2d, origin='lower', vmin=-10, vmax=65,
+							extent=(wave[0], wave[-1], 0, len(flux))
+							)
+		elif scale == 1:
+			pos_ax2d = self.ax2d.imshow(np.log(self.flux2d), origin='lower', vmin=-10, vmax=65,
+							extent=(wave[0], wave[-1], 0, len(flux))
+							)
+		elif scale == 2:
+			pos_ax2d = self.ax2d.imshow(np.sqrt(self.flux2d), origin='lower', vmin=-10, vmax=65,
+							extent=(wave[0], wave[-1], 0, len(flux))
+							)
 		self.ax2d_cb = self.fig.colorbar(pos_ax2d, ax=self.ax2d, location='top')
 		ax2d_xlim = self.ax2d.get_xlim()
 		self.ax2d.hlines(self.extraction_y[0], ax2d_xlim[0], ax2d_xlim[1], color='red', linestyle='dashed')
@@ -233,30 +243,36 @@ class MplCanvas(FigureCanvasQTAgg):
 			self.axes.set_xlim(self.init_xlims)
 			self.draw()
 			self.send_message.emit('You reset the canvas!!!')
-
+			#print(dir(event))
+			#print(event.canvas, event.guiEvent, event.inaxes, event.lastevent, event.name)
+			print(event.inaxes == self.axes)
 		elif event.key == 't':
 			# set y axis max value
-			ylim = self.axes.get_ylim()
-			self.axes.set_ylim([ylim[0], event.ydata])
-			self.draw()
+			if event.inaxes == self.axes:
+				ylim = self.axes.get_ylim()
+				self.axes.set_ylim([ylim[0], event.ydata])
+				self.draw()
 
 		elif event.key == 'b':
 			# set y axis min value
-			ylim = self.axes.get_ylim()
-			self.axes.set_ylim([event.ydata, ylim[-1]])
-			self.draw()
+			if event.inaxes == self.axes:
+				ylim = self.axes.get_ylim()
+				self.axes.set_ylim([event.ydata, ylim[-1]])
+				self.draw()
 
 		elif event.key == 'X':
 			# set x axis max value
-			xlim = self.axes.get_xlim()
-			self.axes.set_xlim([xlim[0], event.xdata])
-			self.draw()
+			if event.inaxes == self.axes:
+				xlim = self.axes.get_xlim()
+				self.axes.set_xlim([xlim[0], event.xdata])
+				self.draw()
 
 		elif event.key == 'x':
 			# set x axis min value
-			xlim = self.axes.get_xlim()
-			self.axes.set_xlim([event.xdata, xlim[-1]])
-			self.draw()
+			if event.inaxes == self.axes:
+				xlim = self.axes.get_xlim()
+				self.axes.set_xlim([event.xdata, xlim[-1]])
+				self.draw()
 
 		elif event.key == '[':
 			# pan window to the left
@@ -274,145 +290,162 @@ class MplCanvas(FigureCanvasQTAgg):
 
 		elif event.key == 'S':
 			# smooth ydata
-			self.scale += 2
-			self.new_spec = convolve(self.flux, Box1DKernel(self.scale))
-			if len(self.error) > 0:
-				self.new_err = convolve(self.error, Box1DKernel(self.scale))
-				self.replot(self.wave, self.new_spec, self.new_err)
-			else:
-				self.replot2d(self.wave, self.new_spec)
-			self.draw()
+			if event.inaxes == self.axes:
+				self.scale += 2
+				self.new_spec = convolve(self.flux, Box1DKernel(self.scale))
+				if len(self.error) > 0:
+					self.new_err = convolve(self.error, Box1DKernel(self.scale))
+					self.replot(self.wave, self.new_spec, self.new_err)
+				else:
+					self.replot2d(self.wave, self.new_spec)
+				self.draw()
 
 		elif event.key == 'U':
 			# unsmooth ydata
-			self.scale -= 2
-			if self.scale < 0:
-				self.scale = 1
-			self.new_spec = convolve(self.flux, Box1DKernel(self.scale))
-			if len(self.error) > 0:
-				self.new_err = convolve(self.error, Box1DKernel(self.scale))
-				self.replot(self.wave, self.new_spec, self.new_err)
-			else:
-				self.replot2d(self.wave, self.new_spec)
-			self.draw()
+			if event.inaxes == self.axes:
+				self.scale -= 2
+				if self.scale < 0:
+					self.scale = 1
+				self.new_spec = convolve(self.flux, Box1DKernel(self.scale))
+				if len(self.error) > 0:
+					self.new_err = convolve(self.error, Box1DKernel(self.scale))
+					self.replot(self.wave, self.new_spec, self.new_err)
+				else:
+					self.replot2d(self.wave, self.new_spec)
+				self.draw()
 
 		elif event.key == 'Y':
 			# set y-axis limits with precise values
-			ylimdialog = CustomLimDialog(axis='y')
-			if ylimdialog.exec_():
-				ylim = ylimdialog._getlim()
-				self.axes.set_ylim(ylim)
-				self.draw()
+			if event.inaxes == self.axes:
+				ylimdialog = CustomLimDialog(axis='y')
+				if ylimdialog.exec_():
+					ylim = ylimdialog._getlim()
+					self.axes.set_ylim(ylim)
+					self.draw()
+			if event.inaxes == self.ax2d:
+				ylimdialog2d = CustomLimDialog(axis='y')
+				if ylimdialog2d.exec_():
+					ylim2d = ylimdialog2d._getlim()
+					self.ax2d.set_ylim(ylim2d)
+					self.draw()
 
 		elif event.key == 'W':
 			# set y-axis limits with precise values
-			xlimdialog = CustomLimDialog(axis='x')
-			if xlimdialog.exec_():
-				xlim = xlimdialog._getlim()
-				self.axes.set_xlim(xlim)
-				self.draw()
+			if event.inaxes == self.axes:
+				xlimdialog = CustomLimDialog(axis='x')
+				if xlimdialog.exec_():
+					xlim = xlimdialog._getlim()
+					self.axes.set_xlim(xlim)
+					self.draw()
+			if event.inaxes == self.ax2d:
+				xlimdialog2d = CustomLimDialog(axis='x')
+				if xlimdialog2d.exec_():
+					xlim2d = xlimdialog2d._getlim()
+					self.ax2d.set_xlim(xlim2d)
+					self.draw()
 
 
 		elif event.key == 'G':
 			# fit a Gaussian profile
-			self.gxval = np.append(self.gxval, event.xdata)
-			self.gyval = np.append(self.gyval, event.ydata)
+			if event.inaxes == self.axes:
+				self.gxval = np.append(self.gxval, event.xdata)
+				self.gyval = np.append(self.gyval, event.ydata)
 
-			if self.gauss_num > 1:
-				dgxval, dgyval = [],[]
+				if self.gauss_num > 1:
+					dgxval, dgyval = [],[]
 
-			fclick = len(self.gxval)
-			self.axes.plot(self.gxval[-1], self.gyval[-1], 'rs', ms=5)
-			self.draw()
-
-			if fclick == 1:
-				message = 'You need 3 points to model a Gaussian. Please click 2 more points.'
-				self.send_message.emit(message)
-			elif fclick == 2:
-				message = 'Please click 1 more point to model a Gaussian.'
-				self.send_message.emit(message)
-			elif fclick == 3:
-				# sort xdata before fitting
-				x_sort = np.argsort(self.gxval)
-				gxval = self.gxval[x_sort]
-				gyval = self.gyval[x_sort]
-
-				c_range = np.where((self.wave>gxval[0]) & (self.wave < gxval[-1]))[0]
-				g_wave = self.wave[c_range]
-				g_flux = self.flux[c_range]
-				g_error = self.error[c_range]
-
-				# fit a Gaussian with 3 data points	
-				# 1. fit a local continuum
-				spline = splrep([gxval[0],gxval[-1]], 
-								[gyval[0], gyval[-1]], 
-								k=1)
-				cont = splev(g_wave, spline)
-
-				# 2. check if it is an absorption or emission line
-				if ((gyval[1] < gyval[0]) & (gyval[1] < gyval[2])):
-					# emission line
-					ydata = 1. - (g_flux / cont)
-					errdata = 1. - (g_error / cont)
-					#g = fit_g(g_init, g_wave, ydata, weights= 1.0/errdata)
-					#g_final = (1. - g(g_wave)) * cont
-
-					popt, pcov = curve_fit(self.gauss, g_wave, ydata, 
-											p0=[gyval[1], gxval[1], 0.5*(gxval[2]-gxval[0])],
-											sigma=errdata
-											)
-					g_final = (1. - self.gauss(g_wave, *popt)) * cont
-
-				else:
-					# absorption line
-					ydata = (g_flux / cont)-1.
-					errdata = (g_error / cont)-1.
-					#g = fit_g(g_init, g_wave, ydata, weights= 1.0/errdata,
-					#g_final = g(g_wave) * cont
-					popt, pcov = curve_fit(self.gauss, g_wave, ydata, 
-											p0=[gyval[1], gxval[1], 0.5*(gxval[2]-gxval[0])],
-											sigma=errdata
-											)
-					g_final = (self.gauss(g_wave, *popt)+1.) * cont
-
-				perr = np.sqrt(np.diag(pcov))
-				model_fit = self.axes.plot(g_wave, g_final, 'r--')
-				
+				fclick = len(self.gxval)
+				self.axes.plot(self.gxval[-1], self.gyval[-1], 'rs', ms=5)
 				self.draw()
 
-				message = ("A Gaussian model you fit has the following parameters:\n"
-						   f"Amplitude: {popt[0]:.3f}\n"
-						   f"Mean: {popt[1]:.3f} with std={perr[1]:.3f}\n"
-						   f"Sigma: {popt[2]:.3f}")
+				if fclick == 1:
+					message = 'You need 3 points to model a Gaussian. Please click 2 more points.'
+					self.send_message.emit(message)
+				elif fclick == 2:
+					message = 'Please click 1 more point to model a Gaussian.'
+					self.send_message.emit(message)
+				elif fclick == 3:
+					# sort xdata before fitting
+					x_sort = np.argsort(self.gxval)
+					gxval = self.gxval[x_sort]
+					gyval = self.gyval[x_sort]
 
-				if self.guess_gcenter:
-					self.guess_gcenter[0] = popt[1]
-					self.guess_gcenter[1] = perr[1]
-				else:
-					self.guess_gcenter.append(popt[1])
-					self.guess_gcenter.append(perr[1])
+					c_range = np.where((self.wave>gxval[0]) & (self.wave < gxval[-1]))[0]
+					g_wave = self.wave[c_range]
+					g_flux = self.flux[c_range]
+					g_error = self.error[c_range]
+
+					# fit a Gaussian with 3 data points	
+					# 1. fit a local continuum
+					spline = splrep([gxval[0],gxval[-1]], 
+									[gyval[0], gyval[-1]], 
+									k=1)
+					cont = splev(g_wave, spline)
+
+					# 2. check if it is an absorption or emission line
+					if ((gyval[1] < gyval[0]) & (gyval[1] < gyval[2])):
+						# emission line
+						ydata = 1. - (g_flux / cont)
+						errdata = 1. - (g_error / cont)
+						#g = fit_g(g_init, g_wave, ydata, weights= 1.0/errdata)
+						#g_final = (1. - g(g_wave)) * cont
+
+						popt, pcov = curve_fit(self.gauss, g_wave, ydata, 
+												p0=[gyval[1], gxval[1], 0.5*(gxval[2]-gxval[0])],
+												sigma=errdata
+												)
+						g_final = (1. - self.gauss(g_wave, *popt)) * cont
+
+					else:
+						# absorption line
+						ydata = (g_flux / cont)-1.
+						errdata = (g_error / cont)-1.
+						#g = fit_g(g_init, g_wave, ydata, weights= 1.0/errdata,
+						#g_final = g(g_wave) * cont
+						popt, pcov = curve_fit(self.gauss, g_wave, ydata, 
+												p0=[gyval[1], gxval[1], 0.5*(gxval[2]-gxval[0])],
+												sigma=errdata
+												)
+						g_final = (self.gauss(g_wave, *popt)+1.) * cont
+
+					perr = np.sqrt(np.diag(pcov))
+					model_fit = self.axes.plot(g_wave, g_final, 'r--')
+					
+					self.draw()
+
+					message = ("A Gaussian model you fit has the following parameters:\n"
+							   f"Amplitude: {popt[0]:.3f}\n"
+							   f"Mean: {popt[1]:.3f} with std={perr[1]:.3f}\n"
+							   f"Sigma: {popt[2]:.3f}")
+
+					if self.guess_gcenter:
+						self.guess_gcenter[0] = popt[1]
+						self.guess_gcenter[1] = perr[1]
+					else:
+						self.guess_gcenter.append(popt[1])
+						self.guess_gcenter.append(perr[1])
 
 
-				self.gxval, self.gyval = [], []
-				self.send_message.emit(message)
-				self.send_gcenter.emit(self.guess_gcenter)
-				
+					self.gxval, self.gyval = [], []
+					self.send_message.emit(message)
+					self.send_gcenter.emit(self.guess_gcenter)
+					
 
-				if self.gauss_num == 2:
-					self.gauss_profiles = np.append(self.gauss_profiles, g.parameters, axis=0)
-					dgxval = np.append(dgxval, gxval, axis=0)
-					dgyval = np.append(dgyval, gyval, axis=0)
-					x_sort = np.argsort(dgxval)
-					dgxval = dgxval[x_sort]
-					dgyval = dgyval[x_sort]
-					c_range = np.where((self.wave>=dgxval[0]) & (self.wave <= dgxval[-1]))
-					dg_wave = self.wave[c_range]
-					dg_flux = self.flux[c_range]
+					if self.gauss_num == 2:
+						self.gauss_profiles = np.append(self.gauss_profiles, g.parameters, axis=0)
+						dgxval = np.append(dgxval, gxval, axis=0)
+						dgyval = np.append(dgyval, gyval, axis=0)
+						x_sort = np.argsort(dgxval)
+						dgxval = dgxval[x_sort]
+						dgyval = dgyval[x_sort]
+						c_range = np.where((self.wave>=dgxval[0]) & (self.wave <= dgxval[-1]))
+						dg_wave = self.wave[c_range]
+						dg_flux = self.flux[c_range]
 
-					print(self.gauss_profiles)
+						print(self.gauss_profiles)
 
-				else:
-					self.gauss_profiles = []
+					else:
+						self.gauss_profiles = []
 
 		elif event.key == 'D':
 			# delete previous unwanted points for Gaussian profile fitting
@@ -430,34 +463,39 @@ class MplCanvas(FigureCanvasQTAgg):
 
 		elif event.key == 'C':
 			# change the size of the extraction box in 2D spec plot
-			if self.axnum > 1:
-				boxlines = self.ax2d.plot(event.xdata, event.ydata, 'r+')
-				self.tmp_extraction_y = np.append(self.tmp_extraction_y, event.ydata)
-				if len(self.tmp_extraction_y) == 2:
-					# delete old hlines
-					while self.ax2d.collections:
-						self.ax2d.collections.pop()
+			if event.inaxes == self.ax2d:
+				if self.axnum > 1:
+					boxlines = self.ax2d.plot(event.xdata, event.ydata, 'r+')
+					self.tmp_extraction_y = np.append(self.tmp_extraction_y, event.ydata)
+					if len(self.tmp_extraction_y) == 2:
+						# delete old hlines
+						while self.ax2d.collections:
+							self.ax2d.collections.pop()
 
-					(ext_min_y, ext_max_y) = (int(np.round(min(self.tmp_extraction_y))),
-											int(np.round(max(self.tmp_extraction_y))))
-					self.ax2d_xlim = self.ax2d.get_xlim()
-					self.ax2d.hlines(ext_min_y, self.ax2d_xlim[0], self.ax2d_xlim[1], color='red', linestyle='dashed')
-					self.ax2d.hlines(ext_max_y, self.ax2d_xlim[0], self.ax2d_xlim[1], color='red', linestyle='dashed')
-					flux2d = self.flux2d[ext_min_y:ext_max_y, :]
-					self.new_spec = self.extract_1d(flux2d)
+						(ext_min_y, ext_max_y) = (int(np.round(min(self.tmp_extraction_y))),
+												int(np.round(max(self.tmp_extraction_y))))
+						self.ax2d_xlim = self.ax2d.get_xlim()
+						self.ax2d.hlines(ext_min_y, self.ax2d_xlim[0], self.ax2d_xlim[1], color='red', linestyle='dashed')
+						self.ax2d.hlines(ext_max_y, self.ax2d_xlim[0], self.ax2d_xlim[1], color='red', linestyle='dashed')
+						flux2d = self.flux2d[ext_min_y:ext_max_y, :]
+						self.new_spec = self.extract_1d(flux2d)
 
-					# error has not been updated correspondingly
-					self.replot(self.wave, self.new_spec, self.new_spec*0.05)
-					self.tmp_extraction_y = []
-					while self.ax2d.lines:
-						self.ax2d.lines.pop()
-				self.draw()
+						# error has not been updated correspondingly
+						self.replot(self.wave, self.new_spec, self.new_spec*0.05)
+						self.tmp_extraction_y = []
+						while self.ax2d.lines:
+							self.ax2d.lines.pop()
+					self.draw()
 
 
 
-			else:
-				message = "You don't have a 2D Spectrum plot available."
-				self.send_message.emit(message)
+				else:
+					message = "You don't have a 2D Spectrum plot available."
+					self.send_message.emit(message)
+		elif event.key == 'H':
+			#bring up the histogram dialog
+			fhist = FluxHistogram(self.flux2d)
+			fhist.exec_()
 			
 	def onclick(self, event):
 		'''Mouse click
@@ -566,3 +604,5 @@ class CustomLimDialog(QtWidgets.QDialog):
 
 	def _getlim(self):
 		return [float(self.le_min.text()), float(self.le_max.text())]
+
+#---------------------------------------------------------------

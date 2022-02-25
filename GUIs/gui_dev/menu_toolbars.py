@@ -28,6 +28,8 @@ class Custom_ToolBar(QToolBar):
 		self.fitsobj = mainWindow.fitsobj
 		self.filepaths = []
 		self.filenames = []
+		self.filename = ''
+		self.scale2d = False
 
 		self.setWindowTitle('Customizable TooBar')
 		#self.setFixedSize(QSize(200, 50))
@@ -57,6 +59,13 @@ class Custom_ToolBar(QToolBar):
 		self.f_combobox.setCurrentIndex(0)
 		self.f_combobox.currentIndexChanged.connect(self._read_selected_fits)
 		self.addWidget(self.f_combobox)
+		self.addSeparator()
+
+		self.s_combobox = QComboBox()
+		self.s_combobox.setFixedWidth(100)
+		self.addWidget(self.s_combobox)
+
+
 
 	def _create_button(self, buttonName='', buttonTip=''):
 		#Create buttons wrapper
@@ -198,6 +207,7 @@ class Custom_ToolBar(QToolBar):
 		else:
 			loadspec = LoadSpec(self.filepaths[i-1])
 			filename = self.filenames[i-1]
+			self.filename = filename
 			self.fitsobj = loadspec._load_spec()
 			if len(self.fitsobj.flux.shape) > 1:
 				# new plot 2d
@@ -205,16 +215,35 @@ class Custom_ToolBar(QToolBar):
 									self.fitsobj.flux,
 									self.fitsobj.error,
 									filename)
+				self._add_scale2d()
 			else:
 				self.mW.sc.plot_spec(self.fitsobj.wave, 
 								self.fitsobj.flux, 
 								self.fitsobj.error,
 								filename)
+				self.s_combobox.clear()
 			
 			self.send_filename.emit(filename)
-			self.send_fitsobj.emit(self.fitsobj)			
+			self.send_fitsobj.emit(self.fitsobj)		
+
+	def _add_scale2d(self):
+		self.s_combobox.setMaxVisibleItems(3)
+		self.s_combobox.addItems(['Linear', 'Log', 'Sqrt'])
+		self.s_combobox.setCurrentIndex(0)
+		self.s_combobox.currentIndexChanged.connect(self._scaling_changed)
+
+	def _scaling_changed(self, i):
+		if len(self.fitsobj.flux.shape) > 1:
+			self.mW.sc.plot_spec2d(self.fitsobj.wave,
+								self.fitsobj.flux,
+								self.fitsobj.error,
+								self.filename, scale=i)
+		else:
+			pass
 
 
+
+#----------------------------- Menu bar ---------------------------
 class Custom_MenuBar(QMenuBar):
 
 	send_fitsobj = pyqtSignal(object)

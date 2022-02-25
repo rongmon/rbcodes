@@ -1,8 +1,8 @@
 import sys
 import pandas as pd
-from numpy import floor, log10
+from numpy import floor, log10, isnan
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QLabel, QComboBox, QLineEdit, QPushButton
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QComboBox, QLineEdit, QPushButton, QCheckBox
 from PyQt5.QtCore import pyqtSignal
 
 from PyQt5 import QtCore
@@ -15,6 +15,7 @@ class LineListWidget(QWidget):
 	send_linelist = pyqtSignal(object)
 	send_data = pyqtSignal(object)
 	send_gauss_num = pyqtSignal(int)
+	send_message = pyqtSignal(str)
 
 	def __init__(self):
 		super().__init__()
@@ -24,6 +25,8 @@ class LineListWidget(QWidget):
 		self.filename = ''
 		self.filenames = []
 		self.newz = []
+
+		glayout = QVBoxLayout()
 
 		# Widget column names
 		layout = QGridLayout()
@@ -84,9 +87,59 @@ class LineListWidget(QWidget):
 		layout.addWidget(self.flag, 1,6)
 		layout.addWidget(button, 1,7)
 
+		# Secondary linelists
+		l_checkbox = QCheckBox('Add More Linelists to Examine..')
+		l_checkbox.stateChanged.connect(self._intialize_more_linelist)
+		l_hlayout = QHBoxLayout()
+
+		num_llists = 6
+		self.llists_2 = []
+		for i in range(num_llists):
+			self.llists_2.append(self.add_linelists())
+			#indices for llists_2:
+			# 0-layout, 1-linelist combobox, 2-z lineedit
+			l_hlayout.addLayout(self.llists_2[i][0])
+
+
+		glayout.addLayout(layout)
+		glayout.addWidget(l_checkbox)
+		glayout.addLayout(l_hlayout)
 		
-		layout.setAlignment(QtCore.Qt.AlignLeft)
-		self.setLayout(layout)
+		glayout.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
+		self.setLayout(glayout)
+
+	def add_linelists(self):
+		ll_layout = QGridLayout()
+		l_combox = QComboBox()
+
+		l_combox.setFixedWidth(80)
+		z_edit = QLineEdit()
+		z_edit.setPlaceholderText('Guess z')
+		z_edit.setReadOnly(True)
+		z_edit.setMaximumWidth(60)
+		#ll_layout.addWidget(QLabel('Linelist'), 0,0)
+		#ll_layout.addWidget(QLabel('Guess z'), 0,1)
+		ll_layout.addWidget(l_combox, 0,0)
+		ll_layout.addWidget(z_edit, 0,1)
+		ll_layout.setAlignment(QtCore.Qt.AlignLeft)
+
+		return ll_layout, l_combox, z_edit
+
+	def _intialize_more_linelist(self, s):
+		if s == QtCore.Qt.Checked:
+			# initialize more linelists for plotting
+			
+			for i in range(len(self.llists_2)):
+				self.llists_2[i][1].addItems(['NONE', 'LBG', 'Gal', 'LLS', 'LLS Small', 'DLA', 'atom'])
+				self.llists_2[i][2].setReadOnly(False)
+
+		else:
+			# grey out all things
+			for i in range(len(self.llists_2)):
+				self.llists_2[i][1].clear()
+				self.llists_2[i][2].clear()
+				self.llists_2[i][2].setReadOnly(True)
+			
 
 	def zprint(self):
 		print(self.estZ.text())
@@ -162,21 +215,38 @@ class LineListWidget(QWidget):
 
 	def _on_sent_dictdata(self, sent_dict):
 		#print(self.filename)
-		#print(sent_dict['Name'])
+		#print(sent_dict)
 		if len(sent_dict) > 0:
-			if len(self.newz) < 2:
-				self.newz.append(float(sent_dict['z']))
-				self.newz.append(float(sent_dict['z_err']))
-			else:
-				self.newz[0] = float(sent_dict['z'])
-				self.newz[1] = float(sent_dict['z_err'])
+			if not isnan(sent_dict['z']):
+				# extract z_estimated from z column
+				if len(self.newz) < 2:
+					self.newz.append(float(sent_dict['z']))
+					self.newz.append(float(sent_dict['z_err']))
+				else:
+					self.newz[0] = float(sent_dict['z'])
+					self.newz[1] = float(sent_dict['z_err'])
 
-			show_sigfig = 5
-			self.estZ.setText(str(self.round_to_sigfig(self.newz[0], show_sigfig)))
-			self.estZstd.setText(str(self.round_to_sigfig(self.newz[1], show_sigfig)))
+				show_sigfig = 5
+				self.estZ.setText(str(self.round_to_sigfig(self.newz[0], show_sigfig)))
+				self.estZstd.setText(str(self.round_to_sigfig(self.newz[1], show_sigfig)))
+				self.send_message.emit('Found estimated z in table!')
+
+			elif not isnan(sent_dict['z_guess']):
+				# extract z_estimated from z_guess column
+				if len(self.newz) < 2:
+					self.newz.append(float(sent_dict['z_guess']))
+					self.newz.append(0.)
+					
+				else:
+					self.newz[0] = float(sent_dict['z_guess'])
+					self.newz[1] = 0.				
+				self.estZ.setText(str(self.newz[0]))
+				self.estZstd.setText(str(self.newz[1]))
+			
 			self.conf.setText(str(sent_dict['Confidence']))
 			self.flag.setText(sent_dict['Flag'])
 			self.l_lln.setCurrentText(sent_dict['Linelist'])
+			self.send_message.emit("Can't find z in table! Use z_guess now..")
 		else:
 			self.estZ.clear()
 			self.estZstd.clear()
