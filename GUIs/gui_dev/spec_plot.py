@@ -13,7 +13,7 @@ import numpy as np
 
 
 from guess_transition import GuessTransition
-from spec_hist import FluxHistogram
+from spec_hist import FluxHistogram, PixelHistogram
 
 matplotlib.use('Qt5Agg')
 
@@ -21,6 +21,7 @@ class MplCanvas(FigureCanvasQTAgg):
 	send_message = pyqtSignal(str)
 	send_z_est = pyqtSignal(list)
 	send_gcenter = pyqtSignal(list)
+	send_scale_limits = pyqtSignal(list)
 
 	def __init__(self, parent=None, width=5, height=3, dpi=100):
 		self.figsize = [width, height]
@@ -155,7 +156,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		#self.axes.legend(loc='upper right')
 		del self.axes.lines[-1:]
 
-	def plot_spec2d(self, wave, flux, error, filename, scale=0):
+	def plot_spec2d(self, wave, flux, error, filename, scale=0, normalization=0):
 		self.fig.clf()
 		#self.fig.set_size_inches(w=self.figsize[0], h=self.figsize[-1]*2)
 		self.ax2d = self.fig.add_subplot(211)
@@ -195,19 +196,63 @@ class MplCanvas(FigureCanvasQTAgg):
 		xlim_spec1d = self.axes.get_xlim()
 		self.axes.set_xlim(xlim_spec1d)
 
-		# 2d spec plot...
+		# 2 spec plot...
+		# scaling first
 		if scale == 0:
-			pos_ax2d = self.ax2d.imshow(self.flux2d, origin='lower', vmin=-10, vmax=65,
-							extent=(wave[0], wave[-1], 0, len(flux))
-							)
+			# Linear.. nothing happened
+			scaled2d = self.flux2d
 		elif scale == 1:
-			pos_ax2d = self.ax2d.imshow(np.log(self.flux2d), origin='lower', vmin=-10, vmax=65,
-							extent=(wave[0], wave[-1], 0, len(flux))
-							)
+			# log transformation.. scaled = log(1+ img)/log(1+img_max)
+			scaled2d = np.log(1 + self.flux2d) / np.log(1 + self.flux2d.max())
 		elif scale == 2:
-			pos_ax2d = self.ax2d.imshow(np.sqrt(self.flux2d), origin='lower', vmin=-10, vmax=65,
-							extent=(wave[0], wave[-1], 0, len(flux))
-							)
+			# square root transformation.. 
+			# pixel values > 0 ==> regular sqrt; pixel values <0 ==> 1.absolute value 2.sqrt 3.add minus sign
+			scaled2d = self.flux2d.copy()
+			scaled2d[scaled2d>=0] = np.sqrt(scaled2d[scaled2d>=0])
+			scaled2d[scaled2d<0] = -np.sqrt(-scaled2d[scaled2d<0])
+		elif scale == 3:
+			scaled2d = self.flux2d**2
+
+		# normalization next
+		# send scaling limits back to toolbar
+		if type(normalization) == int:
+			if normalization == 0:
+				self.send_scale_limits.emit([scaled2d.min(), scaled2d.max()])
+			elif normalization == 1:
+				# minmax 100% range
+				scaled2d = (scaled2d - scaled2d.min()) / (scaled2d.max() - scaled2d.min())
+			elif normalization < 10: # this magic num from n_combobox in toolbar
+				if normalization == 2: # 99.5%
+					low, up = np.percentile(scaled2d, [0.25, 99.75])
+				elif normalization == 3: # 99%
+					low, up = np.percentile(scaled2d, [0.5, 99.5])
+				elif normalization == 4: # 98%
+					low, up = np.percentile(scaled2d, [1., 99.])
+				elif normalization == 5: # 97%
+					low, up = np.percentile(scaled2d, [1.5, 98.5])
+				elif normalization == 6: # 96%
+					low, up = np.percentile(scaled2d, [2., 98.])
+				elif normalization == 7: # 95%
+					low, up = np.percentile(scaled2d, [2.5, 97.5])
+				elif normalization == 8: # 92.5%
+					low, up = np.percentile(scaled2d, [3.75, 96.25])
+				elif normalization == 9: # 90%
+					low, up = np.percentile(scaled2d, [5., 95.])
+
+				scaled2d = (scaled2d - low) / (up - low)
+				self.send_scale_limits.emit([scaled2d.min(), scaled2d.max()])
+
+			elif normalization == 10: # Z-score
+				scaled2d = (scaled2d - scaled2d.mean()) / scaled2d.std()
+				self.send_scale_limits.emit([np.nan, np.nan])	
+		elif type(normalization) == list:
+			scaled2d = (scaled2d - normalization[0]) / (normalization[1] - normalization[0])
+		
+
+
+
+		pos_ax2d = self.ax2d.imshow(scaled2d, origin='lower', vmin=scaled2d.min(), vmax=scaled2d.max() * 0.01,
+									extent=(wave[0], wave[-1], 0, len(flux)))
 		self.ax2d_cb = self.fig.colorbar(pos_ax2d, ax=self.ax2d, location='top')
 		ax2d_xlim = self.ax2d.get_xlim()
 		self.ax2d.hlines(self.extraction_y[0], ax2d_xlim[0], ax2d_xlim[1], color='red', linestyle='dashed')
@@ -493,9 +538,14 @@ class MplCanvas(FigureCanvasQTAgg):
 					message = "You don't have a 2D Spectrum plot available."
 					self.send_message.emit(message)
 		elif event.key == 'H':
-			#bring up the histogram dialog
+			#bring up the flux histogram dialog
 			fhist = FluxHistogram(self.flux2d)
 			fhist.exec_()
+
+		elif event.key == 'P':
+			#bring up the pixel histogram dialog
+			phist = PixelHistogram(self.flux2d)
+			phist.exec_()
 			
 	def onclick(self, event):
 		'''Mouse click

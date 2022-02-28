@@ -7,7 +7,7 @@ from astropy.io import fits, ascii
 from astropy.table import Table
 
 from PyQt5.QtCore import Qt, QSize, QUrl, pyqtSignal
-from PyQt5.QtWidgets import QAction, QToolBar, QStatusBar, QMenuBar, QFileDialog, QComboBox, QLineEdit
+from PyQt5.QtWidgets import QAction, QToolBar, QStatusBar, QMenuBar, QFileDialog, QComboBox, QLineEdit, QLabel
 from PyQt5.QtGui import QKeySequence, QDesktopServices
 
 from user_manual import UserManualDialog
@@ -30,6 +30,7 @@ class Custom_ToolBar(QToolBar):
 		self.filenames = []
 		self.filename = ''
 		self.scale2d = False
+		self.scale = 0
 
 		self.setWindowTitle('Customizable TooBar')
 		#self.setFixedSize(QSize(200, 50))
@@ -62,6 +63,9 @@ class Custom_ToolBar(QToolBar):
 		self.addWidget(self.f_combobox)
 		self.addSeparator()
 
+		# Scaling label
+		s_label = QLabel('Scale:')
+		self.addWidget(s_label)
 		# scaling dropbox
 		self.s_combobox = QComboBox()
 		self.s_combobox.setFixedWidth(100)
@@ -77,9 +81,11 @@ class Custom_ToolBar(QToolBar):
 		self.min_range.setFixedWidth(100)
 		self.addWidget(self.min_range)
 		self.min_range.setPlaceholderText('Min')
+		self.min_range.returnPressed.connect(self._return_pressed)
 		self.max_range = QLineEdit()
 		self.max_range.setFixedWidth(100)
 		self.max_range.setPlaceholderText('Max')
+		self.max_range.returnPressed.connect(self._return_pressed)
 		self.addWidget(self.max_range)
 
 
@@ -244,11 +250,14 @@ class Custom_ToolBar(QToolBar):
 			self.send_fitsobj.emit(self.fitsobj)		
 
 	def _add_scale2d(self):
-		self.s_combobox.setMaxVisibleItems(3)
-		self.s_combobox.addItems(['Linear', 'Log', 'Sqrt'])
+		self.s_combobox.setMaxVisibleItems(4)
+		self.s_combobox.addItems(['Linear', 'Log', 'Sqrt', 'Square'])
 		self.s_combobox.setCurrentIndex(0)
 		self.s_combobox.currentIndexChanged.connect(self._scaling_changed)
-		self._add_normalization()
+
+		self.n_combobox.addItems(['None','MinMax', '99.5%', '99%', '98%', '97%', '96%', '95%', '92.5%', '90%', 'Z-Score', 'Manual'])
+		self.n_combobox.setCurrentIndex(0)
+		self.n_combobox.currentIndexChanged.connect(self._normalization_changed)
 
 	def _scaling_changed(self, i):
 		if len(self.fitsobj.flux.shape) > 1:
@@ -256,18 +265,35 @@ class Custom_ToolBar(QToolBar):
 								self.fitsobj.flux,
 								self.fitsobj.error,
 								self.filename, scale=i)
+			self.scale = i
 		else:
 			pass
 
-	def _add_normalization(self):
-		self.n_combobox.setMaxVisibleItems(2)
-		self.n_combobox.addItems(['MinMax', 'Z-Score'])
-		self.n_combobox.setCurrentIndex(0)
-		#self.n_combobox.currentIndexChanged.connect(self._normalization_changed)
-
 	def _normalization_changed(self, i):
-		#if len(self.fitsobj.flux.shape) > 1:
-		pass
+		if len(self.fitsobj.flux.shape) > 1:
+			if i < 11:
+				self.mW.sc.plot_spec2d(self.fitsobj.wave,
+									self.fitsobj.flux,
+									self.fitsobj.error,
+									self.filename, 
+									scale=self.scale,
+									normalization=i)
+		else:
+			pass
+
+	def _on_scale_limits_slot(self, sent_limits):
+		self.min_range.setText(str(sent_limits[0]))
+		self.max_range.setText(str(sent_limits[1]))
+
+	def _return_pressed(self):
+		manual_range = [float(self.min_range.text()), float(self.max_range.text())]
+		self.n_combobox.setCurrentIndex(11)
+		self.mW.sc.plot_spec2d(self.fitsobj.wave,
+							self.fitsobj.flux,
+							self.fitsobj.error,
+							self.filename,
+							scale=self.scale,
+							normalization=manual_range)
 
 
 #----------------------------- Menu bar ---------------------------

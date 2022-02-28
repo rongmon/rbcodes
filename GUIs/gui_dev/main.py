@@ -96,17 +96,19 @@ class MainWindow(QMainWindow):
 		self.sc.send_message.connect(mbox.on_sent_message)
 		# 7. sc (SpecCanvas) ==> widget_z.estZ
 		self.sc.send_z_est.connect(widget_z._on_estZ_changed)
-		# 8. toolbar ==> widget_z
+		# 8. sc (SpecCanvas) ==> toolbar
+		self.sc.send_scale_limits.connect(toolbar._on_scale_limits_slot)
+		# 9. toolbar ==> widget_z
 		toolbar.send_filename.connect(widget_z._on_sent_filename)
-		# 9. widget_z ==> table_z
+		# 10. widget_z ==> table_z
 		widget_z.send_data.connect(table_z._on_sent_data)
-		# 10. toolbar ==> table_z
+		# 11. toolbar ==> table_z
 		toolbar.send_filename.connect(table_z._move_current_filename_top)
-		# 11. toolbar ==> sc (SpecCanvas)
+		# 12. toolbar ==> sc (SpecCanvas)
 		toolbar.send_filename.connect(self.sc._update_lines_for_newfile)
-		# 12. table_z ==> widget_z
+		# 13. table_z ==> widget_z
 		table_z.send_dictdata.connect(widget_z._on_sent_dictdata)
-		# 13. widget_z ==> mbox (MessageBox)
+		# 14. widget_z ==> mbox (MessageBox)
 		widget_z.send_message.connect(mbox.on_sent_message)
 
 
