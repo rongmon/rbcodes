@@ -7,7 +7,7 @@ from astropy.io import fits, ascii
 from astropy.table import Table
 
 from PyQt5.QtCore import Qt, QSize, QUrl, pyqtSignal
-from PyQt5.QtWidgets import QAction, QToolBar, QStatusBar, QMenuBar, QFileDialog, QComboBox
+from PyQt5.QtWidgets import QAction, QToolBar, QStatusBar, QMenuBar, QFileDialog, QComboBox, QLineEdit
 from PyQt5.QtGui import QKeySequence, QDesktopServices
 
 from user_manual import UserManualDialog
@@ -28,6 +28,8 @@ class Custom_ToolBar(QToolBar):
 		self.fitsobj = mainWindow.fitsobj
 		self.filepaths = []
 		self.filenames = []
+		self.filename = ''
+		self.scale2d = False
 
 		self.setWindowTitle('Customizable TooBar')
 		#self.setFixedSize(QSize(200, 50))
@@ -51,12 +53,36 @@ class Custom_ToolBar(QToolBar):
 		btn_help.triggered.connect(self._open_user_manual)	
 		self.addSeparator()
 
+		# file dropbox
 		self.f_combobox = QComboBox()
 		self.f_combobox.setFixedWidth(200)
 		self.f_combobox.addItem('No FITS File')
 		self.f_combobox.setCurrentIndex(0)
 		self.f_combobox.currentIndexChanged.connect(self._read_selected_fits)
 		self.addWidget(self.f_combobox)
+		self.addSeparator()
+
+		# scaling dropbox
+		self.s_combobox = QComboBox()
+		self.s_combobox.setFixedWidth(100)
+		self.addWidget(self.s_combobox)
+
+		# normalization dropbox
+		self.n_combobox = QComboBox()
+		self.n_combobox.setFixedWidth(100)
+		self.addWidget(self.n_combobox)
+
+		# normalization range
+		self.min_range = QLineEdit()
+		self.min_range.setFixedWidth(100)
+		self.addWidget(self.min_range)
+		self.min_range.setPlaceholderText('Min')
+		self.max_range = QLineEdit()
+		self.max_range.setFixedWidth(100)
+		self.max_range.setPlaceholderText('Max')
+		self.addWidget(self.max_range)
+
+
 
 	def _create_button(self, buttonName='', buttonTip=''):
 		#Create buttons wrapper
@@ -198,6 +224,7 @@ class Custom_ToolBar(QToolBar):
 		else:
 			loadspec = LoadSpec(self.filepaths[i-1])
 			filename = self.filenames[i-1]
+			self.filename = filename
 			self.fitsobj = loadspec._load_spec()
 			if len(self.fitsobj.flux.shape) > 1:
 				# new plot 2d
@@ -205,16 +232,45 @@ class Custom_ToolBar(QToolBar):
 									self.fitsobj.flux,
 									self.fitsobj.error,
 									filename)
+				self._add_scale2d()
 			else:
 				self.mW.sc.plot_spec(self.fitsobj.wave, 
 								self.fitsobj.flux, 
 								self.fitsobj.error,
 								filename)
+				self.s_combobox.clear()
 			
 			self.send_filename.emit(filename)
-			self.send_fitsobj.emit(self.fitsobj)			
+			self.send_fitsobj.emit(self.fitsobj)		
+
+	def _add_scale2d(self):
+		self.s_combobox.setMaxVisibleItems(3)
+		self.s_combobox.addItems(['Linear', 'Log', 'Sqrt'])
+		self.s_combobox.setCurrentIndex(0)
+		self.s_combobox.currentIndexChanged.connect(self._scaling_changed)
+		self._add_normalization()
+
+	def _scaling_changed(self, i):
+		if len(self.fitsobj.flux.shape) > 1:
+			self.mW.sc.plot_spec2d(self.fitsobj.wave,
+								self.fitsobj.flux,
+								self.fitsobj.error,
+								self.filename, scale=i)
+		else:
+			pass
+
+	def _add_normalization(self):
+		self.n_combobox.setMaxVisibleItems(2)
+		self.n_combobox.addItems(['MinMax', 'Z-Score'])
+		self.n_combobox.setCurrentIndex(0)
+		#self.n_combobox.currentIndexChanged.connect(self._normalization_changed)
+
+	def _normalization_changed(self, i):
+		#if len(self.fitsobj.flux.shape) > 1:
+		pass
 
 
+#----------------------------- Menu bar ---------------------------
 class Custom_MenuBar(QMenuBar):
 
 	send_fitsobj = pyqtSignal(object)

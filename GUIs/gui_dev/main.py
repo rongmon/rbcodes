@@ -44,7 +44,7 @@ class MainWindow(QMainWindow):
 		#widget.setFixedSize(1600, 900)
 
 		widget_z = LineListWidget()
-		widget_z.setFixedSize(1000,80)
+		#widget_z.setFixedSize(1000,80)
 		table_z = CustomZTable()
 		mbox = MessageBox()
 		sublayout = QHBoxLayout()
@@ -106,6 +106,8 @@ class MainWindow(QMainWindow):
 		toolbar.send_filename.connect(self.sc._update_lines_for_newfile)
 		# 12. table_z ==> widget_z
 		table_z.send_dictdata.connect(widget_z._on_sent_dictdata)
+		# 13. widget_z ==> mbox (MessageBox)
+		widget_z.send_message.connect(mbox.on_sent_message)
 
 
 
