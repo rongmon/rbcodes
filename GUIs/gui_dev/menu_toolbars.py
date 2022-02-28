@@ -7,7 +7,7 @@ from astropy.io import fits, ascii
 from astropy.table import Table
 
 from PyQt5.QtCore import Qt, QSize, QUrl, pyqtSignal
-from PyQt5.QtWidgets import QAction, QToolBar, QStatusBar, QMenuBar, QFileDialog, QComboBox
+from PyQt5.QtWidgets import QAction, QToolBar, QStatusBar, QMenuBar, QFileDialog, QComboBox, QLineEdit
 from PyQt5.QtGui import QKeySequence, QDesktopServices
 
 from user_manual import UserManualDialog
@@ -53,6 +53,7 @@ class Custom_ToolBar(QToolBar):
 		btn_help.triggered.connect(self._open_user_manual)	
 		self.addSeparator()
 
+		# file dropbox
 		self.f_combobox = QComboBox()
 		self.f_combobox.setFixedWidth(200)
 		self.f_combobox.addItem('No FITS File')
@@ -61,9 +62,25 @@ class Custom_ToolBar(QToolBar):
 		self.addWidget(self.f_combobox)
 		self.addSeparator()
 
+		# scaling dropbox
 		self.s_combobox = QComboBox()
 		self.s_combobox.setFixedWidth(100)
 		self.addWidget(self.s_combobox)
+
+		# normalization dropbox
+		self.n_combobox = QComboBox()
+		self.n_combobox.setFixedWidth(100)
+		self.addWidget(self.n_combobox)
+
+		# normalization range
+		self.min_range = QLineEdit()
+		self.min_range.setFixedWidth(100)
+		self.addWidget(self.min_range)
+		self.min_range.setPlaceholderText('Min')
+		self.max_range = QLineEdit()
+		self.max_range.setFixedWidth(100)
+		self.max_range.setPlaceholderText('Max')
+		self.addWidget(self.max_range)
 
 
 
@@ -231,6 +248,7 @@ class Custom_ToolBar(QToolBar):
 		self.s_combobox.addItems(['Linear', 'Log', 'Sqrt'])
 		self.s_combobox.setCurrentIndex(0)
 		self.s_combobox.currentIndexChanged.connect(self._scaling_changed)
+		self._add_normalization()
 
 	def _scaling_changed(self, i):
 		if len(self.fitsobj.flux.shape) > 1:
@@ -241,6 +259,15 @@ class Custom_ToolBar(QToolBar):
 		else:
 			pass
 
+	def _add_normalization(self):
+		self.n_combobox.setMaxVisibleItems(2)
+		self.n_combobox.addItems(['MinMax', 'Z-Score'])
+		self.n_combobox.setCurrentIndex(0)
+		#self.n_combobox.currentIndexChanged.connect(self._normalization_changed)
+
+	def _normalization_changed(self, i):
+		#if len(self.fitsobj.flux.shape) > 1:
+		pass
 
 
 #----------------------------- Menu bar ---------------------------
