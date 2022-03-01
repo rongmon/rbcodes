@@ -44,6 +44,9 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.guess_gcenter = []
 		self.gauss_num = 1
 		self.gauss_profiles = []
+		self.addtional_linelist_idx = []
+		self.addtional_linelist_vlines = []
+		self.addtional_linelist_texts = []
 
 		super().__init__(self.fig)
 
@@ -137,6 +140,84 @@ class MplCanvas(FigureCanvasQTAgg):
 
 		#print(self.axes.texts)
 		#print('vlines num: ', len(self.axes.collections))
+
+	def _plot_additional_lines(self, linelist_dir, z_guess=0.):
+		axes = self.figure.gca()
+		xlim, ylim = axes.get_xlim(), axes.get_ylim()
+		# double check with the colors in linelist_selection.py
+		colors = ['#A52A2A', '#FF7F50', '#40E0D0', '#DAA520', '#008000', '#4B0082']
+
+		# this is the secondary linelist index
+		idx = list(linelist_dir.keys())[0]
+
+		if type(linelist_dir[idx]) is str:
+			# None passed here
+			if idx in self.addtional_linelist_idx:
+				loc = self.addtional_linelist_idx.index(idx)
+
+				# delete previous vlines for selected linelist
+				vline_loc = self.axes.collections.index(self.addtional_linelist_vlines[loc])
+				del self.axes.collections[vline_loc]
+				del self.addtional_linelist_vlines[loc]
+				# delete previous texts for selected linelist
+				for line_text in self.addtional_linelist_texts[loc]:
+					ti = self.axes.texts.index(line_text)
+					del self.axes.texts[ti]
+				del self.addtional_linelist_texts[loc]
+				# delete previous linelist index
+				del self.addtional_linelist_idx[loc]
+				
+		else:
+			# selected a linelist
+			tmp_lines = linelist_dir[idx]['wave'].to_numpy() * (1+z_guess)
+			#print(idx)
+			#print(self.addtional_linelist_idx)
+			if idx in self.addtional_linelist_idx:
+			# check if linelist i plotted or not
+				loc = self.addtional_linelist_idx.index(idx)
+
+				# delete previous vlines for selected linelist
+				vline_loc = self.axes.collections.index(self.addtional_linelist_vlines[loc])
+				del self.axes.collections[vline_loc]
+				del self.addtional_linelist_vlines[loc]
+				# delete previous texts for selected linelist
+				for line_text in self.addtional_linelist_texts[loc]:
+					ti = self.axes.texts.index(line_text)
+					del self.axes.texts[ti]
+				del self.addtional_linelist_texts[loc]
+				# delete previous linelist index
+				del self.addtional_linelist_idx[loc]
+				
+
+			# add new lines..
+			# secondary linelist showed up for the first time
+			self.addtional_linelist_idx.append(idx)
+
+			# not plotted before, just add new one
+			tmp_vlines = self.axes.vlines(x=tmp_lines,
+							 ymin=ylim[0], ymax=ylim[-1], 
+							 color=colors[idx], 
+							 linestyle='dashed')
+			self.addtional_linelist_vlines.append(tmp_vlines)
+
+			tmp_texts = []
+			for row in range(linelist_dir[idx].shape[0]):
+				tmp_txt = self.axes.text(x=tmp_lines[row],
+							   y=ylim[-1]*0.6,
+							   s=linelist_dir[idx].at[row, 'name'],
+							   color=colors[idx], 
+							   fontsize=12, 
+							   rotation='vertical')
+				tmp_texts.append(tmp_txt)
+			#print(tmp_texts)
+			self.addtional_linelist_texts.append(tmp_texts)
+
+		#print(self.axes.collections)
+		#print(self.axes.texts)
+
+		self.axes.set_xlim(xlim)
+		self.axes.set_ylim(ylim)
+		self.draw()
 		
 	def gauss(self, x, amp, mu, sigma):
 		return amp * np.exp(-(x-mu)**2/(2. * sigma**2))
@@ -367,7 +448,7 @@ class MplCanvas(FigureCanvasQTAgg):
 					ylim = ylimdialog._getlim()
 					self.axes.set_ylim(ylim)
 					self.draw()
-			if event.inaxes == self.ax2d:
+			elif event.inaxes == self.ax2d:
 				ylimdialog2d = CustomLimDialog(axis='y')
 				if ylimdialog2d.exec_():
 					ylim2d = ylimdialog2d._getlim()
@@ -382,7 +463,7 @@ class MplCanvas(FigureCanvasQTAgg):
 					xlim = xlimdialog._getlim()
 					self.axes.set_xlim(xlim)
 					self.draw()
-			if event.inaxes == self.ax2d:
+			elif event.inaxes == self.ax2d:
 				xlimdialog2d = CustomLimDialog(axis='x')
 				if xlimdialog2d.exec_():
 					xlim2d = xlimdialog2d._getlim()
@@ -508,7 +589,7 @@ class MplCanvas(FigureCanvasQTAgg):
 
 		elif event.key == 'C':
 			# change the size of the extraction box in 2D spec plot
-			if event.inaxes == self.ax2d:
+			if event.inaxes != self.axes:
 				if self.axnum > 1:
 					boxlines = self.ax2d.plot(event.xdata, event.ydata, 'r+')
 					self.tmp_extraction_y = np.append(self.tmp_extraction_y, event.ydata)
@@ -538,14 +619,16 @@ class MplCanvas(FigureCanvasQTAgg):
 					message = "You don't have a 2D Spectrum plot available."
 					self.send_message.emit(message)
 		elif event.key == 'H':
-			#bring up the flux histogram dialog
-			fhist = FluxHistogram(self.flux2d)
-			fhist.exec_()
+			if event.inaxes != self.axes:
+				#bring up the flux histogram dialog
+				fhist = FluxHistogram(self.flux2d)
+				fhist.exec_()
 
 		elif event.key == 'P':
-			#bring up the pixel histogram dialog
-			phist = PixelHistogram(self.flux2d)
-			phist.exec_()
+			if event.inaxes != self.axes:
+				#bring up the pixel histogram dialog
+				phist = PixelHistogram(self.flux2d)
+				phist.exec_()
 			
 	def onclick(self, event):
 		'''Mouse click
@@ -594,6 +677,14 @@ class MplCanvas(FigureCanvasQTAgg):
 		else:
 			self.lineindex = sent_lineindex - 2
 			self._plot_lines(self.lineindex)
+
+	def on_additional_linelist_slot(self, addtional_linelist):
+		self._plot_additional_lines(addtional_linelist)
+	def on_additional_linelist_slot_z(self, linelist_and_z):
+		addtional_linelist = linelist_and_z[0]
+		z_guess = linelist_and_z[1]
+		self._plot_additional_lines(linelist_dir=addtional_linelist,
+									z_guess=z_guess)
 
 	def _on_estZ_changed(self, newz):
 		self.estZ = newz[0]

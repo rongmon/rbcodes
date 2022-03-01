@@ -92,6 +92,8 @@ class MainWindow(QMainWindow):
 		widget_z.send_lineindex.connect(self.sc.on_lineindex_slot)
 		widget_z.send_gauss_num.connect(self.sc._on_sent_gauss_num)
 		widget_z.estZ.returnPressed.connect(lambda z=widget_z.estZ: self.passing_estZ(z))
+		widget_z.send_more_linelist.connect(self.sc.on_additional_linelist_slot)
+		widget_z.send_more_linelist_z.connect(self.sc.on_additional_linelist_slot_z)
 		# 6. sc (SpecCanvas) ==> mbox (MessageBox)
 		self.sc.send_message.connect(mbox.on_sent_message)
 		# 7. sc (SpecCanvas) ==> widget_z.estZ
