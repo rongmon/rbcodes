@@ -13,6 +13,8 @@ from IGM.rb_setline import read_line_list
 class LineListWidget(QWidget):
 	send_lineindex = pyqtSignal(int)
 	send_linelist = pyqtSignal(object)
+	send_more_linelist = pyqtSignal(object)
+	send_more_linelist_z = pyqtSignal(object)
 	send_data = pyqtSignal(object)
 	send_gauss_num = pyqtSignal(int)
 	send_message = pyqtSignal(str)
@@ -128,10 +130,18 @@ class LineListWidget(QWidget):
 	def _intialize_more_linelist(self, s):
 		if s == QtCore.Qt.Checked:
 			# initialize more linelists for plotting
-			
+			colors = ['#A52A2A', '#FF7F50', '#40E0D0', '#DAA520', '#008000', '#4B0082']
 			for i in range(len(self.llists_2)):
 				self.llists_2[i][1].addItems(['NONE', 'LBG', 'Gal', 'LLS', 'LLS Small', 'DLA', 'atom'])
+				t_color = 'QComboBox {color:' + colors[i] + '}'
+				self.llists_2[i][1].setStyleSheet(t_color)
+				# 2 parameters need to be passed: 1.selected linelist and 2.index of linelist widget changed
+				self.llists_2[i][1].currentTextChanged.connect(lambda s, idx=i: self._addtional_linelist(idx, s))
+				
 				self.llists_2[i][2].setReadOnly(False)
+				# only the index of linelist widget passed
+				self.llists_2[i][2].returnPressed.connect(lambda idx=i: self._guess_z_return_pressed(idx))
+
 
 		else:
 			# grey out all things
@@ -160,26 +170,13 @@ class LineListWidget(QWidget):
 		tmp_df = self.linelist.set_index('name')
 
 	def _linelist_changed(self, s):
-		llist = pd.DataFrame(columns=['wave', 'name'])
 		if s in 'NONE':
 			self.send_linelist.emit(s)
 			self.l_combobox.clear()
 			self.l_combobox.addItem('NONE')
 			self.l_combobox.setCurrentIndex(0)
 		else:
-			tmp = read_line_list(s)
-
-			#need a line to append wrest to name if it doesn't have one
-			if any(map(str.isdigit, tmp[1]['ion'])):
-				# if name column has wrest
-				for li in tmp:
-					newrow = {'wave': li['wrest'], 'name': li['ion']}
-					llist = llist.append(newrow, ignore_index=True)
-			else:
-				# if name column doesn't have wrest, need to append
-				for li in tmp:
-					newrow = {'wave': li['wrest'], 'name': li['ion']+' '+str(round(li['wrest']))}
-					llist = llist.append(newrow, ignore_index=True)
+			llist = self._get_linelist_df(s)
 			self.linelist = llist
 
 			self.l_combobox.addItems(['ALL'] + self.linelist['name'].tolist())
@@ -259,3 +256,39 @@ class LineListWidget(QWidget):
 
 	def round_to_sigfig(self, num=0., sigfig=1):
 		return round(num, sigfig - int(floor(log10(abs(num)))) - 1)
+
+	def _addtional_linelist(self, i, s):
+		# i = index of the widget passing linelist
+		# s = name of the linelist
+		llist = pd.DataFrame(columns=['wave', 'name'])
+		if s in 'NONE':
+			self.send_more_linelist.emit({i:s})
+		else:
+			llist = self._get_linelist_df(s)
+
+			self.send_more_linelist.emit({i:llist})
+
+	def _guess_z_return_pressed(self, i):		
+		llist = self._get_linelist_df(self.llists_2[i][1].currentText())
+		z_guess = float(self.llists_2[i][2].text())
+		self.send_more_linelist_z.emit([{i:llist}, z_guess])
+
+		
+
+	def _get_linelist_df(self, linelist_name):
+		llist = pd.DataFrame(columns=['wave', 'name'])
+		tmp = read_line_list(linelist_name)
+
+		#need a line to append wrest to name if it doesn't have one
+		if any(map(str.isdigit, tmp[1]['ion'])):
+			# if name column has wrest
+			for li in tmp:
+				newrow = {'wave': li['wrest'], 'name': li['ion']}
+				llist = llist.append(newrow, ignore_index=True)
+		else:
+			# if name column doesn't have wrest, need to append
+			for li in tmp:
+				newrow = {'wave': li['wrest'], 'name': li['ion']+' '+str(round(li['wrest']))}
+				llist = llist.append(newrow, ignore_index=True)
+
+		return llist

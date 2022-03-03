@@ -32,6 +32,7 @@ class UserManualDialog(QDialog):
 			title = QLabel('MAIN GUI USER MANUAL')
 			self.layout.addWidget(title, Qt.AlignCenter)
 			self.layout.addWidget(QLabel('Key Presses'))
+			self.layout.addWidget(QLabel('For 1D spectrum plot,'))
 			self._create_event_doc('r', 'Resets/clears the axes and replots the spectra')
 			self._create_event_doc('t', 'Sets bottom y limit (ymin)')
 			self._create_event_doc('b', 'Sets top y limit (ymax)')
@@ -45,6 +46,9 @@ class UserManualDialog(QDialog):
 			self._create_event_doc('[', 'Shifts canvas to the left')
 			self._create_event_doc('G', 'Fit a Gaussian profile with 3 user-selected points')
 			self._create_event_doc('D', 'Delete previous selected points')
+			self.layout.addWidget(QLabel('For 2D spectrum plot,'))
+			self._create_event_doc('C', 'Plots the cumulative data along wavelength axis')
+			self._create_event_doc('P', 'Plots the histogram of entire 2D spectrum range')
 			self.layout.addWidget(QLabel('-'*100), Qt.AlignCenter)
 			self.layout.addWidget(QLabel('Mouse Clicks'))
 			self._create_event_doc('Right', 'Bring up the ion list')
@@ -54,9 +58,8 @@ class UserManualDialog(QDialog):
 			self._create_step_doc('2.', 'Select a line-list to work on')
 			self._create_step_doc('3.', 'Zoom to region of interest and fit a Gaussian')
 			self._create_step_doc('4.', 'Right click to select a potential line')
-			self._create_step_doc('5.', 'Press Return/Enter in the "Estimated z" box')
-			self._create_step_doc('6.', 'Estimate error and Write your confidence level and additional flags')
-			self._create_step_doc('7.', 'Save to the table below')
+			self._create_step_doc('5.', 'Estimate error and Write your confidence level and additional flags')
+			self._create_step_doc('6.', 'Save to the table below')
 
 
 
