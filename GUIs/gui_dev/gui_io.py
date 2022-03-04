@@ -39,10 +39,10 @@ class LoadSpec():
       self.fitsobj.error = self.fitsobj.flux * 0.05
 
 
-    #Read in a specific format to account for EIGER emission line 2d spectrum
+      #Read in a specific format to account for EIGER emission line 2d spectrum
     elif (fitsfile[0].header['NAXIS']==0) & (fitsfile['SCI'].header['NAXIS']==2):
       self.fitsobj.flux=fitsfile['SCI'].data
-      self.fitsobj.error = self.fitsfile['ERR'].data
+      self.fitsobj.error = fitsfile['ERR'].data
       self.fitsobj.wave= self._build_wave(fitsfile['SCI'].header)
 
     return self.fitsobj
@@ -83,38 +83,35 @@ class LoadSpec():
 
     return self.fitsobj
 
+  def _build_wave(self,header):
+      """Returns a NumPy array containing wavelength axis of a 2d specturm in Angstrom.
+      Args:
+          header (astropy.io.fits.Header): header that contains wavelength axis
+          that is specified in 'CTYPE' keywords in NAXIS1 
+              dimension.
+      Returns:
+          numpy.ndarray: Wavelength axis for this data.
+      """
 
 
-    def _build_wave(header):
-        """Returns a NumPy array containing wavelength axis of a 2d specturm in Angstrom.
-        Args:
-            header (astropy.io.fits.Header): header that contains wavelength axis
-            that is specified in 'CTYPE' keywords in NAXIS1 
-                dimension.
-        Returns:
-            numpy.ndarray: Wavelength axis for this data.
-        """
-
-
-        #Get keywords defining wavelength axis
-        nwav = header['NAXIS1']
-        wav0 = header['CRVAL1']
-        dwav = header['CDELT1']
-        pix0 = header['CRPIX1']
-        wave=np.array([wav0 + (i - pix0) * dwav for i in range(nwav)])
-        
-        # Now check units to make sure everything is in angstrom
-        card='CUNIT1'
-        if not card in header:
-            raise ValueError("Header must contain 'CUNIT1' keywords.")
-        #micrometer to Angstrom
-        if header[card] =='um':
-            wave=wave*10000 
-        elif header[card]=='nm':
-            wave=wave*10
-        elif header[card]=='AA':
-            wave=wave
-        else:
-            raise ValueError("Predefined wavelength units are 'um','nm','AA'.")            
-
-        return wave
+      #Get keywords defining wavelength axis
+      nwav = header['NAXIS1']
+      wav0 = header['CRVAL1']
+      dwav = header['CDELT1']
+      pix0 = header['CRPIX1']
+      wave=np.array([wav0 + (i - pix0) * dwav for i in range(nwav)])
+      
+      # Now check units to make sure everything is in angstrom
+      card='CUNIT1'
+      if not card in header:
+          raise ValueError("Header must contain 'CUNIT1' keywords.")
+      #micrometer to Angstrom
+      if header[card] =='um':
+          wave *=10000. 
+      elif header[card]=='nm':
+          wave +=10
+      elif header[card]=='AA':
+          wave=wave
+      else:
+          raise ValueError("Predefined wavelength units are 'um','nm','AA'.")            
+      return wave

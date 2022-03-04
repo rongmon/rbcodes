@@ -244,9 +244,9 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axes = self.fig.add_subplot(212, sharex = self.ax2d)
 
 		# data processing here... this should be generalized
-		flux = np.transpose(flux[:, 2100:2200])
+		#flux = np.transpose(flux[:, 2100:2200])
 		self.flux2d = flux
-		self.err2d = np.transpose(error[:, 2100:2200])
+		self.err2d = error#np.transpose(error[:, 2100:2200])
 
 		# sum in dispersion direction to do initial selection
 		#self.pix = np.array([1.])
