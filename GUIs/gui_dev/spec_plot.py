@@ -223,9 +223,12 @@ class MplCanvas(FigureCanvasQTAgg):
 		return amp * np.exp(-(x-mu)**2/(2. * sigma**2))
 
 #--------------------- Methods for 2D data-------------------------
+    # Extract 1d spectrum and error spectrum from input 2d spectrum
+	def extract_1d(self, two_d_flux,two_d_error):
+		self.flux1d=np.nansum(two_d_flux, axis=0)
+		sub_var = two_d_error**2.
+		self.err1d = np.sqrt(np.sum(sub_var, axis=0))
 
-	def extract_1d(self, flux):
-		return np.sum(flux, axis=0)
 
 	def replot2d(self, wave, new_spec):
 		'''Re-plot smoothed/unsmoothed spectrum
@@ -255,8 +258,9 @@ class MplCanvas(FigureCanvasQTAgg):
 		tmp_cumsum = np.cumsum(tmp) / np.sum(tmp)
 		tmpe_cumsum = np.cumsum(tmpe) / np.sum(tmpe)
 		xlist = np.arange(0, len(tmp_cumsum), 1)
-		self.flux1d = self.extract_1d(self.flux2d)
-		self.err1d = self.extract_1d(self.err2d)
+		#self.flux1d = self.extract_1d(self.flux2d)
+		#self.err1d = self.extract_1d(self.err2d)
+		self.extract_1d(self.flux2d,self.err2d)
 		self.error = self.err1d
 
 		self.extraction_y = [int(np.interp(0.05, tmp_cumsum, xlist)),
@@ -264,9 +268,10 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.extraction_ye = [int(np.interp(0.05, tmpe_cumsum, xlist)),
 							int(np.interp(0.95, tmpe_cumsum, xlist))]
 		self.tmp_extraction_y = []
-		#print(self.extraction_y)
-		self.flux1d = self.extract_1d(self.flux2d[self.extraction_y[0]: self.extraction_y[1], :])
-		self.err1d = self.extract_1d(self.err2d[self.extraction_ye[0]: self.extraction_ye[1], :])
+		# Now extract 1d spectrum
+		#self.flux1d = self.extract_1d(self.flux2d[self.extraction_y[0]: self.extraction_y[1], :])
+		#self.err1d = self.extract_1d(self.err2d[self.extraction_ye[0]: self.extraction_ye[1], :])
+		self.extract_1d(self.flux2d[self.extraction_y[0]: self.extraction_y[1], :],self.err2d[self.extraction_ye[0]: self.extraction_ye[1], :])
 
 		# plot starting...
 		# 1d spec plot... (keep same varname as axes in plot_spec)
@@ -604,10 +609,11 @@ class MplCanvas(FigureCanvasQTAgg):
 						self.ax2d.hlines(ext_min_y, self.ax2d_xlim[0], self.ax2d_xlim[1], color='red', linestyle='dashed')
 						self.ax2d.hlines(ext_max_y, self.ax2d_xlim[0], self.ax2d_xlim[1], color='red', linestyle='dashed')
 						flux2d = self.flux2d[ext_min_y:ext_max_y, :]
-						self.new_spec = self.extract_1d(flux2d)
-
+						err2d=self.err2d[ext_min_y:ext_max_y, :]
+						self.new_spec = np.nansum(flux2d, axis=0)#self.extract_1d(flux2d)
+						self.new_err = np.sqrt(np.nansum( (err2d**2.),axis=0))
 						# error has not been updated correspondingly
-						self.replot(self.wave, self.new_spec, self.new_spec*0.05)
+						self.replot(self.wave, self.new_spec, self.new_err)
 						self.tmp_extraction_y = []
 						while self.ax2d.lines:
 							self.ax2d.lines.pop()
