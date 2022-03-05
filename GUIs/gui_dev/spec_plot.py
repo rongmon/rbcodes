@@ -432,7 +432,7 @@ class MplCanvas(FigureCanvasQTAgg):
                 self.draw()
 
         elif event.key == 'U':
-            # unsmooth ydata
+            # unsmooth ydata 
             if event.inaxes == self.axes:
                 self.scale -= 2
                 if self.scale < 0:
