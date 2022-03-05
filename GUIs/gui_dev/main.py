@@ -147,11 +147,11 @@ class MainWindow(QMainWindow):
 		#self.sc.estZ = float(estZ)
 		
 qss = '''
-	.QLabel {font-size: 8pt}
-	.QComboBox {font-size: 8pt}
-	.QLineEdit {font-size: 8pt}
-	.QPushButton {font-size: 8pt}
-	.QAction {font-size: 8pt}
+	.QLabel {font-size: 12pt}
+	.QComboBox {font-size: 12pt}
+	.QLineEdit {font-size: 12pt}
+	.QPushButton {font-size: 12pt}
+	.QAction {font-size: 12pt}
 '''
 
 
