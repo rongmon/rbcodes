@@ -40,7 +40,7 @@ class LoadSpec():
 
 
       #Read in a specific format to account for EIGER emission line 2d spectrum
-    elif (fitsfile[0].header['NAXIS']==0) & (fitsfile['SCI'].header['NAXIS']==2):
+    elif (fitsfile[0].header['NAXIS']==0) & (fitsfile[1].header['NAXIS']==2):
       self.fitsobj.flux=fitsfile['SCI'].data
       self.fitsobj.error = fitsfile['ERR'].data
       self.fitsobj.wave= self._build_wave(fitsfile['SCI'].header)
