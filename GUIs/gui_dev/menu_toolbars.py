@@ -82,10 +82,12 @@ class Custom_ToolBar(QToolBar):
 		self.addWidget(self.min_range)
 		self.min_range.setPlaceholderText('Min')
 		self.min_range.returnPressed.connect(self._return_pressed)
+		self.min_range.setReadOnly(True)
 		self.max_range = QLineEdit()
 		self.max_range.setFixedWidth(100)
 		self.max_range.setPlaceholderText('Max')
 		self.max_range.returnPressed.connect(self._return_pressed)
+		self.max_range.setReadOnly(True)
 		self.addWidget(self.max_range)
 
 
@@ -258,6 +260,9 @@ class Custom_ToolBar(QToolBar):
 		self.n_combobox.addItems(['None','MinMax', '99.5%', '99%', '98%', '97%', '96%', '95%', '92.5%', '90%', 'Z-Score', 'Manual'])
 		self.n_combobox.setCurrentIndex(0)
 		self.n_combobox.currentIndexChanged.connect(self._normalization_changed)
+
+		self.min_range.setReadOnly(False)
+		self.max_range.setReadOnly(False)
 
 	def _scaling_changed(self, i):
 		if len(self.fitsobj.flux.shape) > 1:
