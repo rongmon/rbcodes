@@ -110,7 +110,7 @@ class LoadSpec():
 			self.fitsobj.error = fitsfile['ERROR'].data
 
 			fitsfile.close()
-			return self.fitsfile
+			return self.fitsobj
 
 
 	def _build_wave(self, header):

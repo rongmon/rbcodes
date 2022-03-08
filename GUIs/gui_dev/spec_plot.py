@@ -45,9 +45,10 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.guess_gcenter = []
 		self.gauss_num = 1
 		self.gauss_profiles = []
-		self.addtional_linelist_idx = []
-		self.addtional_linelist_vlines = []
-		self.addtional_linelist_texts = []
+
+		num_2ndlist = 6
+		self.addtional_linelist = {i:[] for i in range(num_2ndlist)}
+		self.addtional_linelist_z = {i:0. for i in range(num_2ndlist)}
 
 		super().__init__(self.fig)
 
@@ -110,23 +111,36 @@ class MplCanvas(FigureCanvasQTAgg):
 			self.axes.collections.pop()
 		self.draw()
 
+	def _select_lines_within_xlim(self, linelist, estZ=0., xbound=0.):
+		# select lines within axes.xlim
+		axes = self.figure.gca()
+		xlim = axes.get_xlim()
+		tmp_lines = linelist['wave'].to_numpy() * (1+estZ)
+		tmp_names = linelist['name'].to_numpy()
+		tmp_names = tmp_names[(tmp_lines > xlim[0]*(1+xbound)) & (tmp_lines < xlim[1]*(1-xbound))]
+		tmp_lines = tmp_lines[(tmp_lines > xlim[0]*(1+xbound)) & (tmp_lines < xlim[1]*(1-xbound))]
+		return tmp_lines, tmp_names
+
 	def _plot_lines(self, lineindex, estZ=0.):
 		axes = self.figure.gca()
 		xlim, ylim = axes.get_xlim(), axes.get_ylim()
-		self._clear_plotted_lines()
+		xbound = 0.05 # leave non-drawing space at boundary  
 
 		if lineindex < 0:
-
-			tmp_lines = self.linelist['wave'].to_numpy() * (1+estZ)
-			self.axes.vlines(x=tmp_lines,
-							 ymin=ylim[0], ymax=ylim[-1], color='blue', linestyle='dashed')
-			for row in range(self.linelist.shape[0]):
-				self.axes.text(x=tmp_lines[row],
-							   y=ylim[-1]*0.6,
-							   s=self.linelist.at[row, 'name'],
-							   color='blue', fontsize=15, rotation='vertical')
-			#print(lineindex)
-			#print(self.linelist)
+			tmp_lines, tmp_names = self._select_lines_within_xlim(linelist=self.linelist,
+																	estZ=estZ,
+																	xbound=xbound)		
+			if len(tmp_lines) > 0:
+				self.axes.vlines(x=tmp_lines,
+								 ymin=ylim[0], ymax=ylim[-1], color='blue', linestyle='dashed')
+				for row in range(len(tmp_lines)):
+					self.axes.text(x=tmp_lines[row],
+								   y=ylim[-1]*0.6,
+								   s=tmp_names[row],
+								   color='blue', fontsize=15, rotation='vertical')
+			else:
+				message = 'No ions selected. No lines are within current wavelength range.'
+				self.send_message.emit(message)
 		else:
 			self.axes.vlines(x=self.linelist.at[lineindex, 'wave'] * (1+estZ),
 							 ymin=ylim[0], ymax=ylim[-1], color='blue', linestyle='dashed')
@@ -139,86 +153,47 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axes.set_ylim(ylim)
 		self.draw()
 
-		#print(self.axes.texts)
-		#print('vlines num: ', len(self.axes.collections))
-
-	def _plot_additional_lines(self, linelist_dir, z_guess=0.):
+	def _plot_additional_lines(self, linelist_dir, z_guess_dir):
+		# secondary linelist plotting function
+		# linelist_dir values only contain [] or linelist from secondary linelist widget
 		axes = self.figure.gca()
 		xlim, ylim = axes.get_xlim(), axes.get_ylim()
+		xbound = 0.05
 		# double check with the colors in linelist_selection.py
 		colors = ['#A52A2A', '#FF7F50', '#40E0D0', '#DAA520', '#008000', '#4B0082']
 
-		# this is the secondary linelist index
-		idx = list(linelist_dir.keys())[0]
-
-		if type(linelist_dir[idx]) is str:
-			# None passed here
-			if idx in self.addtional_linelist_idx:
-				loc = self.addtional_linelist_idx.index(idx)
-
-				# delete previous vlines for selected linelist
-				vline_loc = self.axes.collections.index(self.addtional_linelist_vlines[loc])
-				del self.axes.collections[vline_loc]
-				del self.addtional_linelist_vlines[loc]
-				# delete previous texts for selected linelist
-				for line_text in self.addtional_linelist_texts[loc]:
-					ti = self.axes.texts.index(line_text)
-					del self.axes.texts[ti]
-				del self.addtional_linelist_texts[loc]
-				# delete previous linelist index
-				del self.addtional_linelist_idx[loc]
-				
-		else:
-			# selected a linelist
-			tmp_lines = linelist_dir[idx]['wave'].to_numpy() * (1+z_guess)
-			#print(idx)
-			#print(self.addtional_linelist_idx)
-			if idx in self.addtional_linelist_idx:
-			# check if linelist i plotted or not
-				loc = self.addtional_linelist_idx.index(idx)
-
-				# delete previous vlines for selected linelist
-				vline_loc = self.axes.collections.index(self.addtional_linelist_vlines[loc])
-				del self.axes.collections[vline_loc]
-				del self.addtional_linelist_vlines[loc]
-				# delete previous texts for selected linelist
-				for line_text in self.addtional_linelist_texts[loc]:
-					ti = self.axes.texts.index(line_text)
-					del self.axes.texts[ti]
-				del self.addtional_linelist_texts[loc]
-				# delete previous linelist index
-				del self.addtional_linelist_idx[loc]
-				
-
-			# add new lines..
-			# secondary linelist showed up for the first time
-			self.addtional_linelist_idx.append(idx)
-
-			# not plotted before, just add new one
-			tmp_vlines = self.axes.vlines(x=tmp_lines,
-							 ymin=ylim[0], ymax=ylim[-1], 
-							 color=colors[idx], 
-							 linestyle='dashed')
-			self.addtional_linelist_vlines.append(tmp_vlines)
-
-			tmp_texts = []
-			for row in range(linelist_dir[idx].shape[0]):
-				tmp_txt = self.axes.text(x=tmp_lines[row],
-							   y=ylim[-1]*0.6,
-							   s=linelist_dir[idx].at[row, 'name'],
-							   color=colors[idx], 
-							   fontsize=12, 
-							   rotation='vertical')
-				tmp_texts.append(tmp_txt)
-			#print(tmp_texts)
-			self.addtional_linelist_texts.append(tmp_texts)
-
+		for key, linelist in linelist_dir.items():
+			if len(linelist) > 0:
+				# linelist is not empy
+				tmp_lines, tmp_names = self._select_lines_within_xlim(linelist=linelist,
+																	estZ=z_guess_dir[key],
+																	xbound=xbound)
+				if len(tmp_lines) > 0:
+					self.axes.vlines(x=tmp_lines,
+									ymin=ylim[0], ymax=ylim[-1],
+									color=colors[key],
+									linestyle='dashed')
+					for row in range(len(tmp_lines)):
+						self.axes.text(x=tmp_lines[row],
+										y=ylim[-1]*0.6,
+										s=tmp_names[row],
+										color=colors[key],
+										fontsize=12,
+										rotation='vertical')
 		#print(self.axes.collections)
 		#print(self.axes.texts)
 
 		self.axes.set_xlim(xlim)
 		self.axes.set_ylim(ylim)
 		self.draw()
+
+	def _lines_in_current_range(self):
+		# wrapper to plot primary and secondary linelists
+		self._clear_plotted_lines()
+		if len(self.linelist) > 0:
+			self._plot_lines(self.lineindex, self.estZ)
+		self._plot_additional_lines(self.addtional_linelist,
+									self.addtional_linelist_z)
 		
 	def gauss(self, x, amp, mu, sigma):
 		return amp * np.exp(-(x-mu)**2/(2. * sigma**2))
@@ -396,6 +371,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			if event.inaxes == self.axes:
 				xlim = self.axes.get_xlim()
 				self.axes.set_xlim([xlim[0], event.xdata])
+				self._lines_in_current_range()
 				self.draw()
 
 		elif event.key == 'x':
@@ -403,6 +379,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			if event.inaxes == self.axes:
 				xlim = self.axes.get_xlim()
 				self.axes.set_xlim([event.xdata, xlim[-1]])
+				self._lines_in_current_range()
 				self.draw()
 
 		elif event.key == '[':
@@ -410,6 +387,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			xlim = self.axes.get_xlim()
 			delx = (xlim[-1] - xlim[0])
 			self.axes.set_xlim([xlim[0] - delx, xlim[0]])
+			self._lines_in_current_range()
 			self.draw()
 
 		elif event.key == ']':
@@ -417,6 +395,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			xlim = self.axes.get_xlim()
 			delx = (xlim[-1] - xlim[0])
 			self.axes.set_xlim([xlim[1], xlim[1] + delx])
+			self._lines_in_current_range()
 			self.draw()
 
 		elif event.key == 'S':
@@ -452,6 +431,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				if ylimdialog.exec_():
 					ylim = ylimdialog._getlim()
 					self.axes.set_ylim(ylim)
+
 					self.draw()
 			elif event.inaxes == self.ax2d:
 				ylimdialog2d = CustomLimDialog(axis='y')
@@ -467,6 +447,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				if xlimdialog.exec_():
 					xlim = xlimdialog._getlim()
 					self.axes.set_xlim(xlim)
+					self._lines_in_current_range()
 					self.draw()
 			elif event.inaxes == self.ax2d:
 				xlimdialog2d = CustomLimDialog(axis='x')
@@ -662,6 +643,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			self._clear_plotted_lines()
 		else:
 			self.linelist = sent_linelist
+			self._clear_plotted_lines()
 			self._plot_lines(-1)
 
 	def on_lineindex_slot(self, sent_lineindex):
@@ -670,26 +652,40 @@ class MplCanvas(FigureCanvasQTAgg):
 			self._clear_plotted_lines()
 		elif sent_lineindex == 1:
 			self.lineindex = -1
+			self._clear_plotted_lines()
 			self._plot_lines(self.lineindex)
 		else:
 			self.lineindex = sent_lineindex - 2
+			self._clear_plotted_lines()
 			self._plot_lines(self.lineindex)
 
-	def on_additional_linelist_slot(self, addtional_linelist):
-		self._plot_additional_lines(addtional_linelist)
-	def on_additional_linelist_slot_z(self, linelist_and_z):
-		addtional_linelist = linelist_and_z[0]
-		z_guess = linelist_and_z[1]
-		self._plot_additional_lines(linelist_dir=addtional_linelist,
-									z_guess=z_guess)
+	def on_additional_linelist_slot(self, addtional_linelist_dir):
+		#self._plot_additional_lines(addtional_linelist)
+		idx = list(addtional_linelist_dir.keys())[0]
+		if type(addtional_linelist_dir[idx]) != str:
+			self.addtional_linelist[idx] = addtional_linelist_dir[idx]
+		else:
+			self.addtional_linelist[idx] = []
+		#print(self.addtional_linelist)
+		#print(type(self.addtional_linelist))
+		self._lines_in_current_range()
+
+	def on_additional_linelist_slot_z(self, linelist_dir_and_z):
+		idx = list(linelist_dir_and_z[0].keys())[0]
+		self.addtional_linelist[idx] = linelist_dir_and_z[0][idx]
+		self.addtional_linelist_z[idx] = linelist_dir_and_z[1]
+
+		self._lines_in_current_range()
 
 	def _on_estZ_changed(self, newz):
 		self.estZ = newz[0]
 		self.estZstd = newz[1]
-		self._plot_lines(self.lineindex, self.estZ)
+		self._lines_in_current_range()
 		self.send_z_est.emit([self.estZ, self.estZstd])
 
-		#print(self.estZ)
+	def _on_estZ_return_pressed(self, sent_estZ):
+		self.estZ = sent_estZ
+		self._lines_in_current_range()
 
 	def _on_sent_gauss_num(self, sent_gauss_num):
 		self.gauss_num = int(sent_gauss_num)
@@ -698,6 +694,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		if len(self.linelist) > 0:
 			# default value of self.linindex = -2
 			if self.lineindex > -2:
+				self._clear_plotted_lines()
 				self._plot_lines(self.lineindex)
 		else:
 			self._clear_plotted_lines()

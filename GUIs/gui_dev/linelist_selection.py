@@ -18,6 +18,7 @@ class LineListWidget(QWidget):
 	send_data = pyqtSignal(object)
 	send_gauss_num = pyqtSignal(int)
 	send_message = pyqtSignal(str)
+	send_z_returnPressed = pyqtSignal(float)
 
 	def __init__(self):
 		super().__init__()
@@ -73,6 +74,7 @@ class LineListWidget(QWidget):
 		self.estZ = QLineEdit()
 		self.estZ.setPlaceholderText('Guess redshift')
 		self.estZ.setMaximumWidth(100)
+		self.estZ.returnPressed.connect(self._on_z_return_pressed)
 		self.estZstd = QLineEdit()
 		self.estZstd.setPlaceholderText('z Error')
 		self.estZstd.setMaximumWidth(100)
@@ -151,8 +153,8 @@ class LineListWidget(QWidget):
 				self.llists_2[i][2].setReadOnly(True)
 			
 
-	def zprint(self):
-		print(self.estZ.text())
+	def _on_z_return_pressed(self):
+		self.send_z_returnPressed.emit(float(self.estZ.text()))
 
 	# data receiption
 	def on_linelist_name_slot(self, sent_linelist_name):
