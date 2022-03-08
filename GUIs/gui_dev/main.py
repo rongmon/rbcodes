@@ -91,7 +91,7 @@ class MainWindow(QMainWindow):
 		widget_z.send_linelist.connect(self.sc.on_linelist_slot)
 		widget_z.send_lineindex.connect(self.sc.on_lineindex_slot)
 		widget_z.send_gauss_num.connect(self.sc._on_sent_gauss_num)
-		widget_z.estZ.returnPressed.connect(lambda z=widget_z.estZ: self.passing_estZ(z))
+		widget_z.send_z_returnPressed.connect(self.sc._on_estZ_return_pressed)
 		widget_z.send_more_linelist.connect(self.sc.on_additional_linelist_slot)
 		widget_z.send_more_linelist_z.connect(self.sc.on_additional_linelist_slot_z)
 		# 6. sc (SpecCanvas) ==> mbox (MessageBox)
@@ -147,11 +147,11 @@ class MainWindow(QMainWindow):
 		#self.sc.estZ = float(estZ)
 		
 qss = '''
-	.QLabel {font-size: 12pt}
-	.QComboBox {font-size: 12pt}
-	.QLineEdit {font-size: 12pt}
-	.QPushButton {font-size: 12pt}
-	.QAction {font-size: 12pt}
+	.QLabel {font-size: 8pt}
+	.QComboBox {font-size: 8pt}
+	.QLineEdit {font-size: 8pt}
+	.QPushButton {font-size: 8pt}
+	.QAction {font-size: 8pt}
 '''
 
 
