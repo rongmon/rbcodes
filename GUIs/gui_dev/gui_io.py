@@ -110,7 +110,7 @@ class LoadSpec():
           wave *=10000. 
       elif header[card]=='nm':
           wave +=10
-      elif header[card]=='AA':
+      elif header[card]=='Angstrom':
           wave=wave
       else:
           raise ValueError("Predefined wavelength units are 'um','nm','AA'.")            
