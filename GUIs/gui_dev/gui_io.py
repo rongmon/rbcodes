@@ -3,7 +3,7 @@ import os
 from astropy.io import fits
 import numpy as np
 
-from utils import FitsObj, FitsObj2d
+from utils import FitsObj
 # use test.fits from rbcodes/example-data as testing example
 '''
 file = fits.open('test.fits')
@@ -23,8 +23,7 @@ NEED TO FIND A BETTER WAY TO TELL IF A FITS FILE HAS 1D(spec) OR 2D(image) DATA
 class LoadSpec():
 	def __init__(self, filepath):
 		self.filepath = filepath
-		self.fitsobj = FitsObj(wave=[], flux=[], error=[])
-		#self.fitsobj2d = FitsObj2d(wave=[], flux2d=[])
+		self.fitsobj = FitsObj(wave=[], flux=None, error=None)
 
 
 	def _load_spec(self):
@@ -34,13 +33,38 @@ class LoadSpec():
 		# for a pair of fits files:
 		# cal-2D, x1d-1D
 		if fitsfile.filename().endswith('cal.fits'):
+			self.fitsobj.flux2d = fitsfile['SCI'].data
+			self.fitsobj.error2d = fitsfile['ERR'].data
+			
 			# search 1D file and open
-			print('prepare 1D spec')
 			fits1d = fitsfile.filename()[:-8] + 'x1d.fits'
+			if os.path.exists(fits1d):
+				fitsfile1d = fits.open(fits1d)
+				scale = self._scale_wave_unit(fitsfile1d['EXTRACT1D'].header)
+				self.fitsobj.wave = fitsfile1d['EXTRACT1D'].data['WAVELENGTH'] * scale
+				self.fitsobj.flux = fitsfile1d['EXTRACT1D'].data['FLUX']
+				self.fitsobj.error = fitsfile1d['EXTRACT1D'].data['FLUX_ERROR']
+				fitsfile1d.close()
+			fitsfile.close()
+			return self.fitsobj
+
 		elif fitsfile.filename().endswith('x1d.fits'):
+			scale = self._scale_wave_unit(fitsfile['EXTRACT1D'].header)
+			self.fitsobj.wave = fitsfile['EXTRACT1D'].data['WAVELENGTH'] * scale
+			self.fitsobj.flux = fitsfile['EXTRACT1D'].data['FLUX']
+			self.fitsobj.error = fitsfile['EXTRACT1D'].data['FLUX_ERROR']
+
 			# search 2D file and open
 			fits2d = fitsfile.filename()[:-8] + 'cal.fits'
 			print('prepare 2D spec')
+			if os.path.exists(fits2d):
+				fitsfile2d = fits.open(fits2d)
+				self.fitsobj.flux2d = fitsfile2d['SCI'].data
+				self.fitsobj.error2d = fitsfile2d['ERR'].data
+				fitsfile2d.close()
+			fitsfile.close()
+			return self.fitsobj
+
 
 
 
@@ -50,13 +74,13 @@ class LoadSpec():
 			# example file: long_radd.fits
 			# delete this condition if long_radd.fits is no longer used
 			if 'long_radd' in fitsfile.filename().split('.')[0]:
-				self.fitsobj.flux = np.transpose(fitsfile[0].data)
+				self.fitsobj.flux2d = np.transpose(fitsfile[0].data)
 			else:
-				self.fitsobj.flux = fitsfile[0].data
+				self.fitsobj.flux2d = fitsfile[0].data
 			wave0,wave1 = fitsfile[0].header['ADCWAVE0'], fitsfile[0].header['ADCWAVE1']
-			self.fitsobj.wave = np.linspace(wave0, wave1, len(self.fitsobj.flux[0]))
+			self.fitsobj.wave = np.linspace(wave0, wave1, len(self.fitsobj.flux2d[0]))
 			# fake error 2d spectrum
-			self.fitsobj.error = self.fitsobj.flux * 0.05
+			self.fitsobj.error2d = self.fitsobj.flux2d * 0.05
 
 			fitsfile.close()
 			return self.fitsobj
@@ -65,8 +89,8 @@ class LoadSpec():
 			if fitsfile[1].name in 'SCI':
 	    		#Read in a specific format to account for EIGER emission line 2d spectrum
 				# example file: spec2d_coadd_QSO_J0100_sID010242.fits
-				self.fitsobj.flux = fitsfile['SCI'].data
-				self.fitsobj.error = fitsfile['ERR'].data
+				self.fitsobj.flux2d = fitsfile['SCI'].data
+				self.fitsobj.error2d = fitsfile['ERR'].data
 				self.fitsobj.wave = self._build_wave(fitsfile['SCI'].header)
 
 				fitsfile.close()
@@ -110,6 +134,7 @@ class LoadSpec():
 			self.fitsobj.error = fitsfile['ERROR'].data
 
 			fitsfile.close()
+			print(type(self.fitsobj))
 			return self.fitsobj
 
 
@@ -131,14 +156,32 @@ class LoadSpec():
 		# Now check units to make sure everything is in angstrom
 		card='CUNIT1'
 		if not card in header:
-		  raise ValueError("Header must contain 'CUNIT1' keywords.")
-		#micrometer to Angstrom
+			raise ValueError("Header must contain 'CUNIT1' keywords.")
+			#micrometer to Angstrom
 		if header[card] =='um':
-		  wave *=10000. 
+			wave *=10000. 
 		elif header[card]=='nm':
-		  wave +=10
+			wave *=10
 		elif header[card]=='Angstrom':
-		  wave=wave
+		#elif header[card]=='AA':
+			wave=wave
 		else:
-		  raise ValueError("Predefined wavelength units are 'um','nm','Angstrom'.")            
+			raise ValueError("Predefined wavelength units are 'um','nm','AA'.")            
 		return wave
+
+	def _scale_wave_unit(self, header):
+		# if wavelength array already existed,
+		card = 'TUNIT1'
+		if not card in header:
+			raise ValueError("Header must contain 'TUNIT1' keywords.")
+			#micrometer to Angstrom
+		if header[card] =='um':
+			scale = 10000. 
+		elif header[card]=='nm':
+			scale = 10.
+		elif header[card]=='Angstrom':
+		#elif header[card]=='AA':
+			scale = 1.
+		else:
+			raise ValueError("Predefined wavelength units are 'um','nm','AA'.")            
+		return scale

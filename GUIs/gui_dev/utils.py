@@ -6,7 +6,8 @@ import sys
 
 class FitsObj():
 	def __init__(self, wave, flux, error, 
-				ra=None, dec=None, z_est=None, flag=None):
+				ra=None, dec=None, z_est=None, flag=None,
+				flux2d=None, error2d=None):
 		self.wave = wave
 		self.flux = flux
 		self.error = error
@@ -15,8 +16,6 @@ class FitsObj():
 		self.z_est = z_est
 		self.flag = flag
 
-class FitsObj2d():
-	def __init__(self, wave, flux2d, error2d=None):
-		self.wave = wave
+		# if fits file contains an image
 		self.flux2d = flux2d
 		self.error2d = error2d
