@@ -66,11 +66,11 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.fig.clf()
 		self.axes = self.fig.add_subplot(111)
 		self.axes.cla()
-		self.axes.plot(wave, error, color='red')# label='Error')
-		self.axes.plot(wave, flux, color='black')#, label='Flux')
+		self.axes.lines[0] = self.axes.plot(wave, error, color='red')# label='Error')
+		self.axes.lines[1] = self.axes.plot(wave, flux, color='black')#, label='Flux')
 		#self.axes.legend(loc='upper right')
-		self.axes.set_ylim([-np.min(flux)*0.01, np.median(flux)*3])
-		self.axes.set_xlabel('Wavelength')
+		self.axes.set_ylim([-np.nanmin(flux)*0.01, np.nanmedian(flux)*3])
+		self.axes.set_xlabel('Wavelength (Angstrom)')
 		self.axes.set_ylabel('Flux')
 		self.axes.set_title(filename)
 		self.draw()
@@ -93,7 +93,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		ylim = axes.get_ylim()
 		self.axes.lines[0] = axes.plot(wave, new_err, color='red')# label='Error')
 		self.axes.lines[1] = axes.plot(wave, new_spec, color='black')#, label='Flux')
-		#self.axes.legend(loc='upper right')
+		self.axes.set_ylim([np.nanmin(new_spec), np.nanmax(new_spec)])
 		del self.axes.lines[-2:]
 
 	def _compute_distance(self, gxval, gyval, event):
@@ -242,7 +242,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		# 1d spec plot... (keep same varname as axes in plot_spec)
 		self.axes.plot(wave, self.error, color='red')
 		self.axes.plot(wave, self.flux, color='black')
-		self.axes.set_xlabel('Wavelength')
+		self.axes.set_xlabel('Wavelength (Angstrom)')
 		self.axes.set_ylabel('Flux')
 		xlim_spec1d = self.axes.get_xlim()
 		self.axes.set_xlim(xlim_spec1d)
@@ -251,7 +251,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		# scaling first
 		if scale == 0:
 			# Linear.. nothing happened
-			scaled2d = copy.deepcopy(self.flux2d)
+			scaled2d = self.flux2d.copy()
 		elif scale == 1:
 			# log transformation.. scaled = log(1+ img)/log(1+img_max)
 			if self.flux2d.min() < 0:
@@ -270,7 +270,9 @@ class MplCanvas(FigureCanvasQTAgg):
 		# normalization next
 		# send scaling limits back to toolbar
 		if type(normalization) == int:
+			#print(scaled2d)
 			if normalization == 0:
+				
 				self.send_scale_limits.emit([scaled2d.min(), scaled2d.max()])
 			elif normalization == 1:
 				# minmax 100% range
@@ -319,18 +321,21 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.init_xlims = self.axes.get_xlim()
 		self.init_ylims = self.axes.get_ylim()
 
+		#del scaled2d
+
 		# a dummy var to tell if ax2d is available later for event.key='C'
 		self.axnum = 2
 
-	def replot2d(self, wave, new_spec):
+	def replot2d(self, wave, new_spec, new_err):
 		'''Re-plot smoothed/unsmoothed spectrum
 		'''
 		axes = self.figure.gca()
 		xlim = axes.get_xlim()
 		ylim = axes.get_ylim()
-		self.axes.lines[0] = axes.plot(wave, new_spec, color='black')#, label='Flux')
-		#self.axes.legend(loc='upper right')
-		del self.axes.lines[-1:]
+		self.axes.lines[0] = axes.plot(wave, new_err, color='red')# label='Error')
+		self.axes.lines[1] = axes.plot(wave, new_spec, color='black')#, label='Flux')
+		self.axes.set_ylim([np.nanmin(new_spec), np.nanmax(new_spec)])
+		del self.axes.lines[-2:]
 
 #------------------- Keyboards/Mouse Events------------------------
 	def ontype(self, event):
