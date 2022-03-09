@@ -234,29 +234,43 @@ class Custom_ToolBar(QToolBar):
 			filename = self.filenames[i-1]
 			self.filename = filename
 			self.fitsobj = loadspec._load_spec()
-			if len(self.fitsobj.flux.shape) > 1:
-				# new plot 2d
+			if (self.fitsobj.flux2d is not None) & (self.fitsobj.flux is None):
+				# only 2d spec exists
 				self.mW.sc.plot_spec2d(self.fitsobj.wave,
-									self.fitsobj.flux,
-									self.fitsobj.error,
+									self.fitsobj.flux2d,
+									self.fitsobj.error2d,
 									filename)
 				self._add_scale2d()
-			else:
+			elif (self.fitsobj.flux is not None) & (self.fitsobj.flux2d is None):
+				# only 1d spec exists
 				self.mW.sc.plot_spec(self.fitsobj.wave, 
 								self.fitsobj.flux, 
 								self.fitsobj.error,
 								filename)
 				self.s_combobox.clear()
+
+			elif (self.fitsobj.flux is not None) & (self.fitsobj.flux2d is not None):
+				# both 1d and 2d specs exist
+				self.mW.sc.plot_spec2d(self.fitsobj.wave,
+									self.fitsobj.flux2d,
+									self.fitsobj.error2d,
+									filename)
+				self.mW.sc.replot2d(self.fitsobj.wave, 
+								self.fitsobj.flux, 
+								self.fitsobj.error)
+				self._add_scale2d()
+
 			
 			self.send_filename.emit(filename)
 			self.send_fitsobj.emit(self.fitsobj)		
 
 	def _add_scale2d(self):
-		self.s_combobox.setMaxVisibleItems(4)
+		self.s_combobox.setMaxCount(4)
 		self.s_combobox.addItems(['Linear', 'Log', 'Sqrt', 'Square'])
 		self.s_combobox.setCurrentIndex(0)
 		self.s_combobox.currentIndexChanged.connect(self._scaling_changed)
 
+		self.n_combobox.setMaxCount(12)
 		self.n_combobox.addItems(['None','MinMax', '99.5%', '99%', '98%', '97%', '96%', '95%', '92.5%', '90%', 'Z-Score', 'Manual'])
 		self.n_combobox.setCurrentIndex(0)
 		self.n_combobox.currentIndexChanged.connect(self._normalization_changed)
@@ -265,21 +279,21 @@ class Custom_ToolBar(QToolBar):
 		self.max_range.setReadOnly(False)
 
 	def _scaling_changed(self, i):
-		if len(self.fitsobj.flux.shape) > 1:
+		if self.fitsobj.flux2d is not None:
 			self.mW.sc.plot_spec2d(self.fitsobj.wave,
-								self.fitsobj.flux,
-								self.fitsobj.error,
+								self.fitsobj.flux2d,
+								self.fitsobj.error2d,
 								self.filename, scale=i)
 			self.scale = i
 		else:
 			pass
 
 	def _normalization_changed(self, i):
-		if len(self.fitsobj.flux.shape) > 1:
+		if self.fitsobj.flux2d is not None:
 			if i < 11:
 				self.mW.sc.plot_spec2d(self.fitsobj.wave,
-									self.fitsobj.flux,
-									self.fitsobj.error,
+									self.fitsobj.flux2d,
+									self.fitsobj.error2d,
 									self.filename, 
 									scale=self.scale,
 									normalization=i)
@@ -294,8 +308,8 @@ class Custom_ToolBar(QToolBar):
 		manual_range = [float(self.min_range.text()), float(self.max_range.text())]
 		self.n_combobox.setCurrentIndex(11)
 		self.mW.sc.plot_spec2d(self.fitsobj.wave,
-							self.fitsobj.flux,
-							self.fitsobj.error,
+							self.fitsobj.flux2d,
+							self.fitsobj.error2d,
 							self.filename,
 							scale=self.scale,
 							normalization=manual_range)
