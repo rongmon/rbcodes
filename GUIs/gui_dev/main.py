@@ -24,7 +24,7 @@ class MainWindow(QMainWindow):
 
 		#----------- External data ---------------------------------
 		# save a fits copy in the main window
-		self.fitsobj = FitsObj([],[],[])
+		self.fitsobj = FitsObj([],None,None)
 		self.linelist = []
 		self.newlinelist = []
 		self.z_est = [] #pd.DataFrame(columns=['Name', 'RA', 'DEC', 'Z', 'Z_err', 'Confidence', 'Flag'])
