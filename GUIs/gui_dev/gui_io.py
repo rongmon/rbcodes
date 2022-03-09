@@ -92,6 +92,9 @@ class LoadSpec():
 				self.fitsobj.flux2d = fitsfile['SCI'].data
 				self.fitsobj.error2d = fitsfile['ERR'].data
 				self.fitsobj.wave = self._build_wave(fitsfile['SCI'].header)
+				# Set RA DEC
+				self.fitsobj.RA = fitsfile['SCI'].header['RA']
+				self.fitsobj.DEC = fitsfile['SCI'].header['DEC']
 
 				fitsfile.close()
 				return self.fitsobj
