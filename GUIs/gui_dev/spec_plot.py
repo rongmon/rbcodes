@@ -124,7 +124,7 @@ class MplCanvas(FigureCanvasQTAgg):
 	def _plot_lines(self, lineindex, estZ=0.):
 		axes = self.figure.gca()
 		xlim, ylim = axes.get_xlim(), axes.get_ylim()
-		xbound = 0.05 # leave non-drawing space at boundary  
+		xbound = 0.00 # leave non-drawing space at boundary  
 
 		if lineindex < 0:
 			tmp_lines, tmp_names = self._select_lines_within_xlim(linelist=self.linelist,
@@ -158,7 +158,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		# linelist_dir values only contain [] or linelist from secondary linelist widget
 		axes = self.figure.gca()
 		xlim, ylim = axes.get_xlim(), axes.get_ylim()
-		xbound = 0.05
+		xbound = 0.00
 		# double check with the colors in linelist_selection.py
 		colors = ['#A52A2A', '#FF7F50', '#40E0D0', '#DAA520', '#008000', '#4B0082']
 
@@ -203,7 +203,7 @@ class MplCanvas(FigureCanvasQTAgg):
 	def extract_1d(self, flux2d, error2d):
 		'''Extract 1d spectrum and error spectrum from input 2d spectrum
 		'''
-		flux1d=np.nansum(flux2d, axis=0)
+		flux1d=np.sum(flux2d, axis=0)
 		sub_var = error2d**2.
 		err1d = np.sqrt(np.sum(sub_var, axis=0))
 		return flux1d, err1d
@@ -219,17 +219,21 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axes = self.fig.add_subplot(212, sharex = self.ax2d)
 
 		# data processing here... this should be generalized
+		# REPLACE NAN WITH ZERO
 		self.flux2d = flux
 		self.err2d = error
 		self.wave = wave
 
+		# copy of flux2d with nan replaced by 0
+		img = np.nan_to_num(self.flux2d, nan=-99.)
 		# sum in dispersion direction to do initial selection
-		tmp = np.sum(self.flux2d + np.abs(self.flux2d.min()), axis=1)
+		tmp = np.sum(img + np.abs(img.min()), axis=1)
 		# make sure tmp has no negative values for initial guess
 		tmp_cumsum = np.cumsum(tmp) / np.sum(tmp)
 		ylist = np.arange(0, len(tmp_cumsum), 1)
 		self.flux, self.error = self.extract_1d(self.flux2d, self.err2d)
 
+		#print(tmp_cumsum)
 		lower, upper = 0.16, 0.84
 		self.extraction_y = [int(np.interp(lower, tmp_cumsum, ylist)),
 							int(np.interp(upper, tmp_cumsum, ylist))]
@@ -251,21 +255,27 @@ class MplCanvas(FigureCanvasQTAgg):
 		# scaling first
 		if scale == 0:
 			# Linear.. nothing happened
-			scaled2d = self.flux2d.copy()
+			#scaled2d = self.flux2d.copy()
+			scaled2d = img.copy()
 		elif scale == 1:
 			# log transformation.. scaled = log(1+ img)/log(1+img_max)
-			if self.flux2d.min() < 0:
-				scaled2d = np.log(-self.flux2d.min() + self.flux2d) / np.log(-self.flux2d.min() + self.flux2d.max())
+			#if self.flux2d.min() < 0:
+			#	scaled2d = np.log(-self.flux2d.min() + self.flux2d) / np.log(-self.flux2d.min() + self.flux2d.max())
+			if img.min() < 0:
+				scaled2d = np.log(-img.min() + img) / np.log(-img.min() + img.max())
 			else:
-				scaled2d = np.log(1 + self.flux2d) / np.log(1 + self.flux2d.max())
+				#scaled2d = np.log(1 + self.flux2d) / np.log(1 + self.flux2d.max())
+				scaled2d = np.log(1 + img) / np.log(1 + img.max())
 		elif scale == 2:
 			# square root transformation.. 
 			# pixel values > 0 ==> regular sqrt; pixel values <0 ==> 1.absolute value 2.sqrt 3.add minus sign
-			scaled2d = copy.deepcopy(self.flux2d)
+			#scaled2d = copy.deepcopy(self.flux2d)
+			scaled2d = copy.deepcopy(img)
 			scaled2d[scaled2d>=0] = np.sqrt(scaled2d[scaled2d>=0])
 			scaled2d[scaled2d<0] = -np.sqrt(-scaled2d[scaled2d<0])
 		elif scale == 3:
-			scaled2d = self.flux2d**2
+			#scaled2d = self.flux2d**2
+			scaled2d = img**2
 
 		# normalization next
 		# send scaling limits back to toolbar
@@ -353,10 +363,11 @@ class MplCanvas(FigureCanvasQTAgg):
 			#self.axes.texts = []
 			self.axes.set_ylim(self.init_ylims)
 			self.axes.set_xlim(self.init_xlims)
+			self._lines_in_current_range()
 			self.draw()
 			self.send_message.emit('You reset the canvas!!!')
 
-			print(event.inaxes == self.axes)
+			#print(event.inaxes == self.axes)
 		elif event.key == 't':
 			# set y axis max value
 			if event.inaxes == self.axes:

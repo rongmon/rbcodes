@@ -5,7 +5,7 @@ import sys
 # define as many classes we want that are not classified in other classes
 
 class FitsObj():
-	def __init__(self, wave, flux, error, 
+	def __init__(self, wave, flux=None, error=None, 
 				ra=None, dec=None, z_est=None, flag=None,
 				flux2d=None, error2d=None):
 		self.wave = wave
