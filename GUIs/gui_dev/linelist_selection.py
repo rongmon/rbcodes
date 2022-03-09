@@ -197,6 +197,9 @@ class LineListWidget(QWidget):
 	def _on_sent_filenames(self, sent_filenames):
 		self.filenames = sent_filenames
 
+	def _on_sent_fitsobj(self, sent_fitsobj):
+		self.fitsobj = sent_fitsobj
+
 	def _on_button_clicked(self, sfilename):
 		if len(self.estZ.text().strip()) < 1:
 			self.estZ.setText('0')
@@ -210,6 +213,10 @@ class LineListWidget(QWidget):
 				'Confidence': float(self.conf.text()),
 				'Linelist': self.l_lln.currentText(),
 				'Flag': self.flag.text()}
+		if self.fitsobj.ra is not None:
+			data.update({'RA': self.fitsobj.ra,
+							'DEC': self.fitsobj.dec})
+
 		self.send_data.emit(data)
 
 	def _on_sent_dictdata(self, sent_dict):
