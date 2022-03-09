@@ -70,6 +70,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axes.lines[1] = self.axes.plot(wave, flux, color='black')#, label='Flux')
 		#self.axes.legend(loc='upper right')
 		self.axes.set_ylim([-np.nanmin(flux)*0.01, np.nanmedian(flux)*3])
+		self.axes.set_xlim([np.min(wave), np.max(wave)])		
 		self.axes.set_xlabel('Wavelength (Angstrom)')
 		self.axes.set_ylabel('Flux')
 		self.axes.set_title(filename)
@@ -248,8 +249,9 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axes.plot(wave, self.flux, color='black')
 		self.axes.set_xlabel('Wavelength (Angstrom)')
 		self.axes.set_ylabel('Flux')
-		xlim_spec1d = self.axes.get_xlim()
-		self.axes.set_xlim(xlim_spec1d)
+		#xlim_spec1d = self.axes.get_xlim()
+		#self.axes.set_xlim(xlim_spec1d)
+		self.axes.set_xlim([np.min(self.wave), np.max(self.wave)])
 
 		# 2 spec plot...
 		# scaling first
