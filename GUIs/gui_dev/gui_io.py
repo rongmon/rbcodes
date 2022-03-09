@@ -93,8 +93,8 @@ class LoadSpec():
 				self.fitsobj.error2d = fitsfile['ERR'].data
 				self.fitsobj.wave = self._build_wave(fitsfile['SCI'].header)
 				# Set RA DEC
-				self.fitsobj.RA = fitsfile['SCI'].header['RA']
-				self.fitsobj.DEC = fitsfile['SCI'].header['DEC']
+				self.fitsobj.ra = fitsfile['SCI'].header['RA']
+				self.fitsobj.dec = fitsfile['SCI'].header['DEC']
 
 				fitsfile.close()
 				return self.fitsobj
@@ -121,6 +121,11 @@ class LoadSpec():
 						self.fitsobj.error = 1. / np.sqrt(fitsfile[i].data['ivar'])
 					elif 'ERROR' in search_list:
 						self.fitsobj.error = fitsfile[i].data['ERROR']
+
+					if 'RA' in search_list:
+						self.fitsobj.ra = fitsfile[i].header['RA']
+					if 'DEC' in search_list:
+						self.fitsobj.dec = fitsfile[i].header['DEC']
 
 				fitsfile.close()
 				return self.fitsobj

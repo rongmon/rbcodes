@@ -102,15 +102,18 @@ class MainWindow(QMainWindow):
 		self.sc.send_scale_limits.connect(toolbar._on_scale_limits_slot)
 		# 9. toolbar ==> widget_z
 		toolbar.send_filename.connect(widget_z._on_sent_filename)
+		toolbar.send_fitsobj.connect(widget_z._on_sent_fitsobj)
 		# 10. widget_z ==> table_z
 		widget_z.send_data.connect(table_z._on_sent_data)
 		# 11. toolbar ==> table_z
 		toolbar.send_filename.connect(table_z._move_current_filename_top)
 		# 12. toolbar ==> sc (SpecCanvas)
 		toolbar.send_filename.connect(self.sc._update_lines_for_newfile)
-		# 13. table_z ==> widget_z
+		# 13. toolbar ==> main
+		toolbar.send_fitsobj.connect(self.on_fitsobj_slot)
+		# 14. table_z ==> widget_z
 		table_z.send_dictdata.connect(widget_z._on_sent_dictdata)
-		# 14. widget_z ==> mbox (MessageBox)
+		# 15. widget_z ==> mbox (MessageBox)
 		widget_z.send_message.connect(mbox.on_sent_message)
 
 

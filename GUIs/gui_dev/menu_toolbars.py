@@ -241,6 +241,7 @@ class Custom_ToolBar(QToolBar):
 									self.fitsobj.error2d,
 									filename)
 				self._add_scale2d()
+
 			elif (self.fitsobj.flux is not None) & (self.fitsobj.flux2d is None):
 				# only 1d spec exists
 				self.mW.sc.plot_spec(self.fitsobj.wave, 
