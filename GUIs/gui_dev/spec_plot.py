@@ -70,7 +70,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axes.lines[1] = self.axes.plot(wave, flux, color='black')#, label='Flux')
 		#self.axes.legend(loc='upper right')
 		self.axes.set_ylim([-np.nanmin(flux)*0.01, np.nanmedian(flux)*3])
-		self.axes.set_xlim([np.min(wave), np.max(wave)])		
+		self.axes.set_xlim([np.min(wave), np.max(wave)])
 		self.axes.set_xlabel('Wavelength (Angstrom)')
 		self.axes.set_ylabel('Flux')
 		self.axes.set_title(filename)
@@ -94,8 +94,9 @@ class MplCanvas(FigureCanvasQTAgg):
 		ylim = axes.get_ylim()
 		self.axes.lines[0] = axes.plot(wave, new_err, color='red')# label='Error')
 		self.axes.lines[1] = axes.plot(wave, new_spec, color='black')#, label='Flux')
-		self.axes.set_ylim([np.nanmin(new_spec), np.nanmax(new_spec)])
-		del self.axes.lines[-2:]
+		
+
+		del self.axes.lines[2:]
 
 	def _compute_distance(self, gxval, gyval, event):
 		'''Compute the distance between the event xydata and selected point for Gaussian fitting
@@ -209,7 +210,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		err1d = np.sqrt(np.sum(sub_var, axis=0))
 		return flux1d, err1d
 
-	def plot_spec2d(self, wave, flux, error, filename, scale=0, normalization=0):
+	def plot_spec2d(self, wave, flux2d, error2d, filename, scale=0, normalization=0):
 		'''Display 2D spec in top panel, 1D extraction in bottom panel
 		self.flux2d, self.err2d - 2D spec info
 		self.flux, self.error - 1D spec extraction
@@ -221,8 +222,8 @@ class MplCanvas(FigureCanvasQTAgg):
 
 		# data processing here... this should be generalized
 		# REPLACE NAN WITH ZERO
-		self.flux2d = flux
-		self.err2d = error
+		self.flux2d = flux2d
+		self.err2d = error2d
 		self.wave = wave
 
 		# copy of flux2d with nan replaced by 0
@@ -251,7 +252,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axes.set_ylabel('Flux')
 		#xlim_spec1d = self.axes.get_xlim()
 		#self.axes.set_xlim(xlim_spec1d)
-		self.axes.set_xlim([np.min(self.wave), np.max(self.wave)])
+		self.axes.set_xlim([np.min(wave), np.max(wave)])
 
 		# 2 spec plot...
 		# scaling first
@@ -281,7 +282,7 @@ class MplCanvas(FigureCanvasQTAgg):
 
 		# normalization next
 		# send scaling limits back to toolbar
-		if type(normalization) == int:
+		if type(normalization) is int:
 			#print(scaled2d)
 			if normalization == 0:
 				
@@ -320,7 +321,7 @@ class MplCanvas(FigureCanvasQTAgg):
 
 
 		pos_ax2d = self.ax2d.imshow(scaled2d, origin='lower', vmin=scaled2d.min(), vmax=scaled2d.max() * 0.01,
-									extent=(wave[0], wave[-1], 0, len(flux)))
+									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)))
 		self.ax2d_cb = self.fig.colorbar(pos_ax2d, ax=self.ax2d, location='top')
 		ax2d_xlim = self.ax2d.get_xlim()
 		self.ax2d.hlines(self.extraction_y[0], ax2d_xlim[0], ax2d_xlim[1], color='red', linestyle='dashed')
@@ -338,7 +339,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		# a dummy var to tell if ax2d is available later for event.key='C'
 		self.axnum = 2
 
-	def replot2d(self, wave, new_spec, new_err):
+	def replot2d(self, wave, new_spec, new_err, new_extraction):
 		'''Re-plot smoothed/unsmoothed spectrum
 		'''
 		axes = self.figure.gca()
@@ -346,8 +347,18 @@ class MplCanvas(FigureCanvasQTAgg):
 		ylim = axes.get_ylim()
 		self.axes.lines[0] = axes.plot(wave, new_err, color='red')# label='Error')
 		self.axes.lines[1] = axes.plot(wave, new_spec, color='black')#, label='Flux')
-		self.axes.set_ylim([np.nanmin(new_spec), np.nanmax(new_spec)])
-		del self.axes.lines[-2:]
+		del self.axes.lines[2:]
+
+		ax2d_xlim = self.ax2d.get_xlim()
+		while self.ax2d.collections:
+			self.ax2d.collections.pop()
+		while self.ax2d.lines:
+			self.ax2d.lines.pop()
+		self.ax2d.hlines(new_extraction[0], np.min(wave), np.max(wave), color='red', linestyle='dashed')
+		self.ax2d.hlines(new_extraction[1], np.min(wave), np.max(wave), color='red', linestyle='dashed')
+
+
+
 
 #------------------- Keyboards/Mouse Events------------------------
 	def ontype(self, event):
@@ -358,14 +369,19 @@ class MplCanvas(FigureCanvasQTAgg):
 		#print(event.key)
 		if event.key == 'r':
 			# reset flux/err and clear all lines
-			del self.axes.lines[2:]	# delete everything except flux/err
+			#del self.axes.lines[2:]	# delete everything except flux/err
 			self.line_xlim, self.line_ylim = [], []
 			self.gxval, self.gyval = [], []
+
+			if self.axnum == 1:
+				self.replot(self.wave, self.flux, self.error)
+			else:
+				self.replot2d(self.wave, self.flux, self.error, self.extraction_y)
+			self.axes.set_ylim([np.nanmin(self.flux), np.nanmax(self.flux)])
+			self.axes.set_xlim([np.min(self.wave), np.max(self.wave)])
 			
-			#self.axes.texts = []
-			self.axes.set_ylim(self.init_ylims)
-			self.axes.set_xlim(self.init_xlims)
 			self._lines_in_current_range()
+
 			self.draw()
 			self.send_message.emit('You reset the canvas!!!')
 
@@ -421,11 +437,8 @@ class MplCanvas(FigureCanvasQTAgg):
 			if event.inaxes == self.axes:
 				self.scale += 2
 				self.new_spec = convolve(self.flux, Box1DKernel(self.scale))
-				if len(self.error) > 0:
-					self.new_err = convolve(self.error, Box1DKernel(self.scale))
-					self.replot(self.wave, self.new_spec, self.new_err)
-				else:
-					self.replot2d(self.wave, self.new_spec)
+				self.new_err = convolve(self.error, Box1DKernel(self.scale))
+				self.replot(self.wave, self.new_spec, self.new_err)
 				self.draw()
 
 		elif event.key == 'U':
@@ -435,11 +448,8 @@ class MplCanvas(FigureCanvasQTAgg):
 				if self.scale < 0:
 					self.scale = 1
 				self.new_spec = convolve(self.flux, Box1DKernel(self.scale))
-				if len(self.error) > 0:
-					self.new_err = convolve(self.error, Box1DKernel(self.scale))
-					self.replot(self.wave, self.new_spec, self.new_err)
-				else:
-					self.replot2d(self.wave, self.new_spec)
+				self.new_err = convolve(self.error, Box1DKernel(self.scale))
+				self.replot(self.wave, self.new_spec, self.new_err)
 				self.draw()
 
 		elif event.key == 'Y':
@@ -454,8 +464,14 @@ class MplCanvas(FigureCanvasQTAgg):
 			elif event.inaxes == self.ax2d:
 				ylimdialog2d = CustomLimDialog(axis='y')
 				if ylimdialog2d.exec_():
-					ylim2d = ylimdialog2d._getlim()
-					self.ax2d.set_ylim(ylim2d)
+					self.tmp_extraction_y = ylimdialog2d._getlim()
+					if len(self.tmp_extraction_y) == 2:
+						(ext_min_y, ext_max_y) = (int(np.round(min(self.tmp_extraction_y))),
+												int(np.round(max(self.tmp_extraction_y))))
+						self.new_spec, self.new_err = self.extract_1d(self.flux2d[ext_min_y:ext_max_y, :], 
+																	self.err2d[ext_min_y:ext_max_y, :])
+						self.replot2d(self.wave, self.new_spec, self.new_err, [ext_min_y,ext_max_y])
+						self.tmp_extraction_y = []
 					self.draw()
 
 		elif event.key == 'W':
@@ -575,7 +591,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			# delete previous unwanted points for Gaussian profile fitting
 			fclick = len(self.gxval)
 
-			if (fclick > 0) & (fclick <3):
+			if (fclick > 0) & (fclick <2):
 				self.gxval = np.delete(self.gxval, -1)
 				self.gyval = np.delete(self.gyval, -1)
 				del self.axes.lines[-1]
@@ -592,24 +608,12 @@ class MplCanvas(FigureCanvasQTAgg):
 					boxlines = self.ax2d.plot(event.xdata, event.ydata, 'r+')
 					self.tmp_extraction_y = np.append(self.tmp_extraction_y, event.ydata)
 					if len(self.tmp_extraction_y) == 2:
-						# delete old hlines
-						while self.ax2d.collections:
-							self.ax2d.collections.pop()
-
 						(ext_min_y, ext_max_y) = (int(np.round(min(self.tmp_extraction_y))),
 												int(np.round(max(self.tmp_extraction_y))))
-						self.ax2d_xlim = self.ax2d.get_xlim()
-						self.ax2d.hlines(ext_min_y, self.ax2d_xlim[0], self.ax2d_xlim[1], color='red', linestyle='dashed')
-						self.ax2d.hlines(ext_max_y, self.ax2d_xlim[0], self.ax2d_xlim[1], color='red', linestyle='dashed')
-						flux2d = self.flux2d[ext_min_y:ext_max_y, :]
-						err2d = self.err2d[ext_min_y:ext_max_y, :]
-						self.new_spec = np.nansum(flux2d, axis=0)
-						self.new_err = np.sqrt(np.nansum((err2d**2), axis=0))
-
-						self.replot(self.wave, self.new_spec, self.new_err)
+						self.new_spec, self.new_err = self.extract_1d(self.flux2d[ext_min_y:ext_max_y, :], 
+																	self.err2d[ext_min_y:ext_max_y, :])
+						self.replot2d(self.wave, self.new_spec, self.new_err, [ext_min_y,ext_max_y])
 						self.tmp_extraction_y = []
-						while self.ax2d.lines:
-							self.ax2d.lines.pop()
 					self.draw()
 				else:
 					message = "You don't have a 2D Spectrum plot available."
