@@ -19,16 +19,16 @@ class Gaussfit_2d(QDialog):
 		# sublayout for Guess z functions
 		lines_layout = QHBoxLayout()
 		
-		line_combo = QComboBox()
-		line_combo.setFixedWidth(120)
-		line_combo.addItems(['NONE', 'LBG', 'Gal', 'LLS', 'LLS Small', 'DLA', 'atom'])
-		line_combo.currentTextChanged.connect(self._linelist_changed)
+		self.line_combo = QComboBox()
+		self.line_combo.setFixedWidth(120)
+		self.line_combo.addItems(['NONE', 'LBG', 'Gal', 'LLS', 'LLS Small', 'DLA', 'atom'])
+		self.line_combo.currentTextChanged.connect(self._linelist_changed)
 		
-		ion_combo = QComboBox()
-		ion_combo.setFixedWidth(150)
-		ion_combo.addItem('NONE')
-		ion_combo.setCurrentIndex(0)
-		ion_combo.currentIndexChanged.connect(self._index_changed)
+		self.ion_combo = QComboBox()
+		self.ion_combo.setFixedWidth(150)
+		self.ion_combo.addItem('NONE')
+		self.ion_combo.setCurrentIndex(0)
+		self.ion_combo.currentIndexChanged.connect(self._index_changed)
 
 		z_guess = QLineEdit()
 		z_guess.setPlaceholderText('Guess z')
@@ -56,16 +56,16 @@ class Gaussfit_2d(QDialog):
 	def _linelist_changed(self, s):
 		if s in 'NONE':
 			self.send_linelist.emit(s)
-			self.l_combobox.clear()
-			self.l_combobox.addItem('NONE')
-			self.l_combobox.setCurrentIndex(0)
+			self.line_combo.clear()
+			self.line_combo.addItem('NONE')
+			self.line_combo.setCurrentIndex(0)
 		else:
 			llist = self._get_linelist_df(s)
 			self.linelist = llist
 
-			self.l_combobox.addItems(['ALL'] + self.linelist['name'].tolist())
+			self.line_combo.addItems(['ALL'] + self.linelist['name'].tolist())
 			self.send_linelist.emit(self.linelist)
-			self.l_combobox.setCurrentIndex(1)
+			self.line_combo.setCurrentIndex(1)
 
 	def _get_linelist_df(self, linelist_name):
 		llist = pd.DataFrame(columns=['wave', 'name'])
