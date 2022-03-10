@@ -104,6 +104,7 @@ class LoadSpec():
 				file[i].data['<variable>']
 				for multiple i HDU table/image
 				example file: SDSS_spec.fits
+				Note: sdss1.fits is okay; sdss2.fits has header PLUG_RA
 				'''
 				for i in range(len(fitsfile)):
 					search_list = np.array(fitsfile[i].header.cards)
