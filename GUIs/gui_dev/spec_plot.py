@@ -382,7 +382,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				# reset active flux/error to fixed flux/error
 				self.flux, self.error = self.flux_fix, self.error_fix
 				self.replot2d(self.wave, self.flux_fix, self.error_fix, self.extraction_y)
-			self.axes.set_ylim([np.nanmin(self.flux_fix), np.nanmax(self.flux_fix)])
+			self.axes.set_ylim([np.nanmin(self.flux), np.nanmax(self.flux)])
 			self.axes.set_xlim([np.min(self.wave), np.max(self.wave)])
 			
 			self._lines_in_current_range()
