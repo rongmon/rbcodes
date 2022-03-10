@@ -6,6 +6,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 import numpy as np
+import pandas as pd
 
 from IGM.rb_setline import read_line_list
 
@@ -33,12 +34,12 @@ class Gaussfit_2d(QDialog):
 		z_guess = QLineEdit()
 		z_guess.setPlaceholderText('Guess z')
 
-		lines_layout.addWidget(line_combo)
-		lines_layout.addWidget(ion_combo)
+		lines_layout.addWidget(self.line_combo)
+		lines_layout.addWidget(self.ion_combo)
 		lines_layout.addWidget(z_guess)
 
 		line1d = LineCanvas()
-		line1d._plot_hist(flux2d)
+		line1d._plot_line(wave,flux1d, error1d)
 		mpl_toolbar = NavigationToolbar(line1d, self)
 
 		# main layout
@@ -56,16 +57,16 @@ class Gaussfit_2d(QDialog):
 	def _linelist_changed(self, s):
 		if s in 'NONE':
 			self.send_linelist.emit(s)
-			self.line_combo.clear()
-			self.line_combo.addItem('NONE')
-			self.line_combo.setCurrentIndex(0)
+			self.ion_combo.clear()
+			self.ion_combo.addItem('NONE')
+			self.ion_combo.setCurrentIndex(0)
 		else:
 			llist = self._get_linelist_df(s)
 			self.linelist = llist
-
-			self.line_combo.addItems(['ALL'] + self.linelist['name'].tolist())
+			self.ion_combo.clear()
+			self.ion_combo.addItems(['ALL'] + self.linelist['name'].tolist())
 			self.send_linelist.emit(self.linelist)
-			self.line_combo.setCurrentIndex(1)
+			self.ion_combo.setCurrentIndex(0)
 
 	def _get_linelist_df(self, linelist_name):
 		llist = pd.DataFrame(columns=['wave', 'name'])
