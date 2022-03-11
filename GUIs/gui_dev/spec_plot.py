@@ -377,11 +377,18 @@ class MplCanvas(FigureCanvasQTAgg):
 			self.gxval, self.gyval = [], []
 
 			if self.axnum == 1:
+				# for 1D spec display only
 				self.replot(self.wave, self.flux, self.error)
 			else:
-				# reset active flux/error to fixed flux/error
-				self.flux, self.error = self.flux_fix, self.error_fix
-				self.replot2d(self.wave, self.flux_fix, self.error_fix, self.extraction_y)
+				# for 2D spec
+				if event.inaxes == self.axes:
+					# cursor in 1d canvas
+					self.replot(self.wave, self.flux, self.error)
+				else:
+					# cursor in 2d canvas
+					# reset active flux/error to fixed flux/error
+					self.flux, self.error = self.flux_fix, self.error_fix
+					self.replot2d(self.wave, self.flux_fix, self.error_fix, self.extraction_y)
 			self.axes.set_ylim([np.nanmin(self.flux), np.nanmax(self.flux)])
 			self.axes.set_xlim([np.min(self.wave), np.max(self.wave)])
 			
@@ -620,6 +627,9 @@ class MplCanvas(FigureCanvasQTAgg):
 						self.replot2d(self.wave, self.flux, self.error, [ext_min_y,ext_max_y])
 						self.tmp_extraction_y = []
 					self.draw()
+
+					# reset convolution kernel size for new extraction
+					self.scale = 1.
 				else:
 					message = "You don't have a 2D Spectrum plot available."
 					self.send_message.emit(message)
