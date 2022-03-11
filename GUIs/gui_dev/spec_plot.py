@@ -15,6 +15,7 @@ import copy
 
 from guess_transition import GuessTransition
 from spec_hist import FluxHistogram, PixelHistogram
+from spec_fit_gauss2d import Gaussfit_2d
 
 matplotlib.use('Qt5Agg')
 
@@ -45,6 +46,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.guess_gcenter = []
 		self.gauss_num = 1
 		self.gauss_profiles = []
+		self.gauss2d = None
 
 		num_2ndlist = 6
 		self.addtional_linelist = {i:[] for i in range(num_2ndlist)}
@@ -509,9 +511,6 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.gxval = np.append(self.gxval, event.xdata)
 				self.gyval = np.append(self.gyval, event.ydata)
 
-				if self.gauss_num > 1:
-					dgxval, dgyval = [],[]
-
 				fclick = len(self.gxval)
 				self.axes.plot(self.gxval[-1], self.gyval[-1], 'rs', ms=5)
 				self.draw()
@@ -531,87 +530,94 @@ class MplCanvas(FigureCanvasQTAgg):
 					g_flux = self.flux[c_range]
 					g_error = self.error[c_range]
 
-					# fit a Gaussian with 3 data points	
-					# 1. fit a local continuum
-					spline = splrep([gxval[0],gxval[-1]], 
-									[gyval[0], gyval[-1]], 
-									k=1)
-					cont = splev(g_wave, spline)
+					if self.gauss_num == 1:
+						# Single Gaussian Fitting
+						# fit a Gaussian with 3 data points	
+						# 1. fit a local continuum
+						spline = splrep([gxval[0],gxval[-1]], 
+										[gyval[0], gyval[-1]], 
+										k=1)
+						cont = splev(g_wave, spline)
 
-					# 2. check if it is an absorption or emission line
-					EW = np.sum(cont - g_flux)
-					if EW > 0:
-						# absorption line
-						sign = -1
-					else:
-						# emission line
-						sign = 1
+						# 2. check if it is an absorption or emission line
+						EW = np.sum(cont - g_flux)
+						if EW > 0:
+							# absorption line
+							sign = -1
+						else:
+							# emission line
+							sign = 1
 
-					Aguess = np.max(g_flux - cont)
-					Cguess = np.mean(g_wave)
-					sguess = 0.1 * np.abs(gxval[0] - gxval[1])
+						Aguess = np.max(g_flux - cont)
+						Cguess = np.mean(g_wave)
+						sguess = 0.1 * np.abs(gxval[0] - gxval[1])
 
-					# prepare ydata for fit
-					ydata = sign * (g_flux - cont)
-					errdata = sign * (g_error - cont)
-					# start fitting
-					popt, pcov = curve_fit(self.gauss, g_wave, ydata,
-											p0=[Aguess, Cguess, sguess],
-											sigma=errdata)
-					g_final = sign * (self.gauss(g_wave, *popt)) + cont
+						# prepare ydata for fit
+						ydata = sign * (g_flux - cont)
+						errdata = sign * (g_error - cont)
+						# start fitting
+						popt, pcov = curve_fit(self.gauss, g_wave, ydata,
+												p0=[Aguess, Cguess, sguess],
+												sigma=errdata)
+						g_final = sign * (self.gauss(g_wave, *popt)) + cont
 
-					perr = np.sqrt(np.diag(pcov))
-					model_fit = self.axes.plot(g_wave, g_final, 'r--')
-					
-					self.draw()
+						perr = np.sqrt(np.diag(pcov))
+						model_fit = self.axes.plot(g_wave, g_final, 'r--')
+						
+						self.draw()
 
-					message = ("A Gaussian model you fit has the following parameters:\n"
-							   f"Amplitude: {popt[0]:.3f}\n"
-							   f"Mean: {popt[1]:.3f} with std={perr[1]:.3f}\n"
-							   f"Sigma: {popt[2]:.3f}")
+						message = ("A Gaussian model you fit has the following parameters:\n"
+								   f"Amplitude: {popt[0]:.3f}\n"
+								   f"Mean: {popt[1]:.3f} with std={perr[1]:.3f}\n"
+								   f"Sigma: {popt[2]:.3f}")
 
-					if self.guess_gcenter:
-						self.guess_gcenter[0] = popt[1]
-						self.guess_gcenter[1] = perr[1]
-					else:
-						self.guess_gcenter.append(popt[1])
-						self.guess_gcenter.append(perr[1])
+						if self.guess_gcenter:
+							self.guess_gcenter[0] = popt[1]
+							self.guess_gcenter[1] = perr[1]
+						else:
+							self.guess_gcenter.append(popt[1])
+							self.guess_gcenter.append(perr[1])
 
 
+						
+						self.send_message.emit(message)
+						self.send_gcenter.emit(self.guess_gcenter)
+
+					elif self.gauss_num == 2:
+						print('Double Gaussian fitting starts here')
+						# Double Gaussian Fitting
+						self.axes.fill_between(g_wave,
+												y1=np.max(g_flux)*1.1,
+												y2=np.min(g_flux)*0.9,
+												alpha=0.5,
+												color='pink')
+						self.draw()
+						# delete the drawn polygon from collection
+						self.axes.collections.pop()
+
+						self.gauss2d = Gaussfit_2d(g_wave, g_flux, g_error)
+
+
+					# clear out selection
 					self.gxval, self.gyval = [], []
-					self.send_message.emit(message)
-					self.send_gcenter.emit(self.guess_gcenter)
-					
-
-					if self.gauss_num == 2:
-						self.gauss_profiles = np.append(self.gauss_profiles, g.parameters, axis=0)
-						dgxval = np.append(dgxval, gxval, axis=0)
-						dgyval = np.append(dgyval, gyval, axis=0)
-						x_sort = np.argsort(dgxval)
-						dgxval = dgxval[x_sort]
-						dgyval = dgyval[x_sort]
-						c_range = np.where((self.wave>=dgxval[0]) & (self.wave <= dgxval[-1]))
-						dg_wave = self.wave[c_range]
-						dg_flux = self.flux[c_range]
-
-						print(self.gauss_profiles)
-
-					else:
-						self.gauss_profiles = []
 
 		elif event.key == 'D':
 			# delete previous unwanted points for Gaussian profile fitting
 			fclick = len(self.gxval)
-
+			'''
 			if (fclick > 0) & (fclick <2):
 				self.gxval = np.delete(self.gxval, -1)
 				self.gyval = np.delete(self.gyval, -1)
 				del self.axes.lines[-1]
 			else:
-				del self.axes.lines[-4:]			
+				del self.axes.lines[-4:]
+			self.gauss_profiles = []
+			'''
+			if len(self.axes.lines) > 2:
+				self.axes.lines.pop()			
 			self.draw()
 
-			self.gauss_profiles = []
+			
 
 		elif event.key == 'C':
 			# change the size of the extraction box in 2D spec plot
@@ -651,7 +657,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		'''
 		if event.button == 3:
 			#For single Gaussian
-			if self.gauss_num < 2:
+			if self.gauss_num == 1:
 				self.send_message.emit(f'Currently, we need {self.gauss_num} Gaussian to guess the line position.')
 				
 				if self.guess_gcenter:
@@ -664,14 +670,12 @@ class MplCanvas(FigureCanvasQTAgg):
 			#print(self.estZ)
 
 			#For double Gaussian
-			# placeholder for now...
-			else:
+			elif self.gauss_num == 2:
 				self.send_message.emit(f'Currently, we need {self.gauss_num} Gaussians to guess the line positions.')
-				if self.guess_gcenter < 0:
-					self.send_message.emit(f'Please fit {self.gauss_num} Gaussian profiles FIRST\n'
-											f'to locate the line CENTERS!!!')
+				if self.gauss2d is None:
+					self.send_message.emit('Please select 2 points to define the range you want to work with')
 				else:
-					pass
+					self.gauss2d.exec_()
 
 #-------------------- Slots for External Signals ------------------
 	def on_linelist_slot(self, sent_linelist):
