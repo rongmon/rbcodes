@@ -233,7 +233,10 @@ class MplCanvas(FigureCanvasQTAgg):
 		# make sure tmp has no negative values for initial guess
 		tmp_cumsum = np.cumsum(tmp) / np.sum(tmp)
 		ylist = np.arange(0, len(tmp_cumsum), 1)
+		# flux/error are active and extracted from flux2d/error2d
 		self.flux, self.error = self.extract_1d(self.flux2d, self.err2d)
+		# keep a frozen copy and only used for reset
+		self.flux_fix, self.error_fix = self.flux.copy(), self.error.copy()
 
 		#print(tmp_cumsum)
 		lower, upper = 0.16, 0.84
@@ -376,7 +379,9 @@ class MplCanvas(FigureCanvasQTAgg):
 			if self.axnum == 1:
 				self.replot(self.wave, self.flux, self.error)
 			else:
-				self.replot2d(self.wave, self.flux, self.error, self.extraction_y)
+				# reset active flux/error to fixed flux/error
+				self.flux, self.error = self.flux_fix, self.error_fix
+				self.replot2d(self.wave, self.flux_fix, self.error_fix, self.extraction_y)
 			self.axes.set_ylim([np.nanmin(self.flux), np.nanmax(self.flux)])
 			self.axes.set_xlim([np.min(self.wave), np.max(self.wave)])
 			
@@ -610,9 +615,9 @@ class MplCanvas(FigureCanvasQTAgg):
 					if len(self.tmp_extraction_y) == 2:
 						(ext_min_y, ext_max_y) = (int(np.round(min(self.tmp_extraction_y))),
 												int(np.round(max(self.tmp_extraction_y))))
-						self.new_spec, self.new_err = self.extract_1d(self.flux2d[ext_min_y:ext_max_y, :], 
+						self.flux, self.error = self.extract_1d(self.flux2d[ext_min_y:ext_max_y, :], 
 																	self.err2d[ext_min_y:ext_max_y, :])
-						self.replot2d(self.wave, self.new_spec, self.new_err, [ext_min_y,ext_max_y])
+						self.replot2d(self.wave, self.flux, self.error, [ext_min_y,ext_max_y])
 						self.tmp_extraction_y = []
 					self.draw()
 				else:
