@@ -24,6 +24,7 @@ class MplCanvas(FigureCanvasQTAgg):
 	send_z_est = pyqtSignal(list)
 	send_gcenter = pyqtSignal(list)
 	send_scale_limits = pyqtSignal(list)
+	send_gauss_num = pyqtSignal(int)
 
 	def __init__(self, parent=None, width=5, height=3, dpi=100):
 		self.figsize = [width, height]
@@ -583,8 +584,8 @@ class MplCanvas(FigureCanvasQTAgg):
 						self.send_message.emit(message)
 						self.send_gcenter.emit(self.guess_gcenter)
 
-					elif self.gauss_num == 2:
-						print('Double Gaussian fitting starts here')
+					else:
+						print('Multiple Gaussian fitting starts here')
 						# Double Gaussian Fitting
 						self.axes.fill_between(g_wave,
 												y1=np.max(g_flux)*1.1,
@@ -595,7 +596,8 @@ class MplCanvas(FigureCanvasQTAgg):
 						# delete the drawn polygon from collection
 						self.axes.collections.pop()
 
-						self.gauss2d = Gaussfit_2d(g_wave, g_flux, g_error)
+						self.gauss2d = Gaussfit_2d(g_wave, g_flux, g_error, 
+													gauss_num=self.gauss_num)
 
 
 					# clear out selection
@@ -669,8 +671,8 @@ class MplCanvas(FigureCanvasQTAgg):
 											f'to locate the line CENTER!!!')
 			#print(self.estZ)
 
-			#For double Gaussian
-			elif self.gauss_num == 2:
+			#For multiple Gaussian
+			else:
 				self.send_message.emit(f'Currently, we need {self.gauss_num} Gaussians to guess the line positions.')
 				if self.gauss2d is None:
 					self.send_message.emit('Please select 2 points to define the range you want to work with')
