@@ -65,7 +65,7 @@ class LineListWidget(QWidget):
 
 		self.gauss_num = QComboBox()
 		self.gauss_num.setFixedWidth(50)
-		self.gauss_num.addItems(['1', '2'])
+		self.gauss_num.addItems(['1', '2', '3'])
 		self.gauss_num.setCurrentIndex(0)
 		self.gauss_num.activated.connect(self._on_gauss_num_activated)
 		layout.addWidget(self.gauss_num, 1,2)
