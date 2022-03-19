@@ -230,7 +230,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.wave = wave
 
 		# copy of flux2d with nan replaced by 0
-		img = np.nan_to_num(self.flux2d, nan=-99.)
+		img = np.nan_to_num(self.flux2d, nan=0.)
 		# sum in dispersion direction to do initial selection
 		tmp = np.sum(img + np.abs(img.min()), axis=1)
 		# make sure tmp has no negative values for initial guess
@@ -326,7 +326,7 @@ class MplCanvas(FigureCanvasQTAgg):
 
 
 
-		pos_ax2d = self.ax2d.imshow(scaled2d, origin='lower', vmin=scaled2d.min(), vmax=scaled2d.max() * 0.01,
+		pos_ax2d = self.ax2d.imshow(scaled2d, origin='lower', vmin=scaled2d.min(), vmax=scaled2d.max() * 1.0,
 									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)))
 		self.ax2d_cb = self.fig.colorbar(pos_ax2d, ax=self.ax2d, location='top')
 		ax2d_xlim = self.ax2d.get_xlim()
