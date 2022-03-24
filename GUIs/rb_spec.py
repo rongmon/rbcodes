@@ -62,7 +62,7 @@ class read_spec(object):
     --------------------------------------------------------------------------------------------
     EXAMPLE: import numpy as np
             import matplotlib
-            matplotlib.use('TkAgg')
+            matplotlib.use('Qt5Agg')
             import matplotlib.pyplot as plt
             from GUIs import rb_spec as r 
 
@@ -118,17 +118,34 @@ class read_spec(object):
     --------------------------------------------------------------------------------------------
 
     """
-    def __init__(self,filename,filetype=False, efil=None,**kwargs):
+    def __init__(self,filename=False,filetype=False, efil=None,**kwargs):
         """ creates the spectrum object """
         self.filename=filename
 
         if filetype==False:
             #Take File Extention and try
-            tt=os.path.splitext(filename)[1]
-            if (tt=='txt')| (tt=='dat'):
-                filetype='ascii'
+            if filename==False:
+                if 'wave' in kwargs:
+                    wave=kwargs['wave']
+                else:
+                    raise IOError("Input wavelength array")
+                if 'flux' in kwargs:
+                    flux=kwargs['flux']
+                else:
+                    raise IOError("Input flux array")
+                if 'error' in kwargs:
+                    error=kwargs['error']
+                else:
+                    raise IOError("Input error array")
+
+
+
             else:
-                filetype=tt[1:len(tt)] 
+                tt=os.path.splitext(filename)[1]
+                if (tt=='txt')| (tt=='dat'):
+                    filetype='ascii'
+                else:
+                    filetype=tt[1:len(tt)] 
 
 
         # Read in Files in differet formats
