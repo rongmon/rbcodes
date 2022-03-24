@@ -41,6 +41,8 @@ class cont_fitter(object):
 
 
     Written : Rongmon Bordoloi      August 2020
+    Edit    : Rongmon Bordoloi      March 2022: Added more input options
+
     Based on RANSAC continuum fitter written by Bin Liu Summer 2020.
     --------------------------------------------------------------------------------------------
     EXAMPLE: 
@@ -57,7 +59,7 @@ class cont_fitter(object):
             
 
             Now fit continuum
-               sp=c.fit_continuum()
+               sp=c.fit_continuum(window=149)
 
                #AND YOU ARE DONE.
 
