@@ -90,7 +90,7 @@ class cont_fitter(object):
         flux=sp.flux.value/cnt
 
         if sp.sig_is_set == False:
-            print('Assuiming arbiarbitrary 10% error on flux')
+            print('Assuiming arbitrary 10% error on flux')
             error=0.1*flux/cnt
         else:
             error=sp.sig.value/cnt
@@ -114,12 +114,16 @@ class cont_fitter(object):
 
 
     def run_ransac(self,window=149):
-        inlier_masks = []
-        outlier_masks = []
+        #inlier_masks = []
+        #outlier_masks = []
         ransac = RANSACRegressor()
         ransac.fit(self.wave.reshape(-1,1), self.sp_diff)
-        inlier_masks.append(ransac.inlier_mask_)
-        outlier_masks.append(np.logical_not(ransac.inlier_mask_))
+        #inlier_masks.append(ransac.inlier_mask_)
+        inlier_masks=ransac.inlier_mask_
+
+        #outlier_masks.append(np.logical_not(ransac.inlier_mask_))
+        outlier_masks=np.logical_not(ransac.inlier_mask_)
+
         ####5. Use `inlier_masks` to interpolate
         spec_inliers = np.interp(self.wave,self.wave[inlier_masks],self.flux[inlier_masks]) 
         self.cont = medfilt(spec_inliers, window)
