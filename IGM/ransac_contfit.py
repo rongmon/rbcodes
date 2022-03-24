@@ -48,14 +48,12 @@ class cont_fitter(object):
     EXAMPLE: 
                from IGM import ransac_contfit as c 
 
-               sp=c.cont_fitter()
-
             Two ways to read in spectrum, from file: 
                  #efil = optional if error spectrum is defined in another file
-               sp=c.from_file(fluxfilename,efil=errorfilename)
+               sp=c.cont_fitter.from_file(fluxfilename,efil=errorfilename)
 
             or from input wave,flux,error array. 
-               sp=c.from_data(wave,flux,error=error)
+               sp=c.cont_fitter.from_data(wave,flux,error=error)
             
 
             Now fit continuum
@@ -78,8 +76,16 @@ class cont_fitter(object):
     --------------------------------------------------------------------------------------------
     """
      
+    def __init__(self,wave,flux,error,mednorm=False,**kwargs):
+        print('Initializing RANSAC continuum fitter')
+        np.random.seed(1)
+        self.wave=wave
+        self.flux=flux
+        self.error=error
+        self.mednorm=mednorm
 
-    def from_file(self,filename,efil=None,mednorm=False,**kwargs):
+    @classmethod
+    def from_file(cls,filename,efil=None,mednorm=False,**kwargs):
         """
             Read spectrum from filename given.        
         """
@@ -98,12 +104,14 @@ class cont_fitter(object):
         else:
             error=sp.sig.value/cnt
 
-        self.wave=wave
-        self.flux=flux
-        self.error=error
-        self.mednorm=mednorm
-        
+        return cls(wave,flux,error,mednorm=mednorm,**kwargs)
 
+        #self.wave=wave
+        #self.flux=flux
+        #self.error=error
+        #self.mednorm=mednorm
+        
+    @classmethod
     def from_data(self, wave,flux,mednorm=False, **kwargs):
         """ read spectrum from input wave,flux,error array. 
         """
@@ -121,16 +129,13 @@ class cont_fitter(object):
             print('Assuiming arbitrary 10% error on flux')
             error=0.1*flux/cnt
             
+        return cls(wave,flux,error,mednorm=mednorm,**kwargs)
 
         # Generate
-        self.flux=flux
-        self.error=error
-        self.wave=wave
-        self.mednorm=mednorm
-
-    def __init__(self,**kwargs):
-        print('Initializing RANSAC continuum fitter')
-        np.random.seed(1)
+        #self.flux=flux
+        #self.error=error
+        #self.wave=wave
+        #self.mednorm=mednorm
 
 
 

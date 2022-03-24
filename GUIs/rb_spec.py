@@ -372,8 +372,8 @@ class read_spec(object):
 
         """
         from IGM import ransac_contfit as cf 
-        sp=cf.cont_fitter()
-        sp.from_data(self.wave_slice,self.flux_slice,error=self.error_slice,mednorm=mednorm)
+        #sp=cf.cont_fitter()
+        sp=cf.cont_fitter.from_data(self.wave_slice,self.flux_slice,error=self.error_slice,mednorm=mednorm)
         sp.fit_continuum(window=window)
 
         self.cont=sp.cont
