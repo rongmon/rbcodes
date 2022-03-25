@@ -320,14 +320,21 @@ class MplCanvas(FigureCanvasQTAgg):
 			elif normalization == 10: # Z-score
 				scaled2d = (scaled2d - scaled2d.mean()) / scaled2d.std()
 				self.send_scale_limits.emit([np.nan, np.nan])	
+
 		elif type(normalization) == list:
-			scaled2d = (scaled2d - normalization[0]) / (normalization[1] - normalization[0])
+			tmp = (scaled2d - scaled2d.min()) / (scaled2d.max() - scaled2d.min())
+			scaled2d = tmp*(normalization[1] - normalization[0]) + normalization[0]
+			
+		if scale == 1:
+			pos_ax2d = self.ax2d.imshow(scaled2d, origin='lower', 
+									vmin=scaled2d.min(), vmax=scaled2d.max() * 0.01,
+									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)))
+		else:
+			pos_ax2d = self.ax2d.imshow(scaled2d, origin='lower', 
+									vmin=scaled2d.min(), vmax=scaled2d.max() * 1.0,
+									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)))
 		
 
-
-
-		pos_ax2d = self.ax2d.imshow(scaled2d, origin='lower', vmin=scaled2d.min(), vmax=scaled2d.max() * 1.0,
-									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)))
 		self.ax2d_cb = self.fig.colorbar(pos_ax2d, ax=self.ax2d, location='top')
 		ax2d_xlim = self.ax2d.get_xlim()
 		self.ax2d.hlines(self.extraction_y[0], ax2d_xlim[0], ax2d_xlim[1], color='red', linestyle='dashed')
