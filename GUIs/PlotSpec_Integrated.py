@@ -511,7 +511,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             #Start Fitting
             if fclick==3:
                 # Fit the data using a Gaussian
-                g_init = models.Gaussian1D(amplitude=np.double(self.FYval[1]), mean=np.double(self.FXval[2]), stddev=0.5*(np.double(self.FXval[2])-np.double(self.FXval[0])))
+                g_init = models.Gaussian1D(amplitude=np.double(self.FYval[1]), mean=np.double(self.FXval[1]), stddev=0.5*(np.double(self.FXval[2])-np.double(self.FXval[0])))
                 fit_g = fitting.LevMarLSQFitter()
 
                 # First fit a quick continuum

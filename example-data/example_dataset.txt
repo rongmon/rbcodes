@@ -1,0 +1,10 @@
+galaxy1.fits
+sdss1.fits
+sdss2.fits
+spec-0398-51789-0282.fits
+spec-0408-51821-0503.fits
+spec-1678-53433-0425.fits
+spec-6781-56274-0989.fits
+spec-6781-56274-0994.fits
+spec-6782-56273-0568.fits
+test.fits
