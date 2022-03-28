@@ -7,7 +7,7 @@ from astropy.io import fits, ascii
 from astropy.table import Table
 
 from PyQt5.QtCore import Qt, QSize, QUrl, pyqtSignal
-from PyQt5.QtWidgets import QAction, QToolBar, QStatusBar, QMenuBar, QFileDialog, QComboBox, QLineEdit, QLabel
+from PyQt5.QtWidgets import QAction, QToolBar, QStatusBar, QMenuBar, QFileDialog, QComboBox, QLineEdit, QLabel, QPushButton
 from PyQt5.QtGui import QKeySequence, QDesktopServices
 
 from user_manual import UserManualDialog
@@ -31,6 +31,7 @@ class Custom_ToolBar(QToolBar):
 		self.filename = ''
 		self.scale2d = False
 		self.scale = 0
+		self.manual = None # No user manual yet
 
 		self.setWindowTitle('Customizable TooBar')
 		#self.setFixedSize(QSize(200, 50))
@@ -99,10 +100,11 @@ class Custom_ToolBar(QToolBar):
 
 		return btn
 
-	def _open_user_manual(self):
+	def _open_user_manual(self, checked):
 		#Open User manual to help
-		manual = UserManualDialog(method=1)
-		manual.exec_()
+		if self.manual is None:
+			self.manual = UserManualDialog(method=1)
+		self.manual.show()
 
 	def _load_spec(self):
 		#Read a single fits file
