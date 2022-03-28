@@ -1,7 +1,7 @@
-from PyQt5.QtWidgets import QDialog, QLabel, QVBoxLayout, QHBoxLayout, QGridLayout
+from PyQt5.QtWidgets import QWidget, QDialog, QLabel, QVBoxLayout, QHBoxLayout, QGridLayout
 from PyQt5.QtCore import QSize, Qt
 # This contains the complicated user manual
-class UserManualDialog(QDialog):
+class UserManualDialog(QWidget):
 	def __init__(self, method = 0):
 		super().__init__()
 		self.setWindowTitle('GUI User Manual')
