@@ -13,8 +13,8 @@ import numpy.polynomial.legendre as L
 import sys
 from astropy.io import ascii
 from utils import rb_utility as rt
-import matplotlib as mpl
-mpl.rcParams['lines.linewidth'] = .9
+from matplotlib import rcParams
+rcParams['lines.linewidth'] = .9
 clr=rt.rb_set_color()
 import webbrowser
 from pkg_resources import resource_filename
