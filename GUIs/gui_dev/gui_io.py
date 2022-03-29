@@ -56,7 +56,7 @@ class LoadSpec():
 
 			# search 2D file and open
 			fits2d = fitsfile.filename()[:-8] + 'cal.fits'
-			print('prepare 2D spec')
+			#print('prepare 2D spec')
 			if os.path.exists(fits2d):
 				fitsfile2d = fits.open(fits2d)
 				self.fitsobj.flux2d = fitsfile2d['SCI'].data
