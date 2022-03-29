@@ -76,7 +76,7 @@ class cont_fitter(object):
     --------------------------------------------------------------------------------------------
     """
      
-    def __init__(self,wave,flux,error,mednorm=False,**kwargs):
+    def __init__(self,wave,flux,error,mednorm=False):
         print('Initializing RANSAC continuum fitter')
         np.random.seed(1)
         self.wave=wave
@@ -104,7 +104,7 @@ class cont_fitter(object):
         else:
             error=sp.sig.value/cnt
 
-        return cls(wave,flux,error,mednorm=mednorm,**kwargs)
+        return cls(wave,flux,error,mednorm=mednorm)
 
         #self.wave=wave
         #self.flux=flux
@@ -112,7 +112,7 @@ class cont_fitter(object):
         #self.mednorm=mednorm
         
     @classmethod
-    def from_data(self, wave,flux,mednorm=False, **kwargs):
+    def from_data(cls, wave,flux,mednorm=False, **kwargs):
         """ read spectrum from input wave,flux,error array. 
         """
 
@@ -129,7 +129,7 @@ class cont_fitter(object):
             print('Assuiming arbitrary 10% error on flux')
             error=0.1*flux/cnt
             
-        return cls(wave,flux,error,mednorm=mednorm,**kwargs)
+        return cls(wave,flux,error,mednorm=mednorm)
 
         # Generate
         #self.flux=flux
