@@ -1,0 +1,9 @@
+# This file may be used to create an environment using:
+# $ conda create --name <env> --file <this file>
+astropy=5.0
+matplotlib=3.5.0
+numpy=1.21.2
+pandas=1.3.5
+pyqt=5.9.2
+python=3.9.5
+scipy=1.7.3
