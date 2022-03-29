@@ -97,7 +97,8 @@ class MplCanvas(FigureCanvasQTAgg):
 		ylim = axes.get_ylim()
 		self.axes.lines[0] = axes.plot(wave, new_err, color='red')# label='Error')
 		self.axes.lines[1] = axes.plot(wave, new_spec, color='black')#, label='Flux')
-		
+		self.axes.set_ylim([np.nanmin(new_spec), np.nanmax(new_spec)])
+		self.axes.set_xlim([np.min(wave), np.max(wave)])
 
 		del self.axes.lines[2:]
 
