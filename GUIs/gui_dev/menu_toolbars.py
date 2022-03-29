@@ -258,7 +258,7 @@ class Custom_ToolBar(QToolBar):
 									self.fitsobj.flux2d,
 									self.fitsobj.error2d,
 									filename)
-				self.mW.sc.replot2d(self.fitsobj.wave, 
+				self.mW.sc.replot(self.fitsobj.wave, 
 								self.fitsobj.flux, 
 								self.fitsobj.error)
 				self._add_scale2d()
