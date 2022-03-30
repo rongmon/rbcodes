@@ -1,4 +1,3 @@
-
 *.pyc
 *.pyc
 *.pyc
@@ -13,6 +12,7 @@ GUIs/__pycache__/__init__.cpython-37.pyc
 IGM/__pycache__/__init__.cpython-37.pyc
 IGM/__pycache__/rb_setline.cpython-37.pyc
 .DS_Store
+*.pyc
 *.pyc
 *.pyc
 *.pyc

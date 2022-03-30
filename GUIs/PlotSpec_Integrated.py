@@ -511,7 +511,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             #Start Fitting
             if fclick==3:
                 # Fit the data using a Gaussian
-                g_init = models.Gaussian1D(amplitude=np.double(self.FYval[1]), mean=np.double(self.FXval[2]), stddev=0.5*(np.double(self.FXval[2])-np.double(self.FXval[0])))
+                g_init = models.Gaussian1D(amplitude=np.double(self.FYval[1]), mean=np.double(self.FXval[1]), stddev=0.5*(np.double(self.FXval[2])-np.double(self.FXval[0])))
                 fit_g = fitting.LevMarLSQFitter()
 
                 # First fit a quick continuum
@@ -527,9 +527,9 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                     g = fit_g(g_init, ww, ydata)
                     Final_fit=(1.-g(ww))*continuum
                 else:
-                    ydata=(flux1/continuum)
+                    ydata=(flux1/continuum)-1
                     g = fit_g(g_init, ww, ydata)
-                    Final_fit=g(ww)*continuum         
+                    Final_fit=(1.+g(ww))*continuum         
     
                 model_fit=self.ax.plot(ww, Final_fit, 'r-')        
                 values0=' Amp: '+'%.3f' %  g.parameters[0] 

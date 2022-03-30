@@ -1,11 +1,11 @@
 """ A continuum fitter class. This reads in a 1D spectrum and allows continuum fitting."""
+from __future__ import print_function, absolute_import, division, unicode_literals
 import os
 import time
 import numpy as np
 import matplotlib
-matplotlib.use('TkAgg') #python 3 only
+matplotlib.use('Qt5Agg') #python 3 only
 import ipdb
-np.random.seed(1)
 from linetools.spectra import io as tio
 from scipy.signal import medfilt
 from scipy.signal import find_peaks
@@ -15,14 +15,11 @@ from linetools.spectra.xspectrum1d import XSpectrum1D
 
 
 class cont_fitter(object):
-
-    def __init__(self,filename, efil=None,window=149,mednorm=False,**kwargs):
-
-        '''
-            """A continuum fitter class. This reads in a 1D spectrum and allows continuum fitting.
-            The initial continuum is fitted using a random sample consensus model.
-            Then user has the option to tweak the fitted continuum by hand usling interactive 
-            linetools API and/or save the spectrum object.
+    """
+   A continuum fitter class. This reads in a 1D spectrum and allows continuum fitting.
+   The initial continuum is fitted using a random sample consensus model.
+   Then user has the option to tweak the fitted continuum by hand usling interactive 
+   linetools API and/or save the spectrum object.
 
 
     Attributes:
@@ -44,14 +41,23 @@ class cont_fitter(object):
 
 
     Written : Rongmon Bordoloi      August 2020
+    Edit    : Rongmon Bordoloi      March 2022: Added more input options
+
     Based on RANSAC continuum fitter written by Bin Liu Summer 2020.
     --------------------------------------------------------------------------------------------
     EXAMPLE: 
                from IGM import ransac_contfit as c 
 
+            Two ways to read in spectrum, from file: 
+                 #efil = optional if error spectrum is defined in another file
+               sp=c.cont_fitter.from_file(fluxfilename,efil=errorfilename)
 
-               #efil = optional if error spectrum is defined in another file
-               sp=c.cont_fitter(fluxfilename,efil=errorfilename)
+            or from input wave,flux,error array. 
+               sp=c.cont_fitter.from_data(wave,flux,error=error)
+            
+
+            Now fit continuum
+               sp=c.fit_continuum(window=149)
 
                #AND YOU ARE DONE.
 
@@ -68,21 +74,24 @@ class cont_fitter(object):
 
 
     --------------------------------------------------------------------------------------------
-
- 
-        '''
+    """
+     
+    def __init__(self,wave,flux,error,mednorm=False):
+        print('Initializing RANSAC continuum fitter')
+        np.random.seed(1)
+        self.wave=wave
+        self.flux=flux
+        self.error=error
         self.mednorm=mednorm
-        self.read_spectrum(filename,efil=efil)
-        self.prepare_data(window=window)
-        self.run_ransac(window=window)
-        self.spectrum= XSpectrum1D.from_tuple((self.wave, self.flux, self.error,self.cont),verbose=False)
 
-
-    def read_spectrum(self,filename,efil=None,**kwargs):
+    @classmethod
+    def from_file(cls,filename,efil=None,mednorm=False,**kwargs):
+        """
+            Read spectrum from filename given.        
+        """
         sp=tio.readspec(filename,inflg=None, efil=efil,**kwargs)
-
         wave=sp.wavelength.value
-        if self.mednorm ==True:
+        if mednorm ==True:
             cnt=np.nanmedian(sp.flux.value)
         else:
             cnt=1.
@@ -90,15 +99,53 @@ class cont_fitter(object):
         flux=sp.flux.value/cnt
 
         if sp.sig_is_set == False:
-            print('Assuiming arbiarbitrary 10% error on flux')
+            print('Assuiming arbitrary 10% error on flux')
             error=0.1*flux/cnt
         else:
             error=sp.sig.value/cnt
 
-        self.wave=wave
-        self.flux=flux
-        self.error=error
+        return cls(wave,flux,error,mednorm=mednorm)
 
+        #self.wave=wave
+        #self.flux=flux
+        #self.error=error
+        #self.mednorm=mednorm
+        
+    @classmethod
+    def from_data(cls, wave,flux,mednorm=False, **kwargs):
+        """ read spectrum from input wave,flux,error array. 
+        """
+
+        if mednorm ==True:
+            cnt=np.nanmedian(flux)
+        else:
+            cnt=1.
+
+        flux=flux/cnt
+
+        if 'error' in kwargs:
+            error=kwargs['error']/cnt
+        else:
+            print('Assuiming arbitrary 10% error on flux')
+            error=0.1*flux/cnt
+            
+        return cls(wave,flux,error,mednorm=mednorm)
+
+        # Generate
+        #self.flux=flux
+        #self.error=error
+        #self.wave=wave
+        #self.mednorm=mednorm
+
+
+
+    def fit_continuum(self,window=149):
+        self.prepare_data(window=window)
+        self.run_ransac(window=window)
+        self.spectrum= XSpectrum1D.from_tuple((self.wave, self.flux, self.error,self.cont),verbose=False)
+
+
+    
 
     def prepare_data(self,window=149):
         self.flx_md=medfilt(self.flux,window)
@@ -114,12 +161,16 @@ class cont_fitter(object):
 
 
     def run_ransac(self,window=149):
-        inlier_masks = []
-        outlier_masks = []
+        #inlier_masks = []
+        #outlier_masks = []
         ransac = RANSACRegressor()
         ransac.fit(self.wave.reshape(-1,1), self.sp_diff)
-        inlier_masks.append(ransac.inlier_mask_)
-        outlier_masks.append(np.logical_not(ransac.inlier_mask_))
+        #inlier_masks.append(ransac.inlier_mask_)
+        inlier_masks=ransac.inlier_mask_
+
+        #outlier_masks.append(np.logical_not(ransac.inlier_mask_))
+        outlier_masks=np.logical_not(ransac.inlier_mask_)
+
         ####5. Use `inlier_masks` to interpolate
         spec_inliers = np.interp(self.wave,self.wave[inlier_masks],self.flux[inlier_masks]) 
         self.cont = medfilt(spec_inliers, window)

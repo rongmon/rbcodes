@@ -1,4 +1,6 @@
-# rbcodes
+rbcodes
+-------
+
 This is a public release of python codes commonly used for astrophysical reserach by Rongmon Bordoloi.
 This package is constantly under development and will be periodically updated. 
 
@@ -76,6 +78,10 @@ The utils folder contains several utility modules:
                              Legendre dispersion spectra. I got this code from https://github.com/kgullikson88/General.
 
 	
+DOI
+---
+[![DOI](https://zenodo.org/badge/192408573.svg)](https://zenodo.org/badge/latestdoi/192408573)
+
 
 
 
