@@ -1,4 +1,6 @@
-# rbcodes
+rbcodes
+-------
+
 This is a public release of python codes commonly used for astrophysical reserach by Rongmon Bordoloi.
 This package is constantly under development and will be periodically updated. 
 
@@ -46,6 +48,7 @@ The IGM folder contains several python routines for intergalactic medium and cir
 	                       algorithm, then allows user to tweak the fit using linetools.fit_continuum 
 	                       routine. Saves the fitted continuum and the 1D spectrum as a xspectrum1D object
 	                       Very helpful to fit a full quasar continuum.	
+	6) lens_sep_to_kpc.py :Function to compute physical separation between sightlines in a lensed quasar 	                       system under the thin lens approximation.
 
 The halo folder contains modules to compute NFW halo profiles
 
@@ -57,6 +60,10 @@ The stat folder contains several statistical codes:
        1) rb_wilsonscore.py :  Wilsonscore confidence intervals.
 
        2) rb_boot.py        :  Bootstrap function
+ 
+The lensing folder contains code to ray trace positions to source plane for a given deflection matrix.
+
+       1) lens_ang_sep.py  :        Inititate the delensing object to load the required deflection matrices
 
 The utils folder contains several utility modules:
 
@@ -71,6 +78,10 @@ The utils folder contains several utility modules:
                              Legendre dispersion spectra. I got this code from https://github.com/kgullikson88/General.
 
 	
+DOI
+---
+[![DOI](https://zenodo.org/badge/192408573.svg)](https://zenodo.org/badge/latestdoi/192408573)
+
 
 
 

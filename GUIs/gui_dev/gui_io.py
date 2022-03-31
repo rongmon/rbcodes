@@ -29,6 +29,7 @@ class LoadSpec():
 	def _load_spec(self):
 		# read fits file
 		fitsfile = fits.open(self.filepath)
+		labels = [label.name for label in fitsfile]
 
 		# for a pair of fits files:
 		# cal-2D, x1d-1D
@@ -85,51 +86,51 @@ class LoadSpec():
 			fitsfile.close()
 			return self.fitsobj
 
-		elif (fitsfile[0].header['NAXIS']==0) & (fitsfile[1].header['NAXIS']==2):
-			if fitsfile[1].name in 'SCI':
-	    		#Read in a specific format to account for EIGER emission line 2d spectrum
-				# example file: spec2d_coadd_QSO_J0100_sID010242.fits
-				self.fitsobj.flux2d = fitsfile['SCI'].data
-				self.fitsobj.error2d = fitsfile['ERR'].data
-				self.fitsobj.wave = self._build_wave(fitsfile['SCI'].header)
-				# Set RA DEC
+		elif 'SCI' in labels:
+    	#Read in a specific format to account for EIGER emission line 2d spectrum
+			# example file: spec2d_coadd_QSO_J0100_sID010242.fits
+			self.fitsobj.flux2d = fitsfile['SCI'].data
+			self.fitsobj.error2d = fitsfile['ERR'].data
+			self.fitsobj.wave = self._build_wave(fitsfile['SCI'].header)
+			# Set RA DEC
+			if 'RA' in fitsfile['SCI'].header:
 				self.fitsobj.ra = fitsfile['SCI'].header['RA']
 				self.fitsobj.dec = fitsfile['SCI'].header['DEC']
 
-				fitsfile.close()
-				return self.fitsobj
+			fitsfile.close()
+			return self.fitsobj
 
-			elif fitsfile[1].name in 'COADD':
-				'''FITS format 2:
-				file[i].data['<variable>']
-				for multiple i HDU table/image
-				example file: SDSS_spec.fits
-				Note: sdss1.fits is okay; sdss2.fits has header PLUG_RA
-				'''
-				for i in range(len(fitsfile)):
-					search_list = np.array(fitsfile[i].header.cards)
-					if 'flux' in search_list:
-						self.fitsobj.flux = fitsfile[i].data['flux']
-					elif 'FLUX' in search_list:
-						self.fitsobj.flux = fitsfile[i].data['FLUX']
+		elif 'COADD' in labels:
+			#FITS format 2:
+			#file[i].data['<variable>']
+			#for multiple i HDU table/image
+			#example file: SDSS_spec.fits
+			#Note: sdss1.fits is okay; sdss2.fits has header PLUG_RA
+			
+			for i in range(len(fitsfile)):
+				search_list = np.array(fitsfile[i].header.cards)
+				if 'flux' in search_list:
+					self.fitsobj.flux = fitsfile[i].data['flux']
+				elif 'FLUX' in search_list:
+					self.fitsobj.flux = fitsfile[i].data['FLUX']
 
-					if 'loglam' in search_list:
-						self.fitsobj.wave = 10**(fitsfile[i].data['loglam'])
-					elif 'WAVELENGTH' in search_list:
-						self.fitsobj.wave = fitsfile[i].data['WAVELENGTH']
+				if 'loglam' in search_list:
+					self.fitsobj.wave = 10**(fitsfile[i].data['loglam'])
+				elif 'WAVELENGTH' in search_list:
+					self.fitsobj.wave = fitsfile[i].data['WAVELENGTH']
 
-					if 'ivar' in search_list:
-						self.fitsobj.error = 1. / np.sqrt(fitsfile[i].data['ivar'])
-					elif 'ERROR' in search_list:
-						self.fitsobj.error = fitsfile[i].data['ERROR']
+				if 'ivar' in search_list:
+					self.fitsobj.error = 1. / np.sqrt(fitsfile[i].data['ivar'])
+				elif 'ERROR' in search_list:
+					self.fitsobj.error = fitsfile[i].data['ERROR']
 
-					if 'RA' in search_list:
-						self.fitsobj.ra = fitsfile[i].header['RA']
-					if 'DEC' in search_list:
-						self.fitsobj.dec = fitsfile[i].header['DEC']
+				if ('RA' in search_list) & (self.fitsobj.ra is None):
+					self.fitsobj.ra = fitsfile[i].header['RA']
+				if ('DEC' in search_list) & (self.fitsobj.dec is None):
+					self.fitsobj.dec = fitsfile[i].header['DEC']
 
-				fitsfile.close()
-				return self.fitsobj
+			fitsfile.close()
+			return self.fitsobj
 
 		# CHECK IF FITS FILE HAS 1D SPECTRAL INFO...
 		# find wavelength, flux, error
@@ -143,8 +144,14 @@ class LoadSpec():
 			self.fitsobj.error = fitsfile['ERROR'].data
 
 			fitsfile.close()
-			print(type(self.fitsobj))
+			#print(type(self.fitsobj))
 			return self.fitsobj
+
+		
+		# Soft warning.. No compatible fits format
+		if self.fitsobj.flux is None:
+			return f'This GUI currently is not compatible with {fitsfile.filename()}.fits..'
+
 
 
 	def _build_wave(self, header):

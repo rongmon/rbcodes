@@ -21,6 +21,7 @@ class Custom_ToolBar(QToolBar):
 	send_fitsobj = pyqtSignal(object)
 	send_filename = pyqtSignal(str)
 	send_filenames = pyqtSignal(list)
+	send_message = pyqtSignal(str)
 	#Our personalized custom Toolbar
 	def __init__(self, mainWindow):
 		super().__init__()
@@ -235,37 +236,43 @@ class Custom_ToolBar(QToolBar):
 			loadspec = LoadSpec(self.filepaths[i-1])
 			filename = self.filenames[i-1]
 			self.filename = filename
-			self.fitsobj = loadspec._load_spec()
-			if (self.fitsobj.flux2d is not None) & (self.fitsobj.flux is None):
-				# only 2d spec exists
-				self.mW.sc.plot_spec2d(self.fitsobj.wave,
-									self.fitsobj.flux2d,
-									self.fitsobj.error2d,
+
+			selfcheck = loadspec._load_spec()
+			if type(selfcheck) is str:
+				print('bad fits format')
+				self.send_message.emit(selfcheck)
+			else:
+				self.fitsobj = loadspec._load_spec()
+
+				if (self.fitsobj.flux2d is not None) & (self.fitsobj.flux is None):
+					# only 2d spec exists
+					self.mW.sc.plot_spec2d(self.fitsobj.wave,
+										self.fitsobj.flux2d,
+										self.fitsobj.error2d,
+										filename)
+					self._add_scale2d()
+
+				elif (self.fitsobj.flux is not None) & (self.fitsobj.flux2d is None):
+					# only 1d spec exists
+					self.mW.sc.plot_spec(self.fitsobj.wave, 
+									self.fitsobj.flux, 
+									self.fitsobj.error,
 									filename)
-				self._add_scale2d()
+					self.s_combobox.clear()
 
-			elif (self.fitsobj.flux is not None) & (self.fitsobj.flux2d is None):
-				# only 1d spec exists
-				self.mW.sc.plot_spec(self.fitsobj.wave, 
-								self.fitsobj.flux, 
-								self.fitsobj.error,
-								filename)
-				self.s_combobox.clear()
+				elif (self.fitsobj.flux is not None) & (self.fitsobj.flux2d is not None):
+					# both 1d and 2d specs exist
+					self.mW.sc.plot_spec2d(self.fitsobj.wave,
+										self.fitsobj.flux2d,
+										self.fitsobj.error2d,
+										filename)
+					self.mW.sc.replot(self.fitsobj.wave, 
+									self.fitsobj.flux, 
+									self.fitsobj.error)
+					self._add_scale2d()
 
-			elif (self.fitsobj.flux is not None) & (self.fitsobj.flux2d is not None):
-				# both 1d and 2d specs exist
-				self.mW.sc.plot_spec2d(self.fitsobj.wave,
-									self.fitsobj.flux2d,
-									self.fitsobj.error2d,
-									filename)
-				self.mW.sc.replot(self.fitsobj.wave, 
-								self.fitsobj.flux, 
-								self.fitsobj.error)
-				self._add_scale2d()
-
-			
-			self.send_filename.emit(filename)
-			self.send_fitsobj.emit(self.fitsobj)		
+				self.send_filename.emit(filename)
+				self.send_fitsobj.emit(self.fitsobj)		
 
 	def _add_scale2d(self):
 		self.s_combobox.setMaxCount(4)

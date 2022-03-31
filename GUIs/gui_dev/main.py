@@ -111,6 +111,8 @@ class MainWindow(QMainWindow):
 		toolbar.send_filename.connect(self.sc._update_lines_for_newfile)
 		# 13. toolbar ==> main
 		toolbar.send_fitsobj.connect(self.on_fitsobj_slot)
+		# 14. toolbar ==> mbox (MessageBox)
+		toolbar.send_message.connect(lambda s,c='#ff0000': mbox.on_sent_message(s, c))
 		# 14. table_z ==> widget_z
 		table_z.send_dictdata.connect(widget_z._on_sent_dictdata)
 		# 15. widget_z ==> mbox (MessageBox)

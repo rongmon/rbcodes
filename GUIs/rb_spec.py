@@ -57,11 +57,12 @@ class read_spec(object):
     Edit    : Rongmon Bordoloi      September 2018 Changed kwargs to be compatible to python 3   
     Edit    : Rongmon Bordoloi      Aug 2020: added linetools.io.readspec file
     Edit    : Rongmon Bordoloi      April 2021: added velocity centroid estimates
+    Edit    : Rongmon Bordoloi      March 2022: Added more continuum fitting methods
 
     --------------------------------------------------------------------------------------------
     EXAMPLE: import numpy as np
             import matplotlib
-            matplotlib.use('TkAgg')
+            matplotlib.use('Qt5Agg')
             import matplotlib.pyplot as plt
             from GUIs import rb_spec as r 
 
@@ -84,6 +85,14 @@ class read_spec(object):
 
             #Fit continuum Mask the regions defined by velocity
             s.fit_continuum(mask=[-200,300,500,1100],domain=xlim,Legendre=3)
+                #Alternative Fit continuum methods.
+                #s.fit_continuum_ransac(window=149,mednorm=False)
+
+                #Aternate continuum fitting method [interactive]
+                s.fit_continuum(Legendre=False,prefit_cont='False')
+                #Aternate continuum fitting method [input prefit continuum]
+                s.fit_continuum(Legendre=False,prefit_cont=cont_arary)
+
 
             #Compute EW
             #Compute equivalent width within a velocity window
@@ -109,17 +118,34 @@ class read_spec(object):
     --------------------------------------------------------------------------------------------
 
     """
-    def __init__(self,filename,filetype=False, efil=None,**kwargs):
+    def __init__(self,filename=False,filetype=False, efil=None,**kwargs):
         """ creates the spectrum object """
         self.filename=filename
 
         if filetype==False:
             #Take File Extention and try
-            tt=os.path.splitext(filename)[1]
-            if (tt=='txt')| (tt=='dat'):
-                filetype='ascii'
+            if filename==False:
+                if 'wave' in kwargs:
+                    wave=kwargs['wave']
+                else:
+                    raise IOError("Input wavelength array")
+                if 'flux' in kwargs:
+                    flux=kwargs['flux']
+                else:
+                    raise IOError("Input flux array")
+                if 'error' in kwargs:
+                    error=kwargs['error']
+                else:
+                    raise IOError("Input error array")
+
+
+
             else:
-                filetype=tt[1:len(tt)] 
+                tt=os.path.splitext(filename)[1]
+                if (tt=='txt')| (tt=='dat'):
+                    filetype='ascii'
+                else:
+                    filetype=tt[1:len(tt)] 
 
 
         # Read in Files in differet formats
@@ -273,13 +299,14 @@ class read_spec(object):
 
         return self.wave_slice,self.error_slice,self.flux_slice,self.velo,self.linelist
 
-    def fit_continuum(self,mask=False,domain=False,Legendre=False,prefit_cont=[1.]):
+    def fit_continuum(self,mask=False,domain=False,Legendre=False,prefit_cont=[1.],RANSAC=False):
         """
         By default calls an interactive continuum fitter to the sliced spectrum.
         Or an automated Legendre polynomial fitter if keyword set Legendre.
             Order is given by Legendre=order
 
         """
+
         if Legendre==False:
             #pdb.set_trace()
             if prefit_cont == 'False':
@@ -337,6 +364,23 @@ class read_spec(object):
 
 
         return self.cont,self.fnorm,self.enorm
+
+
+    def fit_continuum_ransac(self,window=149,mednorm=False):
+        """
+        Alternate continuum fitting method. Does iterative ransac continumm fitting.
+
+        """
+        from IGM import ransac_contfit as cf 
+        #sp=cf.cont_fitter()
+        sp=cf.cont_fitter.from_data(self.wave_slice,self.flux_slice,error=self.error_slice,mednorm=mednorm)
+        sp.fit_continuum(window=window)
+
+        self.cont=sp.cont
+        self.fnorm=self.flux_slice/self.cont
+        self.enorm=self.error_slice/self.cont
+
+
 
     def compute_EW(self,lam_cen,vmin=-50.,vmax=50.,method='closest',plot=False):
         """
