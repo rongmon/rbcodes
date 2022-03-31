@@ -27,6 +27,9 @@ class MessageBox(QWidget):
 
 		self.setLayout(layout)
 
-	def on_sent_message(self, sent_message):
+	def on_sent_message(self, sent_message, hexColor='#000000'):
 		#self.message += sent_message
-		self.te.setText(sent_message)
+		prefix = f'<span style=\"color:{hexColor};\" >'
+		suffix = f'</span>'
+		message = prefix + f'{sent_message}' + suffix
+		self.te.setText(message)
