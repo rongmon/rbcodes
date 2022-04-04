@@ -214,27 +214,27 @@ class MplCanvas(FigureCanvasQTAgg):
 		err1d = np.sqrt(np.nansum(sub_var, axis=0))
 
         #Create weights
-		wt=np.nansum(flux2d,axis=1)
-		wt+=np.abs(np.min(wt))
-		wt/=np.sum(wt)
+		#wt=np.nansum(flux2d,axis=1)
+		#wt+=np.abs(np.min(wt))
+		#wt/=np.sum(wt)
 
-		tt=np.shape(flux2d)
+		#tt=np.shape(flux2d)
 		#print(tt)
 		#print(np.shape(flux2d))
-		temp=np.transpose(np.tile(wt,(tt[1],1)))
-		flux2d *=temp
-		norm = (np.max(flux1d) / np.max(flux2d,axis=(0,1)))
-		fl_sum = flux2d * norm
-		fl1d_opt=np.nansum(fl_sum,axis=0)
-		sig=np.sqrt(np.nansum(sub_var * (temp ** 2), axis=0 ))   # * n_spaxels
-		sig = sig * norm
+		#temp=np.transpose(np.tile(wt,(tt[1],1)))
+		#flux2d *=temp
+		#norm = (np.max(flux1d) / np.max(flux2d,axis=(0,1)))
+		#fl_sum = flux2d * norm
+		#fl1d_opt=np.nansum(fl_sum,axis=0)
+		#sig=np.sqrt(np.nansum(sub_var * (temp ** 2), axis=0 ))   # * n_spaxels
+		#sig = sig * norm
 		#print(np.shape(fl_sum))
 
 		#print(np.shape(sig))
 
 
-		#return flux1d, err1d
-		return fl1d_opt, sig
+		return flux1d, err1d
+		#return fl1d_opt, err1d
 
 
 	def plot_spec2d(self, wave, flux2d, error2d, filename, scale=0, normalization=0):
