@@ -56,14 +56,24 @@ class Custom_ToolBar(QToolBar):
 		btn_help.triggered.connect(self._open_user_manual)	
 		self.addSeparator()
 
-		# file dropbox
+		# "PREV" buttons for file dropbox
+		btn_prevf = self._create_button('PREV', 'Swtich to previous fits file loaded in backend.')
+		self.addAction(btn_prevf)
+		btn_prevf.triggered.connect(self._prev_fitsfile)
+		# File dropbox
 		self.f_combobox = QComboBox()
 		self.f_combobox.setFixedWidth(200)
 		self.f_combobox.addItem('No FITS File')
 		self.f_combobox.setCurrentIndex(0)
 		self.f_combobox.currentIndexChanged.connect(self._read_selected_fits)
 		self.addWidget(self.f_combobox)
+		# "NEXT" buttons for file dropbox
+		btn_nextf = self._create_button('NEXT', 'Switch to next fits file loaded in backend.')
+		self.addAction(btn_nextf)
+		btn_nextf.triggered.connect(self._next_fitsfile)
+
 		self.addSeparator()
+
 
 		# Scaling label
 		s_label = QLabel('Scale:')
@@ -91,6 +101,13 @@ class Custom_ToolBar(QToolBar):
 		self.max_range.returnPressed.connect(self._return_pressed)
 		self.max_range.setReadOnly(True)
 		self.addWidget(self.max_range)
+
+		self.addSeparator()
+
+		# Advanced Option - Call DS9 externally
+		btn_adv = self._create_button('Advanced', 'Call DS9 externally for further inspection')
+		self.addAction(btn_adv)
+		btn_adv.triggered.connect(self._on_advanced_option)
 
 
 
@@ -225,6 +242,29 @@ class Custom_ToolBar(QToolBar):
 			return base
 		else:
 			return os.path.splitext(base)[0]
+
+	def _prev_fitsfile(self):
+		# idx 0 is "No FITS File" placeholder
+		idx_min = 1
+		current = self.f_combobox.currentIndex()
+		if current > idx_min:
+			self.f_combobox.setCurrentIndex(current-1)
+		else:
+			pass
+
+	def _next_fitsfile(self):
+		current = self.f_combobox.currentIndex()
+		idx_max = self.f_combobox.count() - 1
+		if current < idx_max:
+			self.f_combobox.setCurrentIndex(current+1)
+		else:
+			pass
+
+	def _on_advanced_option(self):
+		print('Placeholder.....')
+		print('GUI will call DS9 externally')
+
+
 
 	# combobox event
 	def _read_selected_fits(self, i):

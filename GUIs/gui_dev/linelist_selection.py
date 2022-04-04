@@ -7,6 +7,7 @@ from PyQt5.QtCore import pyqtSignal
 
 from PyQt5 import QtCore
 from PyQt5 import QtGui
+from PyQt5.QtGui import QDoubleValidator
 
 from IGM.rb_setline import read_line_list
 
@@ -71,16 +72,25 @@ class LineListWidget(QWidget):
 		layout.addWidget(self.gauss_num, 1,2)
 
 		# 3 textedit box
+		self.onlyFloat = QDoubleValidator()
 		self.estZ = QLineEdit()
 		self.estZ.setPlaceholderText('Guess redshift')
 		self.estZ.setMaximumWidth(100)
+		self.estZ.setValidator(self.onlyFloat)
 		self.estZ.returnPressed.connect(self._on_z_return_pressed)
 		self.estZstd = QLineEdit()
 		self.estZstd.setPlaceholderText('z Error')
 		self.estZstd.setMaximumWidth(100)
+		self.estZstd.setValidator(self.onlyFloat)
 		self.conf = QLineEdit()
 		self.conf.setPlaceholderText('[0, 1.]')
 		self.conf.setMaximumWidth(150)
+		self.conf_onlyFloat = QDoubleValidator(bottom=0., 
+												top=1., 
+												decimals=3,
+												notation=QDoubleValidator.StandardNotation)
+		self.conf.setValidator(self.conf_onlyFloat)
+
 		self.flag = QLineEdit()
 		self.flag.setPlaceholderText('Additional Info?')
 		button = QPushButton('Add to Table below')
@@ -207,6 +217,8 @@ class LineListWidget(QWidget):
 			self.estZstd.setText('0')
 		if len(self.conf.text().strip()) < 1:
 			self.conf.setText('0')
+		if len(self.flag.text().strip()) < 1:
+			self.flag.setText('No comments')
 		data = {'Name': self.filename,
 				'z': self.newz[0], #float(self.estZ.text()),
 				'z_err': self.newz[1], #float(self.estZstd.text()),
@@ -256,6 +268,8 @@ class LineListWidget(QWidget):
 		else:
 			self.estZ.clear()
 			self.estZstd.clear()
+			self.newz = [0., 0.] # reset est_z and est_z_std back to zero
+
 			self.conf.clear()
 			self.flag.clear()
 			self.l_lln.setCurrentIndex(0)
