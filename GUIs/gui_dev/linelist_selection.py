@@ -12,6 +12,12 @@ from PyQt5.QtGui import QDoubleValidator
 from IGM.rb_setline import read_line_list
 
 class LineListWidget(QWidget):
+	# Linelist constant
+	# only need to update this one
+	LINELISTS = ['NONE', 'Eiger_Strong', 'LBG', 'Gal', 'LLS', 'LLS Small', 'DLA', 'atom']
+	# check function _get_linelist_df if any error showed up
+
+	# sending out data
 	send_lineindex = pyqtSignal(int)
 	send_linelist = pyqtSignal(object)
 	send_more_linelist = pyqtSignal(object)
@@ -24,7 +30,7 @@ class LineListWidget(QWidget):
 	def __init__(self):
 		super().__init__()
 
-		self.linelist_name = ''
+		#self.linelist_name = self.LINELISTS
 		self.linelist = []
 		self.filename = ''
 		self.filenames = []
@@ -49,7 +55,7 @@ class LineListWidget(QWidget):
 
 		self.l_lln = QComboBox()
 		self.l_lln.setFixedWidth(120)
-		self.l_lln.addItems(['NONE', 'LBG', 'Gal', 'LLS', 'LLS Small', 'DLA', 'atom'])
+		self.l_lln.addItems(self.LINELISTS)
 		layout.addWidget(self.l_lln, 1, 0)
 		self.l_lln.currentTextChanged.connect(self._linelist_changed)
 		#menubar.send_filename.connect(self.on_linelist_name_slot)
@@ -144,7 +150,7 @@ class LineListWidget(QWidget):
 			# initialize more linelists for plotting
 			colors = ['#A52A2A', '#FF7F50', '#40E0D0', '#DAA520', '#008000', '#4B0082']
 			for i in range(len(self.llists_2)):
-				self.llists_2[i][1].addItems(['NONE', 'LBG', 'Gal', 'LLS', 'LLS Small', 'DLA', 'atom'])
+				self.llists_2[i][1].addItems(self.LINELISTS)
 				t_color = 'QComboBox {color:' + colors[i] + '}'
 				self.llists_2[i][1].setStyleSheet(t_color)
 				# 2 parameters need to be passed: 1.selected linelist and 2.index of linelist widget changed
