@@ -355,7 +355,14 @@ class Custom_ToolBar(QToolBar):
 		self.max_range.setText(str(sent_limits[1]))
 
 	def _return_pressed(self):
+		# min,max current values
 		manual_range = [float(self.min_range.text()), float(self.max_range.text())]
+		# sort and assign min,max values to avoid user errors
+		manual_range.sort()
+		self.min_range.setText(str(manual_range[0]))
+		self.max_range.setText(str(manual_range[-1]))
+
+
 		self.n_combobox.setCurrentIndex(11)
 		self.mW.sc.plot_spec2d(self.fitsobj.wave,
 							self.fitsobj.flux2d,
