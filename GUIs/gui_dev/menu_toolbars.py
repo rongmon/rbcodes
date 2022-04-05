@@ -26,6 +26,7 @@ class Custom_ToolBar(QToolBar):
 	def __init__(self, mainWindow):
 		super().__init__()
 		self.mW = mainWindow
+		self.loadspec = None
 		self.fitsobj = mainWindow.fitsobj
 		self.filepaths = []
 		self.filenames = []
@@ -33,6 +34,7 @@ class Custom_ToolBar(QToolBar):
 		self.scale2d = False
 		self.scale = 0
 		self.manual = None # No user manual yet
+		self.extract1d = None # wait for sent_extract1d
 
 		self.setWindowTitle('Customizable TooBar')
 		#self.setFixedSize(QSize(200, 50))
@@ -46,7 +48,7 @@ class Custom_ToolBar(QToolBar):
 		#btn_loadf.triggered.connect(self._load_spec)
 		btn_loadf.triggered.connect(self._load_more_specs)
 
-		btn_savef = self._create_button('Save FITS', 'Save the fits file to unified format')
+		btn_savef = self._create_button('Save Extract1D', 'Save the extracted 1D FITS file')
 		self.addAction(btn_savef)
 		btn_savef.triggered.connect(self._save_spec)
 		self.addSeparator()
@@ -221,19 +223,36 @@ class Custom_ToolBar(QToolBar):
 
 
 	def _save_spec(self):
-		#Save spec fits file with our own fits format
+		#Save extract1d (wave, flux1d, error1d) with a deepcopy of loaded 2D spec 
+		if self.loadspec is not None:
+			if self.extract1d is not None:
+				newfilename = self.filename + '_ymin={}_ymax={}'.format(self.extract1d['YMIN'], self.extract1d['YMAX'])
+				filepath, check = QFileDialog.getSaveFileName(None,
+					'Save 1D Spectrum FITS file',
+					newfilename,
+					'Fits Files (*.fits)')
+				print(filepath)
+				if check:
+					# create a deepcopy first
+					hdul_copy = self.loadspec._save_copy()
+					# and then append a BinTable with WAVELENGTH, FLUX1D, ERROR1D
+					col1 = fits.Column(name='WAVELENGTH', format='D', array=self.extract1d['WAVELENGTH'])
+					col2 = fits.Column(name='FLUX', format='D', array=self.extract1d['FLUX'])
+					col3 = fits.Column(name='ERROR', format='D', array=self.extract1d['ERROR'])
+					cols = fits.ColDefs([col1, col2, col3])
+					tmp_hdu = fits.BinTableHDU.from_columns(cols)
+					tmp_hdu.name = 'EXTRACT1D'
+					hdul_copy.append(tmp_hdu)
+					# ymin/ymax are written in the final filename
+					hdul_copy.writeto(filepath)
+					print('Saving a fits file to [{}]'.format(filepath))
 
-		filepath, check = QFileDialog.getSaveFileName(None,
-			'Save 1 spectrum FITS file',
-			'',
-			'Fits Files (*.fits')
-		if check:
-			table = Table()
-			table['WAVELENGTH'] = self.fitsobj.wave
-			table['FLUX'] = self.fitsobj.flux
-			table['ERROR'] = self.fitsobj.error
-			print('Saving a fits file to [{}]'.format(filepath))
-			table.write(filepath, format='fits')
+			else:
+				self.send_message.emit('Please select a new extraction box.')
+				
+				#self.extract1d = None # reset extraction object
+		else:
+			self.send_message.emit('Please read a FITS file first before saving!')
 
 	def _get_filename(self, filepath, extension=False):
 		# return the filename and ready to pass to other widgets
@@ -273,16 +292,16 @@ class Custom_ToolBar(QToolBar):
 		if i < 1:
 			pass
 		else:
-			loadspec = LoadSpec(self.filepaths[i-1])
+			self.loadspec = LoadSpec(self.filepaths[i-1])
 			filename = self.filenames[i-1]
 			self.filename = filename
 
-			selfcheck = loadspec._load_spec()
+			selfcheck = self.loadspec._load_spec()
 			if type(selfcheck) is str:
 				print('bad fits format')
 				self.send_message.emit(selfcheck)
 			else:
-				self.fitsobj = loadspec._load_spec()
+				self.fitsobj = self.loadspec._load_spec()
 
 				if (self.fitsobj.flux2d is not None) & (self.fitsobj.flux is None):
 					# only 2d spec exists
@@ -302,13 +321,32 @@ class Custom_ToolBar(QToolBar):
 
 				elif (self.fitsobj.flux is not None) & (self.fitsobj.flux2d is not None):
 					# both 1d and 2d specs exist
-					self.mW.sc.plot_spec2d(self.fitsobj.wave,
-										self.fitsobj.flux2d,
-										self.fitsobj.error2d,
-										filename)
-					self.mW.sc.replot(self.fitsobj.wave, 
-									self.fitsobj.flux, 
-									self.fitsobj.error)
+
+					# check if filename has keywords ymin/ymax for 2D fits
+					if ('ymin' in filename) & ('ymax' in filename):
+						flist = filename.split('.')[0].split('_')
+						extraction_box = [int(flist[-2][5:]), int(flist[-1][5:])]
+						
+						self.mW.sc.plot_spec2d(self.fitsobj.wave,
+											self.fitsobj.flux2d,
+											self.fitsobj.error2d,
+											filename,
+											pre_extraction=extraction_box)
+						self.mW.sc.replot(self.fitsobj.wave, 
+										self.fitsobj.flux, 
+										self.fitsobj.error)
+										
+					else:
+						# if not, set up extraction box as usual
+						self.mW.sc.plot_spec2d(self.fitsobj.wave,
+											self.fitsobj.flux2d,
+											self.fitsobj.error2d,
+											filename)
+						self.mW.sc.replot(self.fitsobj.wave, 
+										self.fitsobj.flux, 
+										self.fitsobj.error)
+					
+
 					self._add_scale2d()
 
 				self.send_filename.emit(filename)
@@ -370,6 +408,9 @@ class Custom_ToolBar(QToolBar):
 							self.filename,
 							scale=self.scale,
 							normalization=manual_range)
+
+	def _on_sent_extract1d(self, sent_extract1d):
+		self.extract1d = sent_extract1d
 
 
 #----------------------------- Menu bar ---------------------------

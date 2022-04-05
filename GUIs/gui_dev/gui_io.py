@@ -1,5 +1,6 @@
 import sys
 import os
+import copy
 from astropy.io import fits
 import numpy as np
 
@@ -30,6 +31,30 @@ class LoadSpec():
 		# read fits file
 		fitsfile = fits.open(self.filepath)
 		labels = [label.name for label in fitsfile]
+
+		# check if filename has keywords ymin/ymax for 2D fits
+		if 'ymin' in fitsfile.filename():
+			fname = fitsfile.filename().split('.')[0]
+			flist = fname.split('_')
+			extraction_box = [int(flist[-2][5:]), int(flist[-1][5:])]
+
+			self.fitsobj.flux2d = fitsfile['SCI'].data
+			self.fitsobj.error2d = fitsfile['ERR'].data
+			# Set RA DEC
+			if 'RA' in fitsfile['SCI'].header:
+				self.fitsobj.ra = fitsfile['SCI'].header['RA']
+				self.fitsobj.dec = fitsfile['SCI'].header['DEC']
+
+			# check if there is EXTRACT1D BinTableHDU
+			if 'EXTRACT1D' in labels:
+				# This is FITS format that GUI saved
+				self.fitsobj.wave = fitsfile['EXTRACT1D'].data['WAVELENGTH']
+				self.fitsobj.flux = fitsfile['EXTRACT1D'].data['FLUX']
+				self.fitsobj.error = fitsfile['EXTRACT1D'].data['ERROR']
+
+			fitsfile.close()
+			return self.fitsobj
+
 
 		# for a pair of fits files:
 		# cal-2D, x1d-1D
@@ -201,3 +226,9 @@ class LoadSpec():
 		else:
 			raise ValueError("Predefined wavelength units are 'um','nm','AA'.")            
 		return scale
+
+	def _save_copy(self):
+		fitsfile = fits.open(self.filepath)
+		fitsfile_copy = copy.deepcopy(fitsfile)
+		fitsfile.close()
+		return fitsfile_copy
