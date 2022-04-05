@@ -5,7 +5,7 @@ import time
 import numpy as np
 import matplotlib
 matplotlib.use('Qt5Agg') #python 3 only
-import ipdb
+#import ipdb
 from linetools.spectra import io as tio
 from scipy.signal import medfilt
 from scipy.signal import find_peaks
