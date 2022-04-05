@@ -75,48 +75,43 @@ class MainWindow(QMainWindow):
 
 
 		# ----------------- Signal connections ---------------
-		# 1. menubr ==> mainWindow		
+		# 1. menubar signal exports
 		#menubar.send_fitsobj.connect(self.on_fitsobj_slot)
 		#menubar.send_linelist.connect(self.on_linelist_slot)
 		#menubar.send_z_est.connect(self.on_z_est_slot)
-		#print(self.fitsobj.wave)
-		# 2. menubar ==> widget_z
 		#menubar.send_filename.connect(widget_z.on_linelist_name_slot)
 		#menubar.send_linelist.connect(widget_z.on_linelist_slot)
-		# 3. menubar ==> sc (SpecCanvas)
 		#menubar.send_linelist.connect(self.sc.on_linelist_slot)
-		# 4. menubar ==> table_z
 		#menubar.send_z_est.connect(table_z._on_sent_estZ)
-		# 5. widget_z ==> sc (SpecCanvas)
+
+		# 2. toolbar signal exports
+		toolbar.send_filename.connect(widget_z._on_sent_filename)
+		toolbar.send_fitsobj.connect(widget_z._on_sent_fitsobj)
+		toolbar.send_filename.connect(table_z._move_current_filename_top)
+		toolbar.send_filename.connect(self.sc._update_lines_for_newfile)
+		toolbar.send_fitsobj.connect(self.on_fitsobj_slot)
+		toolbar.send_message.connect(lambda s,c='#ff0000': mbox.on_sent_message(s, c))
+
+		# 3. widget_z signal exports
 		widget_z.send_linelist.connect(self.sc.on_linelist_slot)
 		widget_z.send_lineindex.connect(self.sc.on_lineindex_slot)
 		widget_z.send_gauss_num.connect(self.sc._on_sent_gauss_num)
 		widget_z.send_z_returnPressed.connect(self.sc._on_estZ_return_pressed)
 		widget_z.send_more_linelist.connect(self.sc.on_additional_linelist_slot)
 		widget_z.send_more_linelist_z.connect(self.sc.on_additional_linelist_slot_z)
-		# 6. sc (SpecCanvas) ==> mbox (MessageBox)
-		self.sc.send_message.connect(mbox.on_sent_message)
-		# 7. sc (SpecCanvas) ==> widget_z.estZ
-		self.sc.send_z_est.connect(widget_z._on_estZ_changed)
-		# 8. sc (SpecCanvas) ==> toolbar
-		self.sc.send_scale_limits.connect(toolbar._on_scale_limits_slot)
-		# 9. toolbar ==> widget_z
-		toolbar.send_filename.connect(widget_z._on_sent_filename)
-		toolbar.send_fitsobj.connect(widget_z._on_sent_fitsobj)
-		# 10. widget_z ==> table_z
-		widget_z.send_data.connect(table_z._on_sent_data)
-		# 11. toolbar ==> table_z
-		toolbar.send_filename.connect(table_z._move_current_filename_top)
-		# 12. toolbar ==> sc (SpecCanvas)
-		toolbar.send_filename.connect(self.sc._update_lines_for_newfile)
-		# 13. toolbar ==> main
-		toolbar.send_fitsobj.connect(self.on_fitsobj_slot)
-		# 14. toolbar ==> mbox (MessageBox)
-		toolbar.send_message.connect(lambda s,c='#ff0000': mbox.on_sent_message(s, c))
-		# 14. table_z ==> widget_z
-		table_z.send_dictdata.connect(widget_z._on_sent_dictdata)
-		# 15. widget_z ==> mbox (MessageBox)
 		widget_z.send_message.connect(mbox.on_sent_message)
+		widget_z.send_data.connect(table_z._on_sent_data)
+
+		# 4. sc (SpecCanvas) signal exports
+		self.sc.send_message.connect(mbox.on_sent_message)
+		self.sc.send_z_est.connect(widget_z._on_estZ_changed)
+		self.sc.send_scale_limits.connect(toolbar._on_scale_limits_slot)
+		self.sc.send_extract1d.connect(toolbar._on_sent_extract1d)
+		
+		# 5. table_z ==> widget_z
+		table_z.send_dictdata.connect(widget_z._on_sent_dictdata)
+
+		
 
 
 

@@ -25,14 +25,14 @@ class CustomZTable(QtWidgets.QWidget):
 		b_load.clicked.connect(self._load_button_clicked)
 		b_save = QtWidgets.QPushButton('Save')
 		b_save.clicked.connect(self._save_button_clicked)
-		b_clear = QtWidgets.QPushButton('Clear')
-		b_clear.clicked.connect(self._clear_button_clicked)
+		#b_clear = QtWidgets.QPushButton('Clear')
+		#b_clear.clicked.connect(self._clear_button_clicked)
 
 
 		layout_b = QtWidgets.QVBoxLayout()
 		layout_b.addWidget(b_load)
 		layout_b.addWidget(b_save)
-		layout_b.addWidget(b_clear)
+		#layout_b.addWidget(b_clear)
 
 
 		layout = QtWidgets.QHBoxLayout()
@@ -73,6 +73,7 @@ class CustomZTable(QtWidgets.QWidget):
 			self.estZ.reset_index(inplace=True, drop=True)
 			self._update_table()
 			self.send_dictdata.emit(self.estZ.iloc[0].to_dict())
+			#print(self.estZ.iloc[0].to_dict())
 		else:
 			self.send_dictdata.emit({})
 
