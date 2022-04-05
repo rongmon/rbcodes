@@ -7,10 +7,17 @@ from PyQt5.QtCore import pyqtSignal
 
 from PyQt5 import QtCore
 from PyQt5 import QtGui
+from PyQt5.QtGui import QDoubleValidator
 
 from IGM.rb_setline import read_line_list
 
 class LineListWidget(QWidget):
+	# Linelist constant
+	# only need to update this one
+	LINELISTS = ['NONE', 'Eiger_Strong', 'LBG', 'Gal', 'LLS', 'LLS Small', 'DLA', 'atom']
+	# check function _get_linelist_df if any error showed up
+
+	# sending out data
 	send_lineindex = pyqtSignal(int)
 	send_linelist = pyqtSignal(object)
 	send_more_linelist = pyqtSignal(object)
@@ -23,7 +30,7 @@ class LineListWidget(QWidget):
 	def __init__(self):
 		super().__init__()
 
-		self.linelist_name = ''
+		#self.linelist_name = self.LINELISTS
 		self.linelist = []
 		self.filename = ''
 		self.filenames = []
@@ -48,7 +55,7 @@ class LineListWidget(QWidget):
 
 		self.l_lln = QComboBox()
 		self.l_lln.setFixedWidth(120)
-		self.l_lln.addItems(['NONE', 'LBG', 'Gal', 'LLS', 'LLS Small', 'DLA', 'atom'])
+		self.l_lln.addItems(self.LINELISTS)
 		layout.addWidget(self.l_lln, 1, 0)
 		self.l_lln.currentTextChanged.connect(self._linelist_changed)
 		#menubar.send_filename.connect(self.on_linelist_name_slot)
@@ -71,16 +78,25 @@ class LineListWidget(QWidget):
 		layout.addWidget(self.gauss_num, 1,2)
 
 		# 3 textedit box
+		self.onlyFloat = QDoubleValidator()
 		self.estZ = QLineEdit()
 		self.estZ.setPlaceholderText('Guess redshift')
 		self.estZ.setMaximumWidth(100)
+		self.estZ.setValidator(self.onlyFloat)
 		self.estZ.returnPressed.connect(self._on_z_return_pressed)
 		self.estZstd = QLineEdit()
 		self.estZstd.setPlaceholderText('z Error')
 		self.estZstd.setMaximumWidth(100)
+		self.estZstd.setValidator(self.onlyFloat)
 		self.conf = QLineEdit()
 		self.conf.setPlaceholderText('[0, 1.]')
 		self.conf.setMaximumWidth(150)
+		self.conf_onlyFloat = QDoubleValidator(bottom=0., 
+												top=1., 
+												decimals=3,
+												notation=QDoubleValidator.StandardNotation)
+		self.conf.setValidator(self.conf_onlyFloat)
+
 		self.flag = QLineEdit()
 		self.flag.setPlaceholderText('Additional Info?')
 		button = QPushButton('Add to Table below')
@@ -134,7 +150,7 @@ class LineListWidget(QWidget):
 			# initialize more linelists for plotting
 			colors = ['#A52A2A', '#FF7F50', '#40E0D0', '#DAA520', '#008000', '#4B0082']
 			for i in range(len(self.llists_2)):
-				self.llists_2[i][1].addItems(['NONE', 'LBG', 'Gal', 'LLS', 'LLS Small', 'DLA', 'atom'])
+				self.llists_2[i][1].addItems(self.LINELISTS)
 				t_color = 'QComboBox {color:' + colors[i] + '}'
 				self.llists_2[i][1].setStyleSheet(t_color)
 				# 2 parameters need to be passed: 1.selected linelist and 2.index of linelist widget changed
@@ -207,6 +223,8 @@ class LineListWidget(QWidget):
 			self.estZstd.setText('0')
 		if len(self.conf.text().strip()) < 1:
 			self.conf.setText('0')
+		if len(self.flag.text().strip()) < 1:
+			self.flag.setText('No comments')
 		data = {'Name': self.filename,
 				'z': self.newz[0], #float(self.estZ.text()),
 				'z_err': self.newz[1], #float(self.estZstd.text()),
@@ -256,6 +274,8 @@ class LineListWidget(QWidget):
 		else:
 			self.estZ.clear()
 			self.estZstd.clear()
+			self.newz = [0., 0.] # reset est_z and est_z_std back to zero
+
 			self.conf.clear()
 			self.flag.clear()
 			self.l_lln.setCurrentIndex(0)

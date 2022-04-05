@@ -84,6 +84,8 @@ def read_line_list(label):
         filename=resource_filename('IGM','lines/lbg.lst')
     elif label == 'Gal':
         filename=resource_filename('IGM','lines/gal_vac.lst')
+    elif label == 'Eiger_Strong':
+        filename=resource_filename('IGM','lines/Eiger_Strong.lst')
 
     else:
         print('Give Correct LineList')
@@ -113,6 +115,19 @@ def read_line_list(label):
             source['ion'] = s['name'][line]+' '+s['transition'][line]
             source['fval']=float(s['ID'][line])
             source['gamma']=float(s['ID'][line])
+
+            data.append(source)
+
+    elif label =='Eiger_Strong':
+
+        s=ascii.read(filename)
+
+        for line in range(0,len(s['wrest'])):
+            source = {}
+            source['wrest'] = float(s['wrest'][line])
+            source['ion'] = s['name'][line]#+' '+s['transition'][line]
+            source['fval']=float(0)#s['ID'][line])
+            source['gamma']=float(0)#s['ID'][line])
 
             data.append(source)
 

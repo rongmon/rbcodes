@@ -25,6 +25,7 @@ class MplCanvas(FigureCanvasQTAgg):
 	send_gcenter = pyqtSignal(list)
 	send_scale_limits = pyqtSignal(list)
 	send_gauss_num = pyqtSignal(int)
+	send_extract1d = pyqtSignal(dict)
 
 	def __init__(self, parent=None, width=5, height=3, dpi=100):
 		self.figsize = [width, height]
@@ -214,30 +215,30 @@ class MplCanvas(FigureCanvasQTAgg):
 		err1d = np.sqrt(np.nansum(sub_var, axis=0))
 
         #Create weights
-		wt=np.nansum(flux2d,axis=1)
-		wt+=np.abs(np.min(wt))
-		wt/=np.sum(wt)
+		#wt=np.nansum(flux2d,axis=1)
+		#wt+=np.abs(np.min(wt))
+		#wt/=np.sum(wt)
 
-		tt=np.shape(flux2d)
+		#tt=np.shape(flux2d)
 		#print(tt)
 		#print(np.shape(flux2d))
-		temp=np.transpose(np.tile(wt,(tt[1],1)))
-		flux2d *=temp
-		norm = (np.max(flux1d) / np.max(flux2d,axis=(0,1)))
-		fl_sum = flux2d * norm
-		fl1d_opt=np.nansum(fl_sum,axis=0)
-		sig=np.sqrt(np.nansum(sub_var * (temp ** 2), axis=0 ))   # * n_spaxels
-		sig = sig * norm
+		#temp=np.transpose(np.tile(wt,(tt[1],1)))
+		#flux2d *=temp
+		#norm = (np.max(flux1d) / np.max(flux2d,axis=(0,1)))
+		#fl_sum = flux2d * norm
+		#fl1d_opt=np.nansum(fl_sum,axis=0)
+		#sig=np.sqrt(np.nansum(sub_var * (temp ** 2), axis=0 ))   # * n_spaxels
+		#sig = sig * norm
 		#print(np.shape(fl_sum))
 
 		#print(np.shape(sig))
 
 
-		#return flux1d, err1d
-		return fl1d_opt, sig
+		return flux1d, err1d
+		#return fl1d_opt, err1d
 
 
-	def plot_spec2d(self, wave, flux2d, error2d, filename, scale=0, normalization=0):
+	def plot_spec2d(self, wave, flux2d, error2d, filename, scale=0, normalization=0, pre_extraction=None):
 		'''Display 2D spec in top panel, 1D extraction in bottom panel
 		self.flux2d, self.err2d - 2D spec info
 		self.flux, self.error - 1D spec extraction
@@ -255,25 +256,31 @@ class MplCanvas(FigureCanvasQTAgg):
 
 		# copy of flux2d with nan replaced by 0
 		img = np.nan_to_num(self.flux2d, nan=0.)
-		# sum in dispersion direction to do initial selection
-		tmp = np.sum(img + np.abs(img.min()), axis=1)
-		# make sure tmp has no negative values for initial guess
-		tmp_cumsum = np.cumsum(tmp) / np.sum(tmp)
-		ylist = np.arange(0, len(tmp_cumsum), 1)
-		# flux/error are active and extracted from flux2d/error2d
-		self.flux, self.error = self.extract_1d(self.flux2d, self.err2d)
-		# keep a frozen copy and only used for reset
-		self.flux_fix, self.error_fix = self.flux.copy(), self.error.copy()
+		
+		if pre_extraction is None:
+			
+			# sum in dispersion direction to do initial selection
+			tmp = np.sum(img + np.abs(img.min()), axis=1)
+			# make sure tmp has no negative values for initial guess
+			tmp_cumsum = np.cumsum(tmp) / np.sum(tmp)
+			ylist = np.arange(0, len(tmp_cumsum), 1)
+			# flux/error are active and extracted from flux2d/error2d
+			self.flux, self.error = self.extract_1d(self.flux2d, self.err2d)
+			# keep a frozen copy and only used for reset
+			self.flux_fix, self.error_fix = self.flux.copy(), self.error.copy()
 
-		#print(tmp_cumsum)
-		lower, upper = 0.16, 0.84
-		self.extraction_y = [int(np.interp(lower, tmp_cumsum, ylist)),
-							int(np.interp(upper, tmp_cumsum, ylist))]
-		self.tmp_extraction_y = []
-		#print(self.extraction_y)
+			#print(tmp_cumsum)
+			lower, upper = 0.16, 0.84
+			self.extraction_y = [int(np.interp(lower, tmp_cumsum, ylist)),
+								int(np.interp(upper, tmp_cumsum, ylist))]			
+			#print(self.extraction_y)
+		else:
+			self.extraction_y = pre_extraction
+
 		self.flux, self.error = self.extract_1d(self.flux2d[self.extraction_y[0]: self.extraction_y[1], :],
 												self.err2d[self.extraction_y[0]: self.extraction_y[1], :])
-
+		self.tmp_extraction_y = []
+		
 		# plot starting...
 		# 1d spec plot... (keep same varname as axes in plot_spec)
 		self.axes.plot(wave, self.error, color='red')
@@ -663,6 +670,11 @@ class MplCanvas(FigureCanvasQTAgg):
 												int(np.round(max(self.tmp_extraction_y))))
 						self.flux, self.error = self.extract_1d(self.flux2d[ext_min_y:ext_max_y, :], 
 																	self.err2d[ext_min_y:ext_max_y, :])
+						self.send_extract1d.emit({'WAVELENGTH': self.wave,
+												'FLUX': self.flux,
+												'ERROR': self.error,
+												'YMIN': ext_min_y,
+												'YMAX': ext_max_y})
 						self.replot2d(self.wave, self.flux, self.error, [ext_min_y,ext_max_y])
 						self.tmp_extraction_y = []
 					self.draw()
