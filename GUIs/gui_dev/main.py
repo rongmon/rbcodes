@@ -99,6 +99,7 @@ class MainWindow(QMainWindow):
 		widget_z.send_z_returnPressed.connect(self.sc._on_estZ_return_pressed)
 		widget_z.send_more_linelist.connect(self.sc.on_additional_linelist_slot)
 		widget_z.send_more_linelist_z.connect(self.sc.on_additional_linelist_slot_z)
+		widget_z.send_linelists2multiG.connect(self.sc._on_sent_linelists2multiG)
 		widget_z.send_message.connect(mbox.on_sent_message)
 		widget_z.send_data.connect(table_z._on_sent_data)
 

@@ -19,11 +19,12 @@ class Gaussfit_2d(QDialog):
     send_lineindex = pyqtSignal(int)
     send_waves = pyqtSignal(object)
 
-    def __init__(self,wave, flux1d,error1d, gauss_num=2):
+    def __init__(self,wave, flux1d,error1d, gauss_num=2, linelists=[]):
         super().__init__()
         self.gauss_num = gauss_num
         self.waves = np.array([-1] * gauss_num)
         self.names = np.array([None] * gauss_num)
+        self.linelists = linelists
         
 
 
@@ -34,7 +35,7 @@ class Gaussfit_2d(QDialog):
         
         self.line_combo = QComboBox()
         self.line_combo.setFixedWidth(120)
-        self.line_combo.addItems(['NONE', 'LBG', 'Gal', 'LLS', 'LLS Small', 'DLA', 'atom'])
+        self.line_combo.addItems(self.linelists)
         lines_layout.addWidget(self.line_combo, 1, 0)
 
         l_zf = QLabel('Estimated z')
@@ -131,6 +132,8 @@ class Gaussfit_2d(QDialog):
                 self.send_waves.emit({ni:wi for ni,wi in zip(self.names, self.waves)})
 
 
+    def _on_sent_linelists2multiG(self, l):
+        self.LINELISTS = l
 
 
     def _linelist_changed(self, s, ion_widgets):

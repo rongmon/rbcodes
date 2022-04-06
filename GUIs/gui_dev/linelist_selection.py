@@ -1,4 +1,5 @@
 import sys
+import os
 import pandas as pd
 from numpy import floor, log10, isnan
 
@@ -11,10 +12,17 @@ from PyQt5.QtGui import QDoubleValidator
 
 from IGM.rb_setline import read_line_list
 
+LINELIST_DIR = os.path.dirname(os.path.abspath(__file__))
+
 class LineListWidget(QWidget):
 	# Linelist constant
 	# only need to update this one
-	LINELISTS = ['NONE', 'Eiger_Strong', 'LBG', 'Gal', 'LLS', 'LLS Small', 'DLA', 'atom']
+	LINELISTS = ['NONE']
+	with open(LINELIST_DIR+'/gui_linelists.ascii') as f:
+		next(f)
+		for line in f:
+			LINELISTS.append(line.strip())
+
 	# check function _get_linelist_df if any error showed up
 
 	# sending out data
@@ -26,6 +34,7 @@ class LineListWidget(QWidget):
 	send_gauss_num = pyqtSignal(int)
 	send_message = pyqtSignal(str)
 	send_z_returnPressed = pyqtSignal(float)
+	send_linelists2multiG = pyqtSignal(list)
 
 	def __init__(self):
 		super().__init__()
@@ -282,6 +291,7 @@ class LineListWidget(QWidget):
 
 	def _on_gauss_num_activated(self):
 		self.send_gauss_num.emit(int(self.gauss_num.currentText()))
+		self.send_linelists2multiG.emit(self.LINELISTS)
 
 	def round_to_sigfig(self, num=0., sigfig=1):
 		return round(num, sigfig - int(floor(log10(abs(num)))) - 1)
