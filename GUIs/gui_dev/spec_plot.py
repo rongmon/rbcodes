@@ -49,6 +49,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.gauss_num = 1
 		self.gauss_profiles = []
 		self.gauss2d = None
+		self.linelists2multiG = []
 
 		num_2ndlist = 6
 		self.addtional_linelist = {i:[] for i in range(num_2ndlist)}
@@ -623,7 +624,7 @@ class MplCanvas(FigureCanvasQTAgg):
 						self.send_gcenter.emit(self.guess_gcenter)
 
 					else:
-						print('Multiple Gaussian fitting starts here')
+						print('Multiple Gaussian fitting starts.')
 						# Double Gaussian Fitting
 						self.axes.fill_between(g_wave,
 												y1=np.max(g_flux)*1.1,
@@ -635,7 +636,9 @@ class MplCanvas(FigureCanvasQTAgg):
 						self.axes.collections.pop()
 
 						self.gauss2d = Gaussfit_2d(g_wave, g_flux, g_error, 
-													gauss_num=self.gauss_num)
+													gauss_num=self.gauss_num,
+													linelists=self.linelists2multiG)
+
 
 
 					# clear out selection
@@ -784,6 +787,9 @@ class MplCanvas(FigureCanvasQTAgg):
 				self._plot_lines(self.lineindex)
 		else:
 			self._clear_plotted_lines()
+
+	def _on_sent_linelists2multiG(self, l):
+		self.linelists2multiG = l
 
 
 #-------------------- Dialog Box for XY Ranges --------------------
