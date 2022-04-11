@@ -1,6 +1,6 @@
 import sys
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QDialog
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QDialog, QDesktopWidget
 from spec_fit_gauss2d import Gaussfit_2d
 from linetools.spectra.xspectrum1d import XSpectrum1D  
 import numpy as np
@@ -19,7 +19,7 @@ class MainWindow(QMainWindow):
 
         #Add your flux extraction code in here
         
-        sp=XSpectrum1D.from_file('../../example-data/test.fits')
+        sp=XSpectrum1D.from_file('./example-data/test.fits')
 
         wave=sp.wavelength.value
         flux=sp.flux.value
@@ -28,6 +28,12 @@ class MainWindow(QMainWindow):
         self.wave=wave[q]
         self.flux=flux[q]
         self.error=error[q]
+
+        sizeObj = QDesktopWidget().screenGeometry(-1)
+        print('Screen size:' + str(sizeObj.height())+ 'x' + str(sizeObj.width()))  
+        availObj = QDesktopWidget().availableGeometry(-1) 
+        print('Availble size:' + str(availObj.height())+ 'x' + str(availObj.width()))
+        self.move(sizeObj.width()//2, sizeObj.height()//2)
         
 
     def button_clicked(self, s):

@@ -50,6 +50,7 @@ class MainWindow(QMainWindow):
 		sublayout = QHBoxLayout()
 		sublayout.addWidget(mbox)
 		sublayout.addWidget(table_z)
+		sublayout.setContentsMargins(0,0,0,0)
 
 		layout = QVBoxLayout()
 		layout.setAlignment(QtCore.Qt.AlignLeft) #QtCore.Qt.AlignTop | 
@@ -57,6 +58,7 @@ class MainWindow(QMainWindow):
 		self.sc = MplCanvas(width=15, height=9, dpi=100)
 		self.sc.setMinimumSize(1000,500)
 		sc_layout = QVBoxLayout()
+		sc_layout.setContentsMargins(0,0,0,0)
 		mpl_toolbar = NavigationToolbar(self.sc, self)
 		sc_layout.addWidget(mpl_toolbar)
 		sc_layout.addWidget(self.sc)
@@ -66,11 +68,13 @@ class MainWindow(QMainWindow):
 		#layout.addWidget(table_z)
 		#layout.addWidget(mbox)
 		layout.addLayout(sublayout)
+		layout.setContentsMargins(0,0,0,0)
 		widget.setLayout(layout)
 
 		# MainWindow parameters
 		self.setCentralWidget(widget)
 		self.setWindowTitle('Spectrum Analysis GUI')
+		#self.setMinimumSize(1000, 900)
 		
 
 
@@ -114,7 +118,9 @@ class MainWindow(QMainWindow):
 		# 5. table_z ==> widget_z
 		table_z.send_dictdata.connect(widget_z._on_sent_dictdata)
 
-		
+	
+		#sizeObj = QDesktopWidget().screenGeometry(-1)
+		#print('Screen size:' + str(sizeObj.height())+ 'x' + str(sizeObj.width()))	
 
 
 
@@ -125,7 +131,7 @@ class MainWindow(QMainWindow):
 
 		x = avail.width() - widget.width()
 		y = 2 * avail.height() - screen.height() - widget.height()
-		self.move(50,50)
+		self.move(5,5)
 
 
 	def on_fitsobj_slot(self, sent_fitsobj):

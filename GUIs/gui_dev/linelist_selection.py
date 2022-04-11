@@ -136,6 +136,7 @@ class LineListWidget(QWidget):
 		
 		glayout.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
 		self.setLayout(glayout)
+		self.setFixedHeight(150)
 
 	def add_linelists(self):
 		ll_layout = QGridLayout()
