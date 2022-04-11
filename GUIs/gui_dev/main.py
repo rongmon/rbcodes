@@ -107,6 +107,7 @@ class MainWindow(QMainWindow):
 		# 4. sc (SpecCanvas) signal exports
 		self.sc.send_message.connect(mbox.on_sent_message)
 		self.sc.send_z_est.connect(widget_z._on_estZ_changed)
+		self.sc.send_z_manual.connect(widget_z._on_estZ_manual)
 		self.sc.send_scale_limits.connect(toolbar._on_scale_limits_slot)
 		self.sc.send_extract1d.connect(toolbar._on_sent_extract1d)
 		

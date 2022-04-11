@@ -23,6 +23,7 @@ matplotlib.use('Qt5Agg')
 class MplCanvas(FigureCanvasQTAgg):
 	send_message = pyqtSignal(str)
 	send_z_est = pyqtSignal(list)
+	send_z_manual = pyqtSignal(float)
 	send_gcenter = pyqtSignal(list)
 	send_scale_limits = pyqtSignal(list)
 	send_gauss_num = pyqtSignal(int)
@@ -555,101 +556,106 @@ class MplCanvas(FigureCanvasQTAgg):
 		elif event.key == 'G':
 			# fit a Gaussian profile
 			if event.inaxes == self.axes:
-				self.gxval = np.append(self.gxval, event.xdata)
-				self.gyval = np.append(self.gyval, event.ydata)
+				if self.gauss_num == 0:
+					self.send_message.emit('You are in manual mode. No need to fit Gaussian.')
 
-				fclick = len(self.gxval)
-				self.axes.plot(self.gxval[-1], self.gyval[-1], 'rs', ms=5)
-				self.draw()
+				else:
+					self.gxval = np.append(self.gxval, event.xdata)
+					self.gyval = np.append(self.gyval, event.ydata)
 
-				if fclick == 1:
-					message = 'You need 2 points to model a Gaussian. Please click 2 more points.'
-					self.send_message.emit(message)
-
-				elif fclick == 2:
-					# sort xdata before fitting
-					x_sort = np.argsort(self.gxval)
-					gxval = self.gxval[x_sort]
-					gyval = self.gyval[x_sort]
-
-					c_range = np.where((self.wave>gxval[0]) & (self.wave < gxval[-1]))
-					g_wave = self.wave[c_range]
-					g_flux = self.flux[c_range]
-					g_error = self.error[c_range]
-
-					if self.gauss_num == 1:
-						# Single Gaussian Fitting
-						# fit a Gaussian with 3 data points	
-						# 1. fit a local continuum
-						spline = splrep([gxval[0],gxval[-1]], 
-										[gyval[0], gyval[-1]], 
-										k=1)
-						cont = splev(g_wave, spline)
-
-						# 2. check if it is an absorption or emission line
-						EW = np.sum(cont - g_flux)
-						if EW > 0:
-							# absorption line
-							sign = -1
-						else:
-							# emission line
-							sign = 1
-
-						Aguess = np.max(g_flux - cont)
-						Cguess = np.mean(g_wave)
-						sguess = 0.1 * np.abs(gxval[0] - gxval[1])
-
-						# prepare ydata for fit
-						ydata = sign * (g_flux - cont)
-						errdata = sign * (g_error - cont)
-						# start fitting
-						popt, pcov = curve_fit(self.gauss, g_wave, ydata,
-												p0=[Aguess, Cguess, sguess],
-												sigma=errdata)
-						g_final = sign * (self.gauss(g_wave, *popt)) + cont
-
-						perr = np.sqrt(np.diag(pcov))
-						model_fit = self.axes.plot(g_wave, g_final, 'r--')
-						
-						self.draw()
-
-						message = ("A Gaussian model you fit has the following parameters:\n"
-								   f"Amplitude: {popt[0]:.3f}\n"
-								   f"Mean: {popt[1]:.3f} with std={perr[1]:.3f}\n"
-								   f"Sigma: {popt[2]:.3f}")
-
-						if self.guess_gcenter:
-							self.guess_gcenter[0] = popt[1]
-							self.guess_gcenter[1] = perr[1]
-						else:
-							self.guess_gcenter.append(popt[1])
-							self.guess_gcenter.append(perr[1])
+					fclick = len(self.gxval)
+					self.axes.plot(self.gxval[-1], self.gyval[-1], 'rs', ms=5)
+					self.draw()
 
 
-						
+					if fclick == 1:
+						message = 'You need 2 points to model a Gaussian. Please click 1 more point.'
 						self.send_message.emit(message)
-						self.send_gcenter.emit(self.guess_gcenter)
 
-					else:
-						print('Multiple Gaussian fitting starts.')
-						# Double Gaussian Fitting
-						self.axes.fill_between(g_wave,
-												y1=np.max(g_flux)*1.1,
-												y2=np.min(g_flux)*0.9,
-												alpha=0.5,
-												color='pink')
-						self.draw()
-						# delete the drawn polygon from collection
-						self.axes.collections.pop()
+					elif fclick == 2:
+						# sort xdata before fitting
+						x_sort = np.argsort(self.gxval)
+						gxval = self.gxval[x_sort]
+						gyval = self.gyval[x_sort]
 
-						self.gauss2d = Gaussfit_2d(g_wave, g_flux, g_error, 
-													gauss_num=self.gauss_num,
-													linelists=self.linelists2multiG)
+						c_range = np.where((self.wave>gxval[0]) & (self.wave < gxval[-1]))
+						g_wave = self.wave[c_range]
+						g_flux = self.flux[c_range]
+						g_error = self.error[c_range]
+
+						if self.gauss_num == 1:
+							# Single Gaussian Fitting
+							# fit a Gaussian with 3 data points	
+							# 1. fit a local continuum
+							spline = splrep([gxval[0],gxval[-1]], 
+											[gyval[0], gyval[-1]], 
+											k=1)
+							cont = splev(g_wave, spline)
+
+							# 2. check if it is an absorption or emission line
+							EW = np.sum(cont - g_flux)
+							if EW > 0:
+								# absorption line
+								sign = -1
+							else:
+								# emission line
+								sign = 1
+
+							Aguess = np.max(g_flux - cont)
+							Cguess = np.mean(g_wave)
+							sguess = 0.1 * np.abs(gxval[0] - gxval[1])
+
+							# prepare ydata for fit
+							ydata = sign * (g_flux - cont)
+							errdata = sign * (g_error - cont)
+							# start fitting
+							popt, pcov = curve_fit(self.gauss, g_wave, ydata,
+													p0=[Aguess, Cguess, sguess],
+													sigma=errdata)
+							g_final = sign * (self.gauss(g_wave, *popt)) + cont
+
+							perr = np.sqrt(np.diag(pcov))
+							model_fit = self.axes.plot(g_wave, g_final, 'r--')
+							
+							self.draw()
+
+							message = ("A Gaussian model you fit has the following parameters:\n"
+									   f"Amplitude: {popt[0]:.3f}\n"
+									   f"Mean: {popt[1]:.3f} with std={perr[1]:.3f}\n"
+									   f"Sigma: {popt[2]:.3f}")
+
+							if self.guess_gcenter:
+								self.guess_gcenter[0] = popt[1]
+								self.guess_gcenter[1] = perr[1]
+							else:
+								self.guess_gcenter.append(popt[1])
+								self.guess_gcenter.append(perr[1])
+
+
+							
+							self.send_message.emit(message)
+							self.send_gcenter.emit(self.guess_gcenter)
+
+						else:
+							print('Multiple Gaussian fitting starts.')
+							# Double Gaussian Fitting
+							self.axes.fill_between(g_wave,
+													y1=np.max(g_flux)*1.1,
+													y2=np.min(g_flux)*0.9,
+													alpha=0.5,
+													color='pink')
+							self.draw()
+							# delete the drawn polygon from collection
+							self.axes.collections.pop()
+
+							self.gauss2d = Gaussfit_2d(g_wave, g_flux, g_error, 
+														gauss_num=self.gauss_num,
+														linelists=self.linelists2multiG)
 
 
 
-					# clear out selection
-					self.gxval, self.gyval = [], []
+						# clear out selection
+						self.gxval, self.gyval = [], []
 
 		elif event.key == 'D':
 			# delete previous unwanted points for Gaussian profile fitting
@@ -708,7 +714,7 @@ class MplCanvas(FigureCanvasQTAgg):
 
 		elif event.key == 'T':
 			if self.stamp is None:
-				send_message.emit('NO Stamp in this file!')
+				self.send_message.emit('NO Stamp in this file!')
 			else:
 				if event.inaxes != self.axes:
 					#bring up the stamp dialog
@@ -720,8 +726,16 @@ class MplCanvas(FigureCanvasQTAgg):
 			Left == 1; Right == 3
 		'''
 		if event.button == 3:
+			#Manual mode
+			if self.gauss_num == 0:
+				self.send_message.emit('You are in manual mode now.')
+				self.guess_ion = GuessTransition(self.linelist, event.xdata, 0.)
+				self.guess_ion.show()
+				self.guess_ion.send_z_cal.connect(self._on_estZ_changed_manual)
+
+
 			#For single Gaussian
-			if self.gauss_num == 1:
+			elif self.gauss_num == 1:
 				self.send_message.emit(f'Currently, we need {self.gauss_num} Gaussian to guess the line position.')
 				
 				if self.guess_gcenter:
@@ -787,6 +801,11 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.estZstd = newz[1]
 		self._lines_in_current_range()
 		self.send_z_est.emit([self.estZ, self.estZstd])
+
+	def _on_estZ_changed_manual(self, newz):
+		self.estZ = newz[0]
+		self._lines_in_current_range()
+		self.send_z_manual.emit(self.estZ)
 
 	def _on_estZ_return_pressed(self, sent_estZ):
 		self.estZ = sent_estZ

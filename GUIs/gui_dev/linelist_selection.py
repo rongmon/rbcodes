@@ -81,8 +81,8 @@ class LineListWidget(QWidget):
 
 		self.gauss_num = QComboBox()
 		self.gauss_num.setFixedWidth(50)
-		self.gauss_num.addItems(['1', '2', '3'])
-		self.gauss_num.setCurrentIndex(0)
+		self.gauss_num.addItems(['0', '1', '2', '3'])
+		self.gauss_num.setCurrentIndex(1)
 		self.gauss_num.activated.connect(self._on_gauss_num_activated)
 		layout.addWidget(self.gauss_num, 1,2)
 
@@ -215,6 +215,12 @@ class LineListWidget(QWidget):
 		self.newz = newz
 		self.estZ.setText(str(self.round_to_sigfig(newz[0], show_sigfig)))
 		self.estZstd.setText(str(self.round_to_sigfig(newz[1], show_sigfig)))
+
+	def _on_estZ_manual(self, estz_only):
+		show_sigfig = 4
+		self.newz = estz_only
+		self.estZ.setText(str(self.round_to_sigfig(self.newz, show_sigfig)))
+		self.estZstd.setText('0')
 
 	def _on_sent_filename(self, sent_filename):
 		self.filename = sent_filename
