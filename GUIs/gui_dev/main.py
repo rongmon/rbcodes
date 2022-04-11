@@ -90,6 +90,7 @@ class MainWindow(QMainWindow):
 		toolbar.send_filename.connect(table_z._move_current_filename_top)
 		toolbar.send_filename.connect(self.sc._update_lines_for_newfile)
 		toolbar.send_fitsobj.connect(self.on_fitsobj_slot)
+		toolbar.send_stamp.connect(self.sc._on_sent_stamp)
 		toolbar.send_message.connect(lambda s,c='#ff0000': mbox.on_sent_message(s, c))
 
 		# 3. widget_z signal exports

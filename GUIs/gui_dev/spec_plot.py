@@ -16,6 +16,7 @@ import copy
 from guess_transition import GuessTransition
 from spec_hist import FluxHistogram, PixelHistogram
 from spec_fit_gauss2d import Gaussfit_2d
+from spec_addtional2d import ShowStamp
 
 matplotlib.use('Qt5Agg')
 
@@ -50,6 +51,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.gauss_profiles = []
 		self.gauss2d = None
 		self.linelists2multiG = []
+		self.stamp = None
 
 		num_2ndlist = 6
 		self.addtional_linelist = {i:[] for i in range(num_2ndlist)}
@@ -525,6 +527,11 @@ class MplCanvas(FigureCanvasQTAgg):
 						self.new_spec, self.new_err = self.extract_1d(self.flux2d[ext_min_y:ext_max_y, :], 
 																	self.err2d[ext_min_y:ext_max_y, :])
 						self.replot2d(self.wave, self.new_spec, self.new_err, [ext_min_y,ext_max_y])
+						self.send_extract1d.emit({'WAVELENGTH': self.wave,
+												'FLUX': self.flux,
+												'ERROR': self.error,
+												'YMIN': ext_min_y,
+												'YMAX': ext_max_y})
 						self.tmp_extraction_y = []
 					self.draw()
 
@@ -698,6 +705,15 @@ class MplCanvas(FigureCanvasQTAgg):
 				#bring up the pixel histogram dialog
 				phist = PixelHistogram(self.flux2d)
 				phist.exec_()
+
+		elif event.key == 'T':
+			if self.stamp is None:
+				send_message.emit('NO Stamp in this file!')
+			else:
+				if event.inaxes != self.axes:
+					#bring up the stamp dialog
+					self.stamp_img = ShowStamp(self.stamp)
+					self.stamp_img.show()
 			
 	def onclick(self, event):
 		'''Mouse click
@@ -790,6 +806,9 @@ class MplCanvas(FigureCanvasQTAgg):
 
 	def _on_sent_linelists2multiG(self, l):
 		self.linelists2multiG = l
+
+	def _on_sent_stamp(self, stp):
+		self.stamp = stp
 
 
 #-------------------- Dialog Box for XY Ranges --------------------
