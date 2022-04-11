@@ -117,10 +117,16 @@ class LoadSpec():
 			self.fitsobj.flux2d = fitsfile['SCI'].data
 			self.fitsobj.error2d = fitsfile['ERR'].data
 			self.fitsobj.wave = self._build_wave(fitsfile['SCI'].header)
+			
 			# Set RA DEC
 			if 'RA' in fitsfile['SCI'].header:
 				self.fitsobj.ra = fitsfile['SCI'].header['RA']
 				self.fitsobj.dec = fitsfile['SCI'].header['DEC']
+
+			# Check if STAMP exists
+			if 'STAMP' in labels:
+				self.fitsobj.stamp = fitsfile['STAMP'].data
+
 
 			fitsfile.close()
 			return self.fitsobj

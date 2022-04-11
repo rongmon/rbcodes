@@ -21,6 +21,7 @@ class Custom_ToolBar(QToolBar):
 	send_fitsobj = pyqtSignal(object)
 	send_filename = pyqtSignal(str)
 	send_filenames = pyqtSignal(list)
+	send_stamp = pyqtSignal(object)
 	send_message = pyqtSignal(str)
 	#Our personalized custom Toolbar
 	def __init__(self, mainWindow):
@@ -243,8 +244,13 @@ class Custom_ToolBar(QToolBar):
 					tmp_hdu = fits.BinTableHDU.from_columns(cols)
 					tmp_hdu.name = 'EXTRACT1D'
 					hdul_copy.append(tmp_hdu)
+					hdr = hdul_copy[-1].header
+					# save ymin/ymax values in header as well
+					hdr.set('YMIN', self.extract1d['YMIN'], 'ymin value of the extracted box')
+					hdr.set('YMAX', self.extract1d['YMAX'], 'ymax value of the extracted box')
+
 					# ymin/ymax are written in the final filename
-					hdul_copy.writeto(filepath)
+					hdul_copy.writeto(filepath, overwrite=True)
 					print('Saving a fits file to [{}]'.format(filepath))
 
 			else:
@@ -350,7 +356,8 @@ class Custom_ToolBar(QToolBar):
 					self._add_scale2d()
 
 				self.send_filename.emit(filename)
-				self.send_fitsobj.emit(self.fitsobj)		
+				self.send_fitsobj.emit(self.fitsobj)
+				self.send_stamp.emit(self.fitsobj.stamp)		
 
 	def _add_scale2d(self):
 		self.s_combobox.setMaxCount(4)
