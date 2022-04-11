@@ -7,6 +7,8 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 import numpy as np
 
+from menu_toolbars import Custom_ToolBar
+
 class FluxHistogram(QDialog):
 	def __init__(self, flux2d):
 		super().__init__()
@@ -18,6 +20,7 @@ class FluxHistogram(QDialog):
 		layout.addWidget(hist2d)
 		self.setLayout(layout)
 		self.setFixedSize(600,600)
+
 
 class Histo2dCanvas(FigureCanvasQTAgg):
 	def __init__(self, parent=None, width=5, height=3, dpi=100):

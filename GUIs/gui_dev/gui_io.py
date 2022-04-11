@@ -4,7 +4,7 @@ import copy
 from astropy.io import fits
 import numpy as np
 
-from utils import FitsObj
+from utils import FitsObj, Fits_2dAux
 # use test.fits from rbcodes/example-data as testing example
 '''
 file = fits.open('test.fits')
@@ -25,6 +25,7 @@ class LoadSpec():
 	def __init__(self, filepath):
 		self.filepath = filepath
 		self.fitsobj = FitsObj(wave=[], flux=None, error=None)
+		self.fits_2daux = Fits_2dAux()
 
 
 	def _load_spec(self):
@@ -126,6 +127,8 @@ class LoadSpec():
 			# Check if STAMP exists
 			if 'STAMP' in labels:
 				self.fitsobj.stamp = fitsfile['STAMP'].data
+				self.fits_2daux.stamp = fitsfile['STAMP'].data
+
 
 
 			fitsfile.close()
@@ -238,3 +241,17 @@ class LoadSpec():
 		fitsfile_copy = copy.deepcopy(fitsfile)
 		fitsfile.close()
 		return fitsfile_copy
+
+	def _check_advanced(self):
+		# read fits file
+		fitsfile = fits.open(self.filepath)
+		labels = [label.name for label in fitsfile]
+
+		# Check if STAMP exists
+		if 'STAMP' in labels:
+			self.fits_2daux.stamp = fitsfile['STAMP'].data
+		if 'CONTAMINATION' in labels:
+			self.fits_2daux.contamination = fitsfile['CONTAMINATION'].data
+
+		fitsfile.close()
+		return self.fits_2daux

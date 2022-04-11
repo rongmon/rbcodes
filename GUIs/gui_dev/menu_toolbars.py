@@ -12,7 +12,8 @@ from PyQt5.QtGui import QKeySequence, QDesktopServices
 
 from user_manual import UserManualDialog
 from gui_io import LoadSpec
-from utils import FitsObj
+from utils import FitsObj, Fits_2dAux
+from spec_advanced2d import ShowAdvanced
 
 WORKING_DIR = os.path.abspath(os.getcwd()) + './example-data'
 LINELIST_DIR = os.path.dirname(os.path.abspath(__file__)) + '/lines'
@@ -21,14 +22,15 @@ class Custom_ToolBar(QToolBar):
 	send_fitsobj = pyqtSignal(object)
 	send_filename = pyqtSignal(str)
 	send_filenames = pyqtSignal(list)
-	send_stamp = pyqtSignal(object)
 	send_message = pyqtSignal(str)
+
 	#Our personalized custom Toolbar
 	def __init__(self, mainWindow):
 		super().__init__()
 		self.mW = mainWindow
 		self.loadspec = None
 		self.fitsobj = mainWindow.fitsobj
+		self.fits_2daux = Fits_2dAux()
 		self.filepaths = []
 		self.filenames = []
 		self.filename = ''
@@ -107,8 +109,8 @@ class Custom_ToolBar(QToolBar):
 
 		self.addSeparator()
 
-		# Advanced Option - Call DS9 externally
-		btn_adv = self._create_button('Advanced', 'Call DS9 externally for further inspection')
+		# Advanced Option
+		btn_adv = self._create_button('Advanced', 'More 2D inspection')
 		self.addAction(btn_adv)
 		btn_adv.triggered.connect(self._on_advanced_option)
 
@@ -287,7 +289,11 @@ class Custom_ToolBar(QToolBar):
 
 	def _on_advanced_option(self):
 		print('Placeholder.....')
-		print('GUI will call DS9 externally')
+		if self.fits_2daux.stamp is not None:
+			self.img_adv = ShowAdvanced(self.fits_2daux.stamp)
+			self.img_adv.show()
+		else:
+			self.send_message.emit('There is no additional images to inspect.')
 
 
 
@@ -357,7 +363,10 @@ class Custom_ToolBar(QToolBar):
 
 				self.send_filename.emit(filename)
 				self.send_fitsobj.emit(self.fitsobj)
-				self.send_stamp.emit(self.fitsobj.stamp)		
+
+				self.fits_2daux = self.loadspec._check_advanced()
+
+					
 
 	def _add_scale2d(self):
 		self.s_combobox.setMaxCount(4)

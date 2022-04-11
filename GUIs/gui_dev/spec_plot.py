@@ -16,7 +16,6 @@ import copy
 from guess_transition import GuessTransition
 from spec_hist import FluxHistogram, PixelHistogram
 from spec_fit_gauss2d import Gaussfit_2d
-from spec_addtional2d import ShowStamp
 
 matplotlib.use('Qt5Agg')
 
@@ -712,14 +711,8 @@ class MplCanvas(FigureCanvasQTAgg):
 				phist = PixelHistogram(self.flux2d)
 				phist.exec_()
 
-		elif event.key == 'T':
-			if self.stamp is None:
-				self.send_message.emit('NO Stamp in this file!')
-			else:
-				if event.inaxes != self.axes:
-					#bring up the stamp dialog
-					self.stamp_img = ShowStamp(self.stamp)
-					self.stamp_img.show()
+		else:
+			self.send_message.emit('Undefined keyboard function. Please click Help for all key functions.')
 			
 	def onclick(self, event):
 		'''Mouse click
@@ -825,9 +818,6 @@ class MplCanvas(FigureCanvasQTAgg):
 
 	def _on_sent_linelists2multiG(self, l):
 		self.linelists2multiG = l
-
-	def _on_sent_stamp(self, stp):
-		self.stamp = stp
 
 
 #-------------------- Dialog Box for XY Ranges --------------------
