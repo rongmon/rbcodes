@@ -321,6 +321,7 @@ class Custom_ToolBar(QToolBar):
 			self.filename = filename
 
 			selfcheck = self.loadspec._load_spec()
+			print(selfcheck)
 			if type(selfcheck) is str:
 				print('bad fits format')
 				self.send_message.emit(selfcheck)

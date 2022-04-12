@@ -5,6 +5,7 @@ from astropy.io import fits
 import numpy as np
 
 from utils import FitsObj, Fits_2dAux
+from connect_XSpectrum1D import GUIio2XSpec
 # use test.fits from rbcodes/example-data as testing example
 '''
 file = fits.open('test.fits')
@@ -165,22 +166,33 @@ class LoadSpec():
 
 			fitsfile.close()
 			return self.fitsobj
-
+		
 		# CHECK IF FITS FILE HAS 1D SPECTRAL INFO...
 		# find wavelength, flux, error
-		elif 'FLUX' in fitsfile:
-			'''FITS format 1:
-				file['<variable>'].data
-			example file: test.fits
-			'''
-			self.fitsobj.wave = fitsfile['WAVELENGTH'].data
-			self.fitsobj.flux = fitsfile['FLUX'].data
-			self.fitsobj.error = fitsfile['ERROR'].data
+		#elif 'FLUX' in fitsfile:
+		#	'''FITS format 1:
+		#		file['<variable>'].data
+		#	example file: test.fits
+		#	'''
+		#	self.fitsobj.wave = fitsfile['WAVELENGTH'].data
+		#	self.fitsobj.flux = fitsfile['FLUX'].data
+		#	self.fitsobj.error = fitsfile['ERROR'].data
+		#
+		#	fitsfile.close()
+		#	#print(type(self.fitsobj))
+		#	return self.fitsobj
 
-			fitsfile.close()
-			#print(type(self.fitsobj))
-			return self.fitsobj
 
+		# Finally, check if XSpectrum1D can handle this file
+		else:
+			print('Trying XSpectrum1D...')
+			gui2Xspec = GUIio2XSpec(self.filepath)
+			if len(gui2Xspec.warning) > 0:
+				# even XSpectrum1D cant read this file
+				return gui2Xspec.warning
+			else:
+				self.fitsobj = gui2Xspec._get_spec_info()
+				return self.fitsobj
 		
 		# Soft warning.. No compatible fits format
 		if self.fitsobj.flux is None:
