@@ -439,7 +439,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			self._lines_in_current_range()
 
 			self.draw()
-			self.send_message.emit('You reset the canvas!!!')
+			self.send_message.emit('You RESET the canvas!!!')
 
 			#print(event.inaxes == self.axes)
 		elif event.key == 't':
@@ -448,6 +448,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				ylim = self.axes.get_ylim()
 				self.axes.set_ylim([ylim[0], event.ydata])
 				self.draw()
+				self.send_message.emit('Flux MAX value in 1D plot changed.')
 
 		elif event.key == 'b':
 			# set y axis min value
@@ -455,6 +456,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				ylim = self.axes.get_ylim()
 				self.axes.set_ylim([event.ydata, ylim[-1]])
 				self.draw()
+				self.send_message.emit('Flux MIN value in 1D plot changed.')
 
 		elif event.key == 'X':
 			# set x axis max value
@@ -463,6 +465,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.axes.set_xlim([xlim[0], event.xdata])
 				self._lines_in_current_range()
 				self.draw()
+				self.send_message.emit('Wavelength MAX value in 1D plot changed.')
 
 		elif event.key == 'x':
 			# set x axis min value
@@ -471,6 +474,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.axes.set_xlim([event.xdata, xlim[-1]])
 				self._lines_in_current_range()
 				self.draw()
+				self.send_message.emit('Wavelength MIN value in 1D plot changed.')
 
 		elif event.key == '[':
 			# pan window to the left
@@ -479,6 +483,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			self.axes.set_xlim([xlim[0] - delx, xlim[0]])
 			self._lines_in_current_range()
 			self.draw()
+			self.send_message.emit('Display window in 1D plot pans LEFT.')
 
 		elif event.key == ']':
 			# pan window to the right
@@ -487,6 +492,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			self.axes.set_xlim([xlim[1], xlim[1] + delx])
 			self._lines_in_current_range()
 			self.draw()
+			self.send_message.emit('Display window in 1D plot pans RIGHT.')
 
 		elif event.key == 'S':
 			# smooth ydata
@@ -496,6 +502,8 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.new_err = convolve(self.error, Box1DKernel(self.scale))
 				self.replot(self.wave, self.new_spec, self.new_err)
 				self.draw()
+
+				self.send_message.emit(f'Convolutional kernel size = {int(self.scale//2)}.')
 
 		elif event.key == 'U':
 			# unsmooth ydata
@@ -507,6 +515,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.new_err = convolve(self.error, Box1DKernel(self.scale))
 				self.replot(self.wave, self.new_spec, self.new_err)
 				self.draw()
+				self.send_message.emit(f'Convolutional kernel size = {int(self.scale//2)}.')
 
 		elif event.key == 'Y':
 			# set y-axis limits with precise values
@@ -517,6 +526,7 @@ class MplCanvas(FigureCanvasQTAgg):
 					self.axes.set_ylim(ylim)
 
 					self.draw()
+				self.send_message.emit('Flux LIMITS in 1D spectrum are changed.')
 			elif event.inaxes == self.ax2d:
 				ylimdialog2d = CustomLimDialog(axis='y')
 				if ylimdialog2d.exec_():
@@ -534,6 +544,7 @@ class MplCanvas(FigureCanvasQTAgg):
 												'YMAX': ext_max_y})
 						self.tmp_extraction_y = []
 					self.draw()
+				self.send_message.emit('Y-Axis LIMITS in 2D spectrum are changed.')
 
 		elif event.key == 'W':
 			# set y-axis limits with precise values
@@ -544,12 +555,14 @@ class MplCanvas(FigureCanvasQTAgg):
 					self.axes.set_xlim(xlim)
 					self._lines_in_current_range()
 					self.draw()
+				self.send_message.emit('Wavelength LIMITS in 1D spectrum are changed.')
 			elif event.inaxes == self.ax2d:
 				xlimdialog2d = CustomLimDialog(axis='x')
 				if xlimdialog2d.exec_():
 					xlim2d = xlimdialog2d._getlim()
 					self.ax2d.set_xlim(xlim2d)
 					self.draw()
+				self.send_message.emit('Wavelength LIMITS in 2D spectrum are changed.')
 
 
 		elif event.key == 'G':
@@ -671,6 +684,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			if len(self.axes.lines) > 2:
 				self.axes.lines.pop()			
 			self.draw()
+			self.send_message.emit('A previous added object is deleted.')
 
 			
 
@@ -692,6 +706,7 @@ class MplCanvas(FigureCanvasQTAgg):
 												'YMAX': ext_max_y})
 						self.replot2d(self.wave, self.flux, self.error, [ext_min_y,ext_max_y])
 						self.tmp_extraction_y = []
+						self.send_message.emit('A new extraction box is created.')
 					self.draw()
 
 					# reset convolution kernel size for new extraction
@@ -703,15 +718,17 @@ class MplCanvas(FigureCanvasQTAgg):
 			if event.inaxes != self.axes:
 				#bring up the flux histogram dialog
 				fhist = FluxHistogram(self.flux2d)
+				self.send_message.emit('Flux distribution window is popped up.')
 				fhist.exec_()
 
 		elif event.key == 'P':
 			if event.inaxes != self.axes:
 				#bring up the pixel histogram dialog
 				phist = PixelHistogram(self.flux2d)
+				self.send_message.emit('Pixel distribution window is popped up.')
 				phist.exec_()
 
-		else:
+		elif event.key != 'shift':
 			self.send_message.emit('Undefined keyboard function. Please click Help for all key functions.')
 			
 	def onclick(self, event):
