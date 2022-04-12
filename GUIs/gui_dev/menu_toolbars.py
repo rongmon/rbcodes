@@ -12,7 +12,8 @@ from PyQt5.QtGui import QKeySequence, QDesktopServices
 
 from user_manual import UserManualDialog
 from gui_io import LoadSpec
-from utils import FitsObj
+from utils import FitsObj, Fits_2dAux
+from spec_advanced2d import ShowAdvanced
 
 WORKING_DIR = os.path.abspath(os.getcwd()) + './example-data'
 LINELIST_DIR = os.path.dirname(os.path.abspath(__file__)) + '/lines'
@@ -22,12 +23,14 @@ class Custom_ToolBar(QToolBar):
 	send_filename = pyqtSignal(str)
 	send_filenames = pyqtSignal(list)
 	send_message = pyqtSignal(str)
+
 	#Our personalized custom Toolbar
 	def __init__(self, mainWindow):
 		super().__init__()
 		self.mW = mainWindow
 		self.loadspec = None
 		self.fitsobj = mainWindow.fitsobj
+		self.fits_2daux = Fits_2dAux()
 		self.filepaths = []
 		self.filenames = []
 		self.filename = ''
@@ -106,8 +109,8 @@ class Custom_ToolBar(QToolBar):
 
 		self.addSeparator()
 
-		# Advanced Option - Call DS9 externally
-		btn_adv = self._create_button('Advanced', 'Call DS9 externally for further inspection')
+		# Advanced Option
+		btn_adv = self._create_button('Advanced', 'More 2D inspection')
 		self.addAction(btn_adv)
 		btn_adv.triggered.connect(self._on_advanced_option)
 
@@ -243,8 +246,13 @@ class Custom_ToolBar(QToolBar):
 					tmp_hdu = fits.BinTableHDU.from_columns(cols)
 					tmp_hdu.name = 'EXTRACT1D'
 					hdul_copy.append(tmp_hdu)
+					hdr = hdul_copy[-1].header
+					# save ymin/ymax values in header as well
+					hdr.set('YMIN', self.extract1d['YMIN'], 'ymin value of the extracted box')
+					hdr.set('YMAX', self.extract1d['YMAX'], 'ymax value of the extracted box')
+
 					# ymin/ymax are written in the final filename
-					hdul_copy.writeto(filepath)
+					hdul_copy.writeto(filepath, overwrite=True)
 					print('Saving a fits file to [{}]'.format(filepath))
 
 			else:
@@ -280,8 +288,24 @@ class Custom_ToolBar(QToolBar):
 			pass
 
 	def _on_advanced_option(self):
-		print('Placeholder.....')
-		print('GUI will call DS9 externally')
+		message = ''
+		if self.fits_2daux.stamp is not None:
+			self.img_sta = ShowAdvanced(self.fits_2daux.stamp, name='STAMP')
+			self.img_sta.show()
+			message += 'GUI found STAMP HDU.'
+		else:
+			message += 'GUI did not find STAMP HDU in the current fits file.'
+
+		if self.fits_2daux.contamination is not None:
+			self.img_con = ShowAdvanced(self.fits_2daux.contamination, name='CONTAMINATION')
+			self.img_con.show()
+			message += 'GUI found CONTAMINATION HDU.'
+		else:
+			message += 'GUI did not find CONTAMINATION HDU in the current fits file.'
+
+		if (self.fits_2daux.stamp is None) & (self.fits_2daux.contamination is None):
+			message +='There is no additional images to inspect.'
+
 
 
 
@@ -297,6 +321,7 @@ class Custom_ToolBar(QToolBar):
 			self.filename = filename
 
 			selfcheck = self.loadspec._load_spec()
+			print(selfcheck)
 			if type(selfcheck) is str:
 				print('bad fits format')
 				self.send_message.emit(selfcheck)
@@ -350,7 +375,11 @@ class Custom_ToolBar(QToolBar):
 					self._add_scale2d()
 
 				self.send_filename.emit(filename)
-				self.send_fitsobj.emit(self.fitsobj)		
+				self.send_fitsobj.emit(self.fitsobj)
+
+				self.fits_2daux = self.loadspec._check_advanced()
+
+					
 
 	def _add_scale2d(self):
 		self.s_combobox.setMaxCount(4)

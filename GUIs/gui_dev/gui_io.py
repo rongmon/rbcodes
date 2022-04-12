@@ -4,7 +4,8 @@ import copy
 from astropy.io import fits
 import numpy as np
 
-from utils import FitsObj
+from utils import FitsObj, Fits_2dAux
+from connect_XSpectrum1D import GUIio2XSpec
 # use test.fits from rbcodes/example-data as testing example
 '''
 file = fits.open('test.fits')
@@ -25,6 +26,7 @@ class LoadSpec():
 	def __init__(self, filepath):
 		self.filepath = filepath
 		self.fitsobj = FitsObj(wave=[], flux=None, error=None)
+		self.fits_2daux = Fits_2dAux()
 
 
 	def _load_spec(self):
@@ -117,10 +119,18 @@ class LoadSpec():
 			self.fitsobj.flux2d = fitsfile['SCI'].data
 			self.fitsobj.error2d = fitsfile['ERR'].data
 			self.fitsobj.wave = self._build_wave(fitsfile['SCI'].header)
+			
 			# Set RA DEC
 			if 'RA' in fitsfile['SCI'].header:
 				self.fitsobj.ra = fitsfile['SCI'].header['RA']
 				self.fitsobj.dec = fitsfile['SCI'].header['DEC']
+
+			# Check if STAMP exists
+			if 'STAMP' in labels:
+				self.fitsobj.stamp = fitsfile['STAMP'].data
+				self.fits_2daux.stamp = fitsfile['STAMP'].data
+
+
 
 			fitsfile.close()
 			return self.fitsobj
@@ -156,22 +166,33 @@ class LoadSpec():
 
 			fitsfile.close()
 			return self.fitsobj
-
+		
 		# CHECK IF FITS FILE HAS 1D SPECTRAL INFO...
 		# find wavelength, flux, error
-		elif 'FLUX' in fitsfile:
-			'''FITS format 1:
-				file['<variable>'].data
-			example file: test.fits
-			'''
-			self.fitsobj.wave = fitsfile['WAVELENGTH'].data
-			self.fitsobj.flux = fitsfile['FLUX'].data
-			self.fitsobj.error = fitsfile['ERROR'].data
+		#elif 'FLUX' in fitsfile:
+		#	'''FITS format 1:
+		#		file['<variable>'].data
+		#	example file: test.fits
+		#	'''
+		#	self.fitsobj.wave = fitsfile['WAVELENGTH'].data
+		#	self.fitsobj.flux = fitsfile['FLUX'].data
+		#	self.fitsobj.error = fitsfile['ERROR'].data
+		#
+		#	fitsfile.close()
+		#	#print(type(self.fitsobj))
+		#	return self.fitsobj
 
-			fitsfile.close()
-			#print(type(self.fitsobj))
-			return self.fitsobj
 
+		# Finally, check if XSpectrum1D can handle this file
+		else:
+			print('Trying XSpectrum1D...')
+			gui2Xspec = GUIio2XSpec(self.filepath)
+			if len(gui2Xspec.warning) > 0:
+				# even XSpectrum1D cant read this file
+				return gui2Xspec.warning
+			else:
+				self.fitsobj = gui2Xspec._get_spec_info()
+				return self.fitsobj
 		
 		# Soft warning.. No compatible fits format
 		if self.fitsobj.flux is None:
@@ -232,3 +253,22 @@ class LoadSpec():
 		fitsfile_copy = copy.deepcopy(fitsfile)
 		fitsfile.close()
 		return fitsfile_copy
+
+	def _check_advanced(self):
+		# read fits file
+		fitsfile = fits.open(self.filepath)
+		labels = [label.name for label in fitsfile]
+
+		# Check if STAMP exists
+		if 'STAMP' in labels:
+			self.fits_2daux.stamp = fitsfile['STAMP'].data
+		else:
+			self.fits_2daux.stamp = None
+
+		if 'CONTAMINATION' in labels:
+			self.fits_2daux.contamination = fitsfile['CONTAMINATION'].data
+		else:
+			self.fits_2daux.contamination = None
+
+		fitsfile.close()
+		return self.fits_2daux
