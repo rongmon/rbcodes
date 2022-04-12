@@ -15,7 +15,7 @@ class ShowAdvanced(QWidget):
 		self.img = img
 		self.scale = 0
 		self.normalization = 0
-		self.name = None
+		self.name = name
 		self.img_lim = [0., 1.]
 		self.namebox = ['STAMP', 'CONTAMINATION']
 
@@ -62,20 +62,21 @@ class ShowAdvanced(QWidget):
 
 		
 		self.advobj = Advanced2dCanvas()
-		self.img_lim = self.advobj._imshow(img)
+		self.img_lim = self.advobj._imshow(img, name=self.name)
 		self._scale_limits_changed(self.img_lim)
 		mpl_toolbar = NavigationToolbar(self.advobj, self)
 		layout.addWidget(mpl_toolbar)
 		layout.addWidget(self.advobj)
 		self.setLayout(layout)
 		self.setMinimumSize(600,600)
-		self.setWindowTitle('Additional Inspection')
+		self.setWindowTitle(name + ' Inspection')
 
 	def _scaling_changed(self, i):
 		self.scale = i
 		self.img_lim = self.advobj._imshow(self.img, 
 							scale=self.scale,
-							normalization=self.normalization)
+							normalization=self.normalization,
+							name=self.name)
 		self._scale_limits_changed(self.img_lim)
 
 	def _normalization_changed(self, i):
@@ -83,7 +84,8 @@ class ShowAdvanced(QWidget):
 			self.normalization = i
 			self.img_lim = self.advobj._imshow(self.img, 
 								scale=self.scale,
-								normalization=self.normalization)
+								normalization=self.normalization,
+								name=self.name)
 			self._scale_limits_changed(self.img_lim)
 
 	def _scale_limits_changed(self, limits):
@@ -103,7 +105,8 @@ class ShowAdvanced(QWidget):
 		self.n_combobox.setCurrentIndex(11)
 		_ = self.advobj._imshow(self.img,
 							scale=self.scale,
-							normalization=manual_range)
+							normalization=manual_range,
+							name=self.name)
 
 
 class Advanced2dCanvas(FigureCanvasQTAgg):
@@ -114,7 +117,7 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 		self.fig.canvas.setFocusPolicy(Qt.ClickFocus)
 		self.fig.canvas.setFocus()
 
-	def _imshow(self, img, scale=0, normalization=0):
+	def _imshow(self, img, scale=0, normalization=0, name=''):
 		self.fig.clf()
 		self.ax = self.fig.add_subplot(111)
 		#self.ax.cla()
@@ -193,7 +196,8 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 		#self.ax.tick_params(labelbottom=False)
 		#self.ax2d.set_xlim(xlim_spec1d)
 		self.ax.set_aspect('auto')
-		self.ax.set_title('XXX of Current Object')		
+		if len(name) > 1:
+			self.ax.set_title(name + ' of Current Object')		
 		self.draw()
 
 		return [scaled2d.min(), scaled2d.max()]

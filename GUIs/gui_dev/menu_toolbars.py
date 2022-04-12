@@ -288,12 +288,24 @@ class Custom_ToolBar(QToolBar):
 			pass
 
 	def _on_advanced_option(self):
-		print('Placeholder.....')
+		message = ''
 		if self.fits_2daux.stamp is not None:
-			self.img_adv = ShowAdvanced(self.fits_2daux.stamp)
-			self.img_adv.show()
+			self.img_sta = ShowAdvanced(self.fits_2daux.stamp, name='STAMP')
+			self.img_sta.show()
+			message += 'GUI found STAMP HDU.'
 		else:
-			self.send_message.emit('There is no additional images to inspect.')
+			message += 'GUI did not find STAMP HDU in the current fits file.'
+
+		if self.fits_2daux.contamination is not None:
+			self.img_con = ShowAdvanced(self.fits_2daux.contamination, name='CONTAMINATION')
+			self.img_con.show()
+			message += 'GUI found CONTAMINATION HDU.'
+		else:
+			message += 'GUI did not find CONTAMINATION HDU in the current fits file.'
+
+		if (self.fits_2daux.stamp is None) & (self.fits_2daux.contamination is None):
+			message +='There is no additional images to inspect.'
+
 
 
 

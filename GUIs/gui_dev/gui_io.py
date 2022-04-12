@@ -250,8 +250,13 @@ class LoadSpec():
 		# Check if STAMP exists
 		if 'STAMP' in labels:
 			self.fits_2daux.stamp = fitsfile['STAMP'].data
+		else:
+			self.fits_2daux.stamp = None
+
 		if 'CONTAMINATION' in labels:
 			self.fits_2daux.contamination = fitsfile['CONTAMINATION'].data
+		else:
+			self.fits_2daux.contamination = None
 
 		fitsfile.close()
 		return self.fits_2daux
