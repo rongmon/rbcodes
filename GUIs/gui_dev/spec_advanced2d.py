@@ -61,15 +61,20 @@ class ShowAdvanced(QWidget):
 		layout.addLayout(scale_layout)
 
 		
-		self.advobj = Advanced2dCanvas()
+		self.advobj = Advanced2dCanvas(width=8, height=8*len(self.img))
 		self.img_lim = self.advobj._imshow(img, name=self.name)
 		self._scale_limits_changed(self.img_lim)
 		mpl_toolbar = NavigationToolbar(self.advobj, self)
 		layout.addWidget(mpl_toolbar)
 		layout.addWidget(self.advobj)
 		self.setLayout(layout)
-		self.setMinimumSize(600,600)
-		self.setWindowTitle(name + ' Inspection')
+		if 'STAMP' in self.name:
+			self.setMinimumSize(600,600)
+			self.setWindowTitle('STAMP Inspection')
+		elif 'CONTAMINATION' in self.name:
+			self.setMinimumSize(1000, 400)
+			self.setWindowTitle('CONTAMINATION Inspection')
+		
 
 	def _scaling_changed(self, i):
 		self.scale = i
@@ -117,9 +122,11 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 		self.fig.canvas.setFocusPolicy(Qt.ClickFocus)
 		self.fig.canvas.setFocus()
 
-	def _imshow(self, img, scale=0, normalization=0, name=''):
+	def _imshow(self, imgs, scale=0, normalization=0, name=''):
 		self.fig.clf()
-		self.ax = self.fig.add_subplot(111)
+		ax_num = len(imgs)
+		# set a primary image
+		img = imgs[0]
 		#self.ax.cla()
 
 		if scale == 0:
@@ -183,6 +190,24 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 			tmp = (scaled2d - scaled2d.min()) / (scaled2d.max() - scaled2d.min())
 			scaled2d = tmp*(normalization[1] - normalization[0]) + normalization[0]
 			
+		
+		if ax_num > 1:
+			self.ax = self.fig.add_subplot(ax_num,1,ax_num)
+			self.ax.set_title(name[0] + ' of Current Object')
+			ax_add = []
+			for i in range(1, ax_num):
+				ax_add.append(self.fig.add_subplot(ax_num,1,i, sharex=self.ax))
+				ax_add[-1].imshow(imgs[i], origin='lower',
+									vmin=imgs[i].min(), vmax=imgs[i].max())
+				ax_add[-1].set_title(name[i] + ' of Current Object')
+				ax_add[-1].set_aspect('auto')
+				ax_add[-1].tick_params(labelbottom=False)
+				
+		else:
+			self.ax = self.fig.add_subplot(1,1,1)
+			if len(name) > 1:
+				self.ax.set_title(name + ' of Current Object')	
+
 		if scale == 1:
 			pos_ax = self.ax.imshow(scaled2d, origin='lower', 
 									vmin=scaled2d.min(), vmax=scaled2d.max() * 0.01)
@@ -190,14 +215,14 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 			pos_ax = self.ax.imshow(scaled2d, origin='lower', 
 									vmin=scaled2d.min(), vmax=scaled2d.max() * 1.0)
 		
-
-		self.ax_cb = self.fig.colorbar(pos_ax, ax=self.ax, location='right')
+		self.ax_cb = self.fig.colorbar(pos_ax, ax=self.ax, location='bottom')
 		ax_xlim = self.ax.get_xlim()
+		self.ax.set_aspect('auto')
 		#self.ax.tick_params(labelbottom=False)
 		#self.ax2d.set_xlim(xlim_spec1d)
-		self.ax.set_aspect('auto')
-		if len(name) > 1:
-			self.ax.set_title(name + ' of Current Object')		
+		#self.fig.tight_layout()
+		
+			
 		self.draw()
 
 		return [scaled2d.min(), scaled2d.max()]

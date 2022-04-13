@@ -1,4 +1,4 @@
-import sys
+import sys, argparse
 import pandas as pd
 
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QStatusBar, QDesktopWidget,
@@ -19,8 +19,9 @@ class MainWindow(QMainWindow):
 	'''This is the main window of this GUI
 	This class only assembles different widgets from customed components.
 	'''
-	def __init__(self):
+	def __init__(self, xspecio=False):
 		super().__init__()
+		self.xspecio = xspecio
 
 		#----------- External data ---------------------------------
 		# save a fits copy in the main window
@@ -163,12 +164,32 @@ qss = '''
 '''
 
 
-app = QApplication(sys.argv)
-#app.setQuitOnLastWindowClosed(True)
-window = MainWindow()
-window._location_on_screen()
-window.show()
+if __name__ == '__main__':
+	parser = argparse.ArgumentParser(description='GUI default IO Initialization',
+									add_help=True)
+	parser.add_argument('-d', '--default', action='store_true',
+		help='Read fits files using default gui_io IO class')
+	parser.add_argument('-x', '--xspec', action='store_true',
+		help='Read fits files using XSpectrum1D class from linetools')
+	args = parser.parse_args()
 
-app.setStyleSheet(qss)
-app.exec_()
-app.quit()
+	app = QApplication(sys.argv[:1])
+	if args.xspec:
+		print('Enable XSpectrum1D IO')
+		window = MainWindow(xspecio=True)
+	else:
+		print('Enable Default IO')
+		window = MainWindow(xspecio=False)
+
+
+	#app.setQuitOnLastWindowClosed(True)
+	window._location_on_screen()
+	window.show()
+
+	app.setStyleSheet(qss)
+	app.exec_()
+	app.quit()
+
+
+
+

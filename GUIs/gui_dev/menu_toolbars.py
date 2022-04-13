@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import QAction, QToolBar, QStatusBar, QMenuBar, QFileDialog
 from PyQt5.QtGui import QKeySequence, QDesktopServices
 
 from user_manual import UserManualDialog
-from gui_io import LoadSpec
+
 from utils import FitsObj, Fits_2dAux
 from spec_advanced2d import ShowAdvanced
 
@@ -290,21 +290,38 @@ class Custom_ToolBar(QToolBar):
 	def _on_advanced_option(self):
 		message = ''
 		if self.fits_2daux.stamp is not None:
-			self.img_sta = ShowAdvanced(self.fits_2daux.stamp, name='STAMP')
+			img_sta = [self.fits_2daux.stamp]
+			self.img_sta = ShowAdvanced(img_sta, name='STAMP')
 			self.img_sta.show()
 			message += 'GUI found STAMP HDU.'
 		else:
 			message += 'GUI did not find STAMP HDU in the current fits file.'
 
+		imgs, names = [], []
+		if self.fitsobj.flux2d is not None:
+			imgs.append(self.fitsobj.flux2d)
+			names.append('FLUX')
+		else:
+			message += 'This fits file does not contain a 2D spectrum.'
+		if self.fitsobj.error2d is not None:
+			imgs.append(self.fitsobj.error2d)
+			names.append('ERROR')
+		else:
+			message += 'This fits file does not contain a 2D error spectrum.'
+
 		if self.fits_2daux.contamination is not None:
-			self.img_con = ShowAdvanced(self.fits_2daux.contamination, name='CONTAMINATION')
-			self.img_con.show()
+			imgs.append(self.fits_2daux.contamination)
+			names.append('CONTAMINATION')
 			message += 'GUI found CONTAMINATION HDU.'
 		else:
 			message += 'GUI did not find CONTAMINATION HDU in the current fits file.'
-
-		if (self.fits_2daux.stamp is None) & (self.fits_2daux.contamination is None):
+		if len(imgs) > 0:
+			self.img_adv = ShowAdvanced(imgs, name=names)
+			self.img_adv.show()
+		else:
 			message +='There is no additional images to inspect.'
+
+		self.send_message.emit(message)
 
 
 
@@ -316,68 +333,90 @@ class Custom_ToolBar(QToolBar):
 		if i < 1:
 			pass
 		else:
-			self.loadspec = LoadSpec(self.filepaths[i-1])
-			filename = self.filenames[i-1]
-			self.filename = filename
-
-			selfcheck = self.loadspec._load_spec()
-			print(selfcheck)
-			if type(selfcheck) is str:
-				print('bad fits format')
-				self.send_message.emit(selfcheck)
-			else:
-				self.fitsobj = self.loadspec._load_spec()
-
-				if (self.fitsobj.flux2d is not None) & (self.fitsobj.flux is None):
-					# only 2d spec exists
-					self.mW.sc.plot_spec2d(self.fitsobj.wave,
-										self.fitsobj.flux2d,
-										self.fitsobj.error2d,
-										filename)
-					self._add_scale2d()
-
-				elif (self.fitsobj.flux is not None) & (self.fitsobj.flux2d is None):
-					# only 1d spec exists
+			self.filename = self.filenames[i-1]
+			if self.mW.xspecio:
+				# enable XSpectrum1D io
+				#print('xspec io mode')
+				from gui_io_xspec import LoadXSpec
+				self.loadspec = LoadXSpec(self.filepaths[i-1])
+				if len(self.loadspec.warning) > 0:
+					# even XSpectrum1D cant read this file
+					self.send_message.emit(self.loadspec.warning)
+				else:
+					self.fitsobj = self.loadspec._load_spec()
+					# XSpectrum1D only reads 1D fits file
 					self.mW.sc.plot_spec(self.fitsobj.wave, 
-									self.fitsobj.flux, 
-									self.fitsobj.error,
-									filename)
+										self.fitsobj.flux, 
+										self.fitsobj.error,
+										self.filename)
 					self.s_combobox.clear()
+					self.send_filename.emit(self.filename)
+					self.send_fitsobj.emit(self.fitsobj)
 
-				elif (self.fitsobj.flux is not None) & (self.fitsobj.flux2d is not None):
-					# both 1d and 2d specs exist
+			else:
+				# enable standalone IO class
+				#print('default io mode')
+				from gui_io import LoadSpec
+				self.loadspec = LoadSpec(self.filepaths[i-1])
 
-					# check if filename has keywords ymin/ymax for 2D fits
-					if ('ymin' in filename) & ('ymax' in filename):
-						flist = filename.split('.')[0].split('_')
-						extraction_box = [int(flist[-2][5:]), int(flist[-1][5:])]
+				selfcheck = self.loadspec._load_spec()
+				#print(selfcheck)
+				if type(selfcheck) is str:
+					print('bad fits format')
+					self.send_message.emit(selfcheck)
+				else:
+					self.fitsobj = self.loadspec._load_spec()
+
+					if (self.fitsobj.flux2d is not None) & (self.fitsobj.flux is None):
+						# only 2d spec exists
+						self.mW.sc.plot_spec2d(self.fitsobj.wave,
+											self.fitsobj.flux2d,
+											self.fitsobj.error2d,
+											self.filename)
+						self._add_scale2d()
+
+					elif (self.fitsobj.flux is not None) & (self.fitsobj.flux2d is None):
+						# only 1d spec exists
+						self.mW.sc.plot_spec(self.fitsobj.wave, 
+										self.fitsobj.flux, 
+										self.fitsobj.error,
+										self.filename)
+						self.s_combobox.clear()
+
+					elif (self.fitsobj.flux is not None) & (self.fitsobj.flux2d is not None):
+						# both 1d and 2d specs exist
+
+						# check if filename has keywords ymin/ymax for 2D fits
+						if ('ymin' in filename) & ('ymax' in filename):
+							flist = filename.split('.')[0].split('_')
+							extraction_box = [int(flist[-2][5:]), int(flist[-1][5:])]
+							
+							self.mW.sc.plot_spec2d(self.fitsobj.wave,
+												self.fitsobj.flux2d,
+												self.fitsobj.error2d,
+												self.filename,
+												pre_extraction=extraction_box)
+							self.mW.sc.replot(self.fitsobj.wave, 
+											self.fitsobj.flux, 
+											self.fitsobj.error)
+											
+						else:
+							# if not, set up extraction box as usual
+							self.mW.sc.plot_spec2d(self.fitsobj.wave,
+												self.fitsobj.flux2d,
+												self.fitsobj.error2d,
+												self.filename)
+							self.mW.sc.replot(self.fitsobj.wave, 
+											self.fitsobj.flux, 
+											self.fitsobj.error)
 						
-						self.mW.sc.plot_spec2d(self.fitsobj.wave,
-											self.fitsobj.flux2d,
-											self.fitsobj.error2d,
-											filename,
-											pre_extraction=extraction_box)
-						self.mW.sc.replot(self.fitsobj.wave, 
-										self.fitsobj.flux, 
-										self.fitsobj.error)
-										
-					else:
-						# if not, set up extraction box as usual
-						self.mW.sc.plot_spec2d(self.fitsobj.wave,
-											self.fitsobj.flux2d,
-											self.fitsobj.error2d,
-											filename)
-						self.mW.sc.replot(self.fitsobj.wave, 
-										self.fitsobj.flux, 
-										self.fitsobj.error)
-					
 
-					self._add_scale2d()
+						self._add_scale2d()
 
-				self.send_filename.emit(filename)
-				self.send_fitsobj.emit(self.fitsobj)
+					self.send_filename.emit(self.filename)
+					self.send_fitsobj.emit(self.fitsobj)
 
-				self.fits_2daux = self.loadspec._check_advanced()
+					self.fits_2daux = self.loadspec._check_advanced()
 
 					
 
