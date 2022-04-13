@@ -12,7 +12,7 @@ class LoadXSpec():
 
 		try:
 			self.sp = XSpectrum1D.from_file(self.filepath)
-		except (OSError, KeyError):
+		except (OSError, KeyError, AttributeError):
 			self.warning += 'XSpectrum1D cannot read this file.'
 
 	def _load_spec(self):
