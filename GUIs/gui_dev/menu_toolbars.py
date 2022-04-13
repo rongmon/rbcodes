@@ -290,20 +290,35 @@ class Custom_ToolBar(QToolBar):
 	def _on_advanced_option(self):
 		message = ''
 		if self.fits_2daux.stamp is not None:
-			self.img_sta = ShowAdvanced(self.fits_2daux.stamp, name='STAMP')
+			img_sta = [self.fits_2daux.stamp]
+			self.img_sta = ShowAdvanced(img_sta, name='STAMP')
 			self.img_sta.show()
 			message += 'GUI found STAMP HDU.'
 		else:
 			message += 'GUI did not find STAMP HDU in the current fits file.'
 
+		imgs, names = [], []
+		if self.fitsobj.flux2d is not None:
+			imgs.append(self.fitsobj.flux2d)
+			names.append('FLUX')
+		else:
+			message += 'This fits file does not contain a 2D spectrum.'
+		if self.fitsobj.error2d is not None:
+			imgs.append(self.fitsobj.error2d)
+			names.append('ERROR')
+		else:
+			message += 'This fits file does not contain a 2D error spectrum.'
+
 		if self.fits_2daux.contamination is not None:
-			self.img_con = ShowAdvanced(self.fits_2daux.contamination, name='CONTAMINATION')
-			self.img_con.show()
+			imgs.append(self.fits_2daux.contamination)
+			names.append('CONTAMINATION')
 			message += 'GUI found CONTAMINATION HDU.'
 		else:
 			message += 'GUI did not find CONTAMINATION HDU in the current fits file.'
-
-		if (self.fits_2daux.stamp is None) & (self.fits_2daux.contamination is None):
+		if len(imgs) > 0:
+			self.img_adv = ShowAdvanced(imgs, name=names)
+			self.img_adv.show()
+		else:
 			message +='There is no additional images to inspect.'
 
 		self.send_message.emit(message)
