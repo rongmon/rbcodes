@@ -114,6 +114,7 @@ class MainWindow(QMainWindow):
 		self.sc.send_z_manual.connect(widget_z._on_estZ_manual)
 		self.sc.send_scale_limits.connect(toolbar._on_scale_limits_slot)
 		self.sc.send_extract1d.connect(toolbar._on_sent_extract1d)
+		#self.sc.gauss2d.send_gcenter
 		
 		# 5. table_z ==> widget_z
 		table_z.send_dictdata.connect(widget_z._on_sent_dictdata)

@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QDialog, QComboBox, QLineEdit, QLabel, QPushButton
+from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QComboBox, QLineEdit, QLabel, QPushButton
 from PyQt5.QtCore import Qt, pyqtSignal
 
 import matplotlib
@@ -14,10 +14,11 @@ from scipy.optimize import curve_fit
 
 from IGM.rb_setline import read_line_list
 
-class Gaussfit_2d(QDialog):
+class Gaussfit_2d(QWidget):
     send_linelist = pyqtSignal(object)
     send_lineindex = pyqtSignal(int)
     send_waves = pyqtSignal(object)
+    send_gfinal = pyqtSignal(list)
 
     def __init__(self,wave, flux1d,error1d, gauss_num=2, linelists=[]):
         super().__init__()
@@ -41,25 +42,27 @@ class Gaussfit_2d(QDialog):
         l_zf = QLabel('Estimated z')
         l_zf.setFixedHeight(20)
         lines_layout.addWidget(l_zf, 0, 1)
-        zf = QLineEdit()
-        zf.setPlaceholderText('Redshift')
-        zf.setFixedWidth(100)
-        zf.setReadOnly(True)
-        lines_layout.addWidget(zf, 1,1)
+        self.zf = QLineEdit()
+        self.zf.setPlaceholderText('Redshift')
+        self.zf.setFixedWidth(100)
+        self.zf.setReadOnly(True)
+        lines_layout.addWidget(self.zf, 1,1)
 
         l_zferr = QLabel('Estimated Error')
         l_zferr.setFixedHeight(20)
         lines_layout.addWidget(l_zferr, 0, 2)
-        zferr = QLineEdit()
-        zferr.setPlaceholderText('Error')
-        zferr.setFixedWidth(100)
-        zferr.setReadOnly(True)
-        lines_layout.addWidget(zferr, 1,2)
+        self.zferr = QLineEdit()
+        self.zferr.setPlaceholderText('Error')
+        self.zferr.setFixedWidth(100)
+        self.zferr.setReadOnly(True)
+        lines_layout.addWidget(self.zferr, 1,2)
 
         pb = QPushButton('Fit')
         pb.setFixedWidth(100)
         pb.clicked.connect(self._button_clicked)
         lines_layout.addWidget(pb, 1,3)
+        self.fit_result = QLabel('Ready')
+        lines_layout.addWidget(self.fit_result, 0, 3)
 
         ion1 = self._create_linelist_widget(lines_layout, 0)
         ion2 = self._create_linelist_widget(lines_layout, 1)
@@ -153,8 +156,23 @@ class Gaussfit_2d(QDialog):
                 #print(self.linelist)
 
     def _button_clicked(self, check):
+        show_sigfig = 5
         print('begin fitting multiple gaussians')
-        self.line1d.fit()
+        result = self.line1d.fit()
+        if result is not None:
+            self.zf.setText(str(self.round_to_sigfig(result[0], show_sigfig)))
+            self.zferr.setText(str(self.round_to_sigfig(result[1], show_sigfig)))
+            self.send_gfinal.emit(result)
+            self.fit_result.setText('Success!')
+            self.fit_result.setStyleSheet('QLabel {color: #000000}')
+        else:
+            self.zf.setText('0')
+            self.zferr.setText('0')
+            self.fit_result.setText('Failure!')
+            self.fit_result.setStyleSheet('QLabel {color: #FF0000}')
+
+    def round_to_sigfig(self, num=0., sigfig=1):
+        return round(num, sigfig - int(np.floor(np.log10(abs(num)))) - 1)
 
 class LineCanvas(FigureCanvasQTAgg):
     def __init__(self, parent=None, width=5, height=3, dpi=100):
@@ -167,8 +185,9 @@ class LineCanvas(FigureCanvasQTAgg):
 
         # initialization of selected ion wavelength
         # will receive updated wavelength once all ions have been selected
-        self.waves = []
+        self.wavelist = []
         self.names = []
+        self.z_guess = 0.
 
 
     def _plot_spec(self, wave,flux1d,error1d):
@@ -189,11 +208,11 @@ class LineCanvas(FigureCanvasQTAgg):
         xlim, ylim = ax.get_xlim(), ax.get_ylim()
         self._clear_plotted_lines()
 
-        z_guess = wave_obs/self.waves[0] - 1
-        self.waves_guess = self.waves * (1 + z_guess)
+        self.z_guess = wave_obs/self.wavelist[0] - 1
+        self.waves_guess = self.wavelist * (1 + self.z_guess)
         self.axline.vlines(x=self.waves_guess,
                             ymin=ylim[0], ymax=ylim[-1], color='blue', linestyle='dashed')
-        for i in range(len(self.delw)):
+        for i in range(len(self.waves_guess)):
             self.axline.text(x=self.waves_guess[i],
                             y=ylim[-1]*0.6,
                             s=self.names[i],
@@ -210,30 +229,10 @@ class LineCanvas(FigureCanvasQTAgg):
         del self.axline.lines[2:]
         self.draw()
 
-    def gauss(self, x, amp, mu, sigma):
-        return amp * np.exp(-(x-mu)**2/(2. * sigma**2))
-
-    def multi_gauss(self, x, *params):
-        # params should have 6 parameters for 2 gausses
-        # and 9 parameters for 3 gausses
-        # Parameter order should be [amp1, mu1, sigma1, amp2, mu2, sigma2, ...]
-
-        # double gaussian
-        g1 = self.gauss(x, params[0], params[1], params[2])
-        g2 = self.gauss(x, params[3], params[4], params[5])
-
-        g_final = g1 + g2
-        if len(params)//3 == 3:
-            # triple gaussian
-            g3 = self.gauss(x, params[6], params[7], params[8])
-            g_final += g3
-
-        return g_final
-
 
 
     def fit(self):
-        print('fitting goes here...')
+        print('Start fitting multi-Gaussian profile...')
         
         # mimic the single Gaussian fitting process
         # 1. fit a local continum across the entire window
@@ -251,58 +250,37 @@ class LineCanvas(FigureCanvasQTAgg):
             # all emission lines
             sign = 1
 
-        Aguess = [self.g_flux.max()]*len(self.waves_guess)
-        Cguess = self.waves_guess
-        sguess = [5]*len(self.waves_guess)
+        # initialize guessed values
+        sig_guess = [5] * len(self.waves_guess)
+        amp_guess = [3] * len(self.waves_guess)
+        p_guess = [self.z_guess] + sig_guess + amp_guess
 
         # prepare ydata for fit
         ydata = sign * (self.g_flux - cont)
         errdata = sign * (self.g_error - cont)
-        # start fitting
-        # first ion
-        popt1, pcov1 = curve_fit(self.gauss, self.g_wave, ydata,
-                                p0=[Aguess[0], Cguess[0], sguess[0]],
-                                sigma=errdata)
-        g1_final = sign * (self.gauss(self.g_wave, *popt1)) + cont
-        perr1 = np.sqrt(np.diag(pcov1))
-        model1_fit = self.axline.plot(self.g_wave, g1_final, 'r--')
+        # start fitting process
+        model_guess = MultiGauss(self.wavelist)
+        bd_low = [self.z_guess*0.86] + [0] * (len(p_guess)-1)
+        bd_up = [self.z_guess*1.16] + [np.inf] * (len(p_guess)-1)
 
-        # second ion
-        popt2, pcov2 = curve_fit(self.gauss, self.g_wave, ydata,
-                                p0=[Aguess[1], Cguess[1], sguess[1]],
-                                sigma=errdata)
-        g2_final = sign * (self.gauss(self.g_wave, *popt2)) + cont
-        perr2 = np.sqrt(np.diag(pcov2))
-        model2_fit = self.axline.plot(self.g_wave, g2_final, 'g--')
+        # if we want to use errdata for estimation
+        # No errdata
+        try:
+            #popt, pcov = curve_fit(model_guess.compile_model, self.g_wave, ydata,
+            #                    p0=p_guess, bounds=(bd_low, bd_up))
+            # With errdata
+            popt, pcov = curve_fit(model_guess.compile_model, self.g_wave, ydata,
+                                p0=p_guess, bounds=(bd_low, bd_up), sigma=errdata)
 
-        '''
-        # fit two gaussians together
-        p0_f = np.array([Aguess, Cguess, sguess]).T.flatten()
-        popt_f, pcov_f = curve_fit(self.multi_gauss, self.g_wave, ydata,
-                                    p0=p0_f,
-                                    sigma=errdata)
-        g_final = sign * (self.multi_gauss(self.g_wave, *popt_f)) + cont
-        perr_f = np.sqrt(np.diag(pcov_f))
-        modelf_fit = self.axline.plot(self.g_wave, g_final, 'y--')
-        '''
-        if len(self.delw) > 2:
-            # optionally, third ion
-            popt3, pcov3 = curve_fit(self.gauss, self.g_wave, ydata,
-                                p0=[Aguess[-1], Cguess[-1], sguess[-1]],
-                                sigma=errdata)
-            g3_final = sign * (self.gauss(self.g_wave, *popt3)) + cont
-            perr3 = np.sqrt(np.diag(pcov3))
-            model3_fit = self.axline.plot(self.g_wave, g3_final, 'b--')
+            gfinal = sign * model_guess.compile_model(self.g_wave, *popt)
+            perr = np.sqrt(np.diag(pcov))
+            model_fit = self.axline.plot(self.g_wave, gfinal, 'r--')
 
-        print('Ion 1 center: ', popt1[1])
-        print('Ion 1 error: ', perr1[1])
-        print('Ion 2 center: ', popt2[1])
-        print('Ion 2 error: ', perr2[1])  
-
-        #print('Final: ', popt_f)      
-
-        self.draw()
-
+            self.draw()
+            return [popt[0], perr[0]]
+        except RuntimeError:
+            print('Fitting failed...')
+            return None
 
     #------------------- Keyboards/Mouse Events------------------------
     def ontype(self, event):
@@ -326,8 +304,35 @@ class LineCanvas(FigureCanvasQTAgg):
 
     #------------------- Signals/Slots --------------------------------
     def _on_sent_waves(self, dict_waves_names):
-        self.waves = np.array(list(dict_waves_names.values()))
+        self.wavelist = np.array(list(dict_waves_names.values()))
         self.names = list(dict_waves_names.keys())
-        self.delw = self.waves - self.waves[0]
-        print(self.delw)
-        #print(self.names)
+        self.delw = self.wavelist - self.wavelist[0]
+        print(self.wavelist)
+        print(self.names)
+
+class MultiGauss():
+    def __init__(self, wavelist):
+        self.wave_rest=wavelist
+        #self.siglist = [20] * len(wavelist)
+        #self.amplist = [5] * len(wavelist)
+    def _gauss1d(self,x,sig,amp,mu):
+        return amp * np.exp(-(x-mu)**2/(2. * sig**2))
+    
+    def compile_model(self, wave, *params):
+        # curve_fit can only take params as 1D array...
+        # params includes z, sigs, amps
+        # params format: z, sig1, sig2, ..., amp1, amp2, ...
+        z = params[0]
+        num_g = int((len(params) - 1) // 2)
+        self.siglist, self.amplist = [], []
+        self.wave_obs=self.wave_rest*(1. + z)
+        for i in range(1, num_g+1):
+            self.siglist.append(params[i])
+            self.amplist.append(params[i + num_g])
+
+        ind_model=np.zeros((len(self.wave_rest),len(wave)))
+        for i in range(len(self.wave_rest)):
+            ind_model[i]=self._gauss1d(wave,self.siglist[i],self.amplist[i],self.wave_obs[i])
+        self.final_model=np.sum(ind_model,axis=0)
+
+        return self.final_model
