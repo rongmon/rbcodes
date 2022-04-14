@@ -50,6 +50,7 @@ class read_spec(object):
         self.Tau= Apparant optical depth as a function of velocity
         self.vel_centroid= EW weighted velocity centroid of the absorption line
         self.vel_disp=    1sigma velocity dispersion
+        self.vel50_err = error on velocity centroid
 
 
 
@@ -58,6 +59,7 @@ class read_spec(object):
     Edit    : Rongmon Bordoloi      Aug 2020: added linetools.io.readspec file
     Edit    : Rongmon Bordoloi      April 2021: added velocity centroid estimates
     Edit    : Rongmon Bordoloi      March 2022: Added more continuum fitting methods
+    Edit    : Rongmon Bordoloi      April 2022: Added velocity centroid error
 
     --------------------------------------------------------------------------------------------
     EXAMPLE: import numpy as np
@@ -410,8 +412,9 @@ class read_spec(object):
         self.Tau=out['Tau_a']
         self.vel_centroid=out['med_vel']
         self.vel_disp=out['vel_disp']
+        self.vel50_err = out['vel50_err'] 
 
-        return self.trans,self.fval,self.vmin,self.vmax,self.trans_wave,self.W,self.W_e,self.logN,self.logN_e,self.Tau
+        #return self.trans,self.fval,self.vmin,self.vmax,self.trans_wave,self.W,self.W_e,self.logN,self.logN_e,self.Tau
 
 
     def plot_spec(self):
