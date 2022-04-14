@@ -72,6 +72,13 @@ class cont_fitter(object):
                #Save it as a fits file
                sp.save_spectrum(outputfilename)
 
+            # If the user wants to tweak an old fitted continuum, do the following sequence with linetools...
+            ---->
+            from linetools.spectra.xspectrum1d import XSpectrum1D
+            sp=XSpectrum1D.from_file(filename)
+            sp.fit_continuum()
+
+
 
     --------------------------------------------------------------------------------------------
     """
