@@ -260,7 +260,7 @@ class LineCanvas(FigureCanvasQTAgg):
         errdata = sign * (self.g_error - cont)
         # start fitting process
         model_guess = MultiGauss(self.wavelist)
-        bd_low = [self.z_guess*0.86] + [0] * (len(p_guess)-1)
+        bd_low = [self.z_guess*0.84] + [0] * (len(p_guess)-1)
         bd_up = [self.z_guess*1.16] + [np.inf] * (len(p_guess)-1)
 
         # if we want to use errdata for estimation
