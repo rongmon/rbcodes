@@ -1,4 +1,4 @@
-import sys, argparse
+import sys, argparse, os
 import pandas as pd
 
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QStatusBar, QDesktopWidget,
@@ -32,8 +32,8 @@ class MainWindow(QMainWindow):
 
 		# --------- Menus and Toolbars -----------------------------
 		self.setStatusBar(QStatusBar(self))
-		toolbar = Custom_ToolBar(self)
-		self.addToolBar(toolbar)
+		self.toolbar = Custom_ToolBar(self)
+		self.addToolBar(self.toolbar)
 
 		#menubar = Custom_MenuBar(self)
 		#self.setMenuBar(menubar)		
@@ -90,12 +90,12 @@ class MainWindow(QMainWindow):
 		#menubar.send_z_est.connect(table_z._on_sent_estZ)
 
 		# 2. toolbar signal exports
-		toolbar.send_filename.connect(widget_z._on_sent_filename)
-		toolbar.send_fitsobj.connect(widget_z._on_sent_fitsobj)
-		toolbar.send_filename.connect(table_z._move_current_filename_top)
-		toolbar.send_filename.connect(self.sc._update_lines_for_newfile)
-		toolbar.send_fitsobj.connect(self.on_fitsobj_slot)
-		toolbar.send_message.connect(lambda s,c='#ff0000': mbox.on_sent_message(s, c))
+		self.toolbar.send_filename.connect(widget_z._on_sent_filename)
+		self.toolbar.send_fitsobj.connect(widget_z._on_sent_fitsobj)
+		self.toolbar.send_filename.connect(table_z._move_current_filename_top)
+		self.toolbar.send_filename.connect(self.sc._update_lines_for_newfile)
+		self.toolbar.send_fitsobj.connect(self.on_fitsobj_slot)
+		self.toolbar.send_message.connect(lambda s,c='#ff0000': mbox.on_sent_message(s, c))
 
 		# 3. widget_z signal exports
 		widget_z.send_linelist.connect(self.sc.on_linelist_slot)
@@ -112,8 +112,8 @@ class MainWindow(QMainWindow):
 		self.sc.send_message.connect(mbox.on_sent_message)
 		self.sc.send_z_est.connect(widget_z._on_estZ_changed)
 		self.sc.send_z_manual.connect(widget_z._on_estZ_manual)
-		self.sc.send_scale_limits.connect(toolbar._on_scale_limits_slot)
-		self.sc.send_extract1d.connect(toolbar._on_sent_extract1d)
+		self.sc.send_scale_limits.connect(self.toolbar._on_scale_limits_slot)
+		self.sc.send_extract1d.connect(self.toolbar._on_sent_extract1d)
 		#self.sc.gauss2d.send_gcenter
 		
 		# 5. table_z ==> widget_z
@@ -164,24 +164,52 @@ qss = '''
 	.QAction {font-size: 8pt}
 '''
 
+def read_file_from_commandline(filepath, win=None):
+	filename = window.toolbar._get_filename(filepath, extension=False)
+	win.toolbar.filepaths.append(filepath)
+	win.toolbar.filenames.append(filename)		
+	win.toolbar.f_combobox.addItem(filename)
+	win.toolbar.f_combobox.setCurrentIndex(1)
+
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='GUI default IO Initialization',
 									add_help=True)
-	parser.add_argument('-d', '--default', action='store_true',
+	# add mutual exclusive arguments to allow users to intialize one IO at a time
+	group = parser.add_mutually_exclusive_group()
+	group.add_argument('-d', '--default', action='store_true', required=False, default=True,
 		help='Read fits files using default gui_io IO class')
-	parser.add_argument('-x', '--xspec', action='store_true',
+	group.add_argument('-x', '--xspec', action='store_true', required=False, default=False,
 		help='Read fits files using XSpectrum1D class from linetools')
+	parser.add_argument('-f', '--fitsfile', type=str, action='store', required=False, default='',
+		help='Feed one FITS file to the internal GUI database')
 	args = parser.parse_args()
 
 	app = QApplication(sys.argv[:1])
+
+	# Select IO class
 	if args.xspec:
 		print('Enable XSpectrum1D IO')
-		window = MainWindow(xspecio=True)
+		window = MainWindow(xspecio=True)	
 	else:
 		print('Enable Default IO')
 		window = MainWindow(xspecio=False)
 
+	# Check if filename provided
+	if len(args.fitsfile) > 0:
+		if args.fitsfile.endswith('fits'):
+			filepath = os.path.abspath(args.fitsfile)
+			file_exists = os.path.exists(filepath)
+			if file_exists:
+				print(f'Reading: {filepath}')
+				read_file_from_commandline(filepath, win=window)
+
+			else:
+				print('Your file does not exists.')
+				exit()
+		else:
+			print('GUI can only read FITS files.')
+			exit()
 
 	#app.setQuitOnLastWindowClosed(True)
 	window._location_on_screen()
@@ -189,8 +217,4 @@ if __name__ == '__main__':
 
 	app.setStyleSheet(qss)
 	app.exec_()
-	app.quit()
-
-
-
-
+	app.quit()	
