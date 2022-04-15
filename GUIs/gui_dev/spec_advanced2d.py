@@ -126,7 +126,7 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 		self.fig.clf()
 		ax_num = len(imgs)
 		# set a primary image
-		img = imgs[0]
+		img = imgs[-1]
 		#self.ax.cla()
 
 		if scale == 0:
@@ -192,33 +192,41 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 			
 		
 		if ax_num > 1:
-			self.ax = self.fig.add_subplot(ax_num,1,ax_num)
+			self.ax = self.fig.add_subplot(ax_num,1,1) # flux
+			self.ax.imshow(imgs[0], origin='lower', 
+							vmin=imgs[0].min(), vmax=imgs[0].max())
 			self.ax.set_title(name[0] + ' of Current Object')
-			ax_add = []
+			self.ax.tick_params(labelbottom=False)
+			
+			ax_add = [self.ax]
 			for i in range(1, ax_num):
-				ax_add.append(self.fig.add_subplot(ax_num,1,i, sharex=self.ax))
-				ax_add[-1].imshow(imgs[i], origin='lower',
+				ax_add.append(self.fig.add_subplot(ax_num,1,i+1, sharex=self.ax))
+				if i+1 == ax_num:
+					if scale == 1:
+						cax = ax_add[-1].imshow(scaled2d, origin='lower',
+												vmin=scaled2d.min(), vmax=scaled2d.max() * 0.01)
+					else:
+						cax = ax_add[-1].imshow(scaled2d, origin='lower',
+												vmin=scaled2d.min(), vmax=scaled2d.max())
+					ax_cb = self.fig.colorbar(cax, ax=ax_add[-1], location='bottom')
+					ax_add[-1].tick_params(labelbottom=True)
+				else:
+					ax_add[-1].imshow(imgs[i], origin='lower',
 									vmin=imgs[i].min(), vmax=imgs[i].max())
+					ax_add[-1].tick_params(labelbottom=False)
+
 				ax_add[-1].set_title(name[i] + ' of Current Object')
 				ax_add[-1].set_aspect('auto')
-				ax_add[-1].tick_params(labelbottom=False)
 				
 		else:
 			self.ax = self.fig.add_subplot(1,1,1)
+			self.ax.imshow(imgs[0], origin='lower', 
+							vmin=imgs[0].min(), vmax=imgs[0].max())
 			if len(name) > 1:
 				self.ax.set_title(name + ' of Current Object')	
 
-		if scale == 1:
-			pos_ax = self.ax.imshow(scaled2d, origin='lower', 
-									vmin=scaled2d.min(), vmax=scaled2d.max() * 0.01)
-		else:
-			pos_ax = self.ax.imshow(scaled2d, origin='lower', 
-									vmin=scaled2d.min(), vmax=scaled2d.max() * 1.0)
-		
-		self.ax_cb = self.fig.colorbar(pos_ax, ax=self.ax, location='bottom')
 		ax_xlim = self.ax.get_xlim()
 		self.ax.set_aspect('auto')
-		#self.ax.tick_params(labelbottom=False)
 		#self.ax2d.set_xlim(xlim_spec1d)
 		#self.fig.tight_layout()
 		
