@@ -23,7 +23,6 @@ class MplCanvas(FigureCanvasQTAgg):
 	send_message = pyqtSignal(str)
 	send_z_est = pyqtSignal(list)
 	send_z_manual = pyqtSignal(float)
-	send_gcenter = pyqtSignal(list)
 	send_scale_limits = pyqtSignal(list)
 	send_gauss_num = pyqtSignal(int)
 	send_extract1d = pyqtSignal(dict)
@@ -394,6 +393,9 @@ class MplCanvas(FigureCanvasQTAgg):
 		ylim = axes.get_ylim()
 		self.axes.lines[0] = axes.plot(wave, new_err, color='red')# label='Error')
 		self.axes.lines[1] = axes.plot(wave, new_spec, color='black')#, label='Flux')
+		self.axes.set_xlim(xlim)
+		self.axes.set_ylim(ylim)
+
 		del self.axes.lines[2:]
 
 		ax2d_xlim = self.ax2d.get_xlim()
@@ -646,7 +648,6 @@ class MplCanvas(FigureCanvasQTAgg):
 
 							
 							self.send_message.emit(message)
-							self.send_gcenter.emit(self.guess_gcenter)
 
 						else:
 							print('Multiple Gaussian fitting starts.')
@@ -763,7 +764,8 @@ class MplCanvas(FigureCanvasQTAgg):
 				if self.gauss2d is None:
 					self.send_message.emit('Please select 2 points to define the range you want to work with')
 				else:
-					self.gauss2d.exec_()
+					self.gauss2d.show()
+					self.gauss2d.send_gfinal.connect(self._on_estZ_changed)
 
 #-------------------- Slots for External Signals ------------------
 	def on_linelist_slot(self, sent_linelist):
