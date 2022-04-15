@@ -28,6 +28,7 @@ class MessageBox(QWidget):
 		self.setLayout(layout)
 
 	def on_sent_message(self, sent_message, hexColor='#000000'):
+		#Receiving the signal
 		#self.message += sent_message
 		prefix = f'<span style=\"color:{hexColor};\" >'
 		suffix = f'</span>'
