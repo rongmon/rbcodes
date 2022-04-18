@@ -1,5 +1,7 @@
-from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QComboBox, QLineEdit, QLabel, QPushButton
+from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QComboBox, QLineEdit, QLabel, QPushButton, QDialog
 from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QDoubleValidator
+from PyQt5 import QtWidgets
 
 import matplotlib
 matplotlib.use('Qt5Agg')
@@ -63,6 +65,10 @@ class Gaussfit_2d(QWidget):
         lines_layout.addWidget(pb, 1,3)
         self.fit_result = QLabel('Ready')
         lines_layout.addWidget(self.fit_result, 0, 3)
+        adv_pb = QPushButton('Advanced')
+        adv_pb.setFixedWidth(100)
+        adv_pb.clicked.connect(self._adv_button_clicked)
+        lines_layout.addWidget(adv_pb, 3,3)
 
         ion1 = self._create_linelist_widget(lines_layout, 0)
         ion2 = self._create_linelist_widget(lines_layout, 1)
@@ -157,7 +163,7 @@ class Gaussfit_2d(QWidget):
 
     def _button_clicked(self, check):
         show_sigfig = 5
-        print('begin fitting multiple gaussians')
+        print('Begin fitting multiple Gaussians')
         result = self.line1d.fit()
         if result is not None:
             self.zf.setText(str(self.round_to_sigfig(result[0], show_sigfig)))
@@ -174,6 +180,21 @@ class Gaussfit_2d(QWidget):
     def round_to_sigfig(self, num=0., sigfig=1):
         return round(num, sigfig - int(np.floor(np.log10(abs(num)))) - 1)
 
+    def _adv_button_clicked(self, check):
+        print('Change parameter bounds')
+        if (self.line1d.bounds is None) | (self.line1d.init_guess is None):
+            print('Please Press Fit button first')
+        else:
+            constraint = FittingConstraintDialog(init_guess=self.line1d.init_guess,
+                                                bounds=self.line1d.bounds)
+            if constraint.exec_():
+                (new_guess, new_bd_low, new_bd_up) = constraint._getvals()
+                self.line1d.bounds = [new_bd_low, new_bd_up]
+                self.line1d.init_guess = new_guess
+
+
+
+
 class LineCanvas(FigureCanvasQTAgg):
     def __init__(self, parent=None, width=5, height=3, dpi=100):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
@@ -187,6 +208,8 @@ class LineCanvas(FigureCanvasQTAgg):
         # will receive updated wavelength once all ions have been selected
         self.wavelist = []
         self.names = []
+        self.init_guess = None
+        self.bounds = None
         self.z_guess = 0.
 
 
@@ -251,17 +274,25 @@ class LineCanvas(FigureCanvasQTAgg):
             sign = 1
 
         # initialize guessed values
-        sig_guess = [5] * len(self.waves_guess)
-        amp_guess = [3] * len(self.waves_guess)
-        p_guess = [self.z_guess] + sig_guess + amp_guess
+        if self.init_guess is None:
+            sig_guess = [5] * len(self.waves_guess)
+            amp_guess = [3] * len(self.waves_guess)
+            p_guess = [self.z_guess] + sig_guess + amp_guess
+            self.init_guess = p_guess.copy()
+        else:
+            p_guess = self.init_guess
 
         # prepare ydata for fit
         ydata = sign * (self.g_flux - cont)
         errdata = sign * (self.g_error - cont)
         # start fitting process
         model_guess = MultiGauss(self.wavelist)
-        bd_low = [self.z_guess*0.84] + [0] * (len(p_guess)-1)
-        bd_up = [self.z_guess*1.16] + [np.inf] * (len(p_guess)-1)
+        if self.bounds is None:
+            self.bd_low = [self.z_guess*0.84] + [0] * (len(p_guess)-1)
+            self.bd_up = [self.z_guess*1.16] + [100] * (len(p_guess)-1)
+            self.bounds = [self.bd_low, self.bd_up]
+        else:
+            self.bd_low, self.bd_up = self.bounds[0], self.bounds[-1]
 
         # if we want to use errdata for estimation
         # No errdata
@@ -270,15 +301,17 @@ class LineCanvas(FigureCanvasQTAgg):
             #                    p0=p_guess, bounds=(bd_low, bd_up))
             # With errdata
             popt, pcov = curve_fit(model_guess.compile_model, self.g_wave, ydata,
-                                p0=p_guess, bounds=(bd_low, bd_up), sigma=errdata)
+                                p0=p_guess, bounds=(self.bd_low, self.bd_up), sigma=errdata)
 
             gfinal = sign * model_guess.compile_model(self.g_wave, *popt)
             perr = np.sqrt(np.diag(pcov))
+
+            del self.axline.lines[2:]
             model_fit = self.axline.plot(self.g_wave, gfinal, 'r--')
 
             self.draw()
             return [popt[0], perr[0]]
-        except RuntimeError:
+        except (RuntimeError, ValueError):
             print('Fitting failed...')
             return None
 
@@ -337,4 +370,121 @@ class MultiGauss():
 
         return self.final_model
 
-#class FittingConstraint():
+class FittingConstraintDialog(QDialog):
+    def __init__(self, init_guess, bounds):
+        super().__init__()
+        self.onlyFloat = QDoubleValidator()
+        self.setWindowTitle('Modify fitting parameter bounds')
+        QBtn = QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+        self.buttonbox = QtWidgets.QDialogButtonBox(QBtn)
+        self.layout = QGridLayout()
+        self.layout.addWidget(QLabel('Names:'), 0,0)
+        self.layout.addWidget(QLabel('Guess:'), 0,1)
+        self.layout.addWidget(QLabel('Lower Limit:'), 0,2)
+        self.layout.addWidget(QLabel('Upper Limit:'), 0,3)
+
+        self.ion_num = (len(init_guess)-1) //2
+        bd_low, bd_up = bounds[0], bounds[1]
+
+        self.layout.addWidget(QLabel('z_guess'), 1,0)
+        self.le_z = QLineEdit(str(round(init_guess[0],5)))
+        self.layout.addWidget(self.le_z, 1,1)
+        self.le_z_low = QLineEdit(str(round(bd_low[0],5)))
+        self.layout.addWidget(self.le_z_low, 1,2)
+        self.le_z_up = QLineEdit(str(round(bd_up[0],5)))
+        self.layout.addWidget(self.le_z_up, 1,3)
+
+        self.layout.addWidget(QLabel('Sigma 1'), 2,0)
+        self.le_s1 = QLineEdit(str(round(init_guess[1],5)))
+        self.layout.addWidget(self.le_s1, 2,1)
+        self.le_s1_low = QLineEdit(str(round(bd_low[1],5)))
+        self.layout.addWidget(self.le_s1_low, 2,2)
+        self.le_s1_up = QLineEdit(str(round(bd_up[1],5)))
+        self.layout.addWidget(self.le_s1_up, 2,3)
+
+        self.layout.addWidget(QLabel('Sigma 2'), 3,0)
+        self.le_s2 = QLineEdit(str(round(init_guess[2],5)))
+        self.layout.addWidget(self.le_s2, 3,1)
+        self.le_s2_low = QLineEdit(str(round(bd_low[2],5)))
+        self.layout.addWidget(self.le_s2_low, 3,2)
+        self.le_s2_up = QLineEdit(str(round(bd_up[2],5)))
+        self.layout.addWidget(self.le_s2_up, 3,3)
+
+        if self.ion_num > 2:
+            self.layout.addWidget(QLabel('Sigma 3'), 4,0)
+            self.le_s3 = QLineEdit(str(round(init_guess[3],5)))
+            self.layout.addWidget(self.le_s3, 4,1)
+            self.le_s3_low = QLineEdit(str(round(bd_low[3],5)))
+            self.layout.addWidget(self.le_s3_low, 4,2)
+            self.le_s3_up = QLineEdit(str(round(bd_up[3],5)))
+            self.layout.addWidget(self.le_s3_up, 3,3)
+
+            self.layout.addWidget(QLabel('Amp 1'), 5,0)
+            self.le_a1 = QLineEdit(str(round(init_guess[4],5)))
+            self.layout.addWidget(self.le_a1, 5,1)
+            self.le_a1_low = QLineEdit(str(round(bd_low[4],5)))
+            self.layout.addWidget(self.le_a1_low, 5,2)
+            self.le_a1_up = QLineEdit(str(round(bd_up[4],5)))
+            self.layout.addWidget(self.le_a1_up, 5,3)
+
+            self.layout.addWidget(QLabel('Amp 2'), 6,0)
+            self.le_a2 = QLineEdit(str(round(init_guess[5],5)))
+            self.layout.addWidget(self.le_a2, 6,1)
+            self.le_a2_low = QLineEdit(str(round(bd_low[5],5)))
+            self.layout.addWidget(self.le_a2_low, 6,2)
+            self.le_a2_up = QLineEdit(str(round(bd_up[5],5)))
+            self.layout.addWidget(self.le_a2_up, 6,3)
+
+            self.layout.addWidget(QLabel('Amp 3'), 7,0)
+            self.le_a3 = QLineEdit(str(round(init_guess[6],5)))
+            self.layout.addWidget(self.le_a3, 7,1)
+            self.le_a3_low = QLineEdit(str(round(bd_low[6],5)))
+            self.layout.addWidget(self.le_a3_low, 7,2)
+            self.le_a3_up = QLineEdit(str(round(bd_up[6],5)))
+            self.layout.addWidget(self.le_a3_up, 7,3)
+            self.layout.addWidget(self.buttonbox, 8, 1)
+        else:
+            self.layout.addWidget(QLabel('Amp 1'), 4,0)
+            self.le_a1 = QLineEdit(str(round(init_guess[3],5)))
+            self.layout.addWidget(self.le_a1, 4,1)
+            self.le_a1_low = QLineEdit(str(round(bd_low[3],5)))
+            self.layout.addWidget(self.le_a1_low, 4,2)
+            self.le_a1_up = QLineEdit(str(round(bd_up[3],5)))
+            self.layout.addWidget(self.le_a1_up, 4,3)
+
+            self.layout.addWidget(QLabel('Amp 2'), 5,0)
+            self.le_a2 = QLineEdit(str(round(init_guess[4],5)))
+            self.layout.addWidget(self.le_a2, 5,1)
+            self.le_a2_low = QLineEdit(str(round(bd_low[4],5)))
+            self.layout.addWidget(self.le_a2_low, 5,2)
+            self.le_a2_up = QLineEdit(str(round(bd_up[4],5)))
+            self.layout.addWidget(self.le_a2_up, 5,3)
+            self.layout.addWidget(self.buttonbox, 6, 1)
+
+        self.setLayout(self.layout)
+
+        self.buttonbox.accepted.connect(self.accept)
+        self.buttonbox.rejected.connect(self.reject)
+
+    def _getvals(self):
+        if self.ion_num > 2:
+            new_guess = [float(self.le_z.text()), 
+                        float(self.le_s1.text()), float(self.le_s2.text()), float(self.le_s3.text()),
+                        float(self.le_a1.text()), float(self.le_a2.text()), float(self.le_a3.text())]
+            new_bd_low = [float(self.le_z_low.text()),
+                        float(self.le_s1_low.text()), float(self.le_s2_low.text()), float(self.le_s3_low.text()),
+                        float(self.le_a1_low.text()), float(self.le_a2_low.text()), float(self.le_a3_low.text())]
+            new_bd_up = [float(self.le_z_up.text()),
+                        float(self.le_s1_up.text()), float(self.le_s2_up.text()),float(self.le_s3_up.text()),
+                        float(self.le_a1_up.text()), float(self.le_a2_up.text()),float(self.le_a3_up.text())]
+        else:
+            new_guess = [float(self.le_z.text()), 
+                        float(self.le_s1.text()), float(self.le_s2.text()),
+                        float(self.le_a1.text()), float(self.le_a2.text())]
+            new_bd_low = [float(self.le_z_low.text()),
+                        float(self.le_s1_low.text()), float(self.le_s2_low.text()),
+                        float(self.le_a1_low.text()), float(self.le_a2_low.text())]
+            new_bd_up = [float(self.le_z_up.text()),
+                        float(self.le_s1_up.text()), float(self.le_s2_up.text()),
+                        float(self.le_a1_up.text()), float(self.le_a2_up.text())]
+        return [new_guess,new_bd_low,new_bd_up]
