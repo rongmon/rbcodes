@@ -13,7 +13,7 @@ from PyQt5.QtGui import QKeySequence, QDesktopServices
 from user_manual import UserManualDialog
 
 from utils import FitsObj, Fits_2dAux
-from spec_advanced2d import ShowAdvanced
+from spec_advanced2d import ShowAdvanced, ZGuessPosterior
 
 WORKING_DIR = os.path.abspath(os.getcwd()) + './example-data'
 LINELIST_DIR = os.path.dirname(os.path.abspath(__file__)) + '/lines'
@@ -297,6 +297,13 @@ class Custom_ToolBar(QToolBar):
 		else:
 			message += 'GUI did not find STAMP HDU in the current fits file.'
 
+		if self.fits_2daux.zpdf is not None:
+			self.z_pdfplot = ZGuessPosterior(self.fits_2daux.zpdf)
+			self.z_pdfplot.show()
+			message += 'GUI found ZPosterior HDU.'
+		else:
+			message += 'GUI did not find ZPosterior HDU in the current fits file.'
+
 		imgs, names = [], []
 		if self.fitsobj.flux2d is not None:
 			imgs.append(self.fitsobj.flux2d)
@@ -308,6 +315,13 @@ class Custom_ToolBar(QToolBar):
 			names.append('ERROR')
 		else:
 			message += 'This fits file does not contain a 2D error spectrum.'
+
+		if self.fits_2daux.source is not None:
+			imgs.append(self.fits_2daux.source)
+			names.append('SOURCE')
+			message += 'GUI found SRC HDU.'
+		else:
+			message += 'GUI did not find SRC HDU in the current fits file.'
 
 		if self.fits_2daux.contamination is not None:
 			imgs.append(self.fits_2daux.contamination)
@@ -387,8 +401,8 @@ class Custom_ToolBar(QToolBar):
 						# both 1d and 2d specs exist
 
 						# check if filename has keywords ymin/ymax for 2D fits
-						if ('ymin' in filename) & ('ymax' in filename):
-							flist = filename.split('.')[0].split('_')
+						if ('ymin' in self.filename) & ('ymax' in self.filename):
+							flist = self.filename.split('.')[0].split('_')
 							extraction_box = [int(flist[-2][5:]), int(flist[-1][5:])]
 							
 							self.mW.sc.plot_spec2d(self.fitsobj.wave,

@@ -124,12 +124,11 @@ class LoadSpec():
 				self.fitsobj.ra = fitsfile['SCI'].header['RA']
 				self.fitsobj.dec = fitsfile['SCI'].header['DEC']
 
-			# Check if STAMP exists
-			if 'STAMP' in labels:
-				self.fitsobj.stamp = fitsfile['STAMP'].data
-				self.fits_2daux.stamp = fitsfile['STAMP'].data
-
-
+			# Check z_guess
+			if 'EAZY_ZPDF' in labels:
+				z = fitsfile['EAZY_ZPDF'].data['z']
+				pdf = fitsfile['EAZY_ZPDF'].data['pdf']
+				self.fitsobj.z_guess = z[np.argmax(pdf)]
 
 			fitsfile.close()
 			return self.fitsobj
@@ -247,15 +246,26 @@ class LoadSpec():
 		labels = [label.name for label in fitsfile]
 
 		# Check if STAMP exists
-		if 'STAMP' in labels:
-			self.fits_2daux.stamp = fitsfile['STAMP'].data
+		if 'SRC_IMG' in labels:
+			self.fits_2daux.stamp = fitsfile['SRC_IMG'].data
 		else:
 			self.fits_2daux.stamp = None
-
-		if 'CONTAMINATION' in labels:
-			self.fits_2daux.contamination = fitsfile['CONTAMINATION'].data
+		# Check CONTAMINATION
+		if 'CONT' in labels:
+			self.fits_2daux.contamination = fitsfile['CONT'].data
 		else:
 			self.fits_2daux.contamination = None
+		# Check SOURCE
+		if 'SRC' in labels:
+			self.fits_2daux.source = fitsfile['SRC'].data
+		else:
+			self.fits_2daux.source = None
+
+		# check z_guess
+		if 'EAZY_ZPDF' in labels:
+			self.fits_2daux.zpdf = fitsfile['EAZY_ZPDF'].data
+		else:
+			self.fits_2daux.zpdf = None
 
 		fitsfile.close()
 		return self.fits_2daux

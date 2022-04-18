@@ -336,3 +336,5 @@ class MultiGauss():
         self.final_model=np.sum(ind_model,axis=0)
 
         return self.final_model
+
+#class FittingConstraint():

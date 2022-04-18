@@ -217,12 +217,6 @@ class LineListWidget(QWidget):
 		self.estZ.setText(str(self.round_to_sigfig(newz[0], show_sigfig)))
 		self.estZstd.setText(str(self.round_to_sigfig(newz[1], show_sigfig)))
 
-	def _on_estZ_manual(self, estz_only):
-		show_sigfig = 4
-		self.newz = estz_only
-		self.estZ.setText(str(self.round_to_sigfig(self.newz, show_sigfig)))
-		self.estZstd.setText('0')
-
 	def _on_sent_filename(self, sent_filename):
 		self.filename = sent_filename
 
@@ -231,6 +225,9 @@ class LineListWidget(QWidget):
 
 	def _on_sent_fitsobj(self, sent_fitsobj):
 		self.fitsobj = sent_fitsobj
+		if self.fitsobj.z_guess is not None:
+			self.estZ.setText(str(self.round_to_sigfig(self.fitsobj.z_guess, 3)))
+			self.send_message.emit('Redshift posterior is found in the FITS file!')
 
 	def _on_button_clicked(self, sfilename):
 		if len(self.estZ.text().strip()) < 1:
@@ -250,6 +247,8 @@ class LineListWidget(QWidget):
 		if self.fitsobj.ra is not None:
 			data.update({'RA': self.fitsobj.ra,
 							'DEC': self.fitsobj.dec})
+		if self.fitsobj.z_guess is not None:
+			data.update({'z_guess': self.fitsobj.z_guess})
 
 		self.send_data.emit(data)
 
@@ -301,7 +300,10 @@ class LineListWidget(QWidget):
 		self.send_linelists2multiG.emit(self.LINELISTS)
 
 	def round_to_sigfig(self, num=0., sigfig=1):
-		return round(num, sigfig - int(floor(log10(abs(num)))) - 1)
+		if num is not None:
+			return round(num, sigfig - int(floor(log10(abs(num)))) - 1)
+		else:
+			return None
 
 	def _addtional_linelist(self, i, s):
 		# i = index of the widget passing linelist
