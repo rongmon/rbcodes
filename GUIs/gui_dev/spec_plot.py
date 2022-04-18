@@ -739,7 +739,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			#Manual mode
 			if self.gauss_num == 0:
 				self.send_message.emit('You are in manual mode now.')
-				self.guess_ion = GuessTransition(self.linelist, event.xdata, None)
+				self.guess_ion = GuessTransition(self.linelist, event.xdata, np.nan)
 				self.guess_ion.show()
 				self.guess_ion.send_z_cal.connect(self._on_estZ_changed)
 

@@ -1,7 +1,7 @@
 import sys
 import os
 import pandas as pd
-from numpy import floor, log10, isnan
+from numpy import floor, log10, isnan, nan
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QComboBox, QLineEdit, QPushButton, QCheckBox
 from PyQt5.QtCore import pyqtSignal
@@ -97,6 +97,7 @@ class LineListWidget(QWidget):
 		self.estZstd.setPlaceholderText('z Error')
 		self.estZstd.setMaximumWidth(100)
 		self.estZstd.setValidator(self.onlyFloat)
+		self.estZstd.setReadOnly(True)
 		self.conf = QLineEdit()
 		self.conf.setPlaceholderText('[0, 1.]')
 		self.conf.setMaximumWidth(150)
@@ -181,6 +182,8 @@ class LineListWidget(QWidget):
 
 	def _on_z_return_pressed(self):
 		self.send_z_returnPressed.emit(float(self.estZ.text()))
+		self.estZstd.setText('nan')
+		# this will not changed the default self.newz values
 
 	# data receiption
 	def on_linelist_name_slot(self, sent_linelist_name):
@@ -214,8 +217,14 @@ class LineListWidget(QWidget):
 	def _on_estZ_changed(self, newz):
 		show_sigfig = 5
 		self.newz = newz
-		self.estZ.setText(str(self.round_to_sigfig(newz[0], show_sigfig)))
-		self.estZstd.setText(str(self.round_to_sigfig(newz[1], show_sigfig)))
+		if not isnan(float(self.newz[0])):
+			self.estZ.setText(str(self.round_to_sigfig(newz[0], show_sigfig)))
+		else:
+			self.estZ.setText('nan')
+		if not isnan(float(self.newz[1])):
+			self.estZstd.setText(str(self.round_to_sigfig(newz[1], show_sigfig)))
+		else:
+			self.estZstd.setText('nan')
 
 	def _on_sent_filename(self, sent_filename):
 		self.filename = sent_filename
@@ -231,9 +240,9 @@ class LineListWidget(QWidget):
 
 	def _on_button_clicked(self, sfilename):
 		if len(self.estZ.text().strip()) < 1:
-			self.estZ.setText('0')
+			self.estZ.setText('nan')
 		if len(self.estZstd.text().strip()) < 1:
-			self.estZstd.setText('0')
+			self.estZstd.setText('nan')
 		if len(self.conf.text().strip()) < 1:
 			self.conf.setText('0')
 		if len(self.flag.text().strip()) < 1:
@@ -256,7 +265,8 @@ class LineListWidget(QWidget):
 		#print(self.filename)
 		#print(sent_dict)
 		if len(sent_dict) > 0:
-			if not isnan(sent_dict['z']):
+			#print(sent_dict['z'])
+			if not isnan(float(sent_dict['z'])):
 				# extract z_estimated from z column
 				if len(self.newz) < 2:
 					self.newz.append(float(sent_dict['z']))
@@ -267,10 +277,13 @@ class LineListWidget(QWidget):
 
 				show_sigfig = 5
 				self.estZ.setText(str(self.round_to_sigfig(self.newz[0], show_sigfig)))
-				self.estZstd.setText(str(self.round_to_sigfig(self.newz[1], show_sigfig)))
+				if not isnan(float(self.newz[1])):
+					self.estZstd.setText(str(self.round_to_sigfig(self.newz[1], show_sigfig)))
+				else:
+					self.estZstd.setText('nan')
 				self.send_message.emit('Found estimated z in table!')
 
-			elif not isnan(sent_dict['z_guess']):
+			elif not isnan(float(sent_dict['z_guess'])):
 				# extract z_estimated from z_guess column
 				if len(self.newz) < 2:
 					self.newz.append(float(sent_dict['z_guess']))
@@ -278,7 +291,7 @@ class LineListWidget(QWidget):
 					
 				else:
 					self.newz[0] = float(sent_dict['z_guess'])
-					self.newz[1] = 0.				
+					self.newz[1] = nan				
 				self.estZ.setText(str(self.newz[0]))
 				self.estZstd.setText(str(self.newz[1]))
 			
@@ -289,7 +302,7 @@ class LineListWidget(QWidget):
 		else:
 			self.estZ.clear()
 			self.estZstd.clear()
-			self.newz = [0., 0.] # reset est_z and est_z_std back to zero
+			self.newz = [nan, nan] # reset est_z and est_z_std back to nans
 
 			self.conf.clear()
 			self.flag.clear()

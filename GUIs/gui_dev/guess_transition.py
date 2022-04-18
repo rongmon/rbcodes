@@ -29,8 +29,8 @@ class GuessTransition(QWidget):
 		ion_num = self.transitions.currentRow()
 		ion_wrest = self.linelist['wave'][ion_num]
 		z_cal = (self.wave - ion_wrest)/ion_wrest
-		if self.std is None:
-			z_std = None
+		if self.std is np.nan:
+			z_std = np.nan
 		else:
 			z_std = self.std / self.wave * z_cal
 		self.send_z_cal.emit([z_cal, z_std])
