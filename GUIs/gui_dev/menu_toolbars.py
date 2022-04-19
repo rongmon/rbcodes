@@ -348,6 +348,7 @@ class Custom_ToolBar(QToolBar):
 			pass
 		else:
 			self.filename = self.filenames[i-1]
+			print(f'Currently, GUI reads FITS file from {self.filepaths[i-1]}')
 			if self.mW.xspecio:
 				# enable XSpectrum1D io
 				#print('xspec io mode')
