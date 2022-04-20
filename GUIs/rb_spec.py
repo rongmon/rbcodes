@@ -5,7 +5,7 @@ from scipy.interpolate import splrep,splev
 import sys
 import os
 import pdb
-class read_spec(object):
+class rb_spec(object):
     """A spectrum read into a class. spectrum will have
     following properties:
 
@@ -20,7 +20,7 @@ class read_spec(object):
     Optional:  All only valid for filetype=linetools option
          efil= errorfile [Default None]
 
-        output: This gives a read_spec object with following attributes:
+        output: This gives a rb_spec object with following attributes:
 
         self.zabs= Absorber redshift
 
@@ -50,6 +50,7 @@ class read_spec(object):
         self.Tau= Apparant optical depth as a function of velocity
         self.vel_centroid= EW weighted velocity centroid of the absorption line
         self.vel_disp=    1sigma velocity dispersion
+        self.vel50_err = error on velocity centroid
 
 
 
@@ -58,13 +59,17 @@ class read_spec(object):
     Edit    : Rongmon Bordoloi      Aug 2020: added linetools.io.readspec file
     Edit    : Rongmon Bordoloi      April 2021: added velocity centroid estimates
     Edit    : Rongmon Bordoloi      March 2022: Added more continuum fitting methods
+    Edit    : Rongmon Bordoloi      April 2022: Added velocity centroid error
+    Edit    : Rongmon Bordoloi      April 2022: Added different calling sequence to ingest numpy arrays directly. 
+    # WARNING: CALLING SEQUENCE HAS CHANGED SINCE APRIL 2022.
+    CAREFULLY LOOK AT THE EXAMPLE BELOW
 
     --------------------------------------------------------------------------------------------
     EXAMPLE: import numpy as np
             import matplotlib
             matplotlib.use('Qt5Agg')
             import matplotlib.pyplot as plt
-            from GUIs import rb_spec as r 
+            from GUIs.rb_spec import rb_spec as r 
 
             # List of absorber redshifts
             zabs=[0.511020,1.026311,1.564481]
@@ -73,7 +78,14 @@ class read_spec(object):
             index=0
             filename='Quasar_Spectrum.fits'
             #Read in file
-            s=r.read_spec(filename,filetype='linetools')
+            s=r.from_file(filename,filetype='linetools')
+               #-------------------------------------------------------------------------------
+               # DETOUR --->
+               #ALTERNATIVE 
+               #IF YOU WANT TO DIRECTLY INJEST NUMPY ARRAYS DO THE FOLLOWING
+               s=r.from_data(wave,flux,error)
+               # HERE wave,flux,error are numpy arrays of wavelength,flux and error respectively.
+               #-------------------------------------------------------------------------------
 
             #Shift spectra to rest frame
             s.shift_spec(zabs[index]);
@@ -85,13 +97,20 @@ class read_spec(object):
 
             #Fit continuum Mask the regions defined by velocity
             s.fit_continuum(mask=[-200,300,500,1100],domain=xlim,Legendre=3)
+               #-------------------------------------------------------------------------------
+               # DETOUR 1--->
+
                 #Alternative Fit continuum methods.
                 #s.fit_continuum_ransac(window=149,mednorm=False)
+
+               #-------------------------------------------------------------------------------
+               # DETOUR 2--->
 
                 #Aternate continuum fitting method [interactive]
                 s.fit_continuum(Legendre=False,prefit_cont='False')
                 #Aternate continuum fitting method [input prefit continuum]
                 s.fit_continuum(Legendre=False,prefit_cont=cont_arary)
+               #-------------------------------------------------------------------------------
 
 
             #Compute EW
@@ -118,9 +137,21 @@ class read_spec(object):
     --------------------------------------------------------------------------------------------
 
     """
-    def __init__(self,filename=False,filetype=False, efil=None,**kwargs):
+    def __init__(self,wave,flux,error,filename=False):#,filetype=False, efil=None,**kwargs):
         """ creates the spectrum object """
+        #print('Initializing rb_spec object for absorption line analysis!')
+        
+
+        self.wave=wave
+        self.flux=flux
+        self.error=error
+        #self.wrest=wave*(1.+0.)
+        #self.zabs=0.
         self.filename=filename
+
+
+    @classmethod
+    def from_file(cls,filename,filetype=False,efil=None,**kwargs):
 
         if filetype==False:
             #Take File Extention and try
@@ -137,8 +168,6 @@ class read_spec(object):
                     error=kwargs['error']
                 else:
                     raise IOError("Input error array")
-
-
 
             else:
                 tt=os.path.splitext(filename)[1]
@@ -230,14 +259,22 @@ class read_spec(object):
             else:
                 error=sp.sig.value
 
+        return cls(wave,flux,error,filename=filename)
+
+
+    @classmethod
+    def from_data(cls,wave,flux,error):
+
+        return cls(wave,flux,error,filename=None)
+
 
         
 
-        self.wave=wave
-        self.flux=flux
-        self.error=error
-        self.wrest=wave*(1.+0.)
-        self.zabs=0.
+        #self.wave=wave
+        #self.flux=flux
+        #self.error=error
+        #self.wrest=wave*(1.+0.)
+        #self.zabs=0.
     
     def shift_spec(self,zabs):
         """ Shifts wavelength to absorber rest frame"""
@@ -410,8 +447,9 @@ class read_spec(object):
         self.Tau=out['Tau_a']
         self.vel_centroid=out['med_vel']
         self.vel_disp=out['vel_disp']
+        self.vel50_err = out['vel50_err'] 
 
-        return self.trans,self.fval,self.vmin,self.vmax,self.trans_wave,self.W,self.W_e,self.logN,self.logN_e,self.Tau
+        #return self.trans,self.fval,self.vmin,self.vmax,self.trans_wave,self.W,self.W_e,self.logN,self.logN_e,self.Tau
 
 
     def plot_spec(self):

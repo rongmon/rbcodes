@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 
 
 class CustomZTable(QtWidgets.QWidget):
-	send_dictdata = pyqtSignal(object)
+	send_dictdata = pyqtSignal(dict)
 
 
 	def __init__(self):

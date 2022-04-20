@@ -13,7 +13,7 @@ from PyQt5.QtGui import QKeySequence, QDesktopServices
 from user_manual import UserManualDialog
 
 from utils import FitsObj, Fits_2dAux
-from spec_advanced2d import ShowAdvanced
+from spec_advanced2d import ShowAdvanced, ZGuessPosterior
 
 WORKING_DIR = os.path.abspath(os.getcwd()) + './example-data'
 LINELIST_DIR = os.path.dirname(os.path.abspath(__file__)) + '/lines'
@@ -48,8 +48,7 @@ class Custom_ToolBar(QToolBar):
 
 		btn_loadf = self._create_button('Read FITS', 'Read a fits file and plot the spectrum')
 		self.addAction(btn_loadf)
-		#btn_loadf.triggered.connect(self._load_spec)
-		btn_loadf.triggered.connect(self._load_more_specs)
+		btn_loadf.triggered.connect(self._load_specs)
 
 		btn_savef = self._create_button('Save Extract1D', 'Save the extracted 1D FITS file')
 		self.addAction(btn_savef)
@@ -129,53 +128,8 @@ class Custom_ToolBar(QToolBar):
 			self.manual = UserManualDialog(method=1)
 		self.manual.show()
 
-	def _load_spec(self):
-		#Read a single fits file
-		filepath, check = QFileDialog.getOpenFileName(None,
-			'Load 1 spectrum FITS file',
-			WORKING_DIR,
-			'Fits Files (*.fits)')
-		if check:
-			#print(type(file), file)
 
-			# read fits file
-			fitsfile = fits.open(filepath)
-			# find wavelength, flux, error
-			if 'FLUX' in fitsfile:
-				self.fitsobj.wave = fitsfile['WAVELENGTH'].data
-				self.fitsobj.flux = fitsfile['FLUX'].data
-				self.fitsobj.error = fitsfile['ERROR'].data 
-			else:
-				for i in range(len(fitsfile)):
-					search_list = np.array(fitsfile[i].header.cards)
-					if 'flux' in search_list:
-						self.fitsobj.flux = fitsfile[i].data['flux']
-					elif 'FLUX' in search_list:
-						self.fitsobj.flux = fitsfile[i].data['FLUX']
-
-					if 'loglam' in search_list:
-						self.fitsobj.wave = 10**(fitsfile[i].data['loglam'])
-					elif 'WAVELENGTH' in search_list:
-						self.fitsobj.wave = fitsfile[i].data['WAVELENGTH']
-
-					if 'ivar' in search_list:
-						self.fitsobj.error = 1. / np.sqrt(fitsfile[i].data['ivar'])
-					elif 'ERROR' in search_list:
-						self.fitsobj.error = fitsfile[i].data['ERROR']
-
-			
-
-			filename = self._get_filename(filepath, extension=False)
-			#print(filename)
-
-			self.mW.sc.plot_spec(self.fitsobj.wave, 
-							self.fitsobj.flux, 
-							self.fitsobj.error,
-							filename)
-			self.send_fitsobj.emit(self.fitsobj)
-			self.send_filename.emit(filename)
-
-	def _load_more_specs(self):
+	def _load_specs(self):
 		#Read multiple spec fits file
 		#	only fetch filepath strings, do not open fits files here
 		filepaths, check = QFileDialog.getOpenFileNames(None,
@@ -297,6 +251,13 @@ class Custom_ToolBar(QToolBar):
 		else:
 			message += 'GUI did not find STAMP HDU in the current fits file.'
 
+		if self.fits_2daux.zpdf is not None:
+			self.z_pdfplot = ZGuessPosterior(self.fits_2daux.zpdf)
+			self.z_pdfplot.show()
+			message += 'GUI found ZPosterior HDU.'
+		else:
+			message += 'GUI did not find ZPosterior HDU in the current fits file.'
+
 		imgs, names = [], []
 		if self.fitsobj.flux2d is not None:
 			imgs.append(self.fitsobj.flux2d)
@@ -308,6 +269,13 @@ class Custom_ToolBar(QToolBar):
 			names.append('ERROR')
 		else:
 			message += 'This fits file does not contain a 2D error spectrum.'
+
+		if self.fits_2daux.source is not None:
+			imgs.append(self.fits_2daux.source)
+			names.append('SOURCE')
+			message += 'GUI found SRC HDU.'
+		else:
+			message += 'GUI did not find SRC HDU in the current fits file.'
 
 		if self.fits_2daux.contamination is not None:
 			imgs.append(self.fits_2daux.contamination)
@@ -334,6 +302,7 @@ class Custom_ToolBar(QToolBar):
 			pass
 		else:
 			self.filename = self.filenames[i-1]
+			print(f'Currently, GUI reads FITS file from {self.filepaths[i-1]}')
 			if self.mW.xspecio:
 				# enable XSpectrum1D io
 				#print('xspec io mode')
@@ -387,8 +356,8 @@ class Custom_ToolBar(QToolBar):
 						# both 1d and 2d specs exist
 
 						# check if filename has keywords ymin/ymax for 2D fits
-						if ('ymin' in filename) & ('ymax' in filename):
-							flist = filename.split('.')[0].split('_')
+						if ('ymin' in self.filename) & ('ymax' in self.filename):
+							flist = self.filename.split('.')[0].split('_')
 							extraction_box = [int(flist[-2][5:]), int(flist[-1][5:])]
 							
 							self.mW.sc.plot_spec2d(self.fitsobj.wave,

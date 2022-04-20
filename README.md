@@ -17,6 +17,7 @@ The GUIs folder contains several graphical user interfaces for astrophysics.
 	2) rb_spec.py :  An absorption line analysis pipeline. Allowing to create an object from an 1D 
 	                 spectrum do continuum fitting, measure equivalenth widths/column densities and
 	                 save the final data and measurements. Also allows the fitting of a simple Voigt profile. 
+	                 NOTE: Major overhawl to calling sequence since April 2022. See example in the file.
 
 	3) rb_interactive_vpfit_singlet.py : Interactive simple Voigt profile fitter [used with rb_spec.py]
 	                                    [ Look for rbvfit github repository for an interactive Voigt 
@@ -30,6 +31,7 @@ The GUIs folder contains several graphical user interfaces for astrophysics.
 	5) abstools: A complex absorption line analysis GUI to simultaneously continuum fit and 
 		     measure EW/logN of several absorption lines. This is under GUIs/abstools. 
 		     Look up readme file in that folder for a working example.
+
 
 
 The IGM folder contains several python routines for intergalactic medium and circumgalactic medium calculations.

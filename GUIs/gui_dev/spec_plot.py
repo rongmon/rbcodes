@@ -22,7 +22,6 @@ matplotlib.use('Qt5Agg')
 class MplCanvas(FigureCanvasQTAgg):
 	send_message = pyqtSignal(str)
 	send_z_est = pyqtSignal(list)
-	send_z_manual = pyqtSignal(float)
 	send_scale_limits = pyqtSignal(list)
 	send_gauss_num = pyqtSignal(int)
 	send_extract1d = pyqtSignal(dict)
@@ -740,9 +739,9 @@ class MplCanvas(FigureCanvasQTAgg):
 			#Manual mode
 			if self.gauss_num == 0:
 				self.send_message.emit('You are in manual mode now.')
-				self.guess_ion = GuessTransition(self.linelist, event.xdata, 0.)
+				self.guess_ion = GuessTransition(self.linelist, event.xdata, np.nan)
 				self.guess_ion.show()
-				self.guess_ion.send_z_cal.connect(self._on_estZ_changed_manual)
+				self.guess_ion.send_z_cal.connect(self._on_estZ_changed)
 
 
 			#For single Gaussian
@@ -813,11 +812,6 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.estZstd = newz[1]
 		self._lines_in_current_range()
 		self.send_z_est.emit([self.estZ, self.estZstd])
-
-	def _on_estZ_changed_manual(self, newz):
-		self.estZ = newz[0]
-		self._lines_in_current_range()
-		self.send_z_manual.emit(self.estZ)
 
 	def _on_estZ_return_pressed(self, sent_estZ):
 		self.estZ = sent_estZ

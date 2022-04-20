@@ -4,15 +4,19 @@ from linetools.spectra.xspectrum1d import XSpectrum1D
 
 from utils import FitsObj
 
+# This class requires installation of linetools
+# check if sys.path has linetools before using
 class LoadXSpec():
 	def __init__(self, filepath=''):
 		self.fitsobj = FitsObj(wave=[])
 		self.filepath = filepath
 		self.warning = ''
 
+		# try if XSpectrum1D can read current file
 		try:
 			self.sp = XSpectrum1D.from_file(self.filepath)
 		except (OSError, KeyError, AttributeError):
+			# give warning without GUI crashing
 			self.warning += 'XSpectrum1D cannot read this file.'
 
 	def _load_spec(self):
@@ -27,6 +31,3 @@ class LoadXSpec():
 			
 
 			return self.fitsobj
-
-
-

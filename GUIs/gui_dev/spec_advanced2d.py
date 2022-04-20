@@ -234,3 +234,47 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 		self.draw()
 
 		return [scaled2d.min(), scaled2d.max()]
+
+
+class ZGuessPosterior(QWidget):
+	def __init__(self, zpdf):
+		super().__init__()
+		layout = QVBoxLayout()
+		zguess = ZGuessCanvas()
+		zguess._plot_posterior(zpdf)
+		mpl_toolbar = NavigationToolbar(zguess, self)
+		layout.addWidget(mpl_toolbar)
+		layout.addWidget(zguess)
+		self.setLayout(layout)
+		self.setMinimumSize(600,600)
+
+
+class ZGuessCanvas(FigureCanvasQTAgg):
+	def __init__(self, parent=None, width=5, height=3, dpi=100):
+		self.fig = Figure(figsize=(width, height), dpi=dpi)
+		self.fig.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9)
+		super().__init__(self.fig)
+		self.fig.canvas.setFocusPolicy(Qt.ClickFocus)
+		self.fig.canvas.setFocus()
+
+	def _plot_posterior(self, zpdf):
+		self.ax = self.fig.add_subplot(111)
+		self.ax.cla()
+		#print(flux2d.shape)
+		#print(len(flux2d.flatten()))
+		z = zpdf['z']
+		z_plot = np.log10(1+z)
+		zmin = round(np.min(z))
+		zmax = round(np.max(z))
+		num_ticks = int(zmax - zmin) + 1
+		z_ticklabels = np.linspace(zmin, zmax, num_ticks, dtype=int)
+		z_ticks = np.log10(1+z_ticklabels)
+		pdf = zpdf['pdf']
+		self.ax.plot(z_plot, pdf)
+		self.ax.set_xticks(z_ticks)
+		self.ax.set_xticklabels(z_ticklabels)
+
+		self.ax.set_xlabel('Redshift Distribution')
+		self.ax.set_ylabel('Posterior PDF')
+		
+		self.draw()
