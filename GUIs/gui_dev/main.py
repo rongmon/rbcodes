@@ -21,6 +21,7 @@ class MainWindow(QMainWindow):
 	'''
 	def __init__(self, xspecio=False):
 		super().__init__()
+		# if using XSpectrum1D io
 		self.xspecio = xspecio
 
 		#----------- External data ---------------------------------
@@ -44,10 +45,15 @@ class MainWindow(QMainWindow):
 		#widget.setMinimumSize(1000, 800)
 		#widget.setFixedSize(1600, 900)
 
+		# Primary Linelist/Redshift Estimation
 		widget_z = LineListWidget()
 		#widget_z.setFixedSize(1000,80)
+
+		# GUI Database/Table DataFrame
 		table_z = CustomZTable()
+		# Message box
 		mbox = MessageBox()
+
 		sublayout = QHBoxLayout()
 		sublayout.addWidget(mbox)
 		sublayout.addWidget(table_z)
@@ -56,6 +62,7 @@ class MainWindow(QMainWindow):
 		layout = QVBoxLayout()
 		layout.setAlignment(QtCore.Qt.AlignLeft) #QtCore.Qt.AlignTop | 
 
+		# Main Plotting Canvas
 		self.sc = MplCanvas(width=15, height=9, dpi=100)
 		self.sc.setMinimumSize(1000,500)
 		sc_layout = QVBoxLayout()

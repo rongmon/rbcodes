@@ -178,7 +178,10 @@ class Gaussfit_2d(QWidget):
             self.fit_result.setStyleSheet('QLabel {color: #FF0000}')
 
     def round_to_sigfig(self, num=0., sigfig=1):
-        return round(num, sigfig - int(np.floor(np.log10(abs(num)))) - 1)
+        if float(num) == np.inf:
+            return np.inf
+        else:
+            return round(num, sigfig - int(np.floor(np.log10(abs(num)))) - 1)
 
     def _adv_button_clicked(self, check):
         print('Change parameter bounds')

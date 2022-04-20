@@ -22,12 +22,14 @@ NEED TO FIND A BETTER WAY TO TELL IF A FITS FILE HAS 1D(spec) OR 2D(image) DATA
 
 # This class is used to load spectrum from fits (unknown format) and save spectrum to fits file (our format)
 class LoadSpec():
+	# Initialization - requires filepath
 	def __init__(self, filepath):
+		# interval values
 		self.filepath = filepath
 		self.fitsobj = FitsObj(wave=[], flux=None, error=None)
 		self.fits_2daux = Fits_2dAux()
 
-
+	# Read FITS file with various format options
 	def _load_spec(self):
 		# read fits file
 		fitsfile = fits.open(self.filepath)
@@ -234,12 +236,16 @@ class LoadSpec():
 			raise ValueError("Predefined wavelength units are 'um','nm','AA'.")            
 		return scale
 
+	# Save the deep copy of current opened FITS file
 	def _save_copy(self):
 		fitsfile = fits.open(self.filepath)
 		fitsfile_copy = copy.deepcopy(fitsfile)
 		fitsfile.close()
 		return fitsfile_copy
 
+	# Extract addtional information from FITS file if available
+	# Addtional infomation includes
+	#													(stamp, contamination, posterior redshift estimation)
 	def _check_advanced(self):
 		# read fits file
 		fitsfile = fits.open(self.filepath)
@@ -250,18 +256,20 @@ class LoadSpec():
 			self.fits_2daux.stamp = fitsfile['SRC_IMG'].data
 		else:
 			self.fits_2daux.stamp = None
+
 		# Check CONTAMINATION
 		if 'CONT' in labels:
 			self.fits_2daux.contamination = fitsfile['CONT'].data
 		else:
 			self.fits_2daux.contamination = None
+
 		# Check SOURCE
 		if 'SRC' in labels:
 			self.fits_2daux.source = fitsfile['SRC'].data
 		else:
 			self.fits_2daux.source = None
 
-		# check z_guess
+		# check z_guess posterior
 		if 'EAZY_ZPDF' in labels:
 			self.fits_2daux.zpdf = fitsfile['EAZY_ZPDF'].data
 		else:
