@@ -291,8 +291,12 @@ class LineCanvas(FigureCanvasQTAgg):
         # start fitting process
         model_guess = MultiGauss(self.wavelist)
         if self.bounds is None:
-            self.bd_low = [self.z_guess*0.84] + [0] * (len(p_guess)-1)
-            self.bd_up = [self.z_guess*1.16] + [100] * (len(p_guess)-1)
+            sol = 3e5 #km/s
+            v_uncer = 1000 #km/s
+            z_guess_low = self.z_guess * (1 - v_uncer/sol)
+            z_guess_up = self.z_guess * (1 + v_uncer/sol)
+            self.bd_low = [z_guess_low] + [0] * (len(p_guess)-1)
+            self.bd_up = [z_guess_up] + [100] * (len(p_guess)-1)
             self.bounds = [self.bd_low, self.bd_up]
         else:
             self.bd_low, self.bd_up = self.bounds[0], self.bounds[-1]
