@@ -29,6 +29,7 @@ class Gaussfit_2d(QWidget):
         self.names = np.array([None] * gauss_num)
         self.linelists = linelists
         self.result = None
+        self.wave, self.flux1d, self.error1d = wave, flux1d, error1d
         
 
 
@@ -88,6 +89,14 @@ class Gaussfit_2d(QWidget):
         self.line1d._plot_spec(wave,flux1d, error1d)
         mpl_toolbar = NavigationToolbar(self.line1d, self)
         self.send_waves.connect(self.line1d._on_sent_waves)
+
+
+        # --- possible implementation ---
+        # right now it is unstable if linetools is not installed
+        cont_pb = QPushButton('Continuum')
+        cont_pb.setFixedWidth(100)
+        cont_pb.clicked.connect(self._fit_ransac_continuum)
+        lines_layout.addWidget(cont_pb, 1,4)
 
         # main layout
         layout.addWidget(mpl_toolbar)
@@ -205,6 +214,13 @@ class Gaussfit_2d(QWidget):
                 self.line1d.bounds = [new_bd_low, new_bd_up]
                 self.line1d.init_guess = new_guess
 
+    def _fit_ransac_continuum(self, check):
+        from IGM.ransac_contfit import cont_fitter
+        c = cont_fitter.from_data(self.wave, self.flux1d, error=self.error1d)
+        c.fit_continuum(window=149)
+        self.line1d._plot_spec(self.wave, self.flux1d, self.error1d,
+                                cont1d=c.cont)
+
 
 
 
@@ -226,13 +242,15 @@ class LineCanvas(FigureCanvasQTAgg):
         self.z_guess = 0.
 
 
-    def _plot_spec(self, wave,flux1d,error1d):
+    def _plot_spec(self, wave,flux1d,error1d, cont1d=None):
         self.axline = self.fig.add_subplot(111)
         self.axline.cla()
         self.axline.plot(wave,flux1d,'k')
         self.axline.plot(wave,error1d,'r')
         self.g_wave, self.g_flux, self.g_error = wave, flux1d, error1d
 
+        if cont1d is not None:
+            self.axline.plot(wave,cont1d,'g--')
 
         self.axline.set_xlabel('Wavelength')
         self.axline.set_title('Fit Gaussians')
