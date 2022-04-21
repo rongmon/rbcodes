@@ -64,7 +64,7 @@ class MainWindow(QMainWindow):
 
 		# Main Plotting Canvas
 		self.sc = MplCanvas(width=15, height=9, dpi=100)
-		self.sc.setMinimumSize(1000,500)
+		self.sc.setMinimumSize(1200,450)
 		sc_layout = QVBoxLayout()
 		sc_layout.setContentsMargins(0,0,0,0)
 		mpl_toolbar = NavigationToolbar(self.sc, self)

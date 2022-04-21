@@ -265,13 +265,9 @@ class MplCanvas(FigureCanvasQTAgg):
 			# make sure tmp has no negative values for initial guess
 			tmp_cumsum = np.cumsum(tmp) / np.sum(tmp)
 			ylist = np.arange(0, len(tmp_cumsum), 1)
-			# flux/error are active and extracted from flux2d/error2d
-			self.flux, self.error = self.extract_1d(self.flux2d, self.err2d)
-			# keep a frozen copy and only used for reset
-			self.flux_fix, self.error_fix = self.flux.copy(), self.error.copy()
 
 			#print(tmp_cumsum)
-			lower, upper = 0.16, 0.84
+			lower, upper = 0.32, 0.68
 			self.extraction_y = [int(np.interp(lower, tmp_cumsum, ylist)),
 								int(np.interp(upper, tmp_cumsum, ylist))]			
 			#print(self.extraction_y)
@@ -280,6 +276,9 @@ class MplCanvas(FigureCanvasQTAgg):
 
 		self.flux, self.error = self.extract_1d(self.flux2d[self.extraction_y[0]: self.extraction_y[1], :],
 												self.err2d[self.extraction_y[0]: self.extraction_y[1], :])
+		# keep a frozen copy and only used for reset
+		self.flux_fix, self.error_fix = self.flux.copy(), self.error.copy()
+
 		self.tmp_extraction_y = []
 		
 		# plot starting...

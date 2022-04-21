@@ -71,9 +71,9 @@ class ShowAdvanced(QWidget):
 		if 'STAMP' in self.name:
 			self.setMinimumSize(600,600)
 			self.setWindowTitle('STAMP Inspection')
-		elif 'CONTAMINATION' in self.name:
+		elif 'FLUX' in self.name:
 			self.setMinimumSize(1000, 400)
-			self.setWindowTitle('CONTAMINATION Inspection')
+			self.setWindowTitle('FLUX Inspection')
 		
 
 	def _scaling_changed(self, i):
