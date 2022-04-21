@@ -84,6 +84,7 @@ class Gaussfit_2d(QWidget):
             ion3 = self._create_linelist_widget(lines_layout, 2)
             ion_widgets.append(ion3)
         self.line_combo.currentTextChanged.connect(lambda s, iw=ion_widgets: self._linelist_changed(s, iw))
+        ion1.currentIndexChanged.connect(lambda idx, iw=ion_widgets: self._auto_populate_ions(idx, iw))
 
         self.line1d = LineCanvas()
         self.line1d._plot_spec(wave,flux1d, error1d)
@@ -218,8 +219,28 @@ class Gaussfit_2d(QWidget):
         from IGM.ransac_contfit import cont_fitter
         c = cont_fitter.from_data(self.wave, self.flux1d, error=self.error1d)
         c.fit_continuum(window=149)
-        self.line1d._plot_spec(self.wave, self.flux1d, self.error1d,
-                                cont1d=c.cont)
+        self.line1d.axline.plot(self.wave, c.cont, 'g--')
+        self.line1d.draw()
+
+    def _auto_populate_ions(self, i, ion_widgets):
+        len_items = ion_widgets[0].count()
+        if len(ion_widgets) < 3:
+            # double Gaussian
+            if i+1 < len_items:
+                ion_widgets[-1].setCurrentIndex(i+1)
+            else:
+                ion_widgets[-1].setCurrentIndex(i)
+        else:
+            # triple Gaussian
+            if i+2 > len_items:
+                ion_widgets[1].setCurrentIndex(i)
+                ion_widgets[2].setCurrentIndex(i)
+            if i+2 == len_items:
+                ion_widgets[1].setCurrentIndex(i+1)
+                ion_widgets[2].setCurrentIndex(i+1)
+            else:
+                ion_widgets[1].setCurrentIndex(i+1)
+                ion_widgets[2].setCurrentIndex(i+2)
 
 
 
@@ -242,15 +263,12 @@ class LineCanvas(FigureCanvasQTAgg):
         self.z_guess = 0.
 
 
-    def _plot_spec(self, wave,flux1d,error1d, cont1d=None):
+    def _plot_spec(self, wave,flux1d,error1d):
         self.axline = self.fig.add_subplot(111)
         self.axline.cla()
         self.axline.plot(wave,flux1d,'k')
         self.axline.plot(wave,error1d,'r')
         self.g_wave, self.g_flux, self.g_error = wave, flux1d, error1d
-
-        if cont1d is not None:
-            self.axline.plot(wave,cont1d,'g--')
 
         self.axline.set_xlabel('Wavelength')
         self.axline.set_title('Fit Gaussians')
