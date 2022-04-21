@@ -200,8 +200,9 @@ class LineListWidget(QWidget):
 	# action to press return button on estZ LineEdit
 	def _on_z_return_pressed(self):
 		self.send_z_returnPressed.emit(float(self.estZ.text()))
-		self.estZstd.setText('nan')
-		# this will not changed the default self.newz values
+		if self.gauss_num.currentIndex() < 1:
+			self.estZstd.setText('nan')
+			# this will not changed the default self.newz values
 
 	# importing signal(linelist name) to slot
 	def on_linelist_name_slot(self, sent_linelist_name):
@@ -240,6 +241,10 @@ class LineListWidget(QWidget):
 		self.newz = newz
 		if not isnan(float(self.newz[0])):
 			self.estZ.setText(str(self.round_to_sigfig(newz[0], show_sigfig)))
+			if self.gauss_num.currentIndex() > 0:
+				# Except for manually guessing z (i.e., gauss_num=0),
+				# sending out estZ to plot automatically without return pressed
+				self.send_z_returnPressed.emit(self.newz[0])
 		else:
 			self.estZ.setText('nan')
 		if not isnan(float(self.newz[1])):
