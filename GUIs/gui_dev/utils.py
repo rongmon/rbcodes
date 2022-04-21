@@ -22,8 +22,9 @@ class FitsObj():
 		self.error2d = error2d
 
 class Fits_2dAux():
-	def __init__(self, stamp=None, contamination=None, source=None, zpdf=None):
+	def __init__(self, stamp=None, contamination=None, source=None, continuum=None, zpdf=None):
 		self.stamp = stamp
 		self.contamination = contamination
 		self.source = source
+		self.continuum = continuum
 		self.zpdf = zpdf
