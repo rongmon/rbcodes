@@ -16,7 +16,8 @@ from utils import FitsObj, Fits_2dAux
 from spec_advanced2d import ShowAdvanced, ZGuessPosterior
 
 WORKING_DIR = os.path.abspath(os.getcwd()) + './example-data'
-LINELIST_DIR = os.path.dirname(os.path.abspath(__file__)) + '/lines'
+# This is not used anymore
+#LINELIST_DIR = os.path.dirname(os.path.abspath(__file__)) + '/lines'
 
 class Custom_ToolBar(QToolBar):
 	send_fitsobj = pyqtSignal(object)

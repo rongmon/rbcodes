@@ -337,8 +337,8 @@ class LineListWidget(QWidget):
 				self.estZstd.setText(str(self.newz[1]))
 			
 			self.conf.setText(str(sent_dict['Confidence']))
-			self.flag.setText(sent_dict['Flag'])
-			self.l_lln.setCurrentText(sent_dict['Linelist'])
+			self.flag.setText(str(sent_dict['Flag']))
+			self.l_lln.setCurrentText(str(sent_dict['Linelist']))
 			self.send_message.emit("Can't find z in table! Use z_guess now..")
 		else:
 			# sent_dict data is empy, reset everythin
