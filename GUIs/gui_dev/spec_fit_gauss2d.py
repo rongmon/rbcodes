@@ -28,6 +28,7 @@ class Gaussfit_2d(QWidget):
         self.waves = np.array([-1] * gauss_num)
         self.names = np.array([None] * gauss_num)
         self.linelists = linelists
+        self.result = None
         
 
 
@@ -68,7 +69,12 @@ class Gaussfit_2d(QWidget):
         adv_pb = QPushButton('Advanced')
         adv_pb.setFixedWidth(100)
         adv_pb.clicked.connect(self._adv_button_clicked)
-        lines_layout.addWidget(adv_pb, 3,3)
+        lines_layout.addWidget(adv_pb, 2,3)
+
+        apply_pb = QPushButton('Apply')
+        apply_pb.setFixedWidth(100)
+        apply_pb.clicked.connect(self._apply_button_clicked)
+        lines_layout.addWidget(apply_pb, 3,3)
 
         ion1 = self._create_linelist_widget(lines_layout, 0)
         ion2 = self._create_linelist_widget(lines_layout, 1)
@@ -164,11 +170,10 @@ class Gaussfit_2d(QWidget):
     def _button_clicked(self, check):
         show_sigfig = 5
         print('Begin fitting multiple Gaussians')
-        result = self.line1d.fit()
-        if result is not None:
-            self.zf.setText(str(self.round_to_sigfig(result[0], show_sigfig)))
-            self.zferr.setText(str(self.round_to_sigfig(result[1], show_sigfig)))
-            self.send_gfinal.emit(result)
+        self.result = self.line1d.fit()
+        if self.result is not None:
+            self.zf.setText(str(self.round_to_sigfig(self.result[0], show_sigfig)))
+            self.zferr.setText(str(self.round_to_sigfig(self.result[1], show_sigfig)))
             self.fit_result.setText('Success!')
             self.fit_result.setStyleSheet('QLabel {color: #000000}')
         else:
@@ -176,9 +181,14 @@ class Gaussfit_2d(QWidget):
             self.zferr.setText('0')
             self.fit_result.setText('Failure!')
             self.fit_result.setStyleSheet('QLabel {color: #FF0000}')
+            self.result = None
+
+    def _apply_button_clicked(self, check):
+        if self.result is not None:
+            self.send_gfinal.emit(self.result)
 
     def round_to_sigfig(self, num=0., sigfig=1):
-        if float(num) == np.inf:
+        if np.isinf(float(num)):
             return np.inf
         else:
             return round(num, sigfig - int(np.floor(np.log10(abs(num)))) - 1)
@@ -291,12 +301,12 @@ class LineCanvas(FigureCanvasQTAgg):
         # start fitting process
         model_guess = MultiGauss(self.wavelist)
         if self.bounds is None:
-            sol = 3e5 #km/s
-            v_uncer = 1000 #km/s
-            z_guess_low = self.z_guess * (1 - v_uncer/sol)
-            z_guess_up = self.z_guess * (1 + v_uncer/sol)
-            self.bd_low = [z_guess_low] + [0] * (len(p_guess)-1)
-            self.bd_up = [z_guess_up] + [100] * (len(p_guess)-1)
+            SoL = 299792.458 #km/s
+            v_uncer = 1000 # km/s
+            beta = v_uncer/SoL
+            delz = np.sqrt((1.+beta)/(1.-beta)) - 1.
+            self.bd_low = [self.z_guess-delz] + [0] * (len(p_guess)-1)
+            self.bd_up = [self.z_guess+delz] + [100] * (len(p_guess)-1)
             self.bounds = [self.bd_low, self.bd_up]
         else:
             self.bd_low, self.bd_up = self.bounds[0], self.bounds[-1]
@@ -310,8 +320,11 @@ class LineCanvas(FigureCanvasQTAgg):
             popt, pcov = curve_fit(model_guess.compile_model, self.g_wave, ydata,
                                 p0=p_guess, bounds=(self.bd_low, self.bd_up), sigma=errdata)
 
+            # interpolate with the model parameters
             gfinal = sign * model_guess.compile_model(self.g_wave, *popt)
             perr = np.sqrt(np.diag(pcov))
+            # do not forget to bring back to observed frame
+
 
             del self.axline.lines[2:]
             model_fit = self.axline.plot(self.g_wave, gfinal, 'r--')
@@ -351,28 +364,34 @@ class LineCanvas(FigureCanvasQTAgg):
         print(self.names)
 
 class MultiGauss():
-    def __init__(self, wavelist):
-        self.wave_rest=wavelist
+    def __init__(self, linelist):
+        self.linelist_rest = linelist
         #self.siglist = [20] * len(wavelist)
         #self.amplist = [5] * len(wavelist)
-    def _gauss1d(self,x,sig,amp,mu):
-        return amp * np.exp(-(x-mu)**2/(2. * sig**2))
+    def _gauss1d(self, wave_rest, sig, amp, mu_rest):
+        return amp * np.exp(-(wave_rest - mu_rest)**2/(2. * sig**2))
     
-    def compile_model(self, wave, *params):
+    def compile_model(self, wave_obs, *params):
         # curve_fit can only take params as 1D array...
         # params includes z, sigs, amps
         # params format: z, sig1, sig2, ..., amp1, amp2, ...
+        # siglist have unit Angstrom in rest frame
+        # z is always saved at index 0
         z = params[0]
+        # number of Gaussians needed
         num_g = int((len(params) - 1) // 2)
+        # intializing sigma's and amp's
         self.siglist, self.amplist = [], []
-        self.wave_obs=self.wave_rest*(1. + z)
         for i in range(1, num_g+1):
             self.siglist.append(params[i])
             self.amplist.append(params[i + num_g])
 
-        ind_model=np.zeros((len(self.wave_rest),len(wave)))
-        for i in range(len(self.wave_rest)):
-            ind_model[i]=self._gauss1d(wave,self.siglist[i],self.amplist[i],self.wave_obs[i])
+        wave_rest = wave_obs/(1. + z)
+
+        ind_model=np.zeros((len(self.linelist_rest), len(wave_rest)))
+        for i in range(len(self.linelist_rest)):
+            # make sure the model is defined in rest frame
+            ind_model[i]=self._gauss1d(wave_rest, self.siglist[i], self.amplist[i], self.linelist_rest[i])
         self.final_model=np.sum(ind_model,axis=0)
 
         return self.final_model
@@ -401,7 +420,7 @@ class FittingConstraintDialog(QDialog):
         self.le_z_up = QLineEdit(str(round(bd_up[0],5)))
         self.layout.addWidget(self.le_z_up, 1,3)
 
-        self.layout.addWidget(QLabel('Sigma 1'), 2,0)
+        self.layout.addWidget(QLabel('Sigma 1 (AA)'), 2,0)
         self.le_s1 = QLineEdit(str(round(init_guess[1],5)))
         self.layout.addWidget(self.le_s1, 2,1)
         self.le_s1_low = QLineEdit(str(round(bd_low[1],5)))
@@ -409,7 +428,7 @@ class FittingConstraintDialog(QDialog):
         self.le_s1_up = QLineEdit(str(round(bd_up[1],5)))
         self.layout.addWidget(self.le_s1_up, 2,3)
 
-        self.layout.addWidget(QLabel('Sigma 2'), 3,0)
+        self.layout.addWidget(QLabel('Sigma 2 (AA)'), 3,0)
         self.le_s2 = QLineEdit(str(round(init_guess[2],5)))
         self.layout.addWidget(self.le_s2, 3,1)
         self.le_s2_low = QLineEdit(str(round(bd_low[2],5)))
@@ -418,13 +437,13 @@ class FittingConstraintDialog(QDialog):
         self.layout.addWidget(self.le_s2_up, 3,3)
 
         if self.ion_num > 2:
-            self.layout.addWidget(QLabel('Sigma 3'), 4,0)
+            self.layout.addWidget(QLabel('Sigma 3 (AA)'), 4,0)
             self.le_s3 = QLineEdit(str(round(init_guess[3],5)))
             self.layout.addWidget(self.le_s3, 4,1)
             self.le_s3_low = QLineEdit(str(round(bd_low[3],5)))
             self.layout.addWidget(self.le_s3_low, 4,2)
             self.le_s3_up = QLineEdit(str(round(bd_up[3],5)))
-            self.layout.addWidget(self.le_s3_up, 3,3)
+            self.layout.addWidget(self.le_s3_up, 4,3)
 
             self.layout.addWidget(QLabel('Amp 1'), 5,0)
             self.le_a1 = QLineEdit(str(round(init_guess[4],5)))
