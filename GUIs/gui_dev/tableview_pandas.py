@@ -78,10 +78,10 @@ class CustomZTable(QtWidgets.QWidget):
 			self.send_dictdata.emit({})
 
 
-	def _clear_button_clicked(self):
-		self.estZ = pd.DataFrame(#[[0,0,0,0,0,0,0,0]],
-			columns=['Name', 'RA', 'DEC', 'z', 'z_err', 'Confidence', 'Linelist', 'Flag'])
-		self._update_table()
+	#def _clear_button_clicked(self):
+	#	self.estZ = pd.DataFrame(#[[0,0,0,0,0,0,0,0]],
+	#		columns=['Name', 'RA', 'DEC', 'z', 'z_err', 'Confidence', 'Linelist', 'Flag'])
+	#	self._update_table()
 
 	def _load_button_clicked(self):
 		#Load estimated redshift working file

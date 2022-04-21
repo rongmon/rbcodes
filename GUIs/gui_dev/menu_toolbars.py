@@ -16,7 +16,8 @@ from utils import FitsObj, Fits_2dAux
 from spec_advanced2d import ShowAdvanced, ZGuessPosterior
 
 WORKING_DIR = os.path.abspath(os.getcwd()) + './example-data'
-LINELIST_DIR = os.path.dirname(os.path.abspath(__file__)) + '/lines'
+# This is not used anymore
+#LINELIST_DIR = os.path.dirname(os.path.abspath(__file__)) + '/lines'
 
 class Custom_ToolBar(QToolBar):
 	send_fitsobj = pyqtSignal(object)
@@ -264,11 +265,11 @@ class Custom_ToolBar(QToolBar):
 			names.append('FLUX')
 		else:
 			message += 'This fits file does not contain a 2D spectrum.'
-		if self.fitsobj.error2d is not None:
-			imgs.append(self.fitsobj.error2d)
-			names.append('ERROR')
-		else:
-			message += 'This fits file does not contain a 2D error spectrum.'
+		#if self.fitsobj.error2d is not None:
+		#	imgs.append(self.fitsobj.error2d)
+		#	names.append('ERROR')
+		#else:
+		#	message += 'This fits file does not contain a 2D error spectrum.'
 
 		if self.fits_2daux.source is not None:
 			imgs.append(self.fits_2daux.source)
@@ -276,6 +277,13 @@ class Custom_ToolBar(QToolBar):
 			message += 'GUI found SRC HDU.'
 		else:
 			message += 'GUI did not find SRC HDU in the current fits file.'
+
+		if self.fits_2daux.continuum is not None:
+			imgs.append(self.fits_2daux.continuum)
+			names.append('CONTINUUM')
+			message += 'GUI found CONTINUUM HDU.'
+		else:
+			message += 'GUI did not find CONTINUUM HDU in the current fits file.'
 
 		if self.fits_2daux.contamination is not None:
 			imgs.append(self.fits_2daux.contamination)
