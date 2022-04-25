@@ -50,6 +50,8 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.gauss2d = None
 		self.linelists2multiG = []
 		self.stamp = None
+		self.current_extraction = None
+		self.current_filename = None
 
 		num_2ndlist = 6
 		self.addtional_linelist = {i:[] for i in range(num_2ndlist)}
@@ -239,7 +241,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		#return fl1d_opt, err1d
 
 
-	def plot_spec2d(self, wave, flux2d, error2d, filename, scale=0, normalization=0, pre_extraction=None):
+	def plot_spec2d(self, wave, flux2d, error2d, filename, scale=0, normalization=0, prev_extraction=None):
 		'''Display 2D spec in top panel, 1D extraction in bottom panel
 		self.flux2d, self.err2d - 2D spec info
 		self.flux, self.error - 1D spec extraction
@@ -258,21 +260,30 @@ class MplCanvas(FigureCanvasQTAgg):
 		# copy of flux2d with nan replaced by 0
 		img = np.nan_to_num(self.flux2d, nan=0.)
 		
-		if pre_extraction is None:
-			
-			# sum in dispersion direction to do initial selection
-			tmp = np.sum(img + np.abs(img.min()), axis=1)
-			# make sure tmp has no negative values for initial guess
-			tmp_cumsum = np.cumsum(tmp) / np.sum(tmp)
-			ylist = np.arange(0, len(tmp_cumsum), 1)
+		# make sure extraction box is not reset after scaling change.
+		if self.current_filename  != filename:
+			# 1st time plotting
+			if prev_extraction is None:
+				
+				# sum in dispersion direction to do initial selection
+				tmp = np.sum(img + np.abs(img.min()), axis=1)
+				# make sure tmp has no negative values for initial guess
+				tmp_cumsum = np.cumsum(tmp) / np.sum(tmp)
+				ylist = np.arange(0, len(tmp_cumsum), 1)
 
-			#print(tmp_cumsum)
-			lower, upper = 0.32, 0.68
-			self.extraction_y = [int(np.interp(lower, tmp_cumsum, ylist)),
-								int(np.interp(upper, tmp_cumsum, ylist))]			
-			#print(self.extraction_y)
+				#print(tmp_cumsum)
+				lower, upper = 0.32, 0.68
+				self.extraction_y = [int(np.interp(lower, tmp_cumsum, ylist)),
+									int(np.interp(upper, tmp_cumsum, ylist))]			
+				#print(self.extraction_y)
+			else:
+				self.extraction_y = prev_extraction
+
+			#save a copy of current extraction box
+			self.current_extraction = self.extraction_y.copy()
+			self.current_filename = filename
 		else:
-			self.extraction_y = pre_extraction
+			self.extraction_y = self.current_extraction.copy()
 
 		self.flux, self.error = self.extract_1d(self.flux2d[self.extraction_y[0]: self.extraction_y[1], :],
 												self.err2d[self.extraction_y[0]: self.extraction_y[1], :])
@@ -704,6 +715,7 @@ class MplCanvas(FigureCanvasQTAgg):
 												'YMIN': ext_min_y,
 												'YMAX': ext_max_y})
 						self.replot2d(self.wave, self.flux, self.error, [ext_min_y,ext_max_y])
+						self.current_extraction = [ext_min_y, ext_max_y]
 						self.tmp_extraction_y = []
 						self.send_message.emit('A new extraction box is created.')
 					self.draw()
