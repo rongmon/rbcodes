@@ -17,6 +17,7 @@ class GUI_DataFrame():
         self.dirpath = os.path.abspath(dirpath)
         self.gui_df = pd.DataFrame(
             columns=['Name', 'RA', 'DEC', 'z', 'z_err', 'Confidence', 'Linelist', 'Flag', 'z_guess'])
+        self.fitsfiles = []
 
     def prepare_database(self):
         if os.path.exists(self.dirpath):
@@ -62,7 +63,8 @@ class GUI_DataFrame():
                             'Flag': '', 
                             'z_guess': z_guess}, ignore_index=True)
 
-
+                        # Update GUI FITS dataset
+                        self.fitsfiles.append(file)
 
         else:
             print('Abort...')
@@ -78,6 +80,10 @@ class GUI_DataFrame():
                             header=True,
                             index=False)
         print('GUI database is saved at ' + save_path)
+        with open(self.dirpath+'/'+'FITS_files.txt', 'w') as f:
+            f.write('\n'.join(self.fitsfiles))
+        print('A TXT file containing all FITS files is also created within the same folder.')
+
 
 
 #save the database

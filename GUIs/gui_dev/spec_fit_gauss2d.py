@@ -94,7 +94,7 @@ class Gaussfit_2d(QWidget):
 
         # --- possible implementation ---
         # right now it is unstable if linetools is not installed
-        cont_pb = QPushButton('Continuum')
+        cont_pb = QPushButton('Continuum (beta)')
         cont_pb.setFixedWidth(100)
         cont_pb.clicked.connect(self._fit_ransac_continuum)
         lines_layout.addWidget(cont_pb, 1,4)
@@ -366,6 +366,16 @@ class LineCanvas(FigureCanvasQTAgg):
             model_fit = self.axline.plot(self.g_wave, gfinal, 'r--')
 
             self.draw()
+            print('\nCurrent multi-Gaussian optimal parameters:')
+            print('-----------------------------------------')
+            print(f'z = {popt[0]:.4f}, error = {perr[0]:.4f}')
+            
+            num_g = int(len(popt)-1) // 2
+            for i in range(1, num_g+1):
+                print(f'Sigma {i} = {popt[i]:.4f}, error = {perr[i]:.4f}')
+                print(f'Amp {i} = {popt[i+num_g]:.4f}, error = {perr[i+num_g]:.4f}')
+            print('-----------------------------------------')
+
             return [popt[0], perr[0]]
         except (RuntimeError, ValueError):
             print('Fitting failed...')
@@ -396,8 +406,8 @@ class LineCanvas(FigureCanvasQTAgg):
         self.wavelist = np.array(list(dict_waves_names.values()))
         self.names = list(dict_waves_names.keys())
         self.delw = self.wavelist - self.wavelist[0]
-        print(self.wavelist)
-        print(self.names)
+        #print(self.wavelist)
+        #print(self.names)
 
 class MultiGauss():
     def __init__(self, linelist):

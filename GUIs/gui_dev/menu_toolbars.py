@@ -67,7 +67,7 @@ class Custom_ToolBar(QToolBar):
 		btn_prevf.triggered.connect(self._prev_fitsfile)
 		# File dropbox
 		self.f_combobox = QComboBox()
-		self.f_combobox.setFixedWidth(200)
+		self.f_combobox.setMinimumWidth(200)
 		self.f_combobox.addItem('No FITS File')
 		self.f_combobox.setCurrentIndex(0)
 		self.f_combobox.currentIndexChanged.connect(self._read_selected_fits)
@@ -372,7 +372,7 @@ class Custom_ToolBar(QToolBar):
 												self.fitsobj.flux2d,
 												self.fitsobj.error2d,
 												self.filename,
-												pre_extraction=extraction_box)
+												prev_extraction=extraction_box)
 							self.mW.sc.replot(self.fitsobj.wave, 
 											self.fitsobj.flux, 
 											self.fitsobj.error)
