@@ -203,10 +203,10 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 				ax_add.append(self.fig.add_subplot(ax_num,1,i+1, sharex=self.ax))
 				if i+1 == ax_num:
 					if scale == 1:
-						cax = ax_add[-1].imshow(scaled2d, origin='lower',
+						cax = ax_add[-1].imshow(img, origin='lower',
 												vmin=scaled2d.min(), vmax=scaled2d.max() * 0.01)
 					else:
-						cax = ax_add[-1].imshow(scaled2d, origin='lower',
+						cax = ax_add[-1].imshow(img, origin='lower',
 												vmin=scaled2d.min(), vmax=scaled2d.max())
 					ax_cb = self.fig.colorbar(cax, ax=ax_add[-1], location='bottom')
 					ax_add[-1].tick_params(labelbottom=True)
