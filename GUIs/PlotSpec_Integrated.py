@@ -287,7 +287,12 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             self.FXval=[]
             self.FYval=[]
 
-            self.ax.texts = []
+            #self.ax.texts = []
+            while self.ax.texts:
+                self.ax.texts.pop()
+            while self.ax.collections:
+                self.ax.collections.pop()
+
             self.ax.set_ylim(self.init_ylims)
             self.ax.set_xlim(self.init_xlims)
             self.spectrum.canvas.draw()
@@ -304,7 +309,13 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                     ii.remove()
             except: 
                 pass
-            self.ax.texts = []
+            #self.ax.texts = []
+            while self.ax.texts:
+                self.ax.texts.pop()
+            while self.ax.collections:
+                self.ax.collections.pop()
+
+
             # Give initial axes limits
 #             self.ax.set_ylim(self.init_ylims)
 #             self.ax.set_xlim(self.init_xlims)
@@ -671,7 +682,12 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             self.message_window.setText(" ")
         if len(self.ax.lines)>2:
             del self.ax.lines[2:]
-            self.ax.texts = []
+            #self.ax.texts = []
+            while self.ax.texts:
+                self.ax.texts.pop()
+            while self.ax.collections:
+                self.ax.collections.pop()
+
             try:
                 for ii in self.text[-1]:
                     ii.remove()
@@ -731,7 +747,11 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         #this is for 'Z' functionality deletes all lines and plots a new line
         if ((remove == True) & (self.row_remove == False) & (self.hide == False)):
             del self.ax.lines[2:len(self.ax.lines)]
-            self.ax.texts = []
+            #self.ax.texts = []
+            while self.ax.texts:
+                self.ax.texts.pop()
+            while self.ax.collections:
+                self.ax.collections.pop()
             self.throw_away = True
             
         #HIDE PROCEDURE
@@ -1029,7 +1049,12 @@ class Manual_Transition(QWidget):
     def transition_change(self,parent):
         
         del parent.ax.lines[2:]
-        parent.ax.texts = []
+        #parent.ax.texts = []
+        while parent.ax.texts:
+            parent.ax.texts.pop()
+        while parent.ax.collections:
+            parent.ax.collections.pop()
+
         
         parent.label = self.combo_ll.currentText()
 #         parent.active_ion.setText(self.Transitions.currentItem().text())
@@ -1306,7 +1331,13 @@ class LoadCatalog(QWidget):
         if parent.zabs_list.shape[0]>0:
             # clear plotted lines/text from zabs_manager such that the new lines for plot/remove/hide are same color as linelist
             del parent.ax.lines[2:]; parent.zabs_line_plot = []
-            parent.ax.texts = []; parent.texts = []
+            #parent.ax.texts = [];
+            while parent.ax.texts:
+                parent.ax.texts.pop()
+            while parent.ax.collections:
+                parent.ax.collections.pop()
+
+            parent.texts = []
 
             for z in parent.zabs_list.Zabs.tolist():
                 index = parent.line_list[parent.line_list['Zabs'] == z].index
