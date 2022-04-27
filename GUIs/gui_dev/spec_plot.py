@@ -368,11 +368,11 @@ class MplCanvas(FigureCanvasQTAgg):
 			scaled2d = tmp*(normalization[1] - normalization[0]) + normalization[0]
 			
 		if scale == 1:
-			pos_ax2d = self.ax2d.imshow(scaled2d, origin='lower', 
+			pos_ax2d = self.ax2d.imshow(img, origin='lower', 
 									vmin=scaled2d.min(), vmax=scaled2d.max() * 0.01,
 									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)))
 		else:
-			pos_ax2d = self.ax2d.imshow(scaled2d, origin='lower', 
+			pos_ax2d = self.ax2d.imshow(img, origin='lower', 
 									vmin=scaled2d.min(), vmax=scaled2d.max() * 1.0,
 									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)))
 		

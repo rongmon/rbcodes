@@ -94,9 +94,10 @@ class Gaussfit_2d(QWidget):
 
         # --- possible implementation ---
         # right now it is unstable if linetools is not installed
-        cont_pb = QPushButton('Continuum (beta)')
+        cont_pb = QPushButton('Continuum')
         cont_pb.setFixedWidth(100)
         cont_pb.clicked.connect(self._fit_ransac_continuum)
+        lines_layout.addWidget(QLabel('(beta test)'), 0, 4)
         lines_layout.addWidget(cont_pb, 1,4)
 
         # main layout
@@ -324,8 +325,13 @@ class LineCanvas(FigureCanvasQTAgg):
 
         # initialize guessed values
         if self.init_guess is None:
-            sig_guess = [5] * len(self.waves_guess)
-            amp_guess = [3] * len(self.waves_guess)
+            sig_guess = [20] * len(self.waves_guess)
+
+            # intialize amp's from sliced spectrum
+            amp_guess = []
+            for wi in self.waves_guess:
+                amp_guess.append(self.g_flux[self.g_wave < wi][-1])
+            #amp_guess = [3] * len(self.waves_guess)
             p_guess = [self.z_guess] + sig_guess + amp_guess
             self.init_guess = p_guess.copy()
         else:
@@ -341,8 +347,8 @@ class LineCanvas(FigureCanvasQTAgg):
             v_uncer = 1000 # km/s
             beta = v_uncer/SoL
             delz = np.sqrt((1.+beta)/(1.-beta)) - 1.
-            self.bd_low = [self.z_guess-delz] + [0] * (len(p_guess)-1)
-            self.bd_up = [self.z_guess+delz] + [100] * (len(p_guess)-1)
+            self.bd_low = [self.z_guess-delz] + [0] * ((len(p_guess)-1)//2) + (np.array(amp_guess)*0.5).tolist()
+            self.bd_up = [self.z_guess+delz] + [100] * ((len(p_guess)-1)//2) + (np.array(amp_guess)*1.5).tolist()
             self.bounds = [self.bd_low, self.bd_up]
         else:
             self.bd_low, self.bd_up = self.bounds[0], self.bounds[-1]
