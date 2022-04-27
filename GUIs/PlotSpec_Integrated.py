@@ -195,7 +195,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         for items in self.line_options:
             self.combo_lines.addItem(items)
         self.main_linelist = self.combo_lines.currentText()
-        
+
         # Shows the active redshift and transition
         self.combo_color_main = QComboBox()
         for items in self.combo_options:
@@ -410,11 +410,11 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                 buttonReply = QMessageBox.question(self,"Reevaluate" ,"Current Zabs LineList already evaluated: Reevaluate and overwrite?",
                                                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
                 if buttonReply == QMessageBox.Yes:
-                    self.ion_selection = vStack(self,self.wave,self.flux,self.error,'LLS',zabs=self.zabs)
+                    self.ion_selection = vStack(self,self.wave,self.flux,self.error,self.main_linelist,zabs=self.zabs)
                     
             #otherwise, proceed without manual consent
             else:
-                self.ion_selection = vStack(self,self.wave,self.flux,self.error,'LLS',zabs=self.zabs)
+                self.ion_selection = vStack(self,self.wave,self.flux,self.error,self.main_linelist,zabs=self.zabs)
 
         elif event.key =='j':
             self.xdata = event.xdata
@@ -1492,12 +1492,12 @@ def prepare_absorber_object(z_abs,wave,flux,error,line_flg='LLS',vlim=[-1000,100
     
 
 class vStack:
-    def __init__(self,parent,wave,flux,error,line_flg,zabs=0,vlim=[-1000.,1000.]):  
+    def __init__(self,parent,wave,flux,error,line_flg,zabs=0,vlim=[-1000.,1000.]):
         self.parent = parent
         self.parent_canvas = parent.canvas
         self.zabs=zabs
         self.vlim=vlim
-        self.ions=prepare_absorber_object(zabs,wave,flux,error,line_flg='LLS')
+        self.ions=prepare_absorber_object(zabs,wave,flux,error,line_flg=line_flg)
         #-----full spectra properties---------#
         self.z = self.ions['Target']['z']; self.flux = self.ions['Target']['flux']
         self.wave = self.ions['Target']['wave']; self.error = self.ions['Target']['error']
@@ -1519,7 +1519,10 @@ class vStack:
         self.plotppage=12
         self.nrow=int(self.plotppage/3)
         self.ncol=int((self.plotppage)/self.nrow)
-        self.npages=int((self.nions/self.plotppage))
+        self.npages=int((self.nions//self.plotppage))
+        # calculate number of pages needed
+        if self.npages % (self.plotppage) > 0:
+            self.npages += 1
         
         
         fig= Figure()#figure(figsize=(12,8))
@@ -1632,6 +1635,7 @@ class vStack:
             ploti=np.arange(self.plotppage*(self.page-1),min(self.plotppage*self.page,self.nions))
         else:
             ploti=[ploti]
+
 
         for i in ploti:
             self.plotstuff(i,comment=comment,yrange=yrange)
