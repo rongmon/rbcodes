@@ -258,10 +258,16 @@ class LoadSpec():
 			self.fits_2daux.stamp = None
 
 		# Check CONTAMINATION
-		if 'CONT' in labels:
-			self.fits_2daux.contamination = fitsfile['CONT'].data
+		if 'CNTM' in labels:
+			self.fits_2daux.contamination = fitsfile['CNTM'].data
 		else:
 			self.fits_2daux.contamination = None
+
+		# Check CONTINUUM frame
+		if 'CONT' in labels:
+			self.fits_2daux.continuum = fitsfile['CONT'].data
+		else:
+			self.fits_2daux.continuum = None
 
 		# Check SOURCE
 		if 'SRC' in labels:
