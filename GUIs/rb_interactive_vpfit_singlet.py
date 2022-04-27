@@ -104,9 +104,9 @@ def rb_interactive_vpfit_singlet(wave,flux,error,wrest,custom_guess=False,FWHM=1
 
 
     # Now starting to set up the Voigt Profile model
-    zabs  = np.zeros((n_clouds))
-    lambda_rest = str['wave'] * np.ones((n_clouds))
-    s=m.create_voigt(zabs,lambda_rest)
+    zabs  = np.array([0.])#np.zeros((n_clouds))
+    lambda_rest = [str['wave']] #* np.ones((n_clouds))
+    s=m.create_voigt(zabs,lambda_rest,n_clouds,ntransition=len(lambda_rest),FWHM=FWHM,verbose=False)
 
     theta=np.concatenate((nguess,bguess,vguess))
     outflux= s.model_flux(theta,wave)

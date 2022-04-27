@@ -82,7 +82,7 @@
 '''
    
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import splrep,splev
@@ -100,7 +100,7 @@ def onclick(event):
     if event.button==1 and toolbar.mode=='':
         window = ((event.xdata-5)<=wave) & (wave<=(event.xdata+5))
         y = np.median(flux[window])
-        plt.plot(event.xdata,y,'ro',ms=5,picker=5,label='cont_pnt',markeredgecolor='k')
+        plt.plot(event.xdata,y,'ro',ms=5,picker=5,label='cont_pnt',markeredgecolor='k',picker=True)
     plt.draw()
 
 def onpick(event):
@@ -167,7 +167,7 @@ def ontype(event):
 
     # when the user hits 'b': selects a handpicked x,y value
     elif event.key=='b':
-        plt.plot(event.xdata,event.ydata,'ro',ms=5,picker=5,label='cont_pnt',markeredgecolor='k')
+        plt.plot(event.xdata,event.ydata,'ro',ms=5,picker=5,label='cont_pnt',markeredgecolor='k',picker=True)
         plt.draw()
 
     #If the user presses 'h': The help is printed on the screen

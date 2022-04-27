@@ -340,8 +340,9 @@ class rb_spec(object):
 
         
         self.velo=vel[q]
+        self.transition=str['wave']
 
-        return self.wave_slice,self.error_slice,self.flux_slice,self.velo,self.linelist
+        #return self.wave_slice,self.error_slice,self.flux_slice,self.velo,self.linelist
 
     def fit_continuum(self,mask=False,domain=False,Legendre=False,**kwargs):
         """
@@ -483,10 +484,10 @@ class rb_spec(object):
         Quick wrapper to call an interactive plotter for the full spectrum as given in input file.
         """
         import matplotlib.pyplot as plt
-        #fig = plt.figure()
-        #ax1 = fig.add_subplot(211)
-        #ax2 = fig.add_subplot(212, sharex = ax1)
-        fig, (ax1, ax2) = plt.subplots(nrows=2, sharex=True)
+        fig = plt.figure()
+        ax1 = fig.add_subplot(211)
+        ax2 = fig.add_subplot(212, sharex = ax1)
+        #fig, (ax1, ax2) = plt.subplots(nrows=2, sharex=True)
         ax1.step(self.velo,self.flux_slice,'k-')
         ax1.step(self.velo,self.cont,'b-')
 
@@ -555,9 +556,9 @@ class rb_spec(object):
         ax2.set_xlabel('vel [km/s]')
         plt.show()
 
-    def vpfit_singlet(self):
+    def vpfit_singlet(self,FWHM=6.5):
         from GUIs import rb_interactive_vpfit_singlet as vf 
-        vt=vf.rb_interactive_vpfit_singlet(self.wave_slice,self.fnorm,self.enorm,self.velo);    
+        vt=vf.rb_interactive_vpfit_singlet(self.wave_slice,self.fnorm,self.enorm,self.transition);    
 
 
 
