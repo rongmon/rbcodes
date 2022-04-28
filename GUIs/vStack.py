@@ -2,7 +2,7 @@
 
 import numpy as np
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 from IGM import rb_setline as rs 
 import pdb
@@ -69,7 +69,7 @@ class vStack(object):
             ploti=[ploti]
             # ploti=range(self.plotppage)+self.plotppage*(self.page-1)
         # pdb.set_trace()
-        for i in ploti:
+        #for i in ploti:
             #if right: self.plotR(i)
             #if left: self.plotL(i)
         plt.draw()

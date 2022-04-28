@@ -61,6 +61,10 @@ if __name__ == "__main__":
             error=0.1*flux
         else:
             error=sp.sig.value
+
+
+
+
         #from astropy.io import fits
         #file=fits.open(cwd+'/'+filename)
         #dat=file[1].data
