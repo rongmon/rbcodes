@@ -28,6 +28,7 @@ class Custom_ToolBar(QToolBar):
 	#Our personalized custom Toolbar
 	def __init__(self, mainWindow):
 		super().__init__()
+		#------- internal variables -------
 		self.mW = mainWindow
 		self.loadspec = None
 		self.fitsobj = mainWindow.fitsobj
@@ -43,19 +44,23 @@ class Custom_ToolBar(QToolBar):
 		self.setWindowTitle('Customizable TooBar')
 		#self.setFixedSize(QSize(200, 50))
 
+		# "Read All" button
 		btn_loadtxt = self._create_button('Read All', 'Read all fits files from a TXT file. Make sure you run "ls *.fits > filenames.txt" before clicking this!')
 		self.addAction(btn_loadtxt)
 		btn_loadtxt.triggered.connect(self._load_from_txt)
 
+		# "Read FITS" button
 		btn_loadf = self._create_button('Read FITS', 'Read a fits file and plot the spectrum')
 		self.addAction(btn_loadf)
 		btn_loadf.triggered.connect(self._load_specs)
 
+		# "Save Extract1D" button
 		btn_savef = self._create_button('Save Extract1D', 'Save the extracted 1D FITS file')
 		self.addAction(btn_savef)
 		btn_savef.triggered.connect(self._save_spec)
 		self.addSeparator()
 
+		# "Help" button
 		btn_help = self._create_button('Help', 'Open the user manual for further help')
 		self.addAction(btn_help)
 		btn_help.triggered.connect(self._open_user_manual)	
@@ -109,7 +114,7 @@ class Custom_ToolBar(QToolBar):
 
 		self.addSeparator()
 
-		# Advanced Option
+		# "Advanced" Option
 		btn_adv = self._create_button('Advanced', 'More 2D inspection')
 		self.addAction(btn_adv)
 		btn_adv.triggered.connect(self._on_advanced_option)
@@ -131,7 +136,8 @@ class Custom_ToolBar(QToolBar):
 
 
 	def _load_specs(self):
-		#Read multiple spec fits file
+		# This function corresponds to the action of "Read FITS" button
+		# Read multiple spec fits file
 		#	only fetch filepath strings, do not open fits files here
 		filepaths, check = QFileDialog.getOpenFileNames(None,
 			'Load multiple FITS files',
@@ -153,7 +159,8 @@ class Custom_ToolBar(QToolBar):
 				self.f_combobox.setCurrentIndex(1)
 
 	def _load_from_txt(self):
-		# read all fits files saved in a txt file
+		# This function corresponds to the action of "Read All" button
+		# Read all fits files saved in a txt file
 		# the txt file should be located within the same folder as fits
 		txtpath, check = QFileDialog.getOpenFileName(None,
 			'Read a TXT file containing all fits filenames in the current folder',
@@ -181,7 +188,8 @@ class Custom_ToolBar(QToolBar):
 
 
 	def _save_spec(self):
-		#Save extract1d (wave, flux1d, error1d) with a deepcopy of loaded 2D spec 
+		# This function corresponds to the action of "Save Extract1D" button
+		# Save extract1d (wave, flux1d, error1d) with a deepcopy of loaded 2D spec 
 		if self.loadspec is not None:
 			if self.extract1d is not None:
 				newfilename = self.filename + '_ymin={}_ymax={}'.format(self.extract1d['YMIN'], self.extract1d['YMAX'])
@@ -226,6 +234,8 @@ class Custom_ToolBar(QToolBar):
 			return os.path.splitext(base)[0]
 
 	def _prev_fitsfile(self):
+		# This function corresponds to the action of "Prev" button
+		# Switch to the previous filename loaded in f_combobox
 		# idx 0 is "No FITS File" placeholder
 		idx_min = 1
 		current = self.f_combobox.currentIndex()
@@ -235,6 +245,8 @@ class Custom_ToolBar(QToolBar):
 			pass
 
 	def _next_fitsfile(self):
+		# This function corresponds to the action of "Next" button
+		# Switch to the next filename loaded in f_combobox
 		current = self.f_combobox.currentIndex()
 		idx_max = self.f_combobox.count() - 1
 		if current < idx_max:
