@@ -338,6 +338,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			elif normalization == 1:
 				# minmax 100% range
 				scaled2d = (scaled2d - scaled2d.min()) / (scaled2d.max() - scaled2d.min())
+				self.send_scale_limits.emit([scaled2d.min(), scaled2d.max()])
 			elif normalization < 10: # this magic num from n_combobox in toolbar
 				if normalization == 2: # 99.5%
 					low, up = np.percentile(scaled2d, [0.25, 99.75])
