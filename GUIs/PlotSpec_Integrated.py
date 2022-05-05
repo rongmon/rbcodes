@@ -410,11 +410,13 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                 buttonReply = QMessageBox.question(self,"Reevaluate" ,"Current Zabs LineList already evaluated: Reevaluate and overwrite?",
                                                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
                 if buttonReply == QMessageBox.Yes:
-                    self.ion_selection = vStack(self,self.wave,self.flux,self.error,self.main_linelist,zabs=self.zabs)
+                    self.ion_selection = vStack(self,self.wave,self.flux,self.error,self.label,zabs=self.zabs)
                     
             #otherwise, proceed without manual consent
             else:
-                self.ion_selection = vStack(self,self.wave,self.flux,self.error,self.main_linelist,zabs=self.zabs)
+                self.ion_selection = vStack(self,self.wave,self.flux,self.error,self.label,zabs=self.zabs)
+                
+
 
         elif event.key =='j':
             self.xdata = event.xdata
@@ -1552,12 +1554,16 @@ class vStack:
                 i=np.where(event.inaxes==self.axes)[0][0]+self.plotppage*(self.page-1)
                 Windowname='Manual y-Limits'
                 instruction_text='Input range (e.g. 0.,2.)'
-                temp=input_txt_dlg(Windowname,instruction_text)
-                yrangetext=temp.filename
-
-                yrange = yrangetext.split(',')
-                yrange = np.array(yrange).astype('float32')
-                self.vPlot(ploti=i,yrange=[yrange[0],yrange[1]])
+                #temp=input_txt_dlg(Windowname,instruction_text)
+                #print(temp)
+                #yrangetext=temp.filename
+                #yrange = yrangetext.split(',')
+                #yrange = np.array(yrange).astype('float32')
+                ylim, ok = QInputDialog.getText(self.parent,Windowname,instruction_text)
+                if ok:
+                    ylimit = ylim.split(',')
+                    ylimit = np.array(ylimit).astype('float32')
+                    self.vPlot(ploti=i,yrange=[ylimit[0],ylimit[1]])
                 
         #page right
         elif event.key=='>':
@@ -1697,7 +1703,7 @@ class vStack:
         return text
 
 #Initial inputs and callable class to run proram        
-class input_txt_dlg:
+class input_txt_dlg(QWidget):
     def __init__(self,Windowname,instruction,default_text='test'):
         app = QApplication(sys.argv)
         main = popup_windows(Windowname,instruction,default_text=default_text)
