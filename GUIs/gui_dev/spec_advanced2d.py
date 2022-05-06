@@ -222,8 +222,8 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 			if len(imgs) > 1:
 				wcs = imgs[0]
 				self.ax = self.fig.add_subplot(1,1,1, projection=wcs)
-				self.ax.set_xlabel('Galactic Longitude')
-				self.ax.set_ylabel('Galactic Latitude')
+				self.ax.set_xlabel('RA')
+				self.ax.set_ylabel('DEC')
 			else:
 				self.ax = self.fig.add_subplot(1,1,1)
 			self.ax.imshow(img, origin='lower', 

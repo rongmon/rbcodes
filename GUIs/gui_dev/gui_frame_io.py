@@ -6,8 +6,8 @@ import numpy as np
 
 class ToggleFrames():
 	'''Main class to search targeted frames'''
-	FRAMENAMES = ['SCI', 'MODEL', 'CNTM', 'EMLINE', 'CONT',
-			'SCI_A', 'EMLINE_A', 'SCI_B', 'EMLINE_B']
+	FRAMENAMES = ['SCI','SCI_A','SCI_B', 'EMLINE',
+			'EMLINE_A', 'EMLINE_B','CONT','MODEL', 'CNTM']
 
 	def __init__(self, filepath):
 		# initialize internel variables
