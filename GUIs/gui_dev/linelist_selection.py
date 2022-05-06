@@ -378,8 +378,16 @@ class LineListWidget(QWidget):
 	# action to press return on secondary z_guess LineEdit widgets
 	def _guess_z_return_pressed(self, i):		
 		llist = self._get_linelist_df(self.llists_2[i][1].currentText())
-		z_guess = float(self.llists_2[i][2].text())
-		self.send_more_linelist_z.emit([{i:llist}, z_guess])
+		if (len(self.llists_2[i][2].text()) < 1) | (self.llists_2[i][2].text().isalpha()):
+			z_guess = 0
+			self.llists_2[i][2].setText('0')
+		else:
+			z_guess = float(self.llists_2[i][2].text())
+
+		if (self.llists_2[i][1].currentText() == 'NONE' ) & (z_guess == 0):
+			pass
+		else:
+			self.send_more_linelist_z.emit([{i:llist}, z_guess])
 
 	# action to read linelist as dataframe
 	def _get_linelist_df(self, linelist_name):
