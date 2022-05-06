@@ -84,6 +84,18 @@ class Custom_ToolBar(QToolBar):
 
 		self.addSeparator()
 
+		# Frame dropbox
+		if self.mW.toggle_frames:
+			self.frames = None
+			self.frame_combobox = QComboBox()
+			self.frame_combobox.setMinimumWidth(130)
+			self.frame_combobox.addItem('NONE')
+			self.frame_combobox.setCurrentIndex(0)
+			self.frame_combobox.currentTextChanged.connect(self._select_frames)
+			self.addWidget(self.frame_combobox)
+
+		self.addSeparator()
+
 
 		# Scaling label
 		s_label = QLabel('Scale:')
@@ -311,6 +323,23 @@ class Custom_ToolBar(QToolBar):
 
 		self.send_message.emit(message)
 
+	# frame_combobox event
+	def _select_frames(self, s):
+		# default is SCI
+		if (s == 'SCI') | (s == ''):
+			self.mW.sc.plot_spec2d(self.fitsobj.wave,
+									self.fitsobj.flux2d,
+									self.fitsobj.error2d,
+									self.filename)
+		else:
+			self.mW.sc.plot_spec2d(self.fitsobj.wave,
+									self.frames[s],
+									self.fitsobj.error2d,
+									self.filename)
+
+
+
+
 
 
 
@@ -406,6 +435,16 @@ class Custom_ToolBar(QToolBar):
 					self.send_fitsobj.emit(self.fitsobj)
 
 					self.fits_2daux = self.loadspec._check_advanced()
+
+			if self.mW.toggle_frames:
+				from gui_frame_io import ToggleFrames
+				toggle_f = ToggleFrames(self.filepaths[i-1])
+				self.frames = toggle_f._check_available_frames()
+
+				self.frame_combobox.clear()
+				for frame_name in self.frames.keys():
+					if self.frames[frame_name] is not None:
+						self.frame_combobox.addItem(str(frame_name))
 
 					
 

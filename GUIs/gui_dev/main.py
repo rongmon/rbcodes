@@ -19,10 +19,13 @@ class MainWindow(QMainWindow):
 	'''This is the main window of this GUI
 	This class only assembles different widgets from customed components.
 	'''
-	def __init__(self, xspecio=False):
+	def __init__(self, xspecio=False, toggle_frames=False):
 		super().__init__()
 		# if using XSpectrum1D io
 		self.xspecio = xspecio
+
+		# if initializing the features of toggling frames
+		self.toggle_frames = toggle_frames
 
 		#----------- External data ---------------------------------
 		# save a fits copy in the main window
@@ -64,7 +67,7 @@ class MainWindow(QMainWindow):
 
 		# Main Plotting Canvas
 		self.sc = MplCanvas(width=15, height=9, dpi=100)
-		self.sc.setMinimumSize(1200,450)
+		self.sc.setMinimumSize(1400,450)
 		sc_layout = QVBoxLayout()
 		sc_layout.setContentsMargins(0,0,0,0)
 		mpl_toolbar = NavigationToolbar(self.sc, self)
@@ -189,6 +192,9 @@ if __name__ == '__main__':
 		help='Read fits files using XSpectrum1D class from linetools')
 	parser.add_argument('-f', '--fitsfile', type=str, action='store', required=False, default='',
 		help='Feed one FITS file to the internal GUI database')
+
+	parser.add_argument('-tf', '--toggleframes', action='store_true', required=False, default=False,
+		help='Enable toggling different frames within the same file')
 	args = parser.parse_args()
 
 	app = QApplication(sys.argv[:1])
@@ -196,10 +202,20 @@ if __name__ == '__main__':
 	# Select IO class
 	if args.xspec:
 		print('Enable XSpectrum1D IO')
-		window = MainWindow(xspecio=True)	
+		xspecio = True	
 	else:
 		print('Enable Default IO')
-		window = MainWindow(xspecio=False)
+		xspecio = False
+
+	# Enable toggling feature
+	if args.toggleframes:
+		print('Frame toggling enabled')
+		toggle_frames = True
+	else:
+		print('Frame toggling disabled')
+		toggle_frames = False
+
+	window = MainWindow(xspecio=xspecio, toggle_frames=toggle_frames)
 
 	# Check if filename provided
 	if len(args.fitsfile) > 0:
