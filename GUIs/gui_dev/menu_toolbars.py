@@ -280,6 +280,11 @@ class Custom_ToolBar(QToolBar):
 		message = ''
 		if self.fits_2daux.stamp is not None:
 			img_sta = [self.fits_2daux.stamp]
+			if self.fits_2daux.wcs is not None:
+				img_sta.append(self.fits_2daux.wcs)
+				# Scaling/Normalization only control the last img
+				# make sure to swap positions for this one
+				img_sta[0], img_sta[1] = img_sta[1], img_sta[0]
 			self.img_sta = ShowAdvanced(img_sta, name='STAMP')
 			self.img_sta.show()
 			message += 'GUI found STAMP HDU.'
