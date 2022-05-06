@@ -252,8 +252,22 @@ class LoadSpec():
 		labels = [label.name for label in fitsfile]
 
 		# Check if STAMP exists
-		if 'SRC_IMG' in labels:
+		if 'STAMP' in labels:
+			self.fits_2daux.stamp = fitsfile['STAMP'].data
+			from astropy.wcs import WCS
+			try:
+				self.fits_2daux.wcs = WCS(fitsfile['STAMP'].header)
+			except AttributeError:
+				self.fits_2daux.wcs = None
+				print('Current FITS file does not have required WCS info.')
+		elif 'SRC_IMG' in labels:
 			self.fits_2daux.stamp = fitsfile['SRC_IMG'].data
+			from astropy.wcs import WCS
+			try:
+				self.fits_2daux.wcs = WCS(fitsfile['SRC_IMG'].header)
+			except AttributeError:
+				self.fits_2daux.wcs = None
+				print('Current FITS file does not have required WCS info.')
 		else:
 			self.fits_2daux.stamp = None
 

@@ -60,12 +60,6 @@ class Custom_ToolBar(QToolBar):
 		btn_savef.triggered.connect(self._save_spec)
 		self.addSeparator()
 
-		# "Help" button
-		btn_help = self._create_button('Help', 'Open the user manual for further help')
-		self.addAction(btn_help)
-		btn_help.triggered.connect(self._open_user_manual)	
-		self.addSeparator()
-
 		# "PREV" buttons for file dropbox
 		btn_prevf = self._create_button('PREV', 'Swtich to previous fits file loaded in backend.')
 		self.addAction(btn_prevf)
@@ -84,15 +78,24 @@ class Custom_ToolBar(QToolBar):
 
 		self.addSeparator()
 
-		# Frame dropbox
+		# Frame dropbox section
 		if self.mW.toggle_frames:
 			self.frames = None
+			# '-' button for frame dropbox
+			btn_prevframe = self._create_button('-', 'Swtich to previous available frame.')
+			self.addAction(btn_prevframe)
+			btn_prevframe.triggered.connect(self._prev_frame)
+			# main frame dropbox
 			self.frame_combobox = QComboBox()
 			self.frame_combobox.setMinimumWidth(130)
 			self.frame_combobox.addItem('NONE')
 			self.frame_combobox.setCurrentIndex(0)
 			self.frame_combobox.currentTextChanged.connect(self._select_frames)
 			self.addWidget(self.frame_combobox)
+			# '+' button for frame dropbox
+			btn_nextframe = self._create_button('+', 'Switch to next available frame.')
+			self.addAction(btn_nextframe)
+			btn_nextframe.triggered.connect(self._next_frame)
 
 		self.addSeparator()
 
@@ -130,6 +133,13 @@ class Custom_ToolBar(QToolBar):
 		btn_adv = self._create_button('Advanced', 'More 2D inspection')
 		self.addAction(btn_adv)
 		btn_adv.triggered.connect(self._on_advanced_option)
+
+		self.addSeparator()
+		# "Help" button
+		btn_help = self._create_button('Help', 'Open the user manual for further help')
+		self.addAction(btn_help)
+		btn_help.triggered.connect(self._open_user_manual)	
+		
 
 
 
@@ -270,6 +280,11 @@ class Custom_ToolBar(QToolBar):
 		message = ''
 		if self.fits_2daux.stamp is not None:
 			img_sta = [self.fits_2daux.stamp]
+			if self.fits_2daux.wcs is not None:
+				img_sta.append(self.fits_2daux.wcs)
+				# Scaling/Normalization only control the last img
+				# make sure to swap positions for this one
+				img_sta[0], img_sta[1] = img_sta[1], img_sta[0]
 			self.img_sta = ShowAdvanced(img_sta, name='STAMP')
 			self.img_sta.show()
 			message += 'GUI found STAMP HDU.'
@@ -337,7 +352,25 @@ class Custom_ToolBar(QToolBar):
 									self.fitsobj.error2d,
 									self.filename)
 
+	def _prev_frame(self):
+		# This function corresponds to the action of "-" button
+		# Switch to the previous frame loaded in frame_combobox
+		idx_min = 0
+		current = self.frame_combobox.currentIndex()
+		if current > idx_min:
+			self.frame_combobox.setCurrentIndex(current-1)
+		else:
+			pass
 
+	def _next_frame(self):
+		# This function corresponds to the action of "-" button
+		# Switch to the next frame loaded in frame_combobox
+		current = self.frame_combobox.currentIndex()
+		idx_max = self.frame_combobox.count() - 1
+		if current < idx_max:
+			self.frame_combobox.setCurrentIndex(current+1)
+		else:
+			pass
 
 
 

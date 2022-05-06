@@ -36,9 +36,10 @@ class FitsObj():
 class Fits_2dAux():
 	'''Auxiliary object to save and traverse non-important data
 	'''
-	def __init__(self, stamp=None, contamination=None, source=None, continuum=None, zpdf=None):
+	def __init__(self, stamp=None, wcs=None, contamination=None, source=None, continuum=None, zpdf=None):
 		# 2D stamp in STAMP frame
 		self.stamp = stamp
+		self.wcs = wcs
 		# 2D contamination in CNTM frame
 		self.contamination = contamination
 		# 2D source in SRC_IMG or SRC frame
