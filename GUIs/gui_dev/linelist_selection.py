@@ -359,7 +359,10 @@ class LineListWidget(QWidget):
 	# utility function to round values to desired significant figures
 	def round_to_sigfig(self, num=0., sigfig=1):
 		if num is not None:
-			return round(num, sigfig - int(floor(log10(abs(num)))) - 1)
+			if int(num)==0:
+				return 0.
+			else:
+				return round(num, sigfig - int(floor(log10(abs(num)))) - 1)
 		else:
 			return None
 
