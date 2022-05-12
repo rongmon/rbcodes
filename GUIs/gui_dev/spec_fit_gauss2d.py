@@ -195,7 +195,7 @@ class Gaussfit_2d(QWidget):
     def _button_clicked(self, check):
         show_sigfig = 5
         print('Begin fitting multiple Gaussians')
-        self.result = self.line1d.fit()
+        self.result = self.line1d.fit(self.cont)
         if self.result is not None:
             self.zf.setText(str(self.round_to_sigfig(self.result[0], show_sigfig)))
             self.zferr.setText(str(self.round_to_sigfig(self.result[1], show_sigfig)))
@@ -344,15 +344,18 @@ class LineCanvas(FigureCanvasQTAgg):
 
 
 
-    def fit(self):
+    def fit(self, ransac_cont=None):
         print('Start fitting multi-Gaussian profile...')
         
         # mimic the single Gaussian fitting process
         # 1. fit a local continum across the entire window
-        spline = splrep([self.g_wave[0], self.g_wave[-1]],
+        if ransac_cont is None:
+            spline = splrep([self.g_wave[0], self.g_wave[-1]],
                         [self.g_flux[0], self.g_flux[-1]],
                         k=1)
-        cont = splev(self.g_wave, spline)
+            cont = splev(self.g_wave, spline)
+        else:
+            cont = ransac_cont
 
         # 2. only fit emission lines or absorption lines at once
         EW = np.sum(cont - self.g_flux)
@@ -409,6 +412,7 @@ class LineCanvas(FigureCanvasQTAgg):
 
 
             del self.axline.lines[2:]
+            cont_fit = self.axline.plot(self.g_wave, cont, 'b')
             model_fit = self.axline.plot(self.g_wave, gfinal, 'r--')
 
             self.draw()
