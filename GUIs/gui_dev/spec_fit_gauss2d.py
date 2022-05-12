@@ -310,7 +310,7 @@ class LineCanvas(FigureCanvasQTAgg):
         self.axline.plot(wave,flux1d,'k', alpha=0.8)
         self.axline.plot(wave,error1d,'r', alpha=0.8)
         self.g_wave, self.g_flux, self.g_error = wave, flux1d, error1d
-
+        self.axline.set_ylim([np.min(flux1d)*0.8, np.max(flux1d)*1.3])
         self.axline.set_xlabel('Wavelength')
         self.axline.set_title('Fit Gaussians')
         
@@ -450,6 +450,42 @@ class LineCanvas(FigureCanvasQTAgg):
             self._plot_line(event.xdata)
 
             self.draw()
+
+        # enable a few keyevent for navigation
+        elif event.key == 'r':
+            axline = self.figure.gca()
+            xlim, ylim = axline.get_xlim(), axline.get_ylim()
+            self.axline.lines[0] = self.axline.plot(wave,error1d,'r', alpha=0.8)
+            self.axline.lines[1] = self.axline.plot(wave,flux1d,'k', alpha=0.8)
+            self.axline.set_xlim(xlim)
+            self.axline.set_ylim(ylim)
+        elif event.key == 't':
+            ylim = self.axline.get_ylim()
+            self.axline.set_ylim([ylim[0], event.ydata])
+            self.draw()
+        elif event.key == 'b':
+            ylim = self.axline.get_ylim()
+            self.axline.set_ylim([event.ydata, ylim[-1]])
+            self.draw()
+        elif event.key == 'X':
+            xlim = self.axline.get_xlim()
+            self.axline.set_xlim([xlim[0], event.xdata])
+            self.draw()
+        elif event.key == 'x':
+            xlim = self.axline.get_xlim()
+            self.axline.set_xlim([event.xdata, xlim[-1]])
+            self.draw()
+        elif event.key == '[':
+            xlim = self.axline.get_xlim()
+            delx = (xlim[-1] - xlim[0])
+            self.axline.set_xlim([xlim[0] - delx, xlim[0]])
+            self.draw()
+        elif event.key == ']':
+            xlim = self.axline.get_xlim()
+            delx = (xlim[-1] - xlim[0])
+            self.axline.set_xlim([xlim[1], xlim[1] + delx])
+            self.draw()
+
 
     #------------------- Signals/Slots --------------------------------
     def _on_sent_waves(self, dict_waves_names):
