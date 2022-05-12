@@ -680,6 +680,22 @@ class MplCanvas(FigureCanvasQTAgg):
 						# clear out selection
 						self.gxval, self.gyval = [], []
 
+		elif (event.key == 'A') & (self.gauss_num > 1):
+			# shade entire spectrum region
+			self.axes.fill_between([self.wave[0]*0.9, self.wave[-1]*1.1],
+									y1=np.max(self.flux)*1.1,
+									y2=np.min(self.flux)*0.9,
+									alpha=0.5,
+									color='pink')
+			self.draw()
+			self.send_message.emit('Entire spectrum has been selected!')
+			# delete the drawn polygon from collection
+			self.axes.collections.pop()
+			# initialize Multi-Gaussian
+			self.gauss2d = Gaussfit_2d(self.wave, self.flux, self.error,
+										gauss_num=self.gauss_num,
+										linelists=self.linelists2multiG)
+
 		elif event.key == 'D':
 			# delete previous unwanted points for Gaussian profile fitting
 			fclick = len(self.gxval)
@@ -777,6 +793,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				else:
 					self.gauss2d.show()
 					self.gauss2d.send_gfinal.connect(self._on_estZ_changed)
+					self.gauss2d.send_ransac.connect(self._on_ransac_cont)
 
 #-------------------- Slots for External Signals ------------------
 	def on_linelist_slot(self, sent_linelist):
@@ -843,6 +860,14 @@ class MplCanvas(FigureCanvasQTAgg):
 
 	def _on_sent_linelists2multiG(self, l):
 		self.linelists2multiG = l
+
+	def _on_ransac_cont(self, wave_cont):
+		print(wave_cont)
+		del self.axes.lines[2:]
+		self.axes.plot(wave_cont[0], wave_cont[-1], color='blue')
+		self.draw()
+
+
 
 
 #-------------------- Dialog Box for XY Ranges --------------------
