@@ -40,6 +40,7 @@ class Custom_ToolBar(QToolBar):
 		self.scale = 0
 		self.manual = None # No user manual yet
 		self.extract1d = None # wait for sent_extract1d
+		self.maxfile_lim = 50 # max displayed files in f_combobox at a time
 
 		self.setWindowTitle('Customizable TooBar')
 		#self.setFixedSize(QSize(200, 50))
@@ -69,6 +70,8 @@ class Custom_ToolBar(QToolBar):
 		self.f_combobox.setMinimumWidth(200)
 		self.f_combobox.addItem('No FITS File')
 		self.f_combobox.setCurrentIndex(0)
+		# set the max visible items for one page
+		self.f_combobox.setMaxVisibleItems(self.maxfile_lim)
 		self.f_combobox.currentIndexChanged.connect(self._read_selected_fits)
 		self.addWidget(self.f_combobox)
 		# "NEXT" buttons for file dropbox
@@ -174,6 +177,8 @@ class Custom_ToolBar(QToolBar):
 				self.filepaths.extend(newpaths)
 				self.f_combobox.addItems(newfiles)
 				self.f_combobox.setCurrentIndex(len(self.filenames)-len(newfiles)+1)
+				#if len(self.filenames) > self.maxfile_lim:
+				#	self.send_message.emit('Max displayed files are reached! Some files are folded in the dropdown box.')
 			else:
 				self.filenames = filenames
 				self.filepaths = filepaths
@@ -202,6 +207,8 @@ class Custom_ToolBar(QToolBar):
 				self.filepaths.extend(newpaths)
 				self.f_combobox.addItems(newfiles)
 				self.f_combobox.setCurrentIndex(len(self.filenames)-len(newfiles)+1)
+				#if len(self.filenames) > self.maxfile_lim:
+				#	self.send_message.emit('Max displayed files are reached! Some files are folded in the dropdown box.')
 			else:
 				self.filenames = filenames
 				self.filepaths = filepaths
@@ -371,9 +378,6 @@ class Custom_ToolBar(QToolBar):
 			self.frame_combobox.setCurrentIndex(current+1)
 		else:
 			pass
-
-
-
 
 
 	# combobox event
