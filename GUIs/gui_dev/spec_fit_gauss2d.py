@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QComboBox, QLineEdit, QLabel, QPushButton, QDialog
+from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QComboBox, QLineEdit, QLabel, QPushButton, QDialog, QCheckBox
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator
 from PyQt5 import QtWidgets
@@ -21,6 +21,7 @@ class Gaussfit_2d(QWidget):
     send_lineindex = pyqtSignal(int)
     send_waves = pyqtSignal(object)
     send_gfinal = pyqtSignal(list)
+    send_ransac = pyqtSignal(object)
 
     def __init__(self,wave, flux1d,error1d, gauss_num=2, linelists=[]):
         super().__init__()
@@ -30,6 +31,9 @@ class Gaussfit_2d(QWidget):
         self.linelists = linelists
         self.result = None
         self.wave, self.flux1d, self.error1d = wave, flux1d, error1d
+        self.kernel_size = 149
+        self.cont = None
+        self.c = None # placeholder for ransac cont_fitter object
         
 
 
@@ -94,11 +98,21 @@ class Gaussfit_2d(QWidget):
 
         # --- possible implementation ---
         # right now it is unstable if linetools is not installed
-        cont_pb = QPushButton('Continuum')
+        c_checkbox = QCheckBox('RANSAC')
+        # apply ransac fitting for continuum if checked
+        c_checkbox.stateChanged.connect(self._initialize_ransac)
+        lines_layout.addWidget(c_checkbox, 0, 4)
+        lines_layout.addWidget(QLabel('Kernel Size'), 1, 4)
+        self.kernel_ransac = QLineEdit()
+        self.kernel_ransac.setPlaceholderText('Kernel Size')
+        self.kernel_ransac.setReadOnly(True)
+        self.kernel_ransac.setFixedWidth(100)
+        self.kernel_ransac.returnPressed.connect(self._fit_ransac_continuum)
+        lines_layout.addWidget(self.kernel_ransac, 2, 4)
+        cont_pb = QPushButton('Export')
         cont_pb.setFixedWidth(100)
-        cont_pb.clicked.connect(self._fit_ransac_continuum)
-        lines_layout.addWidget(QLabel('(beta test)'), 0, 4)
-        lines_layout.addWidget(cont_pb, 1,4)
+        cont_pb.clicked.connect(self._export_button_clicked)
+        lines_layout.addWidget(cont_pb, 3,4)
 
         # main layout
         layout.addWidget(mpl_toolbar)
@@ -216,12 +230,38 @@ class Gaussfit_2d(QWidget):
                 self.line1d.bounds = [new_bd_low, new_bd_up]
                 self.line1d.init_guess = new_guess
 
-    def _fit_ransac_continuum(self, check):
-        from IGM.ransac_contfit import cont_fitter
-        c = cont_fitter.from_data(self.wave, self.flux1d, error=self.error1d)
-        c.fit_continuum(window=149)
-        self.line1d.axline.plot(self.wave, c.cont, 'g--')
+    def _fit_ransac_continuum(self):
+        self.kernel_size = int(self.kernel_ransac.text())
+        if self.kernel_size % 2 == 0:
+            self.kernel_size += 1
+        self.c.fit_continuum(window=self.kernel_size)
+        self.line1d.axline.lines.pop()
+        self.line1d.axline.plot(self.wave, self.c.cont, 'b')
         self.line1d.draw()
+        self.cont = self.c.cont
+
+    def _initialize_ransac(self, s):
+        # if the checkbox is checked, initialize ransac
+        if s == Qt.Checked:
+            self.kernel_ransac.setReadOnly(False)
+            self.kernel_ransac.setText(str(self.kernel_size))
+            from IGM.ransac_contfit import cont_fitter
+            self.c = cont_fitter.from_data(self.wave, self.flux1d, error=self.error1d)
+            self.c.fit_continuum(window=self.kernel_size)
+            self.line1d.axline.plot(self.wave, self.c.cont, 'b')
+            self.line1d.draw()
+            self.cont = self.c.cont
+        else:
+            self.kernel_ransac.setReadOnly(True)
+            self.kernel_ransac.clear()
+            self.cont = None
+            del self.line1d.axline.lines[2:]
+
+    def _export_button_clicked(self, check):
+        if self.cont is not None:
+            self.send_ransac.emit([self.wave,self.cont])
+
+
 
     def _auto_populate_ions(self, i, ion_widgets):
         len_items = ion_widgets[0].count()
@@ -267,8 +307,8 @@ class LineCanvas(FigureCanvasQTAgg):
     def _plot_spec(self, wave,flux1d,error1d):
         self.axline = self.fig.add_subplot(111)
         self.axline.cla()
-        self.axline.plot(wave,flux1d,'k')
-        self.axline.plot(wave,error1d,'r')
+        self.axline.plot(wave,flux1d,'k', alpha=0.8)
+        self.axline.plot(wave,error1d,'r', alpha=0.8)
         self.g_wave, self.g_flux, self.g_error = wave, flux1d, error1d
 
         self.axline.set_xlabel('Wavelength')
@@ -363,7 +403,7 @@ class LineCanvas(FigureCanvasQTAgg):
                                 p0=p_guess, bounds=(self.bd_low, self.bd_up), sigma=errdata)
 
             # interpolate with the model parameters
-            gfinal = sign * model_guess.compile_model(self.g_wave, *popt)
+            gfinal = sign * model_guess.compile_model(self.g_wave, *popt) + cont
             perr = np.sqrt(np.diag(pcov))
             # do not forget to bring back to observed frame
 
