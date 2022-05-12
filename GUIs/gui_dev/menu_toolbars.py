@@ -164,10 +164,16 @@ class Custom_ToolBar(QToolBar):
 		# This function corresponds to the action of "Read FITS" button
 		# Read multiple spec fits file
 		#	only fetch filepath strings, do not open fits files here
-		filepaths, check = QFileDialog.getOpenFileNames(None,
-			'Load multiple FITS files',
-			WORKING_DIR,
-			'Fits Files (*.fits)')
+		if self.mW.xspecio:
+			filepaths, check = QFileDialog.getOpenFileNames(None,
+				'Load multiple FITS/XSpec files',
+				WORKING_DIR,
+				'Fits Files (*.fits);; XSpec Files (*.xspec)')
+		else:
+			filepaths, check = QFileDialog.getOpenFileNames(None,
+				'Load multiple FITS files',
+				WORKING_DIR,
+				'Fits Files (*.fits)')
 		if check:
 			filenames = [self._get_filename(fp, extension=False) for fp in filepaths]
 			if len(self.filepaths)>0:
