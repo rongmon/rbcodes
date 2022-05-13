@@ -60,6 +60,7 @@ class LoadSpec():
 			return self.fitsobj
 
 
+
 		# ------------ FORMAT 2 --------------
 		# for a pair of fits files:
 		# cal-2D, x1d-1D
@@ -97,6 +98,7 @@ class LoadSpec():
 			return self.fitsobj
 
 
+
 		# ------------ FORMAT 3 --------------
 		# EIGER fits files 
 		# for a pair of fits files:
@@ -129,8 +131,9 @@ class LoadSpec():
 			return self.fitsobj
 
 		elif '1D' in fitsfile.filename().split('_')[-2]:
-			self.fitsobj.flux = fitsfile[1].data['flux_opt_ext']
-			self.fitsobj.error = fitsfile[1].data['flux_opt_ext_err']
+			self.fitsobj.flux = np.nan_to_num(fitsfile[1].data['flux_opt_ext'], nan=np.nan)
+			self.fitsobj.error = np.nan_to_num(fitsfile[1].data['flux_opt_ext_err'], nan=np.nan)
+			self.fitsobj.wave = fitsfile[1].data['wavelength']
 
 			# search 2D file and open
 			fnlist = fitsfile.filename().split('_')
