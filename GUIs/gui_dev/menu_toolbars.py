@@ -36,7 +36,7 @@ class Custom_ToolBar(QToolBar):
 		self.filepaths = []
 		self.filenames = []
 		self.filename = ''
-		self.scale2d = False
+		self.display2d = None # displayed 2d spectrum
 		self.scale = 0
 		self.manual = None # No user manual yet
 		self.extract1d = None # wait for sent_extract1d
@@ -353,17 +353,23 @@ class Custom_ToolBar(QToolBar):
 
 	# frame_combobox event
 	def _select_frames(self, s):
-		# default is SCI
-		if (s == 'SCI') | (s == ''):
-			self.mW.sc.plot_spec2d(self.fitsobj.wave,
-									self.fitsobj.flux2d,
-									self.fitsobj.error2d,
-									self.filename)
+		if self.fitsobj.flux2d is None:
+			# only 1d spec exists
+			pass
 		else:
+			# default is SCI
+			if (s == 'SCI') | (s == ''):
+				self.display2d = self.fitsobj.flux2d
+			else:
+				self.display2d = self.frames[s]
 			self.mW.sc.plot_spec2d(self.fitsobj.wave,
-									self.frames[s],
-									self.fitsobj.error2d,
-									self.filename)
+										self.display2d,
+										self.fitsobj.error2d,
+										self.filename)
+			# reset scale and normalization comboboxes
+			self.s_combobox.setCurrentIndex(0)
+			self.n_combobox.setCurrentIndex(0)
+
 
 	def _prev_frame(self):
 		# This function corresponds to the action of "-" button
@@ -430,8 +436,9 @@ class Custom_ToolBar(QToolBar):
 
 					if (self.fitsobj.flux2d is not None) & (self.fitsobj.flux is None):
 						# only 2d spec exists
+						self.display2d = self.fitsobj.flux2d
 						self.mW.sc.plot_spec2d(self.fitsobj.wave,
-											self.fitsobj.flux2d,
+											self.display2d,
 											self.fitsobj.error2d,
 											self.filename)
 						self._add_scale2d()
@@ -443,6 +450,11 @@ class Custom_ToolBar(QToolBar):
 										self.fitsobj.error,
 										self.filename)
 						self.s_combobox.clear()
+						self.n_combobox.clear()
+						self.min_range.clear()
+						self.min_range.setReadOnly(True)
+						self.max_range.clear()
+						self.max_range.setReadOnly(True)
 
 					elif (self.fitsobj.flux is not None) & (self.fitsobj.flux2d is not None):
 						# both 1d and 2d specs exist
@@ -451,9 +463,9 @@ class Custom_ToolBar(QToolBar):
 						if ('ymin' in self.filename) & ('ymax' in self.filename):
 							flist = self.filename.split('.')[0].split('_')
 							extraction_box = [int(flist[-2][5:]), int(flist[-1][5:])]
-							
+							self.display2d = self.fitsobj.flux2d
 							self.mW.sc.plot_spec2d(self.fitsobj.wave,
-												self.fitsobj.flux2d,
+												self.display2d,
 												self.fitsobj.error2d,
 												self.filename,
 												prev_extraction=extraction_box)
@@ -463,10 +475,12 @@ class Custom_ToolBar(QToolBar):
 											
 						else:
 							# if not, set up extraction box as usual
+							self.display2d = self.fitsobj.flux2d
 							self.mW.sc.plot_spec2d(self.fitsobj.wave,
-												self.fitsobj.flux2d,
+												self.display2d,
 												self.fitsobj.error2d,
-												self.filename)
+												self.filename,
+												prev_extraction=[0, len(self.display2d)-1])
 							self.mW.sc.replot(self.fitsobj.wave, 
 											self.fitsobj.flux, 
 											self.fitsobj.error)
@@ -479,15 +493,20 @@ class Custom_ToolBar(QToolBar):
 
 					self.fits_2daux = self.loadspec._check_advanced()
 
-			if self.mW.toggle_frames:
-				from gui_frame_io import ToggleFrames
-				toggle_f = ToggleFrames(self.filepaths[i-1])
-				self.frames = toggle_f._check_available_frames()
+				# toggle_frames only available for default io
+				if self.mW.toggle_frames:
+					from gui_frame_io import ToggleFrames
+					toggle_f = ToggleFrames(self.filepaths[i-1])
+					self.frames = toggle_f._check_available_frames()
 
-				self.frame_combobox.clear()
-				for frame_name in self.frames.keys():
-					if self.frames[frame_name] is not None:
-						self.frame_combobox.addItem(str(frame_name))
+					self.frame_combobox.clear()
+					for frame_name in self.frames.keys():
+						if self.frames[frame_name] is not None:
+							self.frame_combobox.addItem(str(frame_name))
+
+			# reset scale and normalization comboboxes
+			self.s_combobox.setCurrentIndex(0)
+			self.n_combobox.setCurrentIndex(0)
 
 					
 
@@ -508,7 +527,7 @@ class Custom_ToolBar(QToolBar):
 	def _scaling_changed(self, i):
 		if self.fitsobj.flux2d is not None:
 			self.mW.sc.plot_spec2d(self.fitsobj.wave,
-								self.fitsobj.flux2d,
+								self.display2d,
 								self.fitsobj.error2d,
 								self.filename, scale=i)
 			self.scale = i
@@ -519,7 +538,7 @@ class Custom_ToolBar(QToolBar):
 		if self.fitsobj.flux2d is not None:
 			if i < 11:
 				self.mW.sc.plot_spec2d(self.fitsobj.wave,
-									self.fitsobj.flux2d,
+									self.display2d,
 									self.fitsobj.error2d,
 									self.filename, 
 									scale=self.scale,
@@ -542,7 +561,7 @@ class Custom_ToolBar(QToolBar):
 
 		self.n_combobox.setCurrentIndex(11)
 		self.mW.sc.plot_spec2d(self.fitsobj.wave,
-							self.fitsobj.flux2d,
+							self.display2d,
 							self.fitsobj.error2d,
 							self.filename,
 							scale=self.scale,
