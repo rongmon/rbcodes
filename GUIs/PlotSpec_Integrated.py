@@ -270,11 +270,24 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         self.spectrum.canvas.setFocusPolicy( QtCore.Qt.ClickFocus )
         self.spectrum.canvas.setFocus()
         self.cid = self.spectrum.canvas.mpl_connect('key_press_event',self.ontype)
+        self.cid_m = self.spectrum.canvas.mpl_connect('button_press_event', self.onclick)
+
         
         try:
             self.abs_plot.table.cellChanged.connect(self.cellchanged)
         except:
             pass
+
+    def onclick(self, event):
+        '''Mouse click
+            Left == 1; Right == 3
+        '''
+        if event.button == 3:
+            #Manual mode
+            self.xdata = event.xdata
+            self.manT = Manual_Transition(self)
+            self.manT.show()
+
         
     #keyboard events
     def ontype(self,event):
