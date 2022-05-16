@@ -32,9 +32,11 @@ class LoadSpec():
 	# Read FITS file with various format options
 	def _load_spec(self):
 		# read fits file
+
 		fitsfile = fits.open(self.filepath)
 		labels = [label.name for label in fitsfile]
 
+		# ------------ FORMAT 1 --------------
 		# check if filename has keywords ymin/ymax for 2D fits
 		if 'ymin' in fitsfile.filename():
 			fname = fitsfile.filename().split('.')[0]
@@ -59,6 +61,8 @@ class LoadSpec():
 			return self.fitsobj
 
 
+
+		# ------------ FORMAT 2 --------------
 		# for a pair of fits files:
 		# cal-2D, x1d-1D
 		if fitsfile.filename().endswith('cal.fits'):
@@ -96,8 +100,69 @@ class LoadSpec():
 
 
 
+		# ------------ FORMAT 3 --------------
+		# EIGER fits files 
+		# for a pair of fits files:
+		# XXX_2D_YYY.fits; XXX_1D_YYY.fits
+		if '2D' in fitsfile.filename().split('_')[-2]:
+			self.fitsobj.flux2d = fitsfile['SCI'].data
+			self.fitsobj.error2d = fitsfile['ERR'].data
+			self.fitsobj.wave = self._build_wave(fitsfile['SCI'].header)
+			
+			# Set RA DEC
+			if 'RA' in fitsfile['SCI'].header:
+				self.fitsobj.ra = fitsfile['SCI'].header['RA']
+				self.fitsobj.dec = fitsfile['SCI'].header['DEC']
+
+			# Check z_guess
+			if 'EAZY_ZPDF' in labels:
+				z = fitsfile['EAZY_ZPDF'].data['z']
+				pdf = fitsfile['EAZY_ZPDF'].data['pdf']
+				self.fitsobj.z_guess = z[np.argmax(pdf)]
+
+			# search 1D file and open
+			fnlist = fitsfile.filename().split('_')
+			fits1d = '_'.join(fnlist[:-2] + ['1D'] + [fnlist[-1]])
+			if os.path.exists(fits1d):
+				fitsfile1d = fits.open(fits1d)
+				self.fitsobj.flux = fitsfile1d[1].data['flux_opt_ext']
+				self.fitsobj.error = fitsfile1d[1].data['flux_opt_ext_err']
+				fitsfile1d.close()
+			fitsfile.close()
+			return self.fitsobj
+
+		elif '1D' in fitsfile.filename().split('_')[-2]:
+			self.fitsobj.flux = np.nan_to_num(fitsfile[1].data['flux_opt_ext'], nan=np.nan)
+			self.fitsobj.error = np.nan_to_num(fitsfile[1].data['flux_opt_ext_err'], nan=np.nan)
+			self.fitsobj.wave = fitsfile[1].data['wavelength']
+
+			# search 2D file and open
+			fnlist = fitsfile.filename().split('_')
+			fits2d = '_'.join(fnlist[:-2] + ['2D'] + [fnlist[-1]])
+			if os.path.exists(fits2d):
+				fitsfile2d = fits.open(fits2d)
+				self.fitsobj.flux2d = fitsfile2d['SCI'].data
+				self.fitsobj.error2d = fitsfile2d['ERR'].data
+				self.fitsobj.wave = self._build_wave(fitsfile2d['SCI'].header)
+				
+				# Set RA DEC
+				if 'RA' in fitsfile2d['SCI'].header:
+					self.fitsobj.ra = fitsfile2d['SCI'].header['RA']
+					self.fitsobj.dec = fitsfile2d['SCI'].header['DEC']
+
+				# Check z_guess
+				if 'EAZY_ZPDF' in labels:
+					z = fitsfile2d['EAZY_ZPDF'].data['z']
+					pdf = fitsfile2d['EAZY_ZPDF'].data['pdf']
+					self.fitsobj.z_guess = z[np.argmax(pdf)]
+				fitsfile2d.close()
+			fitsfile.close()
+			return self.fitsobj
 
 
+
+
+		# ------------ FORMAT 4 --------------
 		# CHECK IF FITS FILE HAS AN IMAGE
 		if (fitsfile[0].header['NAXIS'] > 1) & (len(fitsfile) < 2):
 			# example file: long_radd.fits
@@ -114,6 +179,7 @@ class LoadSpec():
 			fitsfile.close()
 			return self.fitsobj
 
+		# ------------ FORMAT 5 --------------
 		elif 'SCI' in labels:
     	#Read in a specific format to account for EIGER emission line 2d spectrum
 			# example file: spec2d_coadd_QSO_J0100_sID010242.fits
@@ -135,6 +201,8 @@ class LoadSpec():
 			fitsfile.close()
 			return self.fitsobj
 
+
+		# ------------ FORMAT 6 --------------
 		elif 'COADD' in labels:
 			#FITS format 2:
 			#file[i].data['<variable>']
@@ -166,7 +234,9 @@ class LoadSpec():
 
 			fitsfile.close()
 			return self.fitsobj
-		
+
+
+		# ------------ FORMAT 7 --------------		
 		# CHECK IF FITS FILE HAS 1D SPECTRAL INFO...
 		# find wavelength, flux, error
 		elif 'FLUX' in fitsfile:

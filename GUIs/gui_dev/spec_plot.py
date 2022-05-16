@@ -77,7 +77,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axes.lines[1] = self.axes.plot(wave, flux, color='black')#, label='Flux')
 		#self.axes.legend(loc='upper right')
 		self.axes.set_ylim([-np.nanmin(flux)*0.01, np.nanmedian(flux)*3])
-		self.axes.set_xlim([np.min(wave), np.max(wave)])
+		self.axes.set_xlim([np.nanmin(wave), np.nanmax(wave)])
 		self.axes.set_xlabel('Wavelength (Angstrom)')
 		self.axes.set_ylabel('Flux')
 		self.axes.set_title(filename)
@@ -300,7 +300,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axes.set_ylabel('Flux')
 		#xlim_spec1d = self.axes.get_xlim()
 		#self.axes.set_xlim(xlim_spec1d)
-		self.axes.set_xlim([np.min(wave), np.max(wave)])
+		self.axes.set_xlim([np.nanmin(wave), np.nanmax(wave)])
 
 		# 2 spec plot...
 		# scaling first
@@ -413,8 +413,8 @@ class MplCanvas(FigureCanvasQTAgg):
 			self.ax2d.collections.pop()
 		while self.ax2d.lines:
 			self.ax2d.lines.pop()
-		self.ax2d.hlines(new_extraction[0], np.min(wave), np.max(wave), color='red', linestyle='dashed')
-		self.ax2d.hlines(new_extraction[1], np.min(wave), np.max(wave), color='red', linestyle='dashed')
+		self.ax2d.hlines(new_extraction[0], np.nanmin(wave), np.nanmax(wave), color='red', linestyle='dashed')
+		self.ax2d.hlines(new_extraction[1], np.nanmin(wave), np.nanmax(wave), color='red', linestyle='dashed')
 
 
 
@@ -446,7 +446,7 @@ class MplCanvas(FigureCanvasQTAgg):
 					self.flux, self.error = self.flux_fix, self.error_fix
 					self.replot2d(self.wave, self.flux_fix, self.error_fix, self.extraction_y)
 			self.axes.set_ylim([np.nanmin(self.flux), np.nanmax(self.flux)])
-			self.axes.set_xlim([np.min(self.wave), np.max(self.wave)])
+			self.axes.set_xlim([np.nanmin(self.wave), np.nanmax(self.wave)])
 			
 			self._lines_in_current_range()
 
