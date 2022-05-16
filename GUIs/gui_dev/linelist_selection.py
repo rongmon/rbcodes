@@ -1,7 +1,7 @@
 import sys
 import os
 import pandas as pd
-from numpy import floor, log10, isnan, nan
+from numpy import floor, log10, isnan, nan, isinf
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QComboBox, QLineEdit, QPushButton, QCheckBox
 from PyQt5.QtCore import pyqtSignal
@@ -359,10 +359,11 @@ class LineListWidget(QWidget):
 	# utility function to round values to desired significant figures
 	def round_to_sigfig(self, num=0., sigfig=1):
 		if num is not None:
-			if int(num) == 0:
+			tmp = log10(abs(num))
+			if isinf(tmp):
 				return 0
 			else:
-				return round(num, sigfig - int(floor(log10(abs(num)))) - 1)
+				return round(num, sigfig - int(floor(tmp)) - 1)
 		else:
 			return None
 
