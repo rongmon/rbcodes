@@ -32,6 +32,7 @@ class LoadSpec():
 	# Read FITS file with various format options
 	def _load_spec(self):
 		# read fits file
+
 		fitsfile = fits.open(self.filepath)
 		labels = [label.name for label in fitsfile]
 

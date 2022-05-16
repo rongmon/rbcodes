@@ -424,6 +424,14 @@ class Custom_ToolBar(QToolBar):
 				# enable standalone IO class
 				#print('default io mode')
 				from gui_io import LoadSpec
+				fnlist = self.filepaths[i-1].split('_')
+				# searching for corresponding 2D for advanced display
+				if '1D' in fnlist[-2]:
+					fits2d_path = '_'.join(fnlist[:-2] + ['2D'] + [fnlist[-1]])
+					if os.path.exists(fits2d_path):
+						self.filepaths[i-1] = fits2d_path
+						self.filename = fits2d_path.split('/')[-1].split('.')[0]
+
 				self.loadspec = LoadSpec(self.filepaths[i-1])
 
 				selfcheck = self.loadspec._load_spec()
