@@ -15,6 +15,14 @@ def convert_epoch(filename):
 
 
 
+	 Calling Sequence:
+	   from catalog.convert_FIRE_coordinates import convert_epoch
+	   s=convert_epoch('J0100+28_F.fits')
+
+	   #show results
+	   s.to_string('hmsdms')
+
+
 	Note: Only for specific use of older Magellan FIRE QSO spectra.
 
 
