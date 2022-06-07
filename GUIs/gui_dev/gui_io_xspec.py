@@ -24,7 +24,11 @@ class LoadXSpec():
 			# no error
 			# need to convert astropy quantity class to numpy array
 			self.fitsobj.flux = self.sp.flux.value
-			self.fitsobj.error = self.sp.sig.value
+			if self.sp.sig_is_set==True:
+				self.fitsobj.error = self.sp.sig.value
+			else:
+				#Dummy error values
+				self.fitsobj.error=self.sp.flux.value*.001
 
 			# need to convert wavelength unit to Angstrom
 			self.fitsobj.wave = self.sp.wavelength.to(u.Angstrom).value
