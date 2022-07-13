@@ -28,6 +28,7 @@ class Custom_ToolBar(QToolBar):
 	#Our personalized custom Toolbar
 	def __init__(self, mainWindow):
 		super().__init__()
+		#------- internal variables -------
 		self.mW = mainWindow
 		self.loadspec = None
 		self.fitsobj = mainWindow.fitsobj
@@ -35,30 +36,29 @@ class Custom_ToolBar(QToolBar):
 		self.filepaths = []
 		self.filenames = []
 		self.filename = ''
-		self.scale2d = False
+		self.display2d = None # displayed 2d spectrum
 		self.scale = 0
 		self.manual = None # No user manual yet
 		self.extract1d = None # wait for sent_extract1d
+		self.maxfile_lim = 50 # max displayed files in f_combobox at a time
 
 		self.setWindowTitle('Customizable TooBar')
 		#self.setFixedSize(QSize(200, 50))
 
+		# "Read All" button
 		btn_loadtxt = self._create_button('Read All', 'Read all fits files from a TXT file. Make sure you run "ls *.fits > filenames.txt" before clicking this!')
 		self.addAction(btn_loadtxt)
 		btn_loadtxt.triggered.connect(self._load_from_txt)
 
+		# "Read FITS" button
 		btn_loadf = self._create_button('Read FITS', 'Read a fits file and plot the spectrum')
 		self.addAction(btn_loadf)
 		btn_loadf.triggered.connect(self._load_specs)
 
+		# "Save Extract1D" button
 		btn_savef = self._create_button('Save Extract1D', 'Save the extracted 1D FITS file')
 		self.addAction(btn_savef)
 		btn_savef.triggered.connect(self._save_spec)
-		self.addSeparator()
-
-		btn_help = self._create_button('Help', 'Open the user manual for further help')
-		self.addAction(btn_help)
-		btn_help.triggered.connect(self._open_user_manual)	
 		self.addSeparator()
 
 		# "PREV" buttons for file dropbox
@@ -67,15 +67,38 @@ class Custom_ToolBar(QToolBar):
 		btn_prevf.triggered.connect(self._prev_fitsfile)
 		# File dropbox
 		self.f_combobox = QComboBox()
-		self.f_combobox.setFixedWidth(200)
+		self.f_combobox.setMinimumWidth(200)
 		self.f_combobox.addItem('No FITS File')
 		self.f_combobox.setCurrentIndex(0)
+		# set the max visible items for one page
+		self.f_combobox.setMaxVisibleItems(self.maxfile_lim)
 		self.f_combobox.currentIndexChanged.connect(self._read_selected_fits)
 		self.addWidget(self.f_combobox)
 		# "NEXT" buttons for file dropbox
 		btn_nextf = self._create_button('NEXT', 'Switch to next fits file loaded in backend.')
 		self.addAction(btn_nextf)
 		btn_nextf.triggered.connect(self._next_fitsfile)
+
+		self.addSeparator()
+
+		# Frame dropbox section
+		if self.mW.toggle_frames:
+			self.frames = None
+			# '-' button for frame dropbox
+			btn_prevframe = self._create_button('-', 'Swtich to previous available frame.')
+			self.addAction(btn_prevframe)
+			btn_prevframe.triggered.connect(self._prev_frame)
+			# main frame dropbox
+			self.frame_combobox = QComboBox()
+			self.frame_combobox.setMinimumWidth(130)
+			self.frame_combobox.addItem('NONE')
+			self.frame_combobox.setCurrentIndex(0)
+			self.frame_combobox.currentTextChanged.connect(self._select_frames)
+			self.addWidget(self.frame_combobox)
+			# '+' button for frame dropbox
+			btn_nextframe = self._create_button('+', 'Switch to next available frame.')
+			self.addAction(btn_nextframe)
+			btn_nextframe.triggered.connect(self._next_frame)
 
 		self.addSeparator()
 
@@ -109,10 +132,17 @@ class Custom_ToolBar(QToolBar):
 
 		self.addSeparator()
 
-		# Advanced Option
+		# "Advanced" Option
 		btn_adv = self._create_button('Advanced', 'More 2D inspection')
 		self.addAction(btn_adv)
 		btn_adv.triggered.connect(self._on_advanced_option)
+
+		self.addSeparator()
+		# "Help" button
+		btn_help = self._create_button('Help', 'Open the user manual for further help')
+		self.addAction(btn_help)
+		btn_help.triggered.connect(self._open_user_manual)	
+		
 
 
 
@@ -131,12 +161,19 @@ class Custom_ToolBar(QToolBar):
 
 
 	def _load_specs(self):
-		#Read multiple spec fits file
+		# This function corresponds to the action of "Read FITS" button
+		# Read multiple spec fits file
 		#	only fetch filepath strings, do not open fits files here
-		filepaths, check = QFileDialog.getOpenFileNames(None,
-			'Load multiple FITS files',
-			WORKING_DIR,
-			'Fits Files (*.fits)')
+		if self.mW.xspecio:
+			filepaths, check = QFileDialog.getOpenFileNames(None,
+				'Load multiple FITS/XSpec files',
+				WORKING_DIR,
+				'Fits Files (*.fits);; XSpec Files (*.xspec)')
+		else:
+			filepaths, check = QFileDialog.getOpenFileNames(None,
+				'Load multiple FITS files',
+				WORKING_DIR,
+				'Fits Files (*.fits)')
 		if check:
 			filenames = [self._get_filename(fp, extension=False) for fp in filepaths]
 			if len(self.filepaths)>0:
@@ -146,6 +183,8 @@ class Custom_ToolBar(QToolBar):
 				self.filepaths.extend(newpaths)
 				self.f_combobox.addItems(newfiles)
 				self.f_combobox.setCurrentIndex(len(self.filenames)-len(newfiles)+1)
+				#if len(self.filenames) > self.maxfile_lim:
+				#	self.send_message.emit('Max displayed files are reached! Some files are folded in the dropdown box.')
 			else:
 				self.filenames = filenames
 				self.filepaths = filepaths
@@ -153,7 +192,8 @@ class Custom_ToolBar(QToolBar):
 				self.f_combobox.setCurrentIndex(1)
 
 	def _load_from_txt(self):
-		# read all fits files saved in a txt file
+		# This function corresponds to the action of "Read All" button
+		# Read all fits files saved in a txt file
 		# the txt file should be located within the same folder as fits
 		txtpath, check = QFileDialog.getOpenFileName(None,
 			'Read a TXT file containing all fits filenames in the current folder',
@@ -173,6 +213,8 @@ class Custom_ToolBar(QToolBar):
 				self.filepaths.extend(newpaths)
 				self.f_combobox.addItems(newfiles)
 				self.f_combobox.setCurrentIndex(len(self.filenames)-len(newfiles)+1)
+				#if len(self.filenames) > self.maxfile_lim:
+				#	self.send_message.emit('Max displayed files are reached! Some files are folded in the dropdown box.')
 			else:
 				self.filenames = filenames
 				self.filepaths = filepaths
@@ -181,7 +223,8 @@ class Custom_ToolBar(QToolBar):
 
 
 	def _save_spec(self):
-		#Save extract1d (wave, flux1d, error1d) with a deepcopy of loaded 2D spec 
+		# This function corresponds to the action of "Save Extract1D" button
+		# Save extract1d (wave, flux1d, error1d) with a deepcopy of loaded 2D spec 
 		if self.loadspec is not None:
 			if self.extract1d is not None:
 				newfilename = self.filename + '_ymin={}_ymax={}'.format(self.extract1d['YMIN'], self.extract1d['YMAX'])
@@ -226,6 +269,8 @@ class Custom_ToolBar(QToolBar):
 			return os.path.splitext(base)[0]
 
 	def _prev_fitsfile(self):
+		# This function corresponds to the action of "Prev" button
+		# Switch to the previous filename loaded in f_combobox
 		# idx 0 is "No FITS File" placeholder
 		idx_min = 1
 		current = self.f_combobox.currentIndex()
@@ -235,6 +280,8 @@ class Custom_ToolBar(QToolBar):
 			pass
 
 	def _next_fitsfile(self):
+		# This function corresponds to the action of "Next" button
+		# Switch to the next filename loaded in f_combobox
 		current = self.f_combobox.currentIndex()
 		idx_max = self.f_combobox.count() - 1
 		if current < idx_max:
@@ -246,6 +293,11 @@ class Custom_ToolBar(QToolBar):
 		message = ''
 		if self.fits_2daux.stamp is not None:
 			img_sta = [self.fits_2daux.stamp]
+			if self.fits_2daux.wcs is not None:
+				img_sta.append(self.fits_2daux.wcs)
+				# Scaling/Normalization only control the last img
+				# make sure to swap positions for this one
+				img_sta[0], img_sta[1] = img_sta[1], img_sta[0]
 			self.img_sta = ShowAdvanced(img_sta, name='STAMP')
 			self.img_sta.show()
 			message += 'GUI found STAMP HDU.'
@@ -299,7 +351,53 @@ class Custom_ToolBar(QToolBar):
 
 		self.send_message.emit(message)
 
+	# frame_combobox event
+	def _select_frames(self, s):
+		if self.fitsobj.flux2d is None:
+			# only 1d spec exists
+			pass
+		else:
+			# default is SCI
+			if (s == 'SCI') | (s == ''):
+				self.display2d = self.fitsobj.flux2d
+			else:
+				self.display2d = self.frames[s]
+			self.mW.sc.plot_spec2d(self.fitsobj.wave,
+										self.display2d,
+										self.fitsobj.error2d,
+										self.filename)
+			# reset scale and normalization comboboxes
+			self.s_combobox.setCurrentIndex(0)
+			self.n_combobox.setCurrentIndex(0)
 
+			if (s+'1d' in self.frames1d.keys()) and (self.frames1d[s+'1d'] is not None):
+				#print('replotting...')
+				self.mW.sc.replot(self.fitsobj.wave, 
+								self.frames1d[s+'1d'], 
+								self.frames1d['ERR1d'])
+				self.send_message.emit('Optimal Extraction Found!')
+
+
+	def _prev_frame(self):
+		# This function corresponds to the action of "-" button
+		# Switch to the previous frame loaded in frame_combobox
+		idx_min = 0
+		current = self.frame_combobox.currentIndex()
+		if current > idx_min:
+			self.frame_combobox.setCurrentIndex(current-1)
+		else:
+			self.frame_combobox.setCurrentIndex(self.frame_combobox.count() - 1)
+
+	def _next_frame(self):
+		# This function corresponds to the action of "-" button
+		# Switch to the next frame loaded in frame_combobox
+		current = self.frame_combobox.currentIndex()
+		idx_max = self.frame_combobox.count() - 1
+		if current < idx_max:
+			self.frame_combobox.setCurrentIndex(current+1)
+		else:
+			# wrap around
+			self.frame_combobox.setCurrentIndex(0)
 
 
 	# combobox event
@@ -334,6 +432,14 @@ class Custom_ToolBar(QToolBar):
 				# enable standalone IO class
 				#print('default io mode')
 				from gui_io import LoadSpec
+				fnlist = self.filepaths[i-1].split('_')
+				# searching for corresponding 2D for advanced display
+				if '1D' in fnlist[-2]:
+					fits2d_path = '_'.join(fnlist[:-2] + ['2D'] + [fnlist[-1]])
+					if os.path.exists(fits2d_path):
+						self.filepaths[i-1] = fits2d_path
+						self.filename = fits2d_path.split('/')[-1].split('.')[0]
+
 				self.loadspec = LoadSpec(self.filepaths[i-1])
 
 				selfcheck = self.loadspec._load_spec()
@@ -346,8 +452,9 @@ class Custom_ToolBar(QToolBar):
 
 					if (self.fitsobj.flux2d is not None) & (self.fitsobj.flux is None):
 						# only 2d spec exists
+						self.display2d = self.fitsobj.flux2d
 						self.mW.sc.plot_spec2d(self.fitsobj.wave,
-											self.fitsobj.flux2d,
+											self.display2d,
 											self.fitsobj.error2d,
 											self.filename)
 						self._add_scale2d()
@@ -359,6 +466,11 @@ class Custom_ToolBar(QToolBar):
 										self.fitsobj.error,
 										self.filename)
 						self.s_combobox.clear()
+						self.n_combobox.clear()
+						self.min_range.clear()
+						self.min_range.setReadOnly(True)
+						self.max_range.clear()
+						self.max_range.setReadOnly(True)
 
 					elif (self.fitsobj.flux is not None) & (self.fitsobj.flux2d is not None):
 						# both 1d and 2d specs exist
@@ -367,22 +479,24 @@ class Custom_ToolBar(QToolBar):
 						if ('ymin' in self.filename) & ('ymax' in self.filename):
 							flist = self.filename.split('.')[0].split('_')
 							extraction_box = [int(flist[-2][5:]), int(flist[-1][5:])]
-							
+							self.display2d = self.fitsobj.flux2d
 							self.mW.sc.plot_spec2d(self.fitsobj.wave,
-												self.fitsobj.flux2d,
+												self.display2d,
 												self.fitsobj.error2d,
 												self.filename,
-												pre_extraction=extraction_box)
+												prev_extraction=extraction_box)
 							self.mW.sc.replot(self.fitsobj.wave, 
 											self.fitsobj.flux, 
 											self.fitsobj.error)
 											
 						else:
 							# if not, set up extraction box as usual
+							self.display2d = self.fitsobj.flux2d
 							self.mW.sc.plot_spec2d(self.fitsobj.wave,
-												self.fitsobj.flux2d,
+												self.display2d,
 												self.fitsobj.error2d,
-												self.filename)
+												self.filename,
+												prev_extraction=None)
 							self.mW.sc.replot(self.fitsobj.wave, 
 											self.fitsobj.flux, 
 											self.fitsobj.error)
@@ -394,6 +508,21 @@ class Custom_ToolBar(QToolBar):
 					self.send_fitsobj.emit(self.fitsobj)
 
 					self.fits_2daux = self.loadspec._check_advanced()
+
+				# toggle_frames only available for default io
+				if self.mW.toggle_frames:
+					from gui_frame_io import ToggleFrames
+					toggle_f = ToggleFrames(self.filepaths[i-1])
+					self.frames, self.frames1d = toggle_f._check_available_frames()
+
+					self.frame_combobox.clear()
+					for frame_name in self.frames.keys():
+						if self.frames[frame_name] is not None:
+							self.frame_combobox.addItem(str(frame_name))
+
+			# reset scale and normalization comboboxes
+			self.s_combobox.setCurrentIndex(0)
+			self.n_combobox.setCurrentIndex(0)
 
 					
 
@@ -414,7 +543,7 @@ class Custom_ToolBar(QToolBar):
 	def _scaling_changed(self, i):
 		if self.fitsobj.flux2d is not None:
 			self.mW.sc.plot_spec2d(self.fitsobj.wave,
-								self.fitsobj.flux2d,
+								self.display2d,
 								self.fitsobj.error2d,
 								self.filename, scale=i)
 			self.scale = i
@@ -425,7 +554,7 @@ class Custom_ToolBar(QToolBar):
 		if self.fitsobj.flux2d is not None:
 			if i < 11:
 				self.mW.sc.plot_spec2d(self.fitsobj.wave,
-									self.fitsobj.flux2d,
+									self.display2d,
 									self.fitsobj.error2d,
 									self.filename, 
 									scale=self.scale,
@@ -448,7 +577,7 @@ class Custom_ToolBar(QToolBar):
 
 		self.n_combobox.setCurrentIndex(11)
 		self.mW.sc.plot_spec2d(self.fitsobj.wave,
-							self.fitsobj.flux2d,
+							self.display2d,
 							self.fitsobj.error2d,
 							self.filename,
 							scale=self.scale,
