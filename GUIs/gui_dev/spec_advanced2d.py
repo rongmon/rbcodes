@@ -191,7 +191,7 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 			scaled2d = tmp*(normalization[1] - normalization[0]) + normalization[0]
 			
 		
-		if ax_num > 1:
+		if 'STAMP' not in name:
 			self.ax = self.fig.add_subplot(ax_num,1,1) # flux
 			self.ax.imshow(imgs[0], origin='lower', 
 							vmin=imgs[0].min(), vmax=imgs[0].max())
@@ -203,10 +203,10 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 				ax_add.append(self.fig.add_subplot(ax_num,1,i+1, sharex=self.ax))
 				if i+1 == ax_num:
 					if scale == 1:
-						cax = ax_add[-1].imshow(scaled2d, origin='lower',
+						cax = ax_add[-1].imshow(img, origin='lower',
 												vmin=scaled2d.min(), vmax=scaled2d.max() * 0.01)
 					else:
-						cax = ax_add[-1].imshow(scaled2d, origin='lower',
+						cax = ax_add[-1].imshow(img, origin='lower',
 												vmin=scaled2d.min(), vmax=scaled2d.max())
 					ax_cb = self.fig.colorbar(cax, ax=ax_add[-1], location='bottom')
 					ax_add[-1].tick_params(labelbottom=True)
@@ -219,9 +219,15 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 				ax_add[-1].set_aspect('auto')
 				
 		else:
-			self.ax = self.fig.add_subplot(1,1,1)
-			self.ax.imshow(imgs[0], origin='lower', 
-							vmin=imgs[0].min(), vmax=imgs[0].max())
+			if len(imgs) > 1:
+				wcs = imgs[0]
+				self.ax = self.fig.add_subplot(1,1,1, projection=wcs)
+				self.ax.set_xlabel('Galactic Longitude')
+				self.ax.set_ylabel('Galactic Latitude')
+			else:
+				self.ax = self.fig.add_subplot(1,1,1)
+			self.ax.imshow(img, origin='lower', 
+							vmin=scaled2d.min(), vmax=scaled2d.max())
 			if len(name) > 1:
 				self.ax.set_title(name + ' of Current Object')	
 

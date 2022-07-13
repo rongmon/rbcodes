@@ -1,7 +1,7 @@
 import sys
 import os
 import pandas as pd
-from numpy import floor, log10, isnan, nan
+from numpy import floor, log10, isnan, nan, isinf
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QComboBox, QLineEdit, QPushButton, QCheckBox
 from PyQt5.QtCore import pyqtSignal
@@ -359,7 +359,11 @@ class LineListWidget(QWidget):
 	# utility function to round values to desired significant figures
 	def round_to_sigfig(self, num=0., sigfig=1):
 		if num is not None:
-			return round(num, sigfig - int(floor(log10(abs(num)))) - 1)
+			tmp = log10(abs(num))
+			if isinf(tmp):
+				return 0
+			else:
+				return round(num, sigfig - int(floor(tmp)) - 1)
 		else:
 			return None
 
@@ -378,8 +382,16 @@ class LineListWidget(QWidget):
 	# action to press return on secondary z_guess LineEdit widgets
 	def _guess_z_return_pressed(self, i):		
 		llist = self._get_linelist_df(self.llists_2[i][1].currentText())
-		z_guess = float(self.llists_2[i][2].text())
-		self.send_more_linelist_z.emit([{i:llist}, z_guess])
+		if (len(self.llists_2[i][2].text()) < 1) | (self.llists_2[i][2].text().isalpha()):
+			z_guess = 0
+			self.llists_2[i][2].setText('0')
+		else:
+			z_guess = float(self.llists_2[i][2].text())
+
+		if (self.llists_2[i][1].currentText() == 'NONE' ) & (z_guess == 0):
+			pass
+		else:
+			self.send_more_linelist_z.emit([{i:llist}, z_guess])
 
 	# action to read linelist as dataframe
 	def _get_linelist_df(self, linelist_name):
