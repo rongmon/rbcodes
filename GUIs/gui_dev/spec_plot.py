@@ -50,6 +50,8 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.gauss2d = None
 		self.linelists2multiG = []
 		self.stamp = None
+		self.current_extraction = None
+		self.current_filename = None
 
 		num_2ndlist = 6
 		self.addtional_linelist = {i:[] for i in range(num_2ndlist)}
@@ -75,7 +77,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axes.lines[1] = self.axes.plot(wave, flux, color='black')#, label='Flux')
 		#self.axes.legend(loc='upper right')
 		self.axes.set_ylim([-np.nanmin(flux)*0.01, np.nanmedian(flux)*3])
-		self.axes.set_xlim([np.min(wave), np.max(wave)])
+		self.axes.set_xlim([np.nanmin(wave), np.nanmax(wave)])
 		self.axes.set_xlabel('Wavelength (Angstrom)')
 		self.axes.set_ylabel('Flux')
 		self.axes.set_title(filename)
@@ -97,12 +99,16 @@ class MplCanvas(FigureCanvasQTAgg):
 		axes = self.figure.gca()
 		xlim = axes.get_xlim()
 		ylim = axes.get_ylim()
-		self.axes.lines[0] = axes.plot(wave, new_err, color='red')# label='Error')
-		self.axes.lines[1] = axes.plot(wave, new_spec, color='black')#, label='Flux')
-		self.axes.set_ylim(ylim)#[np.nanmin(new_spec), np.nanmax(new_spec)])
-		self.axes.set_xlim(xlim)#[np.min(wave), np.max(wave)])
+		
+		self.axes.lines[0] = self.axes.plot(wave, new_err, color='red')# label='Error')
+		self.axes.lines[1] = self.axes.plot(wave, new_spec, color='black')#, label='Flux')
+		# for a better y range
+		ytmp = np.nan_to_num(new_spec, nan=0., posinf=0., neginf=0.)
+		self.axes.set_ylim([np.nanmin(ytmp), np.nanmax(ytmp)])
+		self.axes.set_xlim([np.min(wave), np.max(wave)])
 
 		del self.axes.lines[2:]
+		self.draw()
 
 	def _compute_distance(self, gxval, gyval, event):
 		'''Compute the distance between the event xydata and selected point for Gaussian fitting
@@ -239,7 +245,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		#return fl1d_opt, err1d
 
 
-	def plot_spec2d(self, wave, flux2d, error2d, filename, scale=0, normalization=0, pre_extraction=None):
+	def plot_spec2d(self, wave, flux2d, error2d, filename, scale=0, normalization=0, prev_extraction=None):
 		'''Display 2D spec in top panel, 1D extraction in bottom panel
 		self.flux2d, self.err2d - 2D spec info
 		self.flux, self.error - 1D spec extraction
@@ -258,21 +264,30 @@ class MplCanvas(FigureCanvasQTAgg):
 		# copy of flux2d with nan replaced by 0
 		img = np.nan_to_num(self.flux2d, nan=0.)
 		
-		if pre_extraction is None:
-			
-			# sum in dispersion direction to do initial selection
-			tmp = np.sum(img + np.abs(img.min()), axis=1)
-			# make sure tmp has no negative values for initial guess
-			tmp_cumsum = np.cumsum(tmp) / np.sum(tmp)
-			ylist = np.arange(0, len(tmp_cumsum), 1)
+		# make sure extraction box is not reset after scaling change.
+		if self.current_filename  != filename:
+			# 1st time plotting
+			if prev_extraction is None:
+				
+				# sum in dispersion direction to do initial selection
+				tmp = np.sum(img + np.abs(img.min()), axis=1)
+				# make sure tmp has no negative values for initial guess
+				tmp_cumsum = np.cumsum(tmp) / np.sum(tmp)
+				ylist = np.arange(0, len(tmp_cumsum), 1)
 
-			#print(tmp_cumsum)
-			lower, upper = 0.32, 0.68
-			self.extraction_y = [int(np.interp(lower, tmp_cumsum, ylist)),
-								int(np.interp(upper, tmp_cumsum, ylist))]			
-			#print(self.extraction_y)
+				#print(tmp_cumsum)
+				lower, upper = 0.32, 0.68
+				self.extraction_y = [int(np.interp(lower, tmp_cumsum, ylist)),
+									int(np.interp(upper, tmp_cumsum, ylist))]			
+				#print(self.extraction_y)
+			else:
+				self.extraction_y = prev_extraction
+
+			#save a copy of current extraction box
+			self.current_extraction = self.extraction_y.copy()
+			self.current_filename = filename
 		else:
-			self.extraction_y = pre_extraction
+			self.extraction_y = self.current_extraction.copy()
 
 		self.flux, self.error = self.extract_1d(self.flux2d[self.extraction_y[0]: self.extraction_y[1], :],
 												self.err2d[self.extraction_y[0]: self.extraction_y[1], :])
@@ -289,7 +304,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axes.set_ylabel('Flux')
 		#xlim_spec1d = self.axes.get_xlim()
 		#self.axes.set_xlim(xlim_spec1d)
-		self.axes.set_xlim([np.min(wave), np.max(wave)])
+		self.axes.set_xlim([np.nanmin(wave), np.nanmax(wave)])
 
 		# 2 spec plot...
 		# scaling first
@@ -327,6 +342,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			elif normalization == 1:
 				# minmax 100% range
 				scaled2d = (scaled2d - scaled2d.min()) / (scaled2d.max() - scaled2d.min())
+				self.send_scale_limits.emit([scaled2d.min(), scaled2d.max()])
 			elif normalization < 10: # this magic num from n_combobox in toolbar
 				if normalization == 2: # 99.5%
 					low, up = np.percentile(scaled2d, [0.25, 99.75])
@@ -357,11 +373,11 @@ class MplCanvas(FigureCanvasQTAgg):
 			scaled2d = tmp*(normalization[1] - normalization[0]) + normalization[0]
 			
 		if scale == 1:
-			pos_ax2d = self.ax2d.imshow(scaled2d, origin='lower', 
+			pos_ax2d = self.ax2d.imshow(img, origin='lower', 
 									vmin=scaled2d.min(), vmax=scaled2d.max() * 0.01,
 									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)))
 		else:
-			pos_ax2d = self.ax2d.imshow(scaled2d, origin='lower', 
+			pos_ax2d = self.ax2d.imshow(img, origin='lower', 
 									vmin=scaled2d.min(), vmax=scaled2d.max() * 1.0,
 									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)))
 		
@@ -401,8 +417,8 @@ class MplCanvas(FigureCanvasQTAgg):
 			self.ax2d.collections.pop()
 		while self.ax2d.lines:
 			self.ax2d.lines.pop()
-		self.ax2d.hlines(new_extraction[0], np.min(wave), np.max(wave), color='red', linestyle='dashed')
-		self.ax2d.hlines(new_extraction[1], np.min(wave), np.max(wave), color='red', linestyle='dashed')
+		self.ax2d.hlines(new_extraction[0], np.nanmin(wave), np.nanmax(wave), color='red', linestyle='dashed')
+		self.ax2d.hlines(new_extraction[1], np.nanmin(wave), np.nanmax(wave), color='red', linestyle='dashed')
 
 
 
@@ -434,7 +450,7 @@ class MplCanvas(FigureCanvasQTAgg):
 					self.flux, self.error = self.flux_fix, self.error_fix
 					self.replot2d(self.wave, self.flux_fix, self.error_fix, self.extraction_y)
 			self.axes.set_ylim([np.nanmin(self.flux), np.nanmax(self.flux)])
-			self.axes.set_xlim([np.min(self.wave), np.max(self.wave)])
+			self.axes.set_xlim([np.nanmin(self.wave), np.nanmax(self.wave)])
 			
 			self._lines_in_current_range()
 
@@ -668,6 +684,22 @@ class MplCanvas(FigureCanvasQTAgg):
 						# clear out selection
 						self.gxval, self.gyval = [], []
 
+		elif (event.key == 'A') & (self.gauss_num > 1):
+			# shade entire spectrum region
+			self.axes.fill_between([self.wave[0]*0.9, self.wave[-1]*1.1],
+									y1=np.max(self.flux)*1.1,
+									y2=np.min(self.flux)*0.9,
+									alpha=0.5,
+									color='pink')
+			self.draw()
+			self.send_message.emit('Entire spectrum has been selected!')
+			# delete the drawn polygon from collection
+			self.axes.collections.pop()
+			# initialize Multi-Gaussian
+			self.gauss2d = Gaussfit_2d(self.wave, self.flux, self.error,
+										gauss_num=self.gauss_num,
+										linelists=self.linelists2multiG)
+
 		elif event.key == 'D':
 			# delete previous unwanted points for Gaussian profile fitting
 			fclick = len(self.gxval)
@@ -704,6 +736,7 @@ class MplCanvas(FigureCanvasQTAgg):
 												'YMIN': ext_min_y,
 												'YMAX': ext_max_y})
 						self.replot2d(self.wave, self.flux, self.error, [ext_min_y,ext_max_y])
+						self.current_extraction = [ext_min_y, ext_max_y]
 						self.tmp_extraction_y = []
 						self.send_message.emit('A new extraction box is created.')
 					self.draw()
@@ -764,6 +797,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				else:
 					self.gauss2d.show()
 					self.gauss2d.send_gfinal.connect(self._on_estZ_changed)
+					self.gauss2d.send_ransac.connect(self._on_ransac_cont)
 
 #-------------------- Slots for External Signals ------------------
 	def on_linelist_slot(self, sent_linelist):
@@ -830,6 +864,14 @@ class MplCanvas(FigureCanvasQTAgg):
 
 	def _on_sent_linelists2multiG(self, l):
 		self.linelists2multiG = l
+
+	def _on_ransac_cont(self, wave_cont):
+		#print(wave_cont)
+		del self.axes.lines[2:]
+		self.axes.plot(wave_cont[0], wave_cont[-1], color='blue')
+		self.draw()
+
+
 
 
 #-------------------- Dialog Box for XY Ranges --------------------
