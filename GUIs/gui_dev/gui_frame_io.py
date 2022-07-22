@@ -6,8 +6,10 @@ import numpy as np
 
 class ToggleFrames():
 	'''Main class to search targeted frames'''
-	FRAMENAMES = ['SCI', 'MODEL', 'CNTM', 'EMLINE', 'CONT',
-			'SCI_A', 'EMLINE_A', 'SCI_B', 'EMLINE_B']
+	#FRAMENAMES = ['SCI', 'MODEL', 'CNTM', 'EMLINE', 'CONT',
+	#		'SCI_A', 'EMLINE_A', 'SCI_B', 'EMLINE_B']
+	FRAMENAMES = ['SCI','SCI_A','SCI_B', 'EMLINE',
+			'EMLINE_A', 'EMLINE_B','CONT','MODEL', 'CNTM']
 	FRAMENAMES1D = ['SCI1d', 'ERR1d', 'MODEL1d', 'EMLINE1d', 'CONT1d', 'CNTM1d']
 	OPT_EXT_NAMES = ['flux_opt_ext', 'flux_opt_ext_err', 'flux_opt_model',
 					'flux_opt_emline', 'flux_opt_ext_cntm_removed', 'flux_opt_cntm']
