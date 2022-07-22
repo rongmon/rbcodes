@@ -370,6 +370,13 @@ class Custom_ToolBar(QToolBar):
 			self.s_combobox.setCurrentIndex(0)
 			self.n_combobox.setCurrentIndex(0)
 
+			if (s+'1d' in self.frames1d.keys()) and (self.frames1d[s+'1d'] is not None):
+				#print('replotting...')
+				self.mW.sc.replot(self.fitsobj.wave, 
+								self.frames1d[s+'1d'], 
+								self.frames1d['ERR1d'])
+				self.send_message.emit('Optimal Extraction Found!')
+
 
 	def _prev_frame(self):
 		# This function corresponds to the action of "-" button
@@ -379,7 +386,7 @@ class Custom_ToolBar(QToolBar):
 		if current > idx_min:
 			self.frame_combobox.setCurrentIndex(current-1)
 		else:
-			pass
+			self.frame_combobox.setCurrentIndex(self.frame_combobox.count() - 1)
 
 	def _next_frame(self):
 		# This function corresponds to the action of "-" button
@@ -389,7 +396,8 @@ class Custom_ToolBar(QToolBar):
 		if current < idx_max:
 			self.frame_combobox.setCurrentIndex(current+1)
 		else:
-			pass
+			# wrap around
+			self.frame_combobox.setCurrentIndex(0)
 
 
 	# combobox event
@@ -488,7 +496,7 @@ class Custom_ToolBar(QToolBar):
 												self.display2d,
 												self.fitsobj.error2d,
 												self.filename,
-												prev_extraction=[0, len(self.display2d)-1])
+												prev_extraction=None)
 							self.mW.sc.replot(self.fitsobj.wave, 
 											self.fitsobj.flux, 
 											self.fitsobj.error)
@@ -505,7 +513,7 @@ class Custom_ToolBar(QToolBar):
 				if self.mW.toggle_frames:
 					from gui_frame_io import ToggleFrames
 					toggle_f = ToggleFrames(self.filepaths[i-1])
-					self.frames = toggle_f._check_available_frames()
+					self.frames, self.frames1d = toggle_f._check_available_frames()
 
 					self.frame_combobox.clear()
 					for frame_name in self.frames.keys():
