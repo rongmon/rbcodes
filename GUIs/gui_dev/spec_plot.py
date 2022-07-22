@@ -99,12 +99,16 @@ class MplCanvas(FigureCanvasQTAgg):
 		axes = self.figure.gca()
 		xlim = axes.get_xlim()
 		ylim = axes.get_ylim()
-		self.axes.lines[0] = axes.plot(wave, new_err, color='red')# label='Error')
-		self.axes.lines[1] = axes.plot(wave, new_spec, color='black')#, label='Flux')
-		self.axes.set_ylim(ylim)#[np.nanmin(new_spec), np.nanmax(new_spec)])
-		self.axes.set_xlim(xlim)#[np.min(wave), np.max(wave)])
+		
+		self.axes.lines[0] = self.axes.plot(wave, new_err, color='red')# label='Error')
+		self.axes.lines[1] = self.axes.plot(wave, new_spec, color='black')#, label='Flux')
+		# for a better y range
+		ytmp = np.nan_to_num(new_spec, nan=0., posinf=0., neginf=0.)
+		self.axes.set_ylim([np.nanmin(ytmp), np.nanmax(ytmp)])
+		self.axes.set_xlim([np.min(wave), np.max(wave)])
 
 		del self.axes.lines[2:]
+		self.draw()
 
 	def _compute_distance(self, gxval, gyval, event):
 		'''Compute the distance between the event xydata and selected point for Gaussian fitting
@@ -862,7 +866,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.linelists2multiG = l
 
 	def _on_ransac_cont(self, wave_cont):
-		print(wave_cont)
+		#print(wave_cont)
 		del self.axes.lines[2:]
 		self.axes.plot(wave_cont[0], wave_cont[-1], color='blue')
 		self.draw()

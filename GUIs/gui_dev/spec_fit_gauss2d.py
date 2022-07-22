@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QComboBox, QLineEdit, QLabel, QPushButton, QDialog, QCheckBox
+from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QComboBox, QLineEdit, QLabel, QPushButton, QDialog, QCheckBox, QFileDialog
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator
 from PyQt5 import QtWidgets
@@ -81,6 +81,11 @@ class Gaussfit_2d(QWidget):
         apply_pb.clicked.connect(self._apply_button_clicked)
         lines_layout.addWidget(apply_pb, 3,3)
 
+        export_pb = QPushButton('Export')
+        export_pb.setFixedWidth(100)
+        export_pb.clicked.connect(self._export_button_clicked)
+        lines_layout.addWidget(export_pb, 4,3)
+
         ion1 = self._create_linelist_widget(lines_layout, 0)
         ion2 = self._create_linelist_widget(lines_layout, 1)
         ion_widgets = [ion1, ion2]
@@ -109,9 +114,9 @@ class Gaussfit_2d(QWidget):
         self.kernel_ransac.setFixedWidth(100)
         self.kernel_ransac.returnPressed.connect(self._fit_ransac_continuum)
         lines_layout.addWidget(self.kernel_ransac, 2, 4)
-        cont_pb = QPushButton('Export')
+        cont_pb = QPushButton('Draw')
         cont_pb.setFixedWidth(100)
-        cont_pb.clicked.connect(self._export_button_clicked)
+        cont_pb.clicked.connect(self._draw_button_clicked)
         lines_layout.addWidget(cont_pb, 3,4)
 
         # main layout
@@ -257,10 +262,22 @@ class Gaussfit_2d(QWidget):
             self.cont = None
             del self.line1d.axline.lines[2:]
 
-    def _export_button_clicked(self, check):
+    def _draw_button_clicked(self, check):
         if self.cont is not None:
             self.send_ransac.emit([self.wave,self.cont])
 
+    def _export_button_clicked(self, check):
+        fpath_params, fcheck = QFileDialog.getSaveFileName(None,
+            'Save Multi-Gaussian Fitting Parameters',
+            '',
+            'Text Files (*.txt)')
+        print(fpath_params)
+        if fcheck:
+            if self.line1d.track_fit is not None:
+                with open(fpath_params, 'w') as f:
+                    for line in self.line1d.track_fit:
+                        line_i = line + '\n'
+                        f.write(line_i)
 
 
     def _auto_populate_ions(self, i, ion_widgets):
@@ -302,6 +319,7 @@ class LineCanvas(FigureCanvasQTAgg):
         self.init_guess = None
         self.bounds = None
         self.z_guess = 0.
+        self.track_fit = None
 
 
     def _plot_spec(self, wave,flux1d,error1d):
@@ -346,7 +364,8 @@ class LineCanvas(FigureCanvasQTAgg):
 
     def fit(self, ransac_cont=None):
         print('Start fitting multi-Gaussian profile...')
-        
+        fit_log = ['Multi-Gaussian Fitting Log', 
+                    '----------------------------------']
         # mimic the single Gaussian fitting process
         # 1. fit a local continum across the entire window
         if ransac_cont is None:
@@ -416,19 +435,23 @@ class LineCanvas(FigureCanvasQTAgg):
             model_fit = self.axline.plot(self.g_wave, gfinal, 'r--')
 
             self.draw()
-            print('\nCurrent multi-Gaussian optimal parameters:')
-            print('-----------------------------------------')
-            print(f'z = {popt[0]:.4f}, error = {perr[0]:.4f}')
+            fit_log.append('\nCurrent multi-Gaussian optimal parameters:')
+            fit_log.append('-----------------------------------------')
+            fit_log.append(f'z = {popt[0]:.10f}, error = {perr[0]:.12f}')
             
             num_g = int(len(popt)-1) // 2
             for i in range(1, num_g+1):
-                print(f'Sigma {i} = {popt[i]:.4f}, error = {perr[i]:.4f}')
-                print(f'Amp {i} = {popt[i+num_g]:.4f}, error = {perr[i+num_g]:.4f}')
-            print('-----------------------------------------')
+                fit_log.append(f'Sigma {i} = {popt[i]:.4f}, error = {perr[i]:.4f}')
+                fit_log.append(f'Amp {i} = {popt[i+num_g]:.4f}, error = {perr[i+num_g]:.4f}')
+            fit_log.append('-----------------------------------------')
 
+            for line in fit_log:
+                print(line)
+            self.track_fit = fit_log
             return [popt[0], perr[0]]
         except (RuntimeError, ValueError):
             print('Fitting failed...')
+            self.track_fit = None
             return None
 
     #------------------- Keyboards/Mouse Events------------------------
