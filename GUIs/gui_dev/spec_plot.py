@@ -593,7 +593,6 @@ class MplCanvas(FigureCanvasQTAgg):
 					new_2dspec = convolve(self.flux2d, Gaussian2DKernel(x_stddev=self.scale2,
 																	y_stddev=self.scale2))
 					self.replot2d_im(new_2dspec)
-				#self.update_colormap(self.cur_cmap)
 				self.send_message.emit(f'2D Convolutional kernel size = {int(self.scale2)}.')
 
 		elif event.key == 'U':
