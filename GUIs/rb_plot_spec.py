@@ -398,7 +398,12 @@ class rb_plot_spec(object):
 
     def DrawLineList(self,label):
         del self.ax.lines[1:len(self.ax.lines)]
-        self.ax.texts=[]
+        #self.ax.texts=[]
+        while self.ax.texts:
+            self.ax.texts.pop()
+        while self.ax.collections:
+            self.ax.collections.pop()
+            
         self.label=label
         if label == 'None':
             lineplot,=self.ax.plot([0],[0],'k--')

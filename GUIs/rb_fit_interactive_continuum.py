@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Qt5Agg')
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,6 +14,7 @@ class rb_fit_interactive_continuum(object):
         self.wave=wave
         self.flux=flux
         self.error=error
+        self.norm_flag=0
         
         spectrum, = plt.step(self.wave,self.flux,'b-',label='spectrum',linewidth=1)
         plt.xlabel('Wavelength')
@@ -39,7 +40,7 @@ class rb_fit_interactive_continuum(object):
         if event.button==1 and toolbar.mode=='':
             window = ((event.xdata-2.5)<=self.wave) & (self.wave<=(event.xdata+2.5))
             y = np.median(self.flux[window])
-            plt.plot(event.xdata,y,'ro',ms=5,pickradius=5,label='cont_pnt',markeredgecolor='k')
+            plt.plot(event.xdata,y,'ro',ms=5,pickradius=5,label='cont_pnt',markeredgecolor='k',picker=True)
         plt.draw()
     def onpick(self,event):
         # when the user clicks right on a continuum point, remove it
@@ -104,7 +105,7 @@ class rb_fit_interactive_continuum(object):
     
         # when the user hits 'b': selects a handpicked x,y value
         elif event.key=='b':
-            plt.plot(event.xdata,event.ydata,'ro',ms=5,pickradius=5,label='cont_pnt',markeredgecolor='k')
+            plt.plot(event.xdata,event.ydata,'ro',ms=5,pickradius=5,label='cont_pnt',markeredgecolor='k',picker=True)
             plt.draw()
     
         #If the user presses 'h': The help is printed on the screen
@@ -156,11 +157,10 @@ class rb_fit_interactive_continuum(object):
     
         # At any time pressing q means graceful exit
         elif event.key=='q':
-            quit_index=0;
             for artist in plt.gca().get_children():
-                if hasattr(artist,'get_label') and artist.get_label()=='normalised':
-                    quit_index=1
-                if quit_index==1:
+                #if hasattr(artist,'get_label') and artist.get_label()=='normalised':
+                #    quit_index=1
+                if self.norm_flag==1:
                     plt.close()
                     print('Interactive Contunuum Normalization Done.')
                     print('Hope you remembered to save the fit by pressing w!')
@@ -182,6 +182,7 @@ class rb_fit_interactive_continuum(object):
                     data = np.array(artist.get_data())
                     cont=(data.T[:,1])
                     self.cont=cont
+                    self.norm_flag=1
                     print('Final Continuum Chosen')
                     return self.cont
                     break

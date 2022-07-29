@@ -38,9 +38,12 @@ class Custom_ToolBar(QToolBar):
 		self.filename = ''
 		self.display2d = None # displayed 2d spectrum
 		self.scale = 0
+		self.normalization = 0
 		self.manual = None # No user manual yet
 		self.extract1d = None # wait for sent_extract1d
 		self.maxfile_lim = 50 # max displayed files in f_combobox at a time
+		self.manual_range = [0,1] # manual scaling range preset
+		self.num_length = 10 # number of total digits displayed in min/max boxes
 
 		self.setWindowTitle('Customizable TooBar')
 		#self.setFixedSize(QSize(200, 50))
@@ -362,13 +365,24 @@ class Custom_ToolBar(QToolBar):
 				self.display2d = self.fitsobj.flux2d
 			else:
 				self.display2d = self.frames[s]
+
+			# get current scaling and normalization variables
+			s_cur = self.s_combobox.currentIndex()
+			n_cur = self.n_combobox.currentIndex()
+			self._scaling_changed(s_cur)
+			self._normalization_changed(n_cur)
+
+			'''
+			# if we want to reset scaling and normalization
+			# uncomment all of these
 			self.mW.sc.plot_spec2d(self.fitsobj.wave,
 										self.display2d,
 										self.fitsobj.error2d,
 										self.filename)
 			# reset scale and normalization comboboxes
-			self.s_combobox.setCurrentIndex(0)
-			self.n_combobox.setCurrentIndex(0)
+			#self.s_combobox.setCurrentIndex(0)
+			#self.n_combobox.setCurrentIndex(0)
+			'''
 
 			if (s+'1d' in self.frames1d.keys()) and (self.frames1d[s+'1d'] is not None):
 				#print('replotting...')
@@ -530,12 +544,15 @@ class Custom_ToolBar(QToolBar):
 		self.s_combobox.setMaxCount(4)
 		self.s_combobox.addItems(['Linear', 'Log', 'Sqrt', 'Square'])
 		self.s_combobox.setCurrentIndex(0)
-		self.s_combobox.currentIndexChanged.connect(self._scaling_changed)
+		#self.s_combobox.currentIndexChanged.connect(self._scaling_changed)
+		self.s_combobox.activated.connect(self._scaling_changed)
+
 
 		self.n_combobox.setMaxCount(12)
 		self.n_combobox.addItems(['None','MinMax', '99.5%', '99%', '98%', '97%', '96%', '95%', '92.5%', '90%', 'Z-Score', 'Manual'])
 		self.n_combobox.setCurrentIndex(0)
-		self.n_combobox.currentIndexChanged.connect(self._normalization_changed)
+		#self.n_combobox.currentIndexChanged.connect(self._normalization_changed)
+		self.n_combobox.activated.connect(self._normalization_changed)
 
 		self.min_range.setReadOnly(False)
 		self.max_range.setReadOnly(False)
@@ -545,7 +562,9 @@ class Custom_ToolBar(QToolBar):
 			self.mW.sc.plot_spec2d(self.fitsobj.wave,
 								self.display2d,
 								self.fitsobj.error2d,
-								self.filename, scale=i)
+								self.filename, scale=i,
+								normalization=self.normalization)
+			
 			self.scale = i
 		else:
 			pass
@@ -559,20 +578,45 @@ class Custom_ToolBar(QToolBar):
 									self.filename, 
 									scale=self.scale,
 									normalization=i)
+				if i == 1:
+					self.min_range.setText(str(0)[:self.num_length])
+					self.max_range.setText(str(1)[:self.num_length])
+				elif i == 10:
+					self._on_scale_limits_slot([np.nan, np.nan])
+				self.normalization = i
+			else:
+				self.n_combobox.setCurrentIndex(11)
+				self.mW.sc.plot_spec2d(self.fitsobj.wave,
+									self.display2d,
+									self.fitsobj.error2d,
+									self.filename,
+									scale=self.scale,
+									normalization=self.manual_range)
+				self._on_scale_limits_slot(self.manual_range)
+
+
 		else:
 			pass
 
 	def _on_scale_limits_slot(self, sent_limits):
-		self.min_range.setText(str(sent_limits[0]))
-		self.max_range.setText(str(sent_limits[1]))
+		if np.isnan(sent_limits[0]) or np.isnan(sent_limits[-1]):
+			self.min_range.setReadOnly(True)
+			self.max_range.setReadOnly(True)
+			self.min_range.setText('Mean')
+			self.max_range.setText('STD')
+		else:
+			self.min_range.setReadOnly(False)
+			self.max_range.setReadOnly(False)
+			self.min_range.setText(str(sent_limits[0])[:self.num_length])
+			self.max_range.setText(str(sent_limits[1])[:self.num_length])
 
 	def _return_pressed(self):
 		# min,max current values
 		manual_range = [float(self.min_range.text()), float(self.max_range.text())]
 		# sort and assign min,max values to avoid user errors
 		manual_range.sort()
-		self.min_range.setText(str(manual_range[0]))
-		self.max_range.setText(str(manual_range[-1]))
+		self.min_range.setText(str(manual_range[0])[:self.num_length])
+		self.max_range.setText(str(manual_range[-1])[:self.num_length])
 
 
 		self.n_combobox.setCurrentIndex(11)
@@ -582,6 +626,8 @@ class Custom_ToolBar(QToolBar):
 							self.filename,
 							scale=self.scale,
 							normalization=manual_range)
+		# save manual_range for other frames
+		self.manual_range = manual_range
 
 	def _on_sent_extract1d(self, sent_extract1d):
 		self.extract1d = sent_extract1d

@@ -195,7 +195,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         for items in self.line_options:
             self.combo_lines.addItem(items)
         self.main_linelist = self.combo_lines.currentText()
-        
+
         # Shows the active redshift and transition
         self.combo_color_main = QComboBox()
         for items in self.combo_options:
@@ -270,24 +270,42 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         self.spectrum.canvas.setFocusPolicy( QtCore.Qt.ClickFocus )
         self.spectrum.canvas.setFocus()
         self.cid = self.spectrum.canvas.mpl_connect('key_press_event',self.ontype)
+        self.cid_m = self.spectrum.canvas.mpl_connect('button_press_event', self.onclick)
+
         
         try:
             self.abs_plot.table.cellChanged.connect(self.cellchanged)
         except:
             pass
+
+    def onclick(self, event):
+        '''Mouse click
+            Left == 1; Right == 3
+        '''
+        if event.button == 3:
+            #Manual mode
+            self.xdata = event.xdata
+            self.manT = Manual_Transition(self)
+            self.manT.show()
+
         
     #keyboard events
     def ontype(self,event):
         zabs=np.double(0.)
         # when the user hits 'r': clear the axes (except flux and error) and return to the initial x&y lims
         if event.key=='r':
-            del self.ax.lines[2:]
+            #del self.ax.lines[2:]
             self.lam_lim=[]
             self.lam_ylim=[]
             self.FXval=[]
             self.FYval=[]
 
-            self.ax.texts = []
+            #self.ax.texts = []
+            #while self.ax.texts:
+            #    self.ax.texts.pop()
+            #while self.ax.collections:
+            #    self.ax.collections.pop()
+
             self.ax.set_ylim(self.init_ylims)
             self.ax.set_xlim(self.init_xlims)
             self.spectrum.canvas.draw()
@@ -304,7 +322,13 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                     ii.remove()
             except: 
                 pass
-            self.ax.texts = []
+            #self.ax.texts = []
+            while self.ax.texts:
+                self.ax.texts.pop()
+            while self.ax.collections:
+                self.ax.collections.pop()
+
+
             # Give initial axes limits
 #             self.ax.set_ylim(self.init_ylims)
 #             self.ax.set_xlim(self.init_xlims)
@@ -399,11 +423,13 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                 buttonReply = QMessageBox.question(self,"Reevaluate" ,"Current Zabs LineList already evaluated: Reevaluate and overwrite?",
                                                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
                 if buttonReply == QMessageBox.Yes:
-                    self.ion_selection = vStack(self,self.wave,self.flux,self.error,'LLS',zabs=self.zabs)
+                    self.ion_selection = vStack(self,self.wave,self.flux,self.error,self.label,zabs=self.zabs)
                     
             #otherwise, proceed without manual consent
             else:
-                self.ion_selection = vStack(self,self.wave,self.flux,self.error,'LLS',zabs=self.zabs)
+                self.ion_selection = vStack(self,self.wave,self.flux,self.error,self.label,zabs=self.zabs)
+                
+
 
         elif event.key =='j':
             self.xdata = event.xdata
@@ -671,7 +697,12 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             self.message_window.setText(" ")
         if len(self.ax.lines)>2:
             del self.ax.lines[2:]
-            self.ax.texts = []
+            #self.ax.texts = []
+            while self.ax.texts:
+                self.ax.texts.pop()
+            while self.ax.collections:
+                self.ax.collections.pop()
+
             try:
                 for ii in self.text[-1]:
                     ii.remove()
@@ -731,7 +762,11 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         #this is for 'Z' functionality deletes all lines and plots a new line
         if ((remove == True) & (self.row_remove == False) & (self.hide == False)):
             del self.ax.lines[2:len(self.ax.lines)]
-            self.ax.texts = []
+            #self.ax.texts = []
+            while self.ax.texts:
+                self.ax.texts.pop()
+            while self.ax.collections:
+                self.ax.collections.pop()
             self.throw_away = True
             
         #HIDE PROCEDURE
@@ -1029,7 +1064,12 @@ class Manual_Transition(QWidget):
     def transition_change(self,parent):
         
         del parent.ax.lines[2:]
-        parent.ax.texts = []
+        #parent.ax.texts = []
+        while parent.ax.texts:
+            parent.ax.texts.pop()
+        while parent.ax.collections:
+            parent.ax.collections.pop()
+
         
         parent.label = self.combo_ll.currentText()
 #         parent.active_ion.setText(self.Transitions.currentItem().text())
@@ -1306,7 +1346,13 @@ class LoadCatalog(QWidget):
         if parent.zabs_list.shape[0]>0:
             # clear plotted lines/text from zabs_manager such that the new lines for plot/remove/hide are same color as linelist
             del parent.ax.lines[2:]; parent.zabs_line_plot = []
-            parent.ax.texts = []; parent.texts = []
+            #parent.ax.texts = [];
+            while parent.ax.texts:
+                parent.ax.texts.pop()
+            while parent.ax.collections:
+                parent.ax.collections.pop()
+
+            parent.texts = []
 
             for z in parent.zabs_list.Zabs.tolist():
                 index = parent.line_list[parent.line_list['Zabs'] == z].index
@@ -1315,8 +1361,8 @@ class LoadCatalog(QWidget):
                 #for all lines at that redshift
                 for i in index:
                     xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
-                    ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
-                    lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color=color)
+                    #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
+                    lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color=clr[color])
                     tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                     parent.identified_lines.append(lineplot)
                     parent.identified_text.append(tt)
@@ -1333,8 +1379,8 @@ class LoadCatalog(QWidget):
                         ylim=parent.ax.get_ylim()
                         for i in index:
                             xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
-                            ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
-                            lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color='white')
+                            #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
+                            lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color='y')
                             tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                             parent.identified_lines.append(lineplot)
                             parent.identified_text.append(tt)
@@ -1346,8 +1392,8 @@ class LoadCatalog(QWidget):
             ylim=parent.ax.get_ylim()
             for i in range(parent.line_list.shape[0]):
                 xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
-                ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
-                lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color='white')
+                #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
+                lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color='y')
                 tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                 parent.identified_lines.append(lineplot)
                 parent.identified_text.append(tt)
@@ -1396,8 +1442,8 @@ class Identified_plotter:
                         ylim=parent.ax.get_ylim()
                         for i in index:
                             xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
-                            ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
-                            lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color=color)
+                            #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
+                            lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color=clr[color])
                             tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                             parent.identified_lines.append(lineplot)
                             parent.identified_text.append(tt)
@@ -1413,8 +1459,8 @@ class Identified_plotter:
                                 ylim=parent.ax.get_ylim()
                                 for i in index:
                                     xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
-                                    ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
-                                    lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color='white')
+                                    #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
+                                    lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color='y')
                                     tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                                     parent.identified_lines.append(lineplot)
                                     parent.identified_text.append(tt)
@@ -1422,8 +1468,8 @@ class Identified_plotter:
                     ylim=parent.ax.get_ylim()
                     for i in range(parent.line_list.shape[0]):
                         xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
-                        ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
-                        lineplot,=parent.ax.plot(xdata,[ylow,0.75*ylim[1]],'-',color='white')
+                        #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
+                        lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color='y')
                         tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                         parent.identified_lines.append(lineplot)
                         parent.identified_text.append(tt)
@@ -1461,12 +1507,12 @@ def prepare_absorber_object(z_abs,wave,flux,error,line_flg='LLS',vlim=[-1000,100
     
 
 class vStack:
-    def __init__(self,parent,wave,flux,error,line_flg,zabs=0,vlim=[-1000.,1000.]):  
+    def __init__(self,parent,wave,flux,error,line_flg,zabs=0,vlim=[-1000.,1000.]):
         self.parent = parent
         self.parent_canvas = parent.canvas
         self.zabs=zabs
         self.vlim=vlim
-        self.ions=prepare_absorber_object(zabs,wave,flux,error,line_flg='LLS')
+        self.ions=prepare_absorber_object(zabs,wave,flux,error,line_flg=line_flg)
         #-----full spectra properties---------#
         self.z = self.ions['Target']['z']; self.flux = self.ions['Target']['flux']
         self.wave = self.ions['Target']['wave']; self.error = self.ions['Target']['error']
@@ -1488,7 +1534,10 @@ class vStack:
         self.plotppage=12
         self.nrow=int(self.plotppage/3)
         self.ncol=int((self.plotppage)/self.nrow)
-        self.npages=int((self.nions/self.plotppage))
+        self.npages=int((self.nions//self.plotppage))
+        # calculate number of pages needed
+        if self.npages % (self.plotppage) > 0:
+            self.npages += 1
         
         
         fig= Figure()#figure(figsize=(12,8))
@@ -1518,12 +1567,16 @@ class vStack:
                 i=np.where(event.inaxes==self.axes)[0][0]+self.plotppage*(self.page-1)
                 Windowname='Manual y-Limits'
                 instruction_text='Input range (e.g. 0.,2.)'
-                temp=input_txt_dlg(Windowname,instruction_text)
-                yrangetext=temp.filename
-
-                yrange = yrangetext.split(',')
-                yrange = np.array(yrange).astype('float32')
-                self.vPlot(ploti=i,yrange=[yrange[0],yrange[1]])
+                #temp=input_txt_dlg(Windowname,instruction_text)
+                #print(temp)
+                #yrangetext=temp.filename
+                #yrange = yrangetext.split(',')
+                #yrange = np.array(yrange).astype('float32')
+                ylim, ok = QInputDialog.getText(self.parent,Windowname,instruction_text)
+                if ok:
+                    ylimit = ylim.split(',')
+                    ylimit = np.array(ylimit).astype('float32')
+                    self.vPlot(ploti=i,yrange=[ylimit[0],ylimit[1]])
                 
         #page right
         elif event.key=='>':
@@ -1602,8 +1655,13 @@ class vStack:
         else:
             ploti=[ploti]
 
+
+
+
+
         for i in ploti:
             self.plotstuff(i,comment=comment,yrange=yrange)
+
         self.fig.canvas.draw()
 
         
@@ -1658,7 +1716,7 @@ class vStack:
         return text
 
 #Initial inputs and callable class to run proram        
-class input_txt_dlg:
+class input_txt_dlg(QWidget):
     def __init__(self,Windowname,instruction,default_text='test'):
         app = QApplication(sys.argv)
         main = popup_windows(Windowname,instruction,default_text=default_text)

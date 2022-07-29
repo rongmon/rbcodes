@@ -1,11 +1,11 @@
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt, pyqtSignal
 
-import matplotlib
+import matplotlib as mpl
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
-from astropy.convolution import convolve, Box1DKernel
+from astropy.convolution import convolve, Box1DKernel, Gaussian2DKernel
 from astropy.modeling import models, fitting
 from scipy.interpolate import splrep, splev
 from scipy.optimize import curve_fit
@@ -17,7 +17,7 @@ from guess_transition import GuessTransition
 from spec_hist import FluxHistogram, PixelHistogram
 from spec_fit_gauss2d import Gaussfit_2d
 
-matplotlib.use('Qt5Agg')
+mpl.use('Qt5Agg')
 
 class MplCanvas(FigureCanvasQTAgg):
 	send_message = pyqtSignal(str)
@@ -38,7 +38,8 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.wave, self.flux, self.error = [],[],[]
 		self.init_xlims, self.init_ylims = [],[]
 		self.gxval, self.gyval = [], []
-		self.scale = 1.
+		self.scale = 1. # 1D spec convolution kernel size
+		self.scale2 = 1 # 2D spec convolution kernel size
 		self.lineindex = -2
 		self.linelist = [] #pd.DataFrame(columns=['wave', 'name'])
 		self.estZ = 0.
@@ -52,6 +53,11 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.stamp = None
 		self.current_extraction = None
 		self.current_filename = None
+
+		# custom colormap information
+		self.cur_cmap = 'viridis' # default colormap
+		self.cmap_idx = 0 # selected cmap index in ColormapDialog
+		self.cmap_r = False # state of reversed colors in current cmap
 
 		num_2ndlist = 6
 		self.addtional_linelist = {i:[] for i in range(num_2ndlist)}
@@ -96,7 +102,7 @@ class MplCanvas(FigureCanvasQTAgg):
 	def replot(self, wave, new_spec, new_err):
 		'''Re-plot smoothed/unsmoothed spectrum
 		'''
-		axes = self.figure.gca()
+		axes = self.fig.gca()
 		xlim = axes.get_xlim()
 		ylim = axes.get_ylim()
 		
@@ -127,7 +133,7 @@ class MplCanvas(FigureCanvasQTAgg):
 
 	def _select_lines_within_xlim(self, linelist, estZ=0., xbound=0.):
 		# select lines within axes.xlim
-		axes = self.figure.gca()
+		axes = self.fig.gca()
 		xlim = axes.get_xlim()
 		tmp_lines = linelist['wave'].to_numpy() * (1+estZ)
 		tmp_names = linelist['name'].to_numpy()
@@ -136,7 +142,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		return tmp_lines, tmp_names
 
 	def _plot_lines(self, lineindex, estZ=0.):
-		axes = self.figure.gca()
+		axes = self.fig.gca()
 		xlim, ylim = axes.get_xlim(), axes.get_ylim()
 		xbound = 0.00 # leave non-drawing space at boundary  
 
@@ -170,7 +176,7 @@ class MplCanvas(FigureCanvasQTAgg):
 	def _plot_additional_lines(self, linelist_dir, z_guess_dir):
 		# secondary linelist plotting function
 		# linelist_dir values only contain [] or linelist from secondary linelist widget
-		axes = self.figure.gca()
+		axes = self.fig.gca()
 		xlim, ylim = axes.get_xlim(), axes.get_ylim()
 		xbound = 0.00
 		# double check with the colors in linelist_selection.py
@@ -313,14 +319,13 @@ class MplCanvas(FigureCanvasQTAgg):
 			#scaled2d = self.flux2d.copy()
 			scaled2d = img.copy()
 		elif scale == 1:
-			# log transformation.. scaled = log(1+ img)/log(1+img_max)
-			#if self.flux2d.min() < 0:
-			#	scaled2d = np.log(-self.flux2d.min() + self.flux2d) / np.log(-self.flux2d.min() + self.flux2d.max())
+			# log transformation.. scaled = log(1+ img)/log(1+img)
+			a = 100 # exponent placeholder
 			if img.min() < 0:
-				scaled2d = np.log(-img.min() + img) / np.log(-img.min() + img.max())
+				scaled2d = np.log(a*(img-img.min())+1) / np.log(a*(img-img.min()))
 			else:
 				#scaled2d = np.log(1 + self.flux2d) / np.log(1 + self.flux2d.max())
-				scaled2d = np.log(1 + img) / np.log(1 + img.max())
+				scaled2d = np.log(1 + a*img) / np.log(a*img)
 		elif scale == 2:
 			# square root transformation.. 
 			# pixel values > 0 ==> regular sqrt; pixel values <0 ==> 1.absolute value 2.sqrt 3.add minus sign
@@ -366,7 +371,7 @@ class MplCanvas(FigureCanvasQTAgg):
 
 			elif normalization == 10: # Z-score
 				scaled2d = (scaled2d - scaled2d.mean()) / scaled2d.std()
-				self.send_scale_limits.emit([np.nan, np.nan])	
+				self.send_scale_limits.emit([scaled2d.mean()-scaled2d.std(), scaled2d.mean()+scaled2d.std()])	
 
 		elif type(normalization) == list:
 			tmp = (scaled2d - scaled2d.min()) / (scaled2d.max() - scaled2d.min())
@@ -374,14 +379,27 @@ class MplCanvas(FigureCanvasQTAgg):
 			
 		if scale == 1:
 			pos_ax2d = self.ax2d.imshow(img, origin='lower', 
-									vmin=scaled2d.min(), vmax=scaled2d.max() * 0.01,
-									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)))
+									vmin=scaled2d.min(), vmax=scaled2d.max() * 1.,
+									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
+									cmap=self.cur_cmap)
+		elif normalization == 10:
+			# magnification power after zscore centering
+			mag_power = scaled2d.std() / img.std()
+			# 1-sigma range after zscore centering
+			z_vmin = scaled2d.mean() - scaled2d.std()
+			z_vmax = scaled2d.mean() + scaled2d.std()
+			pos_ax2d = self.ax2d.imshow(img, origin='lower', vmin=z_vmin/mag_power, vmax=z_vmax/mag_power,
+									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
+									cmap=self.cur_cmap)
+
 		else:
 			pos_ax2d = self.ax2d.imshow(img, origin='lower', 
-									vmin=scaled2d.min(), vmax=scaled2d.max() * 1.0,
-									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)))
-		
-
+									vmin=scaled2d.min(), vmax=scaled2d.max() * 1.,
+									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
+									cmap=self.cur_cmap)
+		del scaled2d # release memory
+		self.pos_ax2d = pos_ax2d
+		# save a colorbar object
 		self.ax2d_cb = self.fig.colorbar(pos_ax2d, ax=self.ax2d, location='top')
 		ax2d_xlim = self.ax2d.get_xlim()
 		self.ax2d.hlines(self.extraction_y[0], ax2d_xlim[0], ax2d_xlim[1], color='red', linestyle='dashed')
@@ -389,6 +407,8 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.ax2d.tick_params(labelbottom=False)
 		#self.ax2d.set_xlim(xlim_spec1d)
 		self.ax2d.set_aspect('auto')
+		
+
 
 		self.draw()
 		self.init_xlims = self.axes.get_xlim()
@@ -402,7 +422,7 @@ class MplCanvas(FigureCanvasQTAgg):
 	def replot2d(self, wave, new_spec, new_err, new_extraction):
 		'''Re-plot smoothed/unsmoothed spectrum
 		'''
-		axes = self.figure.gca()
+		axes = self.fig.gca()
 		xlim = axes.get_xlim()
 		ylim = axes.get_ylim()
 		self.axes.lines[0] = axes.plot(wave, new_err, color='red')# label='Error')
@@ -420,6 +440,43 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.ax2d.hlines(new_extraction[0], np.nanmin(wave), np.nanmax(wave), color='red', linestyle='dashed')
 		self.ax2d.hlines(new_extraction[1], np.nanmin(wave), np.nanmax(wave), color='red', linestyle='dashed')
 
+	def replot2d_im(self, new_2dspec):
+		'''Re-plot smoothed/unsmoothed 2D spectrum
+		'''
+		#clim = self.ax2d.images[0].get_clim()
+		#cb = self.ax2d.images[0].colorbar
+		#self.ax2d.images[0] = self.ax2d.imshow(new_2dspec, origin='lower',
+		#										vmin=clim[0], vmax=clim[-1],
+		#										extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
+		#										cmap=self.cur_cmap)
+		
+		#self.ax2d_cb = self.fig.colorbar(self.ax2d.images[0], ax=self.ax2d, location='top')
+		#self.ax2d.images[0].colorbar = self.ax2d_cb
+		#self.ax2d.images[-1].colorbar.remove()
+		#self.ax2d.images.pop()
+		#self.ax2d.images[0].colorbar = cb
+		#self.ax2d.set_aspect('auto')
+
+		self.ax2d.images[0].set_array(np.ma.array(new_2dspec))
+		self.draw()
+
+	def update_colormap(self, colormap_selected):
+		if self.ax2d is not None:
+			# retrieve ax2d from fig object
+			self.pos_ax2d = self.ax2d.images[0]
+			#cb = self.pos_ax2d.colorbar
+
+			self.pos_ax2d.set_cmap(colormap_selected)
+			#self.ax2d_cb = self.fig.colorbar(self.pos_ax2d, ax=self.ax2d, location='top')
+			self.ax2d.set_aspect('auto')
+			#self.ax2d.images[0].colorbar = cb
+			self.draw()
+			# don't forget to change the interval variable
+			self.cur_cmap = colormap_selected
+
+			#print(self.pos_ax2d.colorbar.cmap)
+
+
 
 
 
@@ -431,33 +488,40 @@ class MplCanvas(FigureCanvasQTAgg):
 		'''
 		#print(event.key)
 		if event.key == 'r':
-			# reset flux/err and clear all lines
-			#del self.axes.lines[2:]	# delete everything except flux/err
-			self.line_xlim, self.line_ylim = [], []
-			self.gxval, self.gyval = [], []
+			if event.inaxes == self.axes:
+				# reset flux/err and clear all lines
+				#del self.axes.lines[2:]	# delete everything except flux/err
+				self.line_xlim, self.line_ylim = [], []
+				self.gxval, self.gyval = [], []
 
-			if self.axnum == 1:
-				# for 1D spec display only
-				self.replot(self.wave, self.flux, self.error)
-			else:
-				# for 2D spec
-				if event.inaxes == self.axes:
-					# cursor in 1d canvas
+				if self.axnum == 1:
+					# for 1D spec display only
 					self.replot(self.wave, self.flux, self.error)
 				else:
-					# cursor in 2d canvas
-					# reset active flux/error to fixed flux/error
-					self.flux, self.error = self.flux_fix, self.error_fix
-					self.replot2d(self.wave, self.flux_fix, self.error_fix, self.extraction_y)
-			self.axes.set_ylim([np.nanmin(self.flux), np.nanmax(self.flux)])
-			self.axes.set_xlim([np.nanmin(self.wave), np.nanmax(self.wave)])
-			
-			self._lines_in_current_range()
+					# for 2D spec
+					if event.inaxes == self.axes:
+						# cursor in 1d canvas
+						self.replot(self.wave, self.flux, self.error)
+					else:
+						# cursor in 2d canvas
+						# reset active flux/error to fixed flux/error
+						self.flux, self.error = self.flux_fix, self.error_fix
+						self.replot2d(self.wave, self.flux_fix, self.error_fix, self.extraction_y)
+				self.axes.set_ylim([np.nanmin(self.flux), np.nanmax(self.flux)])
+				self.axes.set_xlim([np.nanmin(self.wave), np.nanmax(self.wave)])
+				
+				self._lines_in_current_range()
 
-			self.draw()
-			self.send_message.emit('You RESET the canvas!!!')
+				self.draw()
+				self.send_message.emit('User RESET the 1D Spectrum!!!')
+				self.scale = 1
 
-			#print(event.inaxes == self.axes)
+			elif event.inaxes == self.ax2d:
+				self.replot2d_im(self.flux2d)
+				self.draw()
+				self.send_message.emit('User RESET the 2D Spectrum!')
+				self.scale2 = 1
+
 		elif event.key == 't':
 			# set y axis max value
 			if event.inaxes == self.axes:
@@ -520,6 +584,16 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.draw()
 
 				self.send_message.emit(f'Convolutional kernel size = {int(self.scale//2)}.')
+			elif event.inaxes == self.ax2d:
+				self.scale2 += 1
+				if self.scale2 < 1:
+					self.replot2d_im(self.flux2d)
+					self.scale2 = 1
+				else:
+					new_2dspec = convolve(self.flux2d, Gaussian2DKernel(x_stddev=self.scale2,
+																	y_stddev=self.scale2))
+					self.replot2d_im(new_2dspec)
+				self.send_message.emit(f'2D Convolutional kernel size = {int(self.scale2)}.')
 
 		elif event.key == 'U':
 			# unsmooth ydata
@@ -532,6 +606,18 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.replot(self.wave, self.new_spec, self.new_err)
 				self.draw()
 				self.send_message.emit(f'Convolutional kernel size = {int(self.scale//2)}.')
+			elif event.inaxes == self.ax2d:
+				self.scale2 -= 1
+				if self.scale2 < 1:
+					self.replot2d_im(self.flux2d)
+					self.scale2 = 1
+				else:
+					new_2dspec = convolve(self.flux2d, Gaussian2DKernel(x_stddev=self.scale2,
+																	y_stddev=self.scale2))
+					self.replot2d_im(new_2dspec)
+
+				#self.update_colormap(self.cur_cmap)
+				self.send_message.emit(f'2D Convolutional kernel size = {int(self.scale2)}.')
 
 		elif event.key == 'Y':
 			# set y-axis limits with precise values
@@ -768,36 +854,50 @@ class MplCanvas(FigureCanvasQTAgg):
 			Left == 1; Right == 3
 		'''
 		if event.button == 3:
-			#Manual mode
-			if self.gauss_num == 0:
-				self.send_message.emit('You are in manual mode now.')
-				self.guess_ion = GuessTransition(self.linelist, event.xdata, np.nan)
-				self.guess_ion.show()
-				self.guess_ion.send_z_cal.connect(self._on_estZ_changed)
-
-
-			#For single Gaussian
-			elif self.gauss_num == 1:
-				self.send_message.emit(f'Currently, we need {self.gauss_num} Gaussian to guess the line position.')
-				
-				if self.guess_gcenter:
-					self.guess_ion = GuessTransition(self.linelist, self.guess_gcenter[0], self.guess_gcenter[-1])
+			if event.inaxes == self.axes:
+				#Manual mode
+				if self.gauss_num == 0:
+					self.send_message.emit('You are in manual mode now.')
+					self.guess_ion = GuessTransition(self.linelist, event.xdata, np.nan)
 					self.guess_ion.show()
 					self.guess_ion.send_z_cal.connect(self._on_estZ_changed)
-				else:
-					self.send_message.emit(f'Please fit a Gaussian profile FIRST\n'
-											f'to locate the line CENTER!!!')
-			#print(self.estZ)
 
-			#For multiple Gaussian
-			else:
-				self.send_message.emit(f'Currently, we need {self.gauss_num} Gaussians to guess the line positions.')
-				if self.gauss2d is None:
-					self.send_message.emit('Please select 2 points to define the range you want to work with')
+
+				#For single Gaussian
+				elif self.gauss_num == 1:
+					self.send_message.emit(f'Currently, we need {self.gauss_num} Gaussian to guess the line position.')
+					
+					if self.guess_gcenter:
+						self.guess_ion = GuessTransition(self.linelist, self.guess_gcenter[0], self.guess_gcenter[-1])
+						self.guess_ion.show()
+						self.guess_ion.send_z_cal.connect(self._on_estZ_changed)
+					else:
+						self.send_message.emit(f'Please fit a Gaussian profile FIRST\n'
+												f'to locate the line CENTER!!!')
+				#print(self.estZ)
+
+				#For multiple Gaussian
 				else:
-					self.gauss2d.show()
-					self.gauss2d.send_gfinal.connect(self._on_estZ_changed)
-					self.gauss2d.send_ransac.connect(self._on_ransac_cont)
+					self.send_message.emit(f'Currently, we need {self.gauss_num} Gaussians to guess the line positions.')
+					if self.gauss2d is None:
+						self.send_message.emit('Please select 2 points to define the range you want to work with')
+					else:
+						self.gauss2d.show()
+						self.gauss2d.send_gfinal.connect(self._on_estZ_changed)
+						self.gauss2d.send_ransac.connect(self._on_ransac_cont)
+			
+			# Colormap selection
+			elif event.inaxes == self.ax2d:
+				#print('pointer in axes2d')
+				select_cb = CustomColormapSelection(self.cmap_idx, self.cmap_r)
+				if select_cb.exec_():
+					cb, cb_idx, cb_r = select_cb._getcb()
+					self.cmap_idx, self.cmap_r = cb_idx, cb_r
+					#print(cb)
+					self.update_colormap(cb)
+
+
+
 
 #-------------------- Slots for External Signals ------------------
 	def on_linelist_slot(self, sent_linelist):
@@ -914,4 +1014,59 @@ class CustomLimDialog(QtWidgets.QDialog):
 	def _getlim(self):
 		return [float(self.le_min.text()), float(self.le_max.text())]
 
-#---------------------------------------------------------------
+#--------------------Colormap Dialog-------------------------
+class CustomColormapSelection(QtWidgets.QDialog):
+	def __init__(self, cmap_idx, cmap_r):
+		super().__init__()
+		COLORMAPS = ['viridis', 'plasma', 'inferno', 'cividis', 'binary',
+					'spring', 'summer', 'autumn', 'winter',
+					'cool', 'hot', 'copper', 'bone', 'Wistia',
+					'RdBu', 'PiYG', 'PRGn', 'PuOr', 'coolwarm', 'bwr', 'seismic',
+					'twilight', 'hsv',
+					'Accent', 'tab20', 'tab20b', 'tab20c',
+					'ocean', 'terrain', 'gnuplot', 'brg', 'jet', 'rainbow', 'turbo',
+		]	
+		self.cmap_idx = cmap_idx # selected cmap index in ColormapDialog
+		self.cmap_r = cmap_r # state of reversed colors in current cmap
+
+		self.setWindowTitle('Select Colormaps')
+		QBtn = QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+		self.buttonbox = QtWidgets.QDialogButtonBox(QBtn)
+
+		layout = QtWidgets.QVBoxLayout()
+		line_layout = QtWidgets.QHBoxLayout()
+
+		self.cb_ckbox = QtWidgets.QCheckBox('Reversed')
+		self.cb_ckbox.setChecked(self.cmap_r)
+
+		#lb_cb = QtWidgets.QLabel('Colormaps')
+		self.cb_combobox = QtWidgets.QComboBox()
+		self.cb_combobox.addItems(COLORMAPS)
+		self.cb_combobox.setFixedWidth(120)
+		self.cb_combobox.setFixedHeight(30)
+		self.cb_combobox.setCurrentIndex(self.cmap_idx)
+
+		line_layout.addWidget(self.cb_combobox, Qt.AlignLeft)
+		line_layout.addWidget(self.cb_ckbox, Qt.AlignLeft)
+		layout.addLayout(line_layout, Qt.AlignLeft)
+		layout.addWidget(self.buttonbox, Qt.AlignLeft)
+
+		self.buttonbox.accepted.connect(self.accept)
+		self.buttonbox.rejected.connect(self.reject)
+
+		self.setLayout(layout)
+
+		self.setMinimumSize(300, 100)
+		self.resize(300, 150)
+
+	def _getcb(self):
+		# current state
+		cmap = self.cb_combobox.currentText()
+		# update state
+		self.cmap_idx = self.cb_combobox.currentIndex()
+		self.cmap_r = False
+		if self.cb_ckbox.isChecked():
+			cmap = cmap+'_r'
+			self.cmap_r = True
+		#print('Dialog: ' +cmap)
+		return cmap, self.cmap_idx, self.cmap_r

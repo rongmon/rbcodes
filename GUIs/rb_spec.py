@@ -61,11 +61,14 @@ class rb_spec(object):
     Edit    : Rongmon Bordoloi      March 2022: Added more continuum fitting methods
     Edit    : Rongmon Bordoloi      April 2022: Added velocity centroid error
     Edit    : Rongmon Bordoloi      April 2022: Added different calling sequence to ingest numpy arrays directly. 
+    Edit    : Rongmon Bordoloi      April 2022: Small updates to have all continuum fitting routines working
+    Edit    : Rongmon Bordoloi      April 2022: Added plotting sliced spectrum option
+    
     # WARNING: CALLING SEQUENCE HAS CHANGED SINCE APRIL 2022.
     CAREFULLY LOOK AT THE EXAMPLE BELOW
 
     --------------------------------------------------------------------------------------------
-    EXAMPLE: import numpy as np
+    EXAMPLE:import numpy as np
             import matplotlib
             matplotlib.use('Qt5Agg')
             import matplotlib.pyplot as plt
@@ -107,9 +110,10 @@ class rb_spec(object):
                # DETOUR 2--->
 
                 #Aternate continuum fitting method [interactive]
-                s.fit_continuum(Legendre=False,prefit_cont='False')
+                s.fit_continuum(Interactive=True)
                 #Aternate continuum fitting method [input prefit continuum]
-                s.fit_continuum(Legendre=False,prefit_cont=cont_arary)
+                # Length of prefit continuum array = length of sliced spectrum
+                s.fit_continuum(Legendre=False,prefit_cont=cont_arrary)
                #-------------------------------------------------------------------------------
 
 
@@ -122,6 +126,9 @@ class rb_spec(object):
 
             #plot the Full spectrum
             s.plot_spec()
+
+            #Plot the sliced spectrum with the fitted continuum
+            s.plot_slice()
 
             #plot the sliced and fitted continuum
             #Plot stuff
@@ -333,10 +340,11 @@ class rb_spec(object):
 
         
         self.velo=vel[q]
+        self.transition=str['wave']
 
-        return self.wave_slice,self.error_slice,self.flux_slice,self.velo,self.linelist
+        #return self.wave_slice,self.error_slice,self.flux_slice,self.velo,self.linelist
 
-    def fit_continuum(self,mask=False,domain=False,Legendre=False,prefit_cont=[1.],RANSAC=False):
+    def fit_continuum(self,mask=False,domain=False,Legendre=False,**kwargs):
         """
         By default calls an interactive continuum fitter to the sliced spectrum.
         Or an automated Legendre polynomial fitter if keyword set Legendre.
@@ -346,12 +354,22 @@ class rb_spec(object):
 
         if Legendre==False:
             #pdb.set_trace()
-            if prefit_cont == 'False':
+            if 'Interactive' in kwargs:
+                Interactive=kwargs['Interactive']
+            else:
+                Interactive=False
+
+            if 'prefit_cont' in kwargs:
+                prefit_cont=kwargs['prefit_cont']
+                print('Using prefitted continuum...')
+                if len(prefit_cont)==1:
+                    prefit_cont=prefit_cont*np.ones(len(self.velo),)
+                cont=prefit_cont
+            else:
+                print('Initializing interactive continuum fitter...')
                 from GUIs import rb_fit_interactive_continuum as f
                 s=f.rb_fit_interactive_continuum(self.wave_slice,self.flux_slice,self.error_slice)
                 cont=s.cont
-            else:
-                cont=prefit_cont
 
 
 
@@ -400,7 +418,7 @@ class rb_spec(object):
 
 
 
-        return self.cont,self.fnorm,self.enorm
+        #return self.cont,self.fnorm,self.enorm
 
 
     def fit_continuum_ransac(self,window=149,mednorm=False):
@@ -456,8 +474,42 @@ class rb_spec(object):
         """
         Quick wrapper to call an interactive plotter for the full spectrum as given in input file.
         """
-        from GUIs import rb_plot_spec as sp
-        tt=sp.rb_plot_spec(self.wave,self.flux,self.error)
+        #from GUIs import rb_plot_spec as sp
+        #tt=sp.rb_plot_spec(self.wave,self.flux,self.error)
+        from GUIs import PlotSpec_Integrated as sp
+        tt=sp.rb_plotspec(self.wave,self.flux,self.error)
+
+    def plot_slice(self):
+        """
+        Quick wrapper to call an interactive plotter for the full spectrum as given in input file.
+        """
+        import matplotlib.pyplot as plt
+        fig = plt.figure()
+        ax1 = fig.add_subplot(211)
+        ax2 = fig.add_subplot(212, sharex = ax1)
+        #fig, (ax1, ax2) = plt.subplots(nrows=2, sharex=True)
+        ax1.step(self.velo,self.flux_slice,'k-')
+        ax1.step(self.velo,self.cont,'b-')
+
+        ax1.step(self.velo,self.error_slice,'r-')
+
+        ax1.set_xlim([min(self.velo),max(self.velo)])
+        ax1.set_ylim([min(self.flux_slice)-0.02*min(self.flux_slice),max(self.flux_slice)+.1*max(self.flux_slice)])
+        ax1.plot([-2500,2500],[0,0],'k:')
+        ax1.plot([-2500,2500],[1,1],'k:')       
+        ax1.set_xlabel('vel [km/s]')
+
+        #ax2=fig.add_subplot(212)
+        ax2.step(self.velo,self.fnorm,'k')
+        ax2.step(self.velo,self.enorm,color='r')
+
+        ax2.set_xlim([min(self.velo),max(self.velo)])
+        ax2.set_ylim([-0.02,1.8])
+        ax2.plot([-2500,2500],[0,0],'k:')
+        ax2.plot([-2500,2500],[1,1],'k:')       
+        ax2.set_xlabel('vel [km/s]')
+        plt.show()
+
 
     def save_slice(self,outfilename):
         """
@@ -504,9 +556,9 @@ class rb_spec(object):
         ax2.set_xlabel('vel [km/s]')
         plt.show()
 
-    def vpfit_singlet(self):
+    def vpfit_singlet(self,FWHM=6.5):
         from GUIs import rb_interactive_vpfit_singlet as vf 
-        vt=vf.rb_interactive_vpfit_singlet(self.wave_slice,self.fnorm,self.enorm,self.velo);    
+        vt=vf.rb_interactive_vpfit_singlet(self.wave_slice,self.fnorm,self.enorm,self.transition);    
 
 
 
