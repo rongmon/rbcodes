@@ -126,7 +126,7 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 		self.fig.clf()
 		ax_num = len(imgs)
 		# set a primary image
-		img = imgs[-1]
+		img = np.nan_to_num(imgs[-1], nan=0, posinf=0, neginf=0)
 		#self.ax.cla()
 
 		if scale == 0:
@@ -186,7 +186,8 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 				scaled2d = (scaled2d - scaled2d.mean()) / scaled2d.std()
 
 		elif type(normalization) == list:
-			scaled2d = (scaled2d - scaled2d.mean()) / scaled2d.std()
+			tmp = (scaled2d - scaled2d.min()) / (scaled2d.max() - scaled2d.min())
+			scaled2d = tmp*(normalization[1] - normalization[0]) + normalization[0]
 			
 		
 		if 'STAMP' not in name:
