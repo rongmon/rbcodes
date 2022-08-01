@@ -135,13 +135,12 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 			scaled2d = img.copy()
 		elif scale == 1:
 			# log transformation.. scaled = log(1+ img)/log(1+img_max)
-			#if self.flux2d.min() < 0:
-			#	scaled2d = np.log(-self.flux2d.min() + self.flux2d) / np.log(-self.flux2d.min() + self.flux2d.max())
+			a = 100 # exponent placeholder
 			if img.min() < 0:
-				scaled2d = np.log(-img.min() + img) / np.log(-img.min() + img.max())
+				scaled2d = np.log(a*(img-img.min())+1) / np.log(a*(img-img.min()))
 			else:
 				#scaled2d = np.log(1 + self.flux2d) / np.log(1 + self.flux2d.max())
-				scaled2d = np.log(1 + img) / np.log(1 + img.max())
+				scaled2d = np.log(1 + a*img) / np.log(a*img)
 		elif scale == 2:
 			# square root transformation.. 
 			# pixel values > 0 ==> regular sqrt; pixel values <0 ==> 1.absolute value 2.sqrt 3.add minus sign
@@ -187,8 +186,7 @@ class Advanced2dCanvas(FigureCanvasQTAgg):
 				scaled2d = (scaled2d - scaled2d.mean()) / scaled2d.std()
 
 		elif type(normalization) == list:
-			tmp = (scaled2d - scaled2d.min()) / (scaled2d.max() - scaled2d.min())
-			scaled2d = tmp*(normalization[1] - normalization[0]) + normalization[0]
+			scaled2d = (scaled2d - scaled2d.mean()) / scaled2d.std()
 			
 		
 		if 'STAMP' not in name:
