@@ -1,5 +1,6 @@
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QDoubleValidator, QIntValidator
 
 import matplotlib as mpl
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
@@ -39,7 +40,6 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.init_xlims, self.init_ylims = [],[]
 		self.gxval, self.gyval = [], []
 		self.scale = 1. # 1D spec convolution kernel size
-		self.scale2 = 1 # 2D spec convolution kernel size
 		self.lineindex = -2
 		self.linelist = [] #pd.DataFrame(columns=['wave', 'name'])
 		self.estZ = 0.
@@ -58,6 +58,15 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.cur_cmap = 'viridis' # default colormap
 		self.cmap_idx = 0 # selected cmap index in ColormapDialog
 		self.cmap_r = False # state of reversed colors in current cmap
+
+		# custom gaussian2dkernel info
+		self.stddevs = [1, 1] # standard deviation of Gaussian in x and y
+		self.sizes = [self.stddevs[0]*8+1, self.stddevs[-1]*8+1] # size in x ,y directions, default values
+		self.modes_idx = 0# discretization mode index
+		self.mode_txt = 'center' # discretization mode name
+		self.fac = 10 # factor of oversamping, default = 10
+		self.step_2dspec = 1 # incre/decre size of smooth/unsmooth 2D specs
+		self.cur_stddevs = self.stddevs.copy() # current std
 
 		num_2ndlist = 6
 		self.addtional_linelist = {i:[] for i in range(num_2ndlist)}
@@ -520,7 +529,15 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.replot2d_im(self.flux2d)
 				self.draw()
 				self.send_message.emit('User RESET the 2D Spectrum!')
-				self.scale2 = 1
+				
+				# reset Gaussian2DKernel parameters as well
+				self.stddevs = [1, 1] # standard deviation of Gaussian in x and y
+				self.sizes = [self.stddevs[0]*8+1, self.stddevs[-1]*8+1] # size in x ,y directions, default values
+				self.modes_idx = 0# discretization mode index
+				self.mode_txt = 'center' # discretization mode name
+				self.fac = 10 # factor of oversamping, default = 10
+				self.step_2dspec = 1 # incre/decre size of smooth/unsmooth 2D specs
+				self.cur_stddevs = self.stddevs.copy() # current std
 
 		elif event.key == 't':
 			# set y axis max value
@@ -584,16 +601,23 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.draw()
 
 				self.send_message.emit(f'Convolutional kernel size = {int(self.scale//2)}.')
+			
+			# smooth 2D spec
 			elif event.inaxes == self.ax2d:
-				self.scale2 += 1
-				if self.scale2 < 1:
+				self.cur_stddevs[0] += self.step_2dspec
+				self.cur_stddevs[-1] += self.step_2dspec
+				if self.cur_stddevs[0] <= 0 or self.cur_stddevs[-1] <=0:
 					self.replot2d_im(self.flux2d)
-					self.scale2 = 1
+					self.cur_stddevs = self.stddevs.copy()
 				else:
-					new_2dspec = convolve(self.flux2d, Gaussian2DKernel(x_stddev=self.scale2,
-																	y_stddev=self.scale2))
+					new_2dspec = convolve(self.flux2d, Gaussian2DKernel(x_stddev=self.cur_stddevs[0],
+																		y_stddev=self.cur_stddevs[-1],
+																		x_size=self.sizes[0],
+																		y_size=self.sizes[-1],
+																		mode=self.mode_txt,
+																		factor=self.fac))
 					self.replot2d_im(new_2dspec)
-				self.send_message.emit(f'2D Convolutional kernel size = {int(self.scale2)}.')
+				self.send_message.emit(f'Current 2D kernel size: x={self.cur_stddevs[0]}, y={self.cur_stddevs[-1]}')
 
 		elif event.key == 'U':
 			# unsmooth ydata
@@ -607,17 +631,22 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.draw()
 				self.send_message.emit(f'Convolutional kernel size = {int(self.scale//2)}.')
 			elif event.inaxes == self.ax2d:
-				self.scale2 -= 1
-				if self.scale2 < 1:
+				self.cur_stddevs[0] -= self.step_2dspec
+				self.cur_stddevs[-1] -= self.step_2dspec
+				if self.cur_stddevs[0] <= 0 or self.cur_stddevs[-1] <=0:
 					self.replot2d_im(self.flux2d)
-					self.scale2 = 1
+					self.cur_stddevs = self.stddevs.copy()
 				else:
-					new_2dspec = convolve(self.flux2d, Gaussian2DKernel(x_stddev=self.scale2,
-																	y_stddev=self.scale2))
+					new_2dspec = convolve(self.flux2d, Gaussian2DKernel(x_stddev=self.cur_stddevs[0],
+																		y_stddev=self.cur_stddevs[-1],
+																		x_size=self.sizes[0],
+																		y_size=self.sizes[-1],
+																		mode=self.mode_txt,
+																		factor=self.fac))					
 					self.replot2d_im(new_2dspec)
 
 				#self.update_colormap(self.cur_cmap)
-				self.send_message.emit(f'2D Convolutional kernel size = {int(self.scale2)}.')
+				self.send_message.emit(f'Current 2D kernel size: x={self.cur_stddevs[0]}, y={self.cur_stddevs[-1]}')
 
 		elif event.key == 'Y':
 			# set y-axis limits with precise values
@@ -769,6 +798,19 @@ class MplCanvas(FigureCanvasQTAgg):
 
 						# clear out selection
 						self.gxval, self.gyval = [], []
+
+			elif event.inaxes == self.ax2d:
+				# customize Gaussian2DKernel parameters
+				g2dkernel = CustomGaussian2DSpec(self.stddevs, self.sizes, self.modes_idx, self.fac, self.step_2dspec)
+				if g2dkernel.exec_():
+					stddevs, sizes, mode_txt, mode_idx, fac, step = g2dkernel._set_params()
+					self.stddevs = stddevs
+					self.sizes = sizes
+					self.mode_txt = mode_txt
+					self.mode_idx = mode_idx
+					self.fac = fac
+					self.step_2dspec = step
+					self.cur_stddevs = self.stddevs.copy()
 
 		elif (event.key == 'A') & (self.gauss_num > 1):
 			# shade entire spectrum region
@@ -1013,6 +1055,131 @@ class CustomLimDialog(QtWidgets.QDialog):
 
 	def _getlim(self):
 		return [float(self.le_min.text()), float(self.le_max.text())]
+
+#--------------------Dialog for Customized Gaussian2DKernel----------
+class CustomGaussian2DSpec(QtWidgets.QDialog):
+	def __init__(self, stddevs, sizes, modes_idx, fac, step):
+		super().__init__()
+		MODES = ['center', 'linear_interp', 'oversample', 'integrate'] # discretization modes
+		self.stddevs = stddevs # standard deviation of Gaussian in x and y
+		self.sizes = sizes # size in x ,y directions, default values
+		self.modes_idx = modes_idx
+		self.fac = fac # factor of oversamping, default = 10
+		self.step = step # step size for increment smoothing and unsmoothing
+
+		self.setWindowTitle('Custom Gaussian2DKernel')
+		QBtn = QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+		self.buttonbox = QtWidgets.QDialogButtonBox(QBtn)
+
+		self.layout = QtWidgets.QGridLayout()
+		lb_name = QtWidgets.QLabel('Gaussian2DKernel Parameters')
+		lb_xstd = QtWidgets.QLabel('X Std')
+		lb_ystd = QtWidgets.QLabel('Y Std')
+		lb_xsz = QtWidgets.QLabel('X Size')
+		lb_ysz = QtWidgets.QLabel('Y Size')
+		lb_mode = QtWidgets.QLabel('Mode')
+		lb_fac = QtWidgets.QLabel('Factor')
+		lb_step = QtWidgets.QLabel('Step')
+
+		self.layout.addWidget(lb_name, 0, 0, 1, 2)
+		self.layout.addWidget(lb_xstd, 1, 0)
+		self.layout.addWidget(lb_ystd, 2, 0)
+		self.layout.addWidget(lb_xsz, 3, 0)
+		self.layout.addWidget(lb_ysz, 4, 0)
+		self.layout.addWidget(lb_mode, 5, 0)
+		self.layout.addWidget(lb_fac, 6, 0)
+		self.layout.addWidget(lb_step, 7, 0)
+
+		# User-input parts
+		# use validators to constrain user inputs
+		self.onlyfloat = QDoubleValidator()
+		self.onlyint = QIntValidator()
+		# user entries
+		self.le_xstd = QtWidgets.QLineEdit()
+		self.le_xstd.setPlaceholderText('x_stddev')
+		self.le_xstd.setValidator(self.onlyfloat)
+		self.le_ystd = QtWidgets.QLineEdit()
+		self.le_ystd.setPlaceholderText('y_stddev')
+		self.le_ystd.setValidator(self.onlyfloat)
+		self.le_xsz = QtWidgets.QLineEdit()
+		self.le_xsz.setPlaceholderText('x_size')
+		self.le_xsz.setValidator(self.onlyint)
+		self.le_ysz = QtWidgets.QLineEdit()
+		self.le_ysz.setPlaceholderText('y_size')
+		self.le_ysz.setValidator(self.onlyint)
+		self.cb_mode = QtWidgets.QComboBox()
+		self.cb_mode.addItems(MODES)
+		self.cb_mode.setCurrentIndex(0)
+		self.le_fac = QtWidgets.QLineEdit()
+		self.le_fac.setPlaceholderText('Factor')
+		self.le_fac.setValidator(self.onlyfloat)
+		self.le_step = QtWidgets.QLineEdit()
+		self.le_step.setPlaceholderText('Step size')
+		self.le_step.setValidator(self.onlyfloat)
+
+		self.layout.addWidget(self.le_xstd, 1, 1)
+		self.layout.addWidget(self.le_ystd, 2, 1)
+		self.layout.addWidget(self.le_xsz, 3, 1)
+		self.layout.addWidget(self.le_ysz, 4, 1)
+		self.layout.addWidget(self.cb_mode, 5, 1)
+		self.layout.addWidget(self.le_fac, 6, 1)
+		self.layout.addWidget(self.le_step, 7, 1)
+
+		self.layout.addWidget(self.buttonbox, 8, 0, 1, 2)
+
+		self.setLayout(self.layout)
+
+		self.buttonbox.accepted.connect(self.accept)
+		self.buttonbox.rejected.connect(self.reject)
+
+		# get current parameter values
+		self.le_xstd.setText(str(self.stddevs[0]))
+		self.le_ystd.setText(str(self.stddevs[-1]))
+		self.le_xsz.setText(str(self.sizes[0]))
+		self.le_ysz.setText(str(self.sizes[-1]))
+		self.cb_mode.setCurrentIndex(self.modes_idx)
+		self.le_fac.setText(str(self.fac))
+		self.le_step.setText(str(self.step))
+
+	def _set_params(self):
+		# set up stddevs
+		stddevs = [1,1]
+		if len(self.le_xstd.text()) == 0 or float(self.le_xstd.text()) <=0:
+			pass
+		else:
+			stddevs[0] = float(self.le_xstd.text())
+		if len(self.le_ystd.text()) == 0 or float(self.le_ystd.text()) <=0:
+			pass
+		else:
+			stddevs[-1] = float(self.le_ystd.text())
+
+		# set up sizes
+		sizes = [8*int(stddevs[0])+1, 8*int(stddevs[-1])+1]
+		if len(self.le_xsz.text()) == 0 or int(self.le_xsz.text()) <=0:
+			pass
+		else:
+			sizes[0] = int(self.le_xsz.text())
+		if len(self.le_ysz.text()) == 0 or int(self.le_ysz.text()) <=0:
+			pass
+		else:
+			sizes[-1] = int(self.le_ysz.text())
+
+		# mode combobox
+		mode_txt = self.cb_mode.currentText()
+		mode_idx = self.cb_mode.currentIndex()
+
+		# fac and steps
+		if len(self.le_fac.text()) == 0 or float(self.le_fac.text()) <= 0:
+			fac = 10
+		else:
+			fac = float(self.le_fac.text())
+		if len(self.le_step.text()) == 0 or float(self.le_step.text()) <= 0:
+			step = 1
+		else:
+			step = float(self.le_step.text())
+
+		return stddevs, sizes, mode_txt, mode_idx, fac, step
+
 
 #--------------------Colormap Dialog-------------------------
 class CustomColormapSelection(QtWidgets.QDialog):
