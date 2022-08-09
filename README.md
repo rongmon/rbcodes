@@ -31,6 +31,12 @@ The GUIs folder contains several graphical user interfaces for astrophysics.
 	5) abstools: A complex absorption line analysis GUI to simultaneously continuum fit and 
 		     measure EW/logN of several absorption lines. This is under GUIs/abstools. 
 		     Look up readme file in that folder for a working example.
+		     
+	6) rb_specgui: Wrapper for a complex 1d spectrum viwer and line identifier [Plotspec_integrated.py]. 
+	               This is the upgraded pyqt5 version of rb_plot_spec package.
+        
+	7) gui_dev/main.py : This is a new GUI to measure redshifts of galaxies using 1d or 2d spectrum. 
+			     Can be used in batch mode and is optimized for JWST spectroscopy.
 
 
 
