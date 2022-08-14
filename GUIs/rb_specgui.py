@@ -44,7 +44,7 @@ if __name__ == "__main__":
         flux=np.array(dat[tab[1]])
         if (len(dat.keys())>=3):
             error=dat[tab[2]]
-    elif (filetype=='fits') | (filetype=='linetools'):
+    elif (filetype=='fits') | (filetype=='lt'):
         #Use linetools.io.readspec to read file
         #from linetools.spectra import io as tio
         if (len(sys.argv) >3):
@@ -62,6 +62,32 @@ if __name__ == "__main__":
         else:
             error=sp.sig.value
 
+    elif (filetype=='lt_cont_norm'):
+        print('Using filetype:' + filetype)
+
+       #Use linetools.io.readspec to read file and continuum normalize if exists
+        if (len(sys.argv) >3):
+            sp=XSpectrum1D.from_file(filename,efil=efil)
+        else:
+            sp=XSpectrum1D.from_file(filename)
+
+        #sp=tio.readspec(filename,inflg=None, efil=efil,**kwargs)
+        wave=sp.wavelength.value
+
+        if (sp.co_is_set ==True):
+            print('Using provided continuum to normalzie')
+            flux=sp.flux.value/sp.co.value
+        else:
+            flux=sp.flux.value
+
+        if (sp.sig_is_set == False):
+            print('Assuiming arbiarbitrary 10% error on flux')
+            error=0.1*flux
+        else:
+            if (sp.co_is_set ==True):
+                error=sp.sig.value/sp.co.value
+            else:
+                error=sp.sig.value
 
 
 
@@ -74,13 +100,13 @@ if __name__ == "__main__":
         #if (len(tab)>=3):
         #    error=np.array(dat['error'][0])
 
-    if filetype=='xfits':
-        from astropy.io import fits
-        hdu = fits.open(filename)
-        wave = hdu['wavelength'].data
-        flux = hdu['flux'].data
-        error=hdu['error'].data
-        hdu.close()
+    #elif filetype=='xfits':
+    #    from astropy.io import fits
+    #    hdu = fits.open(filename)
+    #    wave = hdu['wavelength'].data
+    #    flux = hdu['flux'].data
+    #    error=hdu['error'].data
+    #    hdu.close()
     elif filetype=='p':
         import pickle
         dat=pickle.load( open(cwd+'/'+filename, "rb" ))
