@@ -28,7 +28,7 @@ class rb_plot_spec(object):
 
     def __init__(self,wave,flux,error,zabs=0.):
 
-        '''
+        """
                ---------------------------------------------------------------------------
         This is an interactive 1D spectrum viewer.
         The help scene activates by pressing h on the plot.
@@ -72,7 +72,7 @@ class rb_plot_spec(object):
         HEALTH WARNING: The GUI implementation is still in alpha version and is quite unstable.
         User must be careful to make sure that they exit individual GUIs first by pressing the correct button
         before closing the plot window.
-        ''' 
+        """
 
 
         self.wave=wave
@@ -397,6 +397,9 @@ class rb_plot_spec(object):
        
 
     def DrawLineList(self,label):
+        """
+        Draw line list
+        """
         del self.ax.lines[1:len(self.ax.lines)]
         #self.ax.texts=[]
         while self.ax.texts:
@@ -453,6 +456,9 @@ class rb_plot_spec(object):
 
 
     def plot_identified_linelist(self,filename):
+        """
+        plot identified linelist
+        """
         xlim=self.ax.get_xlim()
         ylim=self.ax.get_ylim()
 
@@ -475,6 +481,9 @@ class rb_plot_spec(object):
 
 
     def read_identified_linelist_GUI(self):
+        """
+        Read identified linelist
+        """
         sg.ChangeLookAndFeel('Dark')
 
         event, values = sg.Window('READ Pre-Identifed Lines', [[sg.Text('Filename')], [sg.Input(), sg.FileBrowse()], [sg.OK(), sg.Cancel()] ]).read(close=True)
@@ -487,6 +496,9 @@ class rb_plot_spec(object):
 
 
     def manage_identified_absorbers(self):
+        """
+        Manage identified linelist
+        """
         sg.ChangeLookAndFeel('Dark')   
         col1=[ [sg.Text('1. zabs', size=(5, 1)), sg.In(default_text=np.str(self.zabs_list['zabs'][0]),  size=(15, 1))],
                [sg.Text('2. zabs', size=(5, 1)), sg.In(default_text=np.str(self.zabs_list['zabs'][1]),  size=(15, 1))],
@@ -553,6 +565,9 @@ class rb_plot_spec(object):
 
 
     def plot_keystroke(self,event):
+        """
+        Plot keystroke
+        """
         xdata=event.xdata
         ydata=event.ydata
         test,=self.ax.plot(xdata,ydata,'r+',)
@@ -563,6 +578,9 @@ class rb_plot_spec(object):
 
 
     def set_redshift(self):
+        """
+        Set redshift GUI
+        """
         zabs,LineList=self.set_redshift_GUI()
         self.zabs=np.double(zabs)
         self.label=LineList
@@ -575,6 +593,9 @@ class rb_plot_spec(object):
         self.fig.canvas.draw()
 
     def identify_line_GUI(self):
+        """
+        Identifying linelist GUI
+        """
         if self.label == 'None':
             self.label='LLS Small'
         data=line.read_line_list(self.label)
@@ -628,6 +649,9 @@ class rb_plot_spec(object):
 
 
     def set_redshift_GUI(self):
+        """
+        Set up a GUI for redshifts
+        """
         layout = [
             [sg.Text('Please enter the desired redshift, LineList')],
             [sg.Text('Redshift', size=(15, 1)), sg.InputText(np.str(self.zabs))],
@@ -644,6 +668,9 @@ class rb_plot_spec(object):
 
 
     def specplot(self):
+        """
+        Plots all spectrum
+        """
         ax=plt.gca()
         xlim=ax.get_xlim()
         ylim=ax.get_ylim()
@@ -660,6 +687,9 @@ class rb_plot_spec(object):
 
 
     def load_linelist_GUI(self):
+        """
+        Loading Linelist GUI
+        """
         sg.ChangeLookAndFeel('Dark')
 
         event, values = sg.Window('Load Identifed Line list', [[sg.Text('Filename')], [sg.Input(), sg.FileBrowse()], [sg.OK(), sg.Cancel()] ]).read(close=True)
@@ -688,6 +718,9 @@ class rb_plot_spec(object):
 
     
     def compute_EW(self,lam,flx,lam_lim,lam_ylim,err_flx):
+        """
+        Compute Quick equivalent width
+        """
         qtq=np.where( ( lam >= lam_lim[0] ) & ( lam <= lam_lim[1] ) )
         ww=lam[qtq]                 
         flux1=flx[qtq]

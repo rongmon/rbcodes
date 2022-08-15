@@ -6,25 +6,29 @@ from astropy.io import ascii
 from pkg_resources import resource_filename
 
 
-'''
- Function to read in atomic line information for a given rest frame  wavelength.
-                           Or 
- For the line matching the closest wavelength. 
 
- Input :
+def rb_setline(lambda_rest,method,linelist='atom'):
+    """
+    Function to read in atomic line information for a given rest frame  wavelength.
+                           Or 
+    For the line matching the closest wavelength. 
+
+    Parameters
+    ----------
            lambda_rest :-  Rest Frame wavelength (in \AA) of the line to match
             method     :-    'closest' ->  If set will match the closest line.
                               'Exact'  ->  If set will match the exact wavelength.
  
- Output:    dic :- Dictionary with fval,lambda and species name.
+    Returns
+    ----------
+        dic :- Dictionary with fval,lambda and species name.
 
- Example:   str=rb_setline(2796.3,'closest')
+    Example:   str=rb_setline(2796.3,'closest')
 
 
-Written By: Rongmon Bordoloi                Jan 2018, Python 2.7
-Edit:       Rongmon Bordoloi                            Sep 2018, Depreciated kwargs to be compatible with python 3
-'''
-def rb_setline(lambda_rest,method,linelist='atom'):
+    Written By: Rongmon Bordoloi                Jan 2018, Python 2.7
+    Edit:       Rongmon Bordoloi                            Sep 2018, Depreciated kwargs to be compatible with python 3
+   """
     
     #if kwargs.has_key('linelist'):
     #   linelist=kwargs['linelist']
@@ -70,6 +74,18 @@ def rb_setline(lambda_rest,method,linelist='atom'):
 
 
 def read_line_list(label):
+    """Module to read a linelist defined by the label
+
+    Parameters
+    ----------
+    lable : Label string [e.g. atom, LLS, LLS Small, LBG, Gal, Eiger_Strong]
+      Must include redshift
+
+    Returns
+    ----------
+    a dictionary with wrest, ion name and fvalues
+
+    """
     
 
     if label=='atom':

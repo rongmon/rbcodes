@@ -1,0 +1,235 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>rbcodes.GUIs.interactive_cont_jn &#8212; rbcodes 0.1.3 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinxdoc.css" />
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">rbcodes 0.1.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">rbcodes.GUIs.interactive_cont_jn</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for rbcodes.GUIs.interactive_cont_jn</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">ipywidgets</span> <span class="k">as</span> <span class="nn">widgets</span>
+<span class="c1"># Converting To velocities</span>
+<span class="kn">from</span> <span class="nn">IGM</span> <span class="kn">import</span> <span class="n">rb_setline</span> <span class="k">as</span> <span class="n">line</span>
+<span class="kn">from</span> <span class="nn">scipy.interpolate</span> <span class="kn">import</span> <span class="n">splrep</span><span class="p">,</span><span class="n">splev</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">os</span>
+
+
+<div class="viewcode-block" id="interactive_cont"><a class="viewcode-back" href="../../../rbcodes.GUIs.html#rbcodes.GUIs.interactive_cont_jn.interactive_cont">[docs]</a><span class="k">class</span> <span class="nc">interactive_cont</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">wave</span><span class="p">,</span><span class="n">flux</span><span class="p">,</span><span class="n">error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">xlim</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mf">600.</span><span class="p">,</span><span class="mf">600.</span><span class="p">],</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="o">=</span><span class="n">flux</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error</span><span class="o">=</span><span class="n">error</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="o">=</span><span class="n">wave</span>
+    
+        <span class="bp">self</span><span class="o">.</span><span class="n">fig</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">()</span>
+        <span class="c1">#This is where you feed in your velocity and flux to be fit</span>
+        <span class="n">spectrum</span><span class="p">,</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="p">,</span><span class="s1">&#39;b-&#39;</span><span class="p">,</span><span class="n">label</span><span class="o">=</span><span class="s1">&#39;spectrum&#39;</span><span class="p">,</span><span class="n">linewidth</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Wavelength&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Flux&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">w</span> <span class="o">=</span> <span class="n">widgets</span><span class="o">.</span><span class="n">HTML</span><span class="p">()</span>
+
+        <span class="n">cid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fig</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">mpl_connect</span><span class="p">(</span><span class="s1">&#39;button_press_event&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">onclick</span><span class="p">)</span>
+        <span class="n">cid1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fig</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">mpl_connect</span><span class="p">(</span><span class="s1">&#39;key_press_event&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">onpress</span><span class="p">)</span>
+        <span class="n">cid2</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">fig</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">mpl_connect</span><span class="p">(</span><span class="s1">&#39;pick_event&#39;</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">onpick</span><span class="p">)</span>
+
+        <span class="n">display</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">w</span><span class="p">)</span>
+        
+<div class="viewcode-block" id="interactive_cont.onclick"><a class="viewcode-back" href="../../../rbcodes.GUIs.html#rbcodes.GUIs.interactive_cont_jn.interactive_cont.onclick">[docs]</a>    <span class="k">def</span> <span class="nf">onclick</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">event</span><span class="p">):</span>
+        <span class="c1"># when none of the toolbar buttons is activated and the user clicks in the</span>
+        <span class="c1"># plot somewhere, compute the median value of the spectrum in a 5angstrom</span>
+        <span class="c1"># window around the x-coordinate of the clicked point. The y coordinate</span>
+        <span class="c1"># of the clicked point is not important. Make sure the continuum points</span>
+        <span class="c1"># `feel` it when it gets clicked, set the `feel-radius` (pickradius) to 5 points</span>
+        <span class="n">toolbar</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">get_current_fig_manager</span><span class="p">()</span><span class="o">.</span><span class="n">toolbar</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">w</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="s1">&#39;button=</span><span class="si">%d</span><span class="s1">, x=</span><span class="si">%d</span><span class="s1">, y=</span><span class="si">%d</span><span class="s1">, xdata=</span><span class="si">%f</span><span class="s1">, ydata=</span><span class="si">%f</span><span class="s1">&#39;</span><span class="o">%</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">button</span><span class="p">,</span> <span class="n">event</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">event</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">event</span><span class="o">.</span><span class="n">xdata</span><span class="p">,</span> <span class="n">event</span><span class="o">.</span><span class="n">ydata</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">button</span><span class="o">==</span><span class="mi">1</span> <span class="ow">and</span> <span class="n">toolbar</span><span class="o">.</span><span class="n">mode</span><span class="o">==</span><span class="s1">&#39;&#39;</span><span class="p">:</span>
+            <span class="n">window</span> <span class="o">=</span> <span class="p">((</span><span class="n">event</span><span class="o">.</span><span class="n">xdata</span><span class="o">-</span><span class="mf">2.5</span><span class="p">)</span><span class="o">&lt;=</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="o">&lt;=</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">xdata</span><span class="o">+</span><span class="mf">2.5</span><span class="p">))</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="p">[</span><span class="n">window</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">xdata</span><span class="p">,</span><span class="n">y</span><span class="p">,</span><span class="s1">&#39;ro&#39;</span><span class="p">,</span><span class="n">ms</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span><span class="n">picker</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span><span class="n">label</span><span class="o">=</span><span class="s1">&#39;cont_pnt&#39;</span><span class="p">,</span><span class="n">markeredgecolor</span><span class="o">=</span><span class="s1">&#39;k&#39;</span><span class="p">)</span></div>
+               
+<div class="viewcode-block" id="interactive_cont.onpick"><a class="viewcode-back" href="../../../rbcodes.GUIs.html#rbcodes.GUIs.interactive_cont_jn.interactive_cont.onpick">[docs]</a>    <span class="k">def</span> <span class="nf">onpick</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">event</span><span class="p">):</span>
+        <span class="c1"># when the user clicks right on a continuum point, remove it</span>
+        <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">mouseevent</span><span class="o">.</span><span class="n">button</span><span class="o">==</span><span class="mi">3</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">artist</span><span class="p">,</span><span class="s1">&#39;get_label&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">event</span><span class="o">.</span><span class="n">artist</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span><span class="o">==</span><span class="s1">&#39;cont_pnt&#39;</span><span class="p">:</span>
+                <span class="n">event</span><span class="o">.</span><span class="n">artist</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span></div>
+  
+<div class="viewcode-block" id="interactive_cont.onpress"><a class="viewcode-back" href="../../../rbcodes.GUIs.html#rbcodes.GUIs.interactive_cont_jn.interactive_cont.onpress">[docs]</a>    <span class="k">def</span> <span class="nf">onpress</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">event</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">key</span><span class="o">==</span><span class="s1">&#39;enter&#39;</span><span class="p">:</span>
+            <span class="n">cont_pnt_coord</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">artist</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">get_children</span><span class="p">():</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">artist</span><span class="p">,</span><span class="s1">&#39;get_label&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">artist</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span><span class="o">==</span><span class="s1">&#39;cont_pnt&#39;</span><span class="p">:</span>
+                    <span class="n">cont_pnt_coord</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">artist</span><span class="o">.</span><span class="n">get_data</span><span class="p">())</span>
+                <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">artist</span><span class="p">,</span><span class="s1">&#39;get_label&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">artist</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span><span class="o">==</span><span class="s1">&#39;continuum&#39;</span><span class="p">:</span>
+                    <span class="n">artist</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+            <span class="n">cont_pnt_coord</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">cont_pnt_coord</span><span class="p">)[</span><span class="o">...</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">sort_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">cont_pnt_coord</span><span class="p">[:,</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">x</span><span class="p">,</span><span class="n">y</span> <span class="o">=</span> <span class="n">cont_pnt_coord</span><span class="p">[</span><span class="n">sort_array</span><span class="p">]</span><span class="o">.</span><span class="n">T</span>
+            <span class="n">spline</span> <span class="o">=</span> <span class="n">splrep</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">,</span><span class="n">k</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+            <span class="n">continuum</span> <span class="o">=</span> <span class="n">splev</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">,</span><span class="n">spline</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">,</span><span class="n">continuum</span><span class="p">,</span><span class="s1">&#39;r-&#39;</span><span class="p">,</span><span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span><span class="n">label</span><span class="o">=</span><span class="s1">&#39;continuum&#39;</span><span class="p">)</span>
+    
+        <span class="c1"># when the user hits &#39;n&#39; and a spline-continuum is fitted, normalise the</span>
+        <span class="c1"># spectrum</span>
+        <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">key</span><span class="o">==</span><span class="s1">&#39;n&#39;</span><span class="p">:</span>
+            <span class="n">continuum</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">for</span> <span class="n">artist</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">get_children</span><span class="p">():</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">artist</span><span class="p">,</span><span class="s1">&#39;get_label&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">artist</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span><span class="o">==</span><span class="s1">&#39;continuum&#39;</span><span class="p">:</span>
+                    <span class="n">continuum</span> <span class="o">=</span> <span class="n">artist</span><span class="o">.</span><span class="n">get_data</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="k">break</span>
+            <span class="k">if</span> <span class="n">continuum</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">cla</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="o">/</span><span class="n">continuum</span><span class="p">,</span><span class="s1">&#39;b-&#39;</span><span class="p">,</span><span class="n">label</span><span class="o">=</span><span class="s1">&#39;normalised&#39;</span><span class="p">,</span><span class="n">linewidth</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">,</span><span class="n">continuum</span><span class="p">,</span><span class="s1">&#39;r-&#39;</span><span class="p">,</span><span class="n">label</span><span class="o">=</span><span class="s1">&#39;unnorm_cont&#39;</span><span class="p">,</span><span class="n">linewidth</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>            
+                <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">),</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">)],[</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span><span class="s1">&#39;k--&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">set_xlim</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">),</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">)])</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Wavelength&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Relative Flux&#39;</span><span class="p">)</span>
+    
+    
+        <span class="c1"># when the user hits &#39;r&#39;: clear the axes and plot the original spectrum</span>
+        <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">key</span><span class="o">==</span><span class="s1">&#39;r&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">cla</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="p">,</span><span class="s1">&#39;b-&#39;</span><span class="p">)</span>
+    
+        <span class="c1"># when the user hits &#39;b&#39;: selects a handpicked x,y value</span>
+        <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">key</span><span class="o">==</span><span class="s1">&#39;b&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">xdata</span><span class="p">,</span><span class="n">event</span><span class="o">.</span><span class="n">ydata</span><span class="p">,</span><span class="s1">&#39;ro&#39;</span><span class="p">,</span><span class="n">ms</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span><span class="n">picker</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span><span class="n">label</span><span class="o">=</span><span class="s1">&#39;cont_pnt&#39;</span><span class="p">,</span><span class="n">markeredgecolor</span><span class="o">=</span><span class="s1">&#39;k&#39;</span><span class="p">)</span>
+    
+        <span class="c1">#If the user presses &#39;h&#39;: The help is printed on the screen</span>
+        <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">key</span><span class="o">==</span><span class="s1">&#39;h&#39;</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span>
+            <span class="sd">&#39;&#39;&#39;    </span>
+<span class="sd">            ---------------------------------------------------------------------------</span>
+<span class="sd">            This is an interactive continuum fitter for 1D spectrum.</span>
+<span class="sd">            The purpose of this code is to create a spline continuum fit from selected points.</span>
+<span class="sd">            The help scene activates by pressing h on the plot.</span>
+<span class="sd">    </span>
+<span class="sd">            The program only works properly if none of the toolbar buttons in the figure is activated. </span>
+<span class="sd">    </span>
+<span class="sd">    </span>
+<span class="sd">            Useful Keystrokes:</span>
+<span class="sd">    </span>
+<span class="sd">                Mouse Clicks:</span>
+<span class="sd">                </span>
+<span class="sd">                    Left Click  : Select the median flux value within +/- 5 pixel from the x-coordinate.</span>
+<span class="sd">                                  These points are used for the continuum fit.</span>
+<span class="sd">                    Right Click : Delete the nearest continuum point.</span>
+<span class="sd">    </span>
+<span class="sd">                Keystrokes:</span>
+<span class="sd">                  </span>
+<span class="sd">                  b     :    Select a point for continuum fit at that exact (x,y) coordinate.</span>
+<span class="sd">                  enter :    Perform a spline fit to data to create a continuum.</span>
+<span class="sd">                  n     :    Show the normalized spectrum.</span>
+<span class="sd">                  w     :    Only after pressing n: This will ourput the continuum. </span>
+<span class="sd">                  h     :    This Help screen.</span>
+<span class="sd">                  r     :    Reset fit.</span>
+<span class="sd">                  q     :    Quit Program.</span>
+<span class="sd">             ---------------------------------------------------------------------------</span>
+<span class="sd">            Written By:  Rongmon Bordoloi                                   July 13 2017.</span>
+<span class="sd">    </span>
+<span class="sd">    </span>
+<span class="sd">            ----------------------------------------------------------------------------</span>
+<span class="sd">            </span>
+<span class="sd">            Basic code is taken from : http://www.ster.kuleuven.be/~pieterd/python/html/plotting/specnorm.html</span>
+<span class="sd">            Heavily modified by Rongmon Bordoloi July 13/14 2017.</span>
+<span class="sd">            Modified to add custom points and changed the look of the plots.</span>
+<span class="sd">            Also added custom input options to read different formats. </span>
+<span class="sd">            Input file could be ascii, fits or pickle format</span>
+<span class="sd">            Output will be in the same format as the input file. </span>
+<span class="sd">            Added help feature and graceful exit option. - Now pressing q will exit the program at any stage</span>
+<span class="sd">            ---------------------------------------------------------------------------</span>
+<span class="sd">            &#39;&#39;&#39;</span>
+            <span class="p">)</span>
+    
+    
+        <span class="c1"># At any time pressing q means graceful exit</span>
+        <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">key</span><span class="o">==</span><span class="s1">&#39;q&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">w</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span><span class="s1">&#39;Good Bye!&#39;</span>
+            <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            
+    
+        <span class="c1"># when the user hits &#39;w&#39;: if the normalised spectrum exists, write it to a</span>
+        <span class="c1"># file.</span>
+        <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">key</span><span class="o">==</span><span class="s1">&#39;w&#39;</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">artist</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ax</span><span class="o">.</span><span class="n">get_children</span><span class="p">():</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">artist</span><span class="p">,</span><span class="s1">&#39;get_label&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">artist</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span><span class="o">==</span><span class="s1">&#39;unnorm_cont&#39;</span><span class="p">:</span><span class="c1">#&#39;normalised&#39;:</span>
+                    <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">artist</span><span class="o">.</span><span class="n">get_data</span><span class="p">())</span>
+                    <span class="n">cont</span><span class="o">=</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">T</span><span class="p">[:,</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">cont</span><span class="o">=</span><span class="n">cont</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">w</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span><span class="s1">&#39;Final Continuum Chosen&#39;</span>
+                    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cont</span>
+                    <span class="k">break</span></div></div>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">rbcodes 0.1.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">rbcodes.GUIs.interactive_cont_jn</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2022, Rongmon Bordoloi.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.0.2.
+    </div>
+  </body>
+</html>

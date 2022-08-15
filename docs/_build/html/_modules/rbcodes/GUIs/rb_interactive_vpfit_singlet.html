@@ -1,0 +1,219 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>rbcodes.GUIs.rb_interactive_vpfit_singlet &#8212; rbcodes 0.1.3 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinxdoc.css" />
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">rbcodes 0.1.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">rbcodes.GUIs.rb_interactive_vpfit_singlet</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for rbcodes.GUIs.rb_interactive_vpfit_singlet</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot; Interactive Voigt profile fitter.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">matplotlib</span>
+<span class="n">matplotlib</span><span class="o">.</span><span class="n">use</span><span class="p">(</span><span class="s1">&#39;Qt5Agg&#39;</span><span class="p">)</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span> 
+<span class="kn">from</span> <span class="nn">rbvfit</span> <span class="kn">import</span> <span class="n">model</span> <span class="k">as</span> <span class="n">m</span>
+<span class="kn">from</span> <span class="nn">importlib</span> <span class="kn">import</span> <span class="n">reload</span>
+<span class="n">reload</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">scipy.optimize</span> <span class="kn">import</span> <span class="n">curve_fit</span>
+<span class="kn">import</span> <span class="nn">pdb</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">n_clouds = 1</span>
+<span class="sd">logN=np.array([15.])</span>
+<span class="sd">b=np.array([20.])</span>
+<span class="sd">v=np.array([0.])</span>
+
+<span class="sd">zabs     = np.zeros((n_clouds))</span>
+<span class="sd">lambda_rest = 1526.9 * np.ones((n_clouds))</span>
+
+<span class="sd">s=m.create_voigt(zabs,lambda_rest)</span>
+<span class="sd">theta=np.concatenate((logN,b,v))</span>
+<span class="sd">outflux= s.model_flux(theta,wave)</span>
+<span class="sd">&#39;&#39;&#39;</span>
+
+
+<div class="viewcode-block" id="vel2shift"><a class="viewcode-back" href="../../../rbcodes.GUIs.html#rbcodes.GUIs.rb_interactive_vpfit_singlet.vel2shift">[docs]</a><span class="k">def</span> <span class="nf">vel2shift</span><span class="p">(</span><span class="n">vel</span><span class="p">):</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="mf">299792.458</span><span class="p">;</span>  <span class="c1">#% speed of light [km/sec]</span>
+    <span class="n">Beta</span>  <span class="o">=</span> <span class="n">Vel</span><span class="o">/</span><span class="n">c</span><span class="p">;</span>
+    <span class="n">z</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">((</span><span class="mf">1.</span><span class="o">+</span><span class="n">Beta</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="mf">1.</span><span class="o">-</span><span class="n">Beta</span><span class="p">))</span> <span class="o">-</span> <span class="mf">1.</span><span class="p">;</span>
+    <span class="k">return</span> <span class="n">z</span></div>
+
+
+
+<div class="viewcode-block" id="quick_nv_estimate"><a class="viewcode-back" href="../../../rbcodes.GUIs.html#rbcodes.GUIs.rb_interactive_vpfit_singlet.quick_nv_estimate">[docs]</a><span class="k">def</span> <span class="nf">quick_nv_estimate</span><span class="p">(</span><span class="n">wave</span><span class="p">,</span><span class="n">norm_flx</span><span class="p">,</span><span class="n">wrest</span><span class="p">,</span><span class="n">f0</span><span class="p">):</span>
+    <span class="c1"># All done in rest frame</span>
+    <span class="n">spl</span><span class="o">=</span><span class="mf">2.9979e5</span>  <span class="c1">#speed of light</span>
+    <span class="n">vel</span> <span class="o">=</span> <span class="p">(</span><span class="n">wave</span><span class="o">-</span><span class="n">wrest</span><span class="o">*</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="mf">0.</span><span class="p">))</span><span class="o">*</span><span class="n">spl</span><span class="o">/</span><span class="p">(</span><span class="n">wrest</span><span class="o">*</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="mf">0.</span><span class="p">))</span>
+    <span class="n">lambda_r</span><span class="o">=</span><span class="n">wave</span><span class="o">/</span><span class="p">(</span><span class="mi">1</span><span class="o">+</span><span class="mf">0.</span><span class="p">)</span>    
+    <span class="c1">#compute apparent optical depth</span>
+    <span class="n">Tau_a</span> <span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mf">1.</span><span class="o">/</span><span class="n">norm_flx</span><span class="p">);</span>
+    <span class="c1"># REMEMBER WE ARE SWITCHING TO VELOCITY HERE</span>
+    <span class="n">del_vel_j</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">vel</span><span class="p">);</span>
+    <span class="n">del_vel_j</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">del_vel_j</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="n">del_vel_j</span><span class="p">)</span>
+    <span class="c1"># Column density per pixel as a function of velocity</span>
+    <span class="n">nv</span> <span class="o">=</span> <span class="n">Tau_a</span> <span class="o">/</span> <span class="p">((</span><span class="mf">2.654e-15</span><span class="p">)</span> <span class="o">*</span> <span class="n">f0</span> <span class="o">*</span> <span class="n">lambda_r</span><span class="p">)</span> <span class="c1"># in units cm^-2 / (km s^-1), SS91 </span>
+    <span class="n">n</span> <span class="o">=</span> <span class="n">nv</span> <span class="o">*</span> <span class="n">del_vel_j</span>  <span class="c1"># column density per bin obtained by multiplying differential Nv by bin width</span>
+    <span class="k">return</span> <span class="n">vel</span><span class="p">,</span> <span class="n">n</span> </div>
+
+<div class="viewcode-block" id="rb_interactive_vpfit_singlet"><a class="viewcode-back" href="../../../rbcodes.GUIs.html#rbcodes.GUIs.rb_interactive_vpfit_singlet.rb_interactive_vpfit_singlet">[docs]</a><span class="k">def</span> <span class="nf">rb_interactive_vpfit_singlet</span><span class="p">(</span><span class="n">wave</span><span class="p">,</span><span class="n">flux</span><span class="p">,</span><span class="n">error</span><span class="p">,</span><span class="n">wrest</span><span class="p">,</span><span class="n">custom_guess</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">FWHM</span><span class="o">=</span><span class="mf">15.</span><span class="p">):</span>
+
+
+    <span class="c1"># Fix infinities</span>
+
+    <span class="n">sq</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">flux</span><span class="p">);</span>
+    <span class="n">flux</span><span class="p">[</span><span class="n">sq</span><span class="p">]</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+    <span class="n">sqq</span><span class="o">=</span><span class="n">flux</span><span class="o">&lt;=</span><span class="mi">0</span><span class="p">;</span>
+    <span class="n">flux</span><span class="p">[</span><span class="n">sqq</span><span class="p">]</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span>
+    <span class="n">q</span><span class="o">=</span><span class="n">flux</span><span class="o">&lt;=</span><span class="mi">0</span><span class="p">;</span>
+    <span class="n">flux</span><span class="p">[</span><span class="n">q</span><span class="p">]</span><span class="o">=</span><span class="n">error</span><span class="p">[</span><span class="n">q</span><span class="p">];</span>
+
+    <span class="c1"># Converting To velocities</span>
+    <span class="kn">from</span> <span class="nn">IGM</span> <span class="kn">import</span> <span class="n">rb_setline</span> <span class="k">as</span> <span class="n">s</span>
+    <span class="nb">str</span><span class="o">=</span><span class="n">s</span><span class="o">.</span><span class="n">rb_setline</span><span class="p">(</span><span class="n">wrest</span><span class="p">,</span><span class="s1">&#39;closest&#39;</span><span class="p">,</span><span class="s1">&#39;atom&#39;</span><span class="p">)</span>
+    <span class="n">spl</span><span class="o">=</span><span class="mf">2.9979e5</span><span class="p">;</span>  <span class="c1">#speed of light</span>
+    <span class="n">vel</span> <span class="o">=</span> <span class="p">(</span><span class="n">wave</span><span class="o">-</span><span class="nb">str</span><span class="p">[</span><span class="s1">&#39;wave&#39;</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="mf">0.</span><span class="p">))</span><span class="o">*</span><span class="n">spl</span><span class="o">/</span><span class="p">(</span><span class="nb">str</span><span class="p">[</span><span class="s1">&#39;wave&#39;</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="mf">0.</span><span class="p">))</span>
+
+
+    <span class="n">vel</span><span class="p">,</span><span class="n">nv</span><span class="o">=</span><span class="n">quick_nv_estimate</span><span class="p">(</span><span class="n">wave</span><span class="p">,</span><span class="n">flux</span><span class="p">,</span><span class="nb">str</span><span class="p">[</span><span class="s1">&#39;wave&#39;</span><span class="p">],</span><span class="nb">str</span><span class="p">[</span><span class="s1">&#39;fval&#39;</span><span class="p">]);</span>
+
+    <span class="c1"># Start guessing initial fit interactively</span>
+    <span class="k">if</span> <span class="n">custom_guess</span> <span class="o">==</span> <span class="kc">False</span><span class="p">:</span>
+        <span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="n">vel</span><span class="p">,</span><span class="n">flux</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="n">vel</span><span class="p">,</span><span class="n">error</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">vel</span><span class="p">),</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">vel</span><span class="p">)])</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">ylim</span><span class="p">([</span><span class="o">-</span><span class="mf">0.02</span><span class="p">,</span><span class="mf">1.8</span><span class="p">])</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="o">-</span><span class="mi">2500</span><span class="p">,</span><span class="mi">2500</span><span class="p">],[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">],</span><span class="s1">&#39;k:&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="o">-</span><span class="mi">2500</span><span class="p">,</span><span class="mi">2500</span><span class="p">],[</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span><span class="s1">&#39;k:&#39;</span><span class="p">)</span>       
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;vel [km/s]&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Normalized Flux&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;click to select line centers!&#39;</span><span class="p">)</span>
+        <span class="n">xx</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">ginput</span><span class="p">(</span><span class="n">n</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Once you are done, press enter to continue!&#39;</span><span class="p">)</span>
+        <span class="n">n_clouds</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">xx</span><span class="p">)</span>
+
+
+        <span class="c1"># Create the guesses for starting a fit</span>
+        <span class="n">bguess</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_clouds</span><span class="p">,)</span>
+        <span class="n">vguess</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_clouds</span><span class="p">,)</span>
+        <span class="n">nguess</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_clouds</span><span class="p">,)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="n">n_clouds</span><span class="p">):</span>
+            <span class="n">vguess</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">xx</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">qq</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span> <span class="p">(</span><span class="n">vel</span> <span class="o">&lt;</span> <span class="n">vguess</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">+</span> <span class="mf">80.</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">vel</span> <span class="o">&gt;</span> <span class="n">vguess</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-</span><span class="mf">80.</span><span class="p">))</span>
+            <span class="n">nguess</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">nv</span><span class="p">[</span><span class="n">qq</span><span class="p">]))</span>        
+
+            <span class="c1">#Now ask interactively for b values     </span>
+            <span class="n">prompt</span><span class="o">=</span><span class="s1">&#39;Guess  b  for line &#39;</span> <span class="o">+</span><span class="n">np</span><span class="o">.</span><span class="n">str</span><span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">+</span> <span class="s1">&#39;/&#39;</span><span class="o">+</span><span class="n">np</span><span class="o">.</span><span class="n">str</span><span class="p">(</span><span class="n">n_clouds</span><span class="p">)</span> <span class="o">+</span><span class="s1">&#39;, vel guess = &#39;</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">str</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%.1f</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">vguess</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>  <span class="o">+</span><span class="s1">&#39;, col guess= &#39;</span><span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">str</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%.1f</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">nguess</span><span class="p">[</span><span class="n">i</span><span class="p">])</span><span class="o">+</span> <span class="s1">&#39;: &#39;</span>
+            <span class="n">tmp_b</span> <span class="o">=</span>  <span class="nb">input</span><span class="p">(</span><span class="n">prompt</span><span class="p">)</span>
+            <span class="n">bguess</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span> <span class="n">tmp_b</span> 
+
+
+    <span class="c1"># Now starting to set up the Voigt Profile model</span>
+    <span class="n">zabs</span>  <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.</span><span class="p">])</span><span class="c1">#np.zeros((n_clouds))</span>
+    <span class="n">lambda_rest</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">[</span><span class="s1">&#39;wave&#39;</span><span class="p">]]</span> <span class="c1">#* np.ones((n_clouds))</span>
+    <span class="n">s</span><span class="o">=</span><span class="n">m</span><span class="o">.</span><span class="n">create_voigt</span><span class="p">(</span><span class="n">zabs</span><span class="p">,</span><span class="n">lambda_rest</span><span class="p">,</span><span class="n">n_clouds</span><span class="p">,</span><span class="n">ntransition</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">lambda_rest</span><span class="p">),</span><span class="n">FWHM</span><span class="o">=</span><span class="n">FWHM</span><span class="p">,</span><span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="n">theta</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">nguess</span><span class="p">,</span><span class="n">bguess</span><span class="p">,</span><span class="n">vguess</span><span class="p">))</span>
+    <span class="n">outflux</span><span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">model_flux</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span><span class="n">wave</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">test_fit</span><span class="p">(</span><span class="n">wave</span><span class="p">,</span><span class="o">*</span><span class="n">params</span><span class="p">):</span>
+        <span class="k">return</span>  <span class="n">s</span><span class="o">.</span><span class="n">model_flux</span><span class="p">(</span><span class="n">params</span><span class="p">,</span><span class="n">wave</span><span class="p">)</span>
+
+    <span class="c1">#pdb.set_trace()</span>
+    <span class="n">popt</span><span class="p">,</span> <span class="n">pcov</span> <span class="o">=</span> <span class="n">curve_fit</span><span class="p">(</span><span class="n">test_fit</span><span class="p">,</span> <span class="n">wave</span><span class="p">,</span> <span class="n">flux</span><span class="p">,</span> <span class="n">p0</span><span class="o">=</span><span class="p">(</span><span class="n">theta</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">popt</span><span class="p">)</span>
+
+
+    <span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+    <span class="n">ax</span><span class="o">=</span><span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="n">vel</span><span class="p">,</span><span class="n">flux</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="n">vel</span><span class="p">,</span><span class="n">error</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">vel</span><span class="p">,</span><span class="n">outflux</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;k&#39;</span><span class="p">,</span><span class="n">lw</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">vel</span><span class="p">,</span><span class="n">s</span><span class="o">.</span><span class="n">model_flux</span><span class="p">(</span><span class="n">popt</span><span class="p">,</span><span class="n">wave</span><span class="p">),</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;g&#39;</span><span class="p">,</span><span class="n">lw</span><span class="o">=</span><span class="mi">6</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">vel</span><span class="p">),</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">vel</span><span class="p">)])</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylim</span><span class="p">([</span><span class="o">-</span><span class="mf">0.02</span><span class="p">,</span><span class="mf">1.8</span><span class="p">])</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="o">-</span><span class="mi">2500</span><span class="p">,</span><span class="mi">2500</span><span class="p">],[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">],</span><span class="s1">&#39;k:&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="o">-</span><span class="mi">2500</span><span class="p">,</span><span class="mi">2500</span><span class="p">],[</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span><span class="s1">&#39;k:&#39;</span><span class="p">)</span>       
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;vel [km/s]&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Normalized Flux&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
+
+
+
+
+
+    
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">rbcodes 0.1.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">rbcodes.GUIs.rb_interactive_vpfit_singlet</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2022, Rongmon Bordoloi.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.0.2.
+    </div>
+  </body>
+</html>

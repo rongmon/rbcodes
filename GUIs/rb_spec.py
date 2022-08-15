@@ -6,10 +6,12 @@ import sys
 import os
 import pdb
 class rb_spec(object):
-    """A spectrum read into a class. spectrum will have
+    """
+    A spectrum read into a class. spectrum will have
     following properties:
 
-    Attributes:
+    Attributes
+    -----------
         wave: wavelength.
         flux: flux.
         error: error
@@ -20,7 +22,9 @@ class rb_spec(object):
     Optional:  All only valid for filetype=linetools option
          efil= errorfile [Default None]
 
-        output: This gives a rb_spec object with following attributes:
+    Returns
+    ---------
+        This gives a rb_spec object with following attributes:
 
         self.zabs= Absorber redshift
 
@@ -28,16 +32,10 @@ class rb_spec(object):
         self.flux_slice= sliced observed flux vector
         self.error_slice= sliced velocity spectra 
         self.linelist=. LineList used
-
-        
         self.velo=  sliced velocity vector
-
-
-
         self.cont = Fitted continuum
         self.fnorm= Normalized flux
         self.enorm= Normalized error
-
         self.trans=  Name of the Transition
         self.fval= fvalue of transition
         self.trans_wave= rest frame wavelength of transition
@@ -54,94 +52,94 @@ class rb_spec(object):
 
 
 
-    Written : Rongmon Bordoloi      April 2018
-    Edit    : Rongmon Bordoloi      September 2018 Changed kwargs to be compatible to python 3   
-    Edit    : Rongmon Bordoloi      Aug 2020: added linetools.io.readspec file
-    Edit    : Rongmon Bordoloi      April 2021: added velocity centroid estimates
-    Edit    : Rongmon Bordoloi      March 2022: Added more continuum fitting methods
-    Edit    : Rongmon Bordoloi      April 2022: Added velocity centroid error
-    Edit    : Rongmon Bordoloi      April 2022: Added different calling sequence to ingest numpy arrays directly. 
-    Edit    : Rongmon Bordoloi      April 2022: Small updates to have all continuum fitting routines working
-    Edit    : Rongmon Bordoloi      April 2022: Added plotting sliced spectrum option
+        Written : Rongmon Bordoloi      April 2018
+        Edit    : Rongmon Bordoloi      September 2018 Changed kwargs to be compatible to python 3   
+        Edit    : Rongmon Bordoloi      Aug 2020: added linetools.io.readspec file
+        Edit    : Rongmon Bordoloi      April 2021: added velocity centroid estimates
+        Edit    : Rongmon Bordoloi      March 2022: Added more continuum fitting methods
+        Edit    : Rongmon Bordoloi      April 2022: Added velocity centroid error
+        Edit    : Rongmon Bordoloi      April 2022: Added different calling sequence to ingest numpy arrays directly. 
+        Edit    : Rongmon Bordoloi      April 2022: Small updates to have all continuum fitting routines working
+        Edit    : Rongmon Bordoloi      April 2022: Added plotting sliced spectrum option
+        
+        # WARNING: CALLING SEQUENCE HAS CHANGED SINCE APRIL 2022.
+        CAREFULLY LOOK AT THE EXAMPLE BELOW
+
+        --------------------------------------------------------------------------------------------
+        EXAMPLE:import numpy as np
+                import matplotlib
+                matplotlib.use('Qt5Agg')
+                import matplotlib.pyplot as plt
+                from GUIs.rb_spec import rb_spec as r 
     
-    # WARNING: CALLING SEQUENCE HAS CHANGED SINCE APRIL 2022.
-    CAREFULLY LOOK AT THE EXAMPLE BELOW
-
-    --------------------------------------------------------------------------------------------
-    EXAMPLE:import numpy as np
-            import matplotlib
-            matplotlib.use('Qt5Agg')
-            import matplotlib.pyplot as plt
-            from GUIs.rb_spec import rb_spec as r 
-
-            # List of absorber redshifts
-            zabs=[0.511020,1.026311,1.564481]
-            transition= 2796.3
-            #Which absorber to analyze
-            index=0
-            filename='Quasar_Spectrum.fits'
-            #Read in file
-            s=r.from_file(filename,filetype='linetools')
-               #-------------------------------------------------------------------------------
-               # DETOUR --->
-               #ALTERNATIVE 
-               #IF YOU WANT TO DIRECTLY INJEST NUMPY ARRAYS DO THE FOLLOWING
-               s=r.from_data(wave,flux,error)
-               # HERE wave,flux,error are numpy arrays of wavelength,flux and error respectively.
-               #-------------------------------------------------------------------------------
-
-            #Shift spectra to rest frame
-            s.shift_spec(zabs[index]);
-            #Velocity window around transition
-            xlim=[-1500,1500]
-            
-            #Slice Spectrum within that window
-            s.slice_spec(transition,xlim[0],xlim[1],use_vel=True);
-
-            #Fit continuum Mask the regions defined by velocity
-            s.fit_continuum(mask=[-200,300,500,1100],domain=xlim,Legendre=3)
-               #-------------------------------------------------------------------------------
-               # DETOUR 1--->
-
-                #Alternative Fit continuum methods.
-                #s.fit_continuum_ransac(window=149,mednorm=False)
-
-               #-------------------------------------------------------------------------------
-               # DETOUR 2--->
-
-                #Aternate continuum fitting method [interactive]
-                s.fit_continuum(Interactive=True)
-                #Aternate continuum fitting method [input prefit continuum]
-                # Length of prefit continuum array = length of sliced spectrum
-                s.fit_continuum(Legendre=False,prefit_cont=cont_arrary)
-               #-------------------------------------------------------------------------------
-
-
-            #Compute EW
-            #Compute equivalent width within a velocity window
-            s.compute_EW(transition,vmin=-200.,vmax=360.);
-
-            #save everything as a pickle file
-            s.save_slice('outfile.p')
-
-            #plot the Full spectrum
-            s.plot_spec()
-
-            #Plot the sliced spectrum with the fitted continuum
-            s.plot_slice()
-
-            #plot the sliced and fitted continuum
-            #Plot stuff
-            plt.subplot(2,1,1)
-            plt.step(s.velo,s.flux_slice)
-            plt.step(s.velo,s.flux_slice/s.fnorm)
-            plt.xlim(xlim)
-            plt.subplot(2,1,2)
-            plt.step(s.velo,s.fnorm)
-            plt.plot([-1500,1500],[1,1],'--')
-            plt.xlim(xlim)
-            plt.show()
-    --------------------------------------------------------------------------------------------
+                # List of absorber redshifts
+                zabs=[0.511020,1.026311,1.564481]
+                transition= 2796.3
+                #Which absorber to analyze
+                index=0
+                filename='Quasar_Spectrum.fits'
+                #Read in file
+                s=r.from_file(filename,filetype='linetools')
+                   #-------------------------------------------------------------------------------
+                   # DETOUR --->
+                   #ALTERNATIVE 
+                   #IF YOU WANT TO DIRECTLY INJEST NUMPY ARRAYS DO THE FOLLOWING
+                   s=r.from_data(wave,flux,error)
+                   # HERE wave,flux,error are numpy arrays of wavelength,flux and error respectively.
+                   #-------------------------------------------------------------------------------
+    
+                #Shift spectra to rest frame
+                s.shift_spec(zabs[index]);
+                #Velocity window around transition
+                xlim=[-1500,1500]
+                
+                #Slice Spectrum within that window
+                s.slice_spec(transition,xlim[0],xlim[1],use_vel=True);
+    
+                #Fit continuum Mask the regions defined by velocity
+                s.fit_continuum(mask=[-200,300,500,1100],domain=xlim,Legendre=3)
+                   #-------------------------------------------------------------------------------
+                   # DETOUR 1--->
+    
+                    #Alternative Fit continuum methods.
+                    #s.fit_continuum_ransac(window=149,mednorm=False)
+    
+                   #-------------------------------------------------------------------------------
+                   # DETOUR 2--->
+    
+                    #Aternate continuum fitting method [interactive]
+                    s.fit_continuum(Interactive=True)
+                    #Aternate continuum fitting method [input prefit continuum]
+                    # Length of prefit continuum array = length of sliced spectrum
+                    s.fit_continuum(Legendre=False,prefit_cont=cont_arrary)
+                   #-------------------------------------------------------------------------------
+    
+    
+                #Compute EW
+                #Compute equivalent width within a velocity window
+                s.compute_EW(transition,vmin=-200.,vmax=360.);
+    
+                #save everything as a pickle file
+                s.save_slice('outfile.p')
+    
+                #plot the Full spectrum
+                s.plot_spec()
+    
+                #Plot the sliced spectrum with the fitted continuum
+                s.plot_slice()
+    
+                #plot the sliced and fitted continuum
+                #Plot stuff
+                plt.subplot(2,1,1)
+                plt.step(s.velo,s.flux_slice)
+                plt.step(s.velo,s.flux_slice/s.fnorm)
+                plt.xlim(xlim)
+                plt.subplot(2,1,2)
+                plt.step(s.velo,s.fnorm)
+                plt.plot([-1500,1500],[1,1],'--')
+                plt.xlim(xlim)
+                plt.show()
+        --------------------------------------------------------------------------------------------
 
     """
     def __init__(self,wave,flux,error,filename=False):#,filetype=False, efil=None,**kwargs):

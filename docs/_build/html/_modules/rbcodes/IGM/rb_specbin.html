@@ -1,0 +1,177 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>rbcodes.IGM.rb_specbin &#8212; rbcodes 0.1.3 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinxdoc.css" />
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">rbcodes 0.1.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">rbcodes.IGM.rb_specbin</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for rbcodes.IGM.rb_specbin</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot; Rebin 1D spectrum to new pixel scale.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="c1">#binning function</span>
+<span class="c1">#bins up 1D spectra in integer pixels. </span>
+<span class="c1">#The routine returns a structure of flux and wavelength and variance that has been rebinned.</span>
+<div class="viewcode-block" id="rb_specbin"><a class="viewcode-back" href="../../../rbcodes.IGM.html#rbcodes.IGM.rb_specbin.rb_specbin">[docs]</a><span class="k">def</span> <span class="nf">rb_specbin</span><span class="p">(</span><span class="n">flux</span><span class="p">,</span><span class="n">nbin</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    --------------------------------------------------------------------------------</span>
+<span class="sd">       This is a translation of x_specbin.pro from xidl. </span>
+<span class="sd">      </span>
+<span class="sd">       This function bins up 1D spectra in integer pixels. The routine returns a</span>
+<span class="sd">       structure of flux and wavelength and variance that has been rebinned.</span>
+<span class="sd">     </span>
+<span class="sd">      CALLING SEQUENCE:</span>
+<span class="sd">        bin = x_specbin(fx, nbin WAV, var)</span>
+<span class="sd">     </span>
+<span class="sd">      Parameters:</span>
+<span class="sd">      -----------</span>
+<span class="sd">     </span>
+<span class="sd">        fx       - Flux</span>
+<span class="sd">        nbin     - Number of pixels to bin on</span>
+<span class="sd">     </span>
+<span class="sd">      Returns:</span>
+<span class="sd">      --------</span>
+<span class="sd">        bin       - Structure of data</span>
+<span class="sd">     </span>
+<span class="sd">     </span>
+<span class="sd">       Optional Input: </span>
+<span class="sd">       VAR=  -- Input variance array</span>
+<span class="sd">       WAV=  -- Input wavelength array</span>
+<span class="sd">     </span>
+<span class="sd">      EXAMPLES:</span>
+<span class="sd">        bin = rb_specbin(fx, 3)</span>
+<span class="sd">     </span>
+<span class="sd">     </span>
+<span class="sd">      REVISION HISTORY:</span>
+<span class="sd">       Written by RB. June 2015</span>
+<span class="sd">     -</span>
+<span class="sd">     ------------------------------------------------------------------------------</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">TF</span><span class="o">=</span><span class="mi">0</span>
+    <span class="n">TFF</span><span class="o">=</span><span class="mi">0</span>
+    <span class="k">if</span> <span class="s1">&#39;var&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+        <span class="n">var</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;var&#39;</span><span class="p">]</span>
+        <span class="n">TF</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="k">if</span> <span class="s1">&#39;wave&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+        <span class="n">wave</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;wave&#39;</span><span class="p">]</span>
+        <span class="n">TFF</span> <span class="o">=</span> <span class="mi">1</span>
+        
+
+    <span class="n">wavePixels</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">flux</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">wavePixels</span> <span class="o">%</span> <span class="n">nbin</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">numPix</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">wavePixels</span><span class="o">/</span><span class="n">nbin</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">numPix</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">wavePixels</span><span class="o">/</span><span class="n">nbin</span><span class="p">)</span>
+    <span class="n">first</span> <span class="o">=</span> <span class="n">wavePixels</span> <span class="o">%</span> <span class="n">nbin</span>
+    <span class="k">if</span> <span class="n">first</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">first</span> <span class="o">=</span> <span class="n">nbin</span>
+    <span class="n">newFlux</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">numPix</span><span class="p">,)</span>
+    <span class="n">newVar</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">numPix</span><span class="p">,)</span>
+    <span class="n">newWave</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">numPix</span><span class="p">,)</span> 
+    <span class="c1"># Binning</span>
+    <span class="k">for</span> <span class="n">qq</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">numPix</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span> 
+        <span class="n">ii</span> <span class="o">=</span> <span class="n">qq</span><span class="o">*</span><span class="n">nbin</span>
+        <span class="n">index</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">ii</span><span class="p">,</span><span class="n">ii</span><span class="o">+</span><span class="n">nbin</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">qq</span> <span class="o">!=</span> <span class="n">numPix</span><span class="p">:</span> 
+            <span class="c1">#add them up</span>
+            <span class="n">newFlux</span><span class="p">[</span><span class="n">qq</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">flux</span><span class="p">[</span><span class="n">index</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">TF</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">newVar</span><span class="p">[</span><span class="n">qq</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">var</span><span class="p">[</span><span class="n">index</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">TFF</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">newWave</span><span class="p">[</span><span class="n">qq</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">wave</span><span class="p">[</span><span class="n">index</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span> <span class="c1">#last pixel</span>
+            <span class="n">index</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">ii</span><span class="p">,</span><span class="n">ii</span><span class="o">+</span><span class="n">first</span><span class="p">))</span>
+            <span class="n">newFlux</span><span class="p">[</span><span class="n">qq</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">flux</span><span class="p">[</span><span class="n">index</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">TF</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">newVar</span><span class="p">[</span><span class="n">qq</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">var</span><span class="p">[</span><span class="n">index</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">TFF</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">newWave</span><span class="p">[</span><span class="n">qq</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">wave</span><span class="p">[</span><span class="n">index</span><span class="p">])</span>
+    <span class="n">output</span><span class="o">=</span><span class="p">{}</span>
+    <span class="n">output</span><span class="p">[</span><span class="s1">&#39;flux&#39;</span><span class="p">]</span><span class="o">=</span><span class="n">newFlux</span>
+
+    <span class="c1">#returns = newFlux</span>
+    <span class="k">if</span> <span class="n">TF</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="c1">#newVar is in second column of returns</span>
+        <span class="c1">#returns = np.append(returns,newVar,axis = 1)</span>
+        <span class="n">output</span><span class="p">[</span><span class="s1">&#39;error&#39;</span><span class="p">]</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">newVar</span><span class="o">/</span><span class="n">nbin</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">TFF</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="c1">#returns = np.append(returns,newWave,axis = 1)</span>
+        <span class="n">output</span><span class="p">[</span><span class="s1">&#39;wave&#39;</span><span class="p">]</span><span class="o">=</span><span class="n">newWave</span>
+
+
+
+    <span class="k">return</span> <span class="n">output</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">rbcodes 0.1.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">rbcodes.IGM.rb_specbin</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2022, Rongmon Bordoloi.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.0.2.
+    </div>
+  </body>
+</html>

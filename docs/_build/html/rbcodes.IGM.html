@@ -1,0 +1,446 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>rbcodes.IGM package &#8212; rbcodes 0.1.3 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinxdoc.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">rbcodes 0.1.3 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">rbcodes.IGM package</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="rbcodes-igm-package">
+<h1>rbcodes.IGM package<a class="headerlink" href="#rbcodes-igm-package" title="Permalink to this headline">¶</a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="module-rbcodes.IGM.compute_EW">
+<span id="rbcodes-igm-compute-ew-module"></span><h2>rbcodes.IGM.compute_EW module<a class="headerlink" href="#module-rbcodes.IGM.compute_EW" title="Permalink to this headline">¶</a></h2>
+<p>Function to compute the equivalent width within a given velocity limits.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="rbcodes.IGM.compute_EW.compute_EW">
+<span class="sig-prename descclassname"><span class="pre">rbcodes.IGM.compute_EW.</span></span><span class="sig-name descname"><span class="pre">compute_EW</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lam</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wrest</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lmts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flx_err</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/compute_EW.html#compute_EW"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.compute_EW.compute_EW" title="Permalink to this definition">¶</a></dt>
+<dd><blockquote>
+<div><blockquote>
+<div><dl class="simple">
+<dt>Function to compute the equivalent width within a given velocity limits lmts=[vmin,vmax]</dt><dd><p>[Only good for high resolution spectra]</p>
+</dd>
+</dl>
+</div></blockquote>
+<p>Caveats:- Not automated, must not include other absorption troughs within the velocity range.</p>
+<blockquote>
+<div><dl>
+<dt>Parameters:-</dt><dd><p>lam         :- Observed Wavelength vector (units of Angstrom)
+flx         :- flux vector ( same length as wavelgnth vector, preferably continuum normalized)
+wrest       :- rest frame wavelength of the line [used to make velcity cuts]
+lmts        :- [vmin,vmax], the velocity window within which equivalent width is computed.
+flx_err     :- error spectrum [same length as the flux vector]</p>
+</dd>
+<dt>OPTIONAL :-</dt><dd><blockquote>
+<div><p>f0=f0       :- fvalue of the transition
+zabs=zabs   :- absorber redshift
+plot        :- plot keyword, default = no plots plot=0</p>
+<blockquote>
+<div><dl class="simple">
+<dt>plot=1 or anything else will plot the corresponding spectrum</dt><dd><p>and the apparent optical depth of absorption.</p>
+</dd>
+</dl>
+</div></blockquote>
+</div></blockquote>
+<dl class="simple">
+<dt>Returns:-  In a Python dictionary format</dt><dd><p>output[‘ew_tot’]      :- rest frame equivalent width of the absorpiton system [Angstrom]
+output[‘err_ew_tot’]  :- error on rest fram equivalent width
+output[‘col’]         :- AOD column denisty
+output[‘colerr’]      :- 1 sigma error on AOD column density
+output[‘n’]           :- AOD column density as a function of velocity
+output[‘Tau_a’]       :- AOD as a function of velocity
+output[‘med_vel’]     :- velocity centroid (Median Equivalent Width weighted velocity within lmts)
+output[‘vel_disp’]    : 1 sigma velocity dispersion
+output[‘vel50_err’]   : error on velocity centroid</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>Written :- Rongmon Bordoloi                             2nd November 2016</p>
+</div></blockquote>
+</div></blockquote>
+<ul>
+<li><p>I translated this from my matlab code compute_EW.m, which in turn is from Chris Thom’s eqwrange.pro.
+This was tested with COS-Halos/Dwarfs data.
+Edit:  RB July 5 2017. Output is a dictionary. Edited minor dictionary arrangement</p>
+<blockquote>
+<div><p>RB July 25 2019. Added med_vel
+RB April 28, 2021, changed med_vel to weight be EW &amp; vel_disp</p>
+</div></blockquote>
+</li>
+</ul>
+</dd></dl>
+
+</section>
+<section id="module-rbcodes.IGM.lens_sep">
+<span id="rbcodes-igm-lens-sep-module"></span><h2>rbcodes.IGM.lens_sep module<a class="headerlink" href="#module-rbcodes.IGM.lens_sep" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="module-rbcodes.IGM.lens_sep_to_kpc">
+<span id="rbcodes-igm-lens-sep-to-kpc-module"></span><h2>rbcodes.IGM.lens_sep_to_kpc module<a class="headerlink" href="#module-rbcodes.IGM.lens_sep_to_kpc" title="Permalink to this headline">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="rbcodes.IGM.lens_sep_to_kpc.lens_sep_to_kpc">
+<span class="sig-prename descclassname"><span class="pre">rbcodes.IGM.lens_sep_to_kpc.</span></span><span class="sig-name descname"><span class="pre">lens_sep_to_kpc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">delta_arcsec</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zabs_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z_lens</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z_source</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/lens_sep_to_kpc.html#lens_sep_to_kpc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.lens_sep_to_kpc.lens_sep_to_kpc" title="Permalink to this definition">¶</a></dt>
+<dd><blockquote>
+<div><p>Function to compute physical separation between sightlines in a lensed quasar system.
+Input:-</p>
+<blockquote>
+<div><p>delta_arcsec      :- Angular separation between two quasars in arcsecond
+zabs_list         :- List of absorber redshifts for which we want to compute physical separation
+z_lens            :- Lens galaxy redshift
+z_source          :- background Quasar redshift</p>
+</div></blockquote>
+<dl class="simple">
+<dt>Output:-</dt><dd><p>distlist          :- numpy array with physical Separation for each absorber redshift in kpc</p>
+</dd>
+<dt>Example:-</dt><dd><p>&gt;from IGM import lens_sep_to_kpc as l
+&gt; delta_arcsec=1. # 1 arcsecond separation
+&gt; zabs_list =[.2, .5,1.2,2.]
+&gt;z_lens =0.55
+&gt;z_source =3.5
+&gt; out = l.lens_sep_to_kpc(delta_arcsec,zabs_list,z_lens,z_source)</p>
+</dd>
+</dl>
+<p>Written :- Rongmon Bordoloi                           March 2 2021</p>
+<p>Equation used is the equation (5) from Cooke et al 2010.
+[Cooke, R., Pettini, M., Steidel, C. C., et al. 2010, MNRAS, 409, 679]
+Uses Planck 2018 LambdaCDM cosmology</p>
+</div></blockquote>
+</dd></dl>
+
+</section>
+<section id="module-rbcodes.IGM.ransac_contfit">
+<span id="rbcodes-igm-ransac-contfit-module"></span><h2>rbcodes.IGM.ransac_contfit module<a class="headerlink" href="#module-rbcodes.IGM.ransac_contfit" title="Permalink to this headline">¶</a></h2>
+<p>A continuum fitter class. This reads in a 1D spectrum and allows continuum fitting.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="rbcodes.IGM.ransac_contfit.cont_fitter">
+<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">rbcodes.IGM.ransac_contfit.</span></span><span class="sig-name descname"><span class="pre">cont_fitter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wave</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">error</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mednorm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/ransac_contfit.html#cont_fitter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.ransac_contfit.cont_fitter" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A continuum fitter class. This reads in a 1D spectrum and allows continuum fitting.
+The initial continuum is fitted using a random sample consensus model.
+Then user has the option to tweak the fitted continuum by hand usling interactive
+linetools API and/or save the spectrum object.</p>
+<blockquote>
+<div><p>Attributes:</p>
+<blockquote>
+<div><dl class="simple">
+<dt>Input:</dt><dd><p>filename=input spectrum filename
+efil = input error spectrum name [If it exists, otherwise None]
+window=    default [149], smoothing window
+mednorm = False [default], if set normalizes the spectrum with median value</p>
+</dd>
+</dl>
+<p>output: This gives a cont_fitter object with following attributes:</p>
+<p>self.wave= wavelength</p>
+<p>self.flux= Flux
+self.error= error
+self.cont= Fitted continuum</p>
+</div></blockquote>
+<p>Written : Rongmon Bordoloi      August 2020
+Edit    : Rongmon Bordoloi      March 2022: Added more input options</p>
+<dl>
+<dt>EXAMPLE:</dt><dd><blockquote>
+<div><p>from IGM import ransac_contfit as c</p>
+</div></blockquote>
+<dl>
+<dt>Two ways to read in spectrum, from file:</dt><dd><blockquote>
+<div><p>#efil = optional if error spectrum is defined in another file</p>
+</div></blockquote>
+<p>sp=c.cont_fitter.from_file(fluxfilename,efil=errorfilename)</p>
+</dd>
+<dt>or from input wave,flux,error array.</dt><dd><p>sp=c.cont_fitter.from_data(wave,flux,error=error)</p>
+</dd>
+<dt>Now fit continuum</dt><dd><p>sp=c.fit_continuum(window=149)</p>
+<p>#AND YOU ARE DONE.</p>
+<p>#OPTIONAL:</p>
+<p>#Tweak the fitted continuum
+sp.tweak_continuum()</p>
+<p>#Show new continuum
+sp.plot_spectrum()</p>
+<p>#Save it as a fits file
+sp.save_spectrum(outputfilename)</p>
+</dd>
+</dl>
+<p># If the user wants to tweak an old fitted continuum, do the following sequence with linetools…
+—-&gt;
+from linetools.spectra.xspectrum1d import XSpectrum1D
+sp=XSpectrum1D.from_file(filename)
+sp.fit_continuum()</p>
+</dd>
+</dl>
+</div></blockquote>
+<dl class="py method">
+<dt class="sig sig-object py" id="rbcodes.IGM.ransac_contfit.cont_fitter.fit_continuum">
+<span class="sig-name descname"><span class="pre">fit_continuum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">window</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">149</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/ransac_contfit.html#cont_fitter.fit_continuum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.ransac_contfit.cont_fitter.fit_continuum" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="rbcodes.IGM.ransac_contfit.cont_fitter.from_data">
+<em class="property"><span class="pre">classmethod</span> </em><span class="sig-name descname"><span class="pre">from_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wave</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mednorm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/ransac_contfit.html#cont_fitter.from_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.ransac_contfit.cont_fitter.from_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>read spectrum from input wave,flux,error array.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="rbcodes.IGM.ransac_contfit.cont_fitter.from_file">
+<em class="property"><span class="pre">classmethod</span> </em><span class="sig-name descname"><span class="pre">from_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">efil</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mednorm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/ransac_contfit.html#cont_fitter.from_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.ransac_contfit.cont_fitter.from_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read spectrum from filename given.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="rbcodes.IGM.ransac_contfit.cont_fitter.plot_spectrum">
+<span class="sig-name descname"><span class="pre">plot_spectrum</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/ransac_contfit.html#cont_fitter.plot_spectrum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.ransac_contfit.cont_fitter.plot_spectrum" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="rbcodes.IGM.ransac_contfit.cont_fitter.prepare_data">
+<span class="sig-name descname"><span class="pre">prepare_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">window</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">149</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/ransac_contfit.html#cont_fitter.prepare_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.ransac_contfit.cont_fitter.prepare_data" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="rbcodes.IGM.ransac_contfit.cont_fitter.run_ransac">
+<span class="sig-name descname"><span class="pre">run_ransac</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">window</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">149</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/ransac_contfit.html#cont_fitter.run_ransac"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.ransac_contfit.cont_fitter.run_ransac" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="rbcodes.IGM.ransac_contfit.cont_fitter.save_spectrum">
+<span class="sig-name descname"><span class="pre">save_spectrum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/ransac_contfit.html#cont_fitter.save_spectrum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.ransac_contfit.cont_fitter.save_spectrum" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="rbcodes.IGM.ransac_contfit.cont_fitter.tweak_continuum">
+<span class="sig-name descname"><span class="pre">tweak_continuum</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/ransac_contfit.html#cont_fitter.tweak_continuum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.ransac_contfit.cont_fitter.tweak_continuum" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-rbcodes.IGM.rb_iter_contfit">
+<span id="rbcodes-igm-rb-iter-contfit-module"></span><h2>rbcodes.IGM.rb_iter_contfit module<a class="headerlink" href="#module-rbcodes.IGM.rb_iter_contfit" title="Permalink to this headline">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="rbcodes.IGM.rb_iter_contfit.rb_iter_contfit">
+<span class="sig-prename descclassname"><span class="pre">rbcodes.IGM.rb_iter_contfit.</span></span><span class="sig-name descname"><span class="pre">rb_iter_contfit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wave</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">error</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/rb_iter_contfit.html#rb_iter_contfit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.rb_iter_contfit.rb_iter_contfit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterative continuum fitter using Legendre polynomials
+Input:  -</p>
+<blockquote>
+<div><blockquote>
+<div><p>wavelength array
+flux array
+error array</p>
+</div></blockquote>
+<dl class="simple">
+<dt>optional input:</dt><dd><p>maxiter :-  maximum iteration [25 default]
+order   :-  polynomial order of fit [4 default]</p>
+</dd>
+</dl>
+</div></blockquote>
+<dl class="simple">
+<dt>output: -</dt><dd><p>fit_final : Final fitted continuum array
+resid_final : residual error array
+fit_error  : error on the fit [standard deviation of the residual]</p>
+</dd>
+</dl>
+<p>Written by:  Rongmon Bordoloi
+Tested on Python 3.7  Sep 4 2019
+————————–</p>
+<dl>
+<dt>example :</dt><dd><p>from IGM import rb_iter_contfit as r
+out= r.rb_iter_contfit(wave,flux,error,order=5)</p>
+<p>out[0] = fitted continuum</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-rbcodes.IGM.rb_setline">
+<span id="rbcodes-igm-rb-setline-module"></span><h2>rbcodes.IGM.rb_setline module<a class="headerlink" href="#module-rbcodes.IGM.rb_setline" title="Permalink to this headline">¶</a></h2>
+<p>Read in atomic line information for a given or approximate rest frame  wavelength.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="rbcodes.IGM.rb_setline.rb_setline">
+<span class="sig-prename descclassname"><span class="pre">rbcodes.IGM.rb_setline.</span></span><span class="sig-name descname"><span class="pre">rb_setline</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lambda_rest</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">linelist</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'atom'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/rb_setline.html#rb_setline"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.rb_setline.rb_setline" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="simple">
+<dt>Function to read in atomic line information for a given rest frame  wavelength.</dt><dd><p>Or</p>
+</dd>
+</dl>
+<p>For the line matching the closest wavelength.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>lambda_rest</strong> – <dl class="simple">
+<dt>method     :-    ‘closest’ -&gt;  If set will match the closest line.</dt><dd><p>’Exact’  -&gt;  If set will match the exact wavelength.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><strong>dic</strong></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p>Dictionary with fval,lambda and species name.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p>Example:   str=rb_setline(2796.3,’closest’)</p>
+<p>Written By: Rongmon Bordoloi                Jan 2018, Python 2.7
+Edit:       Rongmon Bordoloi                            Sep 2018, Depreciated kwargs to be compatible with python 3</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="rbcodes.IGM.rb_setline.read_line_list">
+<span class="sig-prename descclassname"><span class="pre">rbcodes.IGM.rb_setline.</span></span><span class="sig-name descname"><span class="pre">read_line_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">label</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/rb_setline.html#read_line_list"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.rb_setline.read_line_list" title="Permalink to this definition">¶</a></dt>
+<dd><p>Module to read a linelist defined by the label</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>lable</strong> (<em>Label string</em><em> [</em><em>e.g. atom</em><em>, </em><em>LLS</em><em>, </em><em>LLS Small</em><em>, </em><em>LBG</em><em>, </em><em>Gal</em><em>, </em><em>Eiger_Strong</em><em>]</em>) – Must include redshift</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>a dictionary with wrest, ion name and fvalues</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-rbcodes.IGM.rb_specbin">
+<span id="rbcodes-igm-rb-specbin-module"></span><h2>rbcodes.IGM.rb_specbin module<a class="headerlink" href="#module-rbcodes.IGM.rb_specbin" title="Permalink to this headline">¶</a></h2>
+<p>Rebin 1D spectrum to new pixel scale.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="rbcodes.IGM.rb_specbin.rb_specbin">
+<span class="sig-prename descclassname"><span class="pre">rbcodes.IGM.rb_specbin.</span></span><span class="sig-name descname"><span class="pre">rb_specbin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nbin</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/rb_specbin.html#rb_specbin"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.rb_specbin.rb_specbin" title="Permalink to this definition">¶</a></dt>
+<dd><blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>This is a translation of x_specbin.pro from xidl.</p>
+<p>This function bins up 1D spectra in integer pixels. The routine returns a
+structure of flux and wavelength and variance that has been rebinned.</p>
+</div></blockquote>
+<dl class="simple">
+<dt>CALLING SEQUENCE:</dt><dd><p>bin = x_specbin(fx, nbin WAV, var)</p>
+</dd>
+</dl>
+<blockquote>
+<div><p>fx       - Flux
+nbin     - Number of pixels to bin on</p>
+</div></blockquote>
+<blockquote>
+<div><blockquote>
+<div><p>bin       - Structure of data</p>
+</div></blockquote>
+<p>Optional Input:
+VAR=  – Input variance array
+WAV=  – Input wavelength array</p>
+</div></blockquote>
+<dl class="simple">
+<dt>EXAMPLES:</dt><dd><p>bin = rb_specbin(fx, 3)</p>
+</dd>
+<dt>REVISION HISTORY:</dt><dd><p>Written by RB. June 2015</p>
+</dd>
+</dl>
+</div></blockquote>
+<ul class="simple">
+<li></li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
+</section>
+<section id="module-rbcodes.IGM">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-rbcodes.IGM" title="Permalink to this headline">¶</a></h2>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">rbcodes.IGM package</a><ul>
+<li><a class="reference internal" href="#submodules">Submodules</a></li>
+<li><a class="reference internal" href="#module-rbcodes.IGM.compute_EW">rbcodes.IGM.compute_EW module</a></li>
+<li><a class="reference internal" href="#module-rbcodes.IGM.lens_sep">rbcodes.IGM.lens_sep module</a></li>
+<li><a class="reference internal" href="#module-rbcodes.IGM.lens_sep_to_kpc">rbcodes.IGM.lens_sep_to_kpc module</a></li>
+<li><a class="reference internal" href="#module-rbcodes.IGM.ransac_contfit">rbcodes.IGM.ransac_contfit module</a></li>
+<li><a class="reference internal" href="#module-rbcodes.IGM.rb_iter_contfit">rbcodes.IGM.rb_iter_contfit module</a></li>
+<li><a class="reference internal" href="#module-rbcodes.IGM.rb_setline">rbcodes.IGM.rb_setline module</a></li>
+<li><a class="reference internal" href="#module-rbcodes.IGM.rb_specbin">rbcodes.IGM.rb_specbin module</a></li>
+<li><a class="reference internal" href="#module-rbcodes.IGM">Module contents</a></li>
+</ul>
+</li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/rbcodes.IGM.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">rbcodes 0.1.3 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">rbcodes.IGM package</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2022, Rongmon Bordoloi.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.0.2.
+    </div>
+  </body>
+</html>

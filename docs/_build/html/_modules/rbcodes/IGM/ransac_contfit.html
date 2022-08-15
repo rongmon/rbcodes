@@ -1,0 +1,302 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>rbcodes.IGM.ransac_contfit &#8212; rbcodes 0.1.3 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinxdoc.css" />
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">rbcodes 0.1.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">rbcodes.IGM.ransac_contfit</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for rbcodes.IGM.ransac_contfit</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot; A continuum fitter class. This reads in a 1D spectrum and allows continuum fitting.&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">print_function</span><span class="p">,</span> <span class="n">absolute_import</span><span class="p">,</span> <span class="n">division</span><span class="p">,</span> <span class="n">unicode_literals</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib</span>
+<span class="n">matplotlib</span><span class="o">.</span><span class="n">use</span><span class="p">(</span><span class="s1">&#39;Qt5Agg&#39;</span><span class="p">)</span> <span class="c1">#python 3 only</span>
+<span class="c1">#import ipdb</span>
+<span class="kn">from</span> <span class="nn">linetools.spectra</span> <span class="kn">import</span> <span class="n">io</span> <span class="k">as</span> <span class="n">tio</span>
+<span class="kn">from</span> <span class="nn">scipy.signal</span> <span class="kn">import</span> <span class="n">medfilt</span>
+<span class="kn">from</span> <span class="nn">scipy.signal</span> <span class="kn">import</span> <span class="n">find_peaks</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">from</span> <span class="nn">sklearn.linear_model</span> <span class="kn">import</span> <span class="n">RANSACRegressor</span>
+<span class="kn">from</span> <span class="nn">linetools.spectra.xspectrum1d</span> <span class="kn">import</span> <span class="n">XSpectrum1D</span>
+
+
+<div class="viewcode-block" id="cont_fitter"><a class="viewcode-back" href="../../../rbcodes.IGM.html#rbcodes.IGM.ransac_contfit.cont_fitter">[docs]</a><span class="k">class</span> <span class="nc">cont_fitter</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">   A continuum fitter class. This reads in a 1D spectrum and allows continuum fitting.</span>
+<span class="sd">   The initial continuum is fitted using a random sample consensus model.</span>
+<span class="sd">   Then user has the option to tweak the fitted continuum by hand usling interactive </span>
+<span class="sd">   linetools API and/or save the spectrum object.</span>
+
+
+<span class="sd">    Attributes:</span>
+
+<span class="sd">        Input:</span>
+<span class="sd">              filename=input spectrum filename</span>
+<span class="sd">              efil = input error spectrum name [If it exists, otherwise None]</span>
+<span class="sd">              window=    default [149], smoothing window</span>
+<span class="sd">              mednorm = False [default], if set normalizes the spectrum with median value</span>
+
+
+<span class="sd">        output: This gives a cont_fitter object with following attributes:</span>
+
+<span class="sd">        self.wave= wavelength</span>
+
+<span class="sd">        self.flux= Flux</span>
+<span class="sd">        self.error= error</span>
+<span class="sd">        self.cont= Fitted continuum </span>
+
+
+<span class="sd">    Written : Rongmon Bordoloi      August 2020</span>
+<span class="sd">    Edit    : Rongmon Bordoloi      March 2022: Added more input options</span>
+
+<span class="sd">    Based on RANSAC continuum fitter written by Bin Liu Summer 2020.</span>
+<span class="sd">    --------------------------------------------------------------------------------------------</span>
+<span class="sd">    EXAMPLE: </span>
+<span class="sd">               from IGM import ransac_contfit as c </span>
+
+<span class="sd">            Two ways to read in spectrum, from file: </span>
+<span class="sd">                 #efil = optional if error spectrum is defined in another file</span>
+<span class="sd">               sp=c.cont_fitter.from_file(fluxfilename,efil=errorfilename)</span>
+
+<span class="sd">            or from input wave,flux,error array. </span>
+<span class="sd">               sp=c.cont_fitter.from_data(wave,flux,error=error)</span>
+<span class="sd">            </span>
+
+<span class="sd">            Now fit continuum</span>
+<span class="sd">               sp=c.fit_continuum(window=149)</span>
+
+<span class="sd">               #AND YOU ARE DONE.</span>
+
+<span class="sd">               #OPTIONAL:</span>
+
+<span class="sd">               #Tweak the fitted continuum </span>
+<span class="sd">               sp.tweak_continuum()</span>
+
+<span class="sd">               #Show new continuum</span>
+<span class="sd">               sp.plot_spectrum()</span>
+
+<span class="sd">               #Save it as a fits file</span>
+<span class="sd">               sp.save_spectrum(outputfilename)</span>
+
+<span class="sd">            # If the user wants to tweak an old fitted continuum, do the following sequence with linetools...</span>
+<span class="sd">            ----&gt;</span>
+<span class="sd">            from linetools.spectra.xspectrum1d import XSpectrum1D</span>
+<span class="sd">            sp=XSpectrum1D.from_file(filename)</span>
+<span class="sd">            sp.fit_continuum()</span>
+
+
+
+<span class="sd">    --------------------------------------------------------------------------------------------</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+     
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">wave</span><span class="p">,</span><span class="n">flux</span><span class="p">,</span><span class="n">error</span><span class="p">,</span><span class="n">mednorm</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Initializing RANSAC continuum fitter&#39;</span><span class="p">)</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="o">=</span><span class="n">wave</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="o">=</span><span class="n">flux</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error</span><span class="o">=</span><span class="n">error</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mednorm</span><span class="o">=</span><span class="n">mednorm</span>
+
+<div class="viewcode-block" id="cont_fitter.from_file"><a class="viewcode-back" href="../../../rbcodes.IGM.html#rbcodes.IGM.ransac_contfit.cont_fitter.from_file">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_file</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span><span class="n">filename</span><span class="p">,</span><span class="n">efil</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">mednorm</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Read spectrum from filename given.        </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">sp</span><span class="o">=</span><span class="n">tio</span><span class="o">.</span><span class="n">readspec</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span><span class="n">inflg</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">efil</span><span class="o">=</span><span class="n">efil</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">wave</span><span class="o">=</span><span class="n">sp</span><span class="o">.</span><span class="n">wavelength</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">if</span> <span class="n">mednorm</span> <span class="o">==</span><span class="kc">True</span><span class="p">:</span>
+            <span class="n">cnt</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">nanmedian</span><span class="p">(</span><span class="n">sp</span><span class="o">.</span><span class="n">flux</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cnt</span><span class="o">=</span><span class="mf">1.</span>
+
+        <span class="n">flux</span><span class="o">=</span><span class="n">sp</span><span class="o">.</span><span class="n">flux</span><span class="o">.</span><span class="n">value</span><span class="o">/</span><span class="n">cnt</span>
+
+        <span class="k">if</span> <span class="n">sp</span><span class="o">.</span><span class="n">sig_is_set</span> <span class="o">==</span> <span class="kc">False</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Assuiming arbitrary 10</span><span class="si">% e</span><span class="s1">rror on flux&#39;</span><span class="p">)</span>
+            <span class="n">error</span><span class="o">=</span><span class="mf">0.1</span><span class="o">*</span><span class="n">flux</span><span class="o">/</span><span class="n">cnt</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">error</span><span class="o">=</span><span class="n">sp</span><span class="o">.</span><span class="n">sig</span><span class="o">.</span><span class="n">value</span><span class="o">/</span><span class="n">cnt</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">wave</span><span class="p">,</span><span class="n">flux</span><span class="p">,</span><span class="n">error</span><span class="p">,</span><span class="n">mednorm</span><span class="o">=</span><span class="n">mednorm</span><span class="p">)</span></div>
+
+        <span class="c1">#self.wave=wave</span>
+        <span class="c1">#self.flux=flux</span>
+        <span class="c1">#self.error=error</span>
+        <span class="c1">#self.mednorm=mednorm</span>
+        
+<div class="viewcode-block" id="cont_fitter.from_data"><a class="viewcode-back" href="../../../rbcodes.IGM.html#rbcodes.IGM.ransac_contfit.cont_fitter.from_data">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_data</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">wave</span><span class="p">,</span><span class="n">flux</span><span class="p">,</span><span class="n">mednorm</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; read spectrum from input wave,flux,error array. </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">mednorm</span> <span class="o">==</span><span class="kc">True</span><span class="p">:</span>
+            <span class="n">cnt</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">nanmedian</span><span class="p">(</span><span class="n">flux</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cnt</span><span class="o">=</span><span class="mf">1.</span>
+
+        <span class="n">flux</span><span class="o">=</span><span class="n">flux</span><span class="o">/</span><span class="n">cnt</span>
+
+        <span class="k">if</span> <span class="s1">&#39;error&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">error</span><span class="o">=</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;error&#39;</span><span class="p">]</span><span class="o">/</span><span class="n">cnt</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Assuiming arbitrary 10</span><span class="si">% e</span><span class="s1">rror on flux&#39;</span><span class="p">)</span>
+            <span class="n">error</span><span class="o">=</span><span class="mf">0.1</span><span class="o">*</span><span class="n">flux</span><span class="o">/</span><span class="n">cnt</span>
+            
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">wave</span><span class="p">,</span><span class="n">flux</span><span class="p">,</span><span class="n">error</span><span class="p">,</span><span class="n">mednorm</span><span class="o">=</span><span class="n">mednorm</span><span class="p">)</span></div>
+
+        <span class="c1"># Generate</span>
+        <span class="c1">#self.flux=flux</span>
+        <span class="c1">#self.error=error</span>
+        <span class="c1">#self.wave=wave</span>
+        <span class="c1">#self.mednorm=mednorm</span>
+
+
+
+<div class="viewcode-block" id="cont_fitter.fit_continuum"><a class="viewcode-back" href="../../../rbcodes.IGM.html#rbcodes.IGM.ransac_contfit.cont_fitter.fit_continuum">[docs]</a>    <span class="k">def</span> <span class="nf">fit_continuum</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">window</span><span class="o">=</span><span class="mi">149</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prepare_data</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="n">window</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">run_ransac</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="n">window</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spectrum</span><span class="o">=</span> <span class="n">XSpectrum1D</span><span class="o">.</span><span class="n">from_tuple</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">error</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">cont</span><span class="p">),</span><span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></div>
+
+
+    
+
+<div class="viewcode-block" id="cont_fitter.prepare_data"><a class="viewcode-back" href="../../../rbcodes.IGM.html#rbcodes.IGM.ransac_contfit.cont_fitter.prepare_data">[docs]</a>    <span class="k">def</span> <span class="nf">prepare_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">window</span><span class="o">=</span><span class="mi">149</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">flx_md</span><span class="o">=</span><span class="n">medfilt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="p">,</span><span class="n">window</span><span class="p">)</span>
+        <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">peaks</span><span class="p">,</span> <span class="n">prop</span><span class="p">)</span> <span class="o">=</span> <span class="n">find_peaks</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">flx_md</span><span class="p">)</span>
+
+        <span class="c1">#interpolate the peaks</span>
+        <span class="n">peak_interp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">peaks</span><span class="p">],</span><span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">peaks</span><span class="p">])</span> 
+        <span class="n">peak_interp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">peak_interp</span><span class="p">)</span>
+
+        <span class="c1">####4. RANSAC RANSAC(spec-evenlope)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sp_diff</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">flux</span> <span class="o">-</span> <span class="n">peak_interp</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">window</span><span class="o">=</span><span class="n">window</span></div>
+
+
+<div class="viewcode-block" id="cont_fitter.run_ransac"><a class="viewcode-back" href="../../../rbcodes.IGM.html#rbcodes.IGM.ransac_contfit.cont_fitter.run_ransac">[docs]</a>    <span class="k">def</span> <span class="nf">run_ransac</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">window</span><span class="o">=</span><span class="mi">149</span><span class="p">):</span>
+        <span class="c1">#inlier_masks = []</span>
+        <span class="c1">#outlier_masks = []</span>
+        <span class="n">ransac</span> <span class="o">=</span> <span class="n">RANSACRegressor</span><span class="p">()</span>
+        <span class="n">ransac</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">sp_diff</span><span class="p">)</span>
+        <span class="c1">#inlier_masks.append(ransac.inlier_mask_)</span>
+        <span class="n">inlier_masks</span><span class="o">=</span><span class="n">ransac</span><span class="o">.</span><span class="n">inlier_mask_</span>
+
+        <span class="c1">#outlier_masks.append(np.logical_not(ransac.inlier_mask_))</span>
+        <span class="n">outlier_masks</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">logical_not</span><span class="p">(</span><span class="n">ransac</span><span class="o">.</span><span class="n">inlier_mask_</span><span class="p">)</span>
+
+        <span class="c1">####5. Use `inlier_masks` to interpolate</span>
+        <span class="n">spec_inliers</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">[</span><span class="n">inlier_masks</span><span class="p">],</span><span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="p">[</span><span class="n">inlier_masks</span><span class="p">])</span> 
+        <span class="bp">self</span><span class="o">.</span><span class="n">cont</span> <span class="o">=</span> <span class="n">medfilt</span><span class="p">(</span><span class="n">spec_inliers</span><span class="p">,</span> <span class="n">window</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="cont_fitter.save_spectrum"><a class="viewcode-back" href="../../../rbcodes.IGM.html#rbcodes.IGM.ransac_contfit.cont_fitter.save_spectrum">[docs]</a>    <span class="k">def</span> <span class="nf">save_spectrum</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">filename</span><span class="p">):</span>
+        <span class="n">spec</span><span class="o">=</span> <span class="n">XSpectrum1D</span><span class="o">.</span><span class="n">from_tuple</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">error</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">cont</span><span class="p">),</span> <span class="n">masking</span><span class="o">=</span><span class="s1">&#39;none&#39;</span><span class="p">)</span>
+        <span class="n">spec</span><span class="o">.</span><span class="n">write_to_fits</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="cont_fitter.plot_spectrum"><a class="viewcode-back" href="../../../rbcodes.IGM.html#rbcodes.IGM.ransac_contfit.cont_fitter.plot_spectrum">[docs]</a>    <span class="k">def</span> <span class="nf">plot_spectrum</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="mi">6</span><span class="p">))</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;grey&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Original Spectrum&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">flx_md</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;RunningMedFilter, &#39;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">window</span><span class="p">))</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cont</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;red&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;RANSAC fit&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Wavelength ($\AA$)&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">15</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Relative Flux &#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">15</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s1">&#39;upper right&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">ylim</span><span class="p">([</span><span class="o">-</span><span class="mf">0.01</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">+</span><span class="mi">2</span><span class="p">])</span>
+
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="cont_fitter.tweak_continuum"><a class="viewcode-back" href="../../../rbcodes.IGM.html#rbcodes.IGM.ransac_contfit.cont_fitter.tweak_continuum">[docs]</a>    <span class="k">def</span> <span class="nf">tweak_continuum</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">deltax</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">[</span><span class="mi">50</span><span class="p">]</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">knot_x</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">),</span><span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">),</span> <span class="n">deltax</span><span class="p">)</span>
+        <span class="n">knot_y</span> <span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">knot_x</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">cont</span><span class="p">)</span>
+
+        <span class="n">knots</span><span class="o">=</span><span class="p">[[</span><span class="n">knot_x</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">knot_y</span><span class="p">[</span><span class="n">i</span><span class="p">]]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">knot_x</span><span class="p">))]</span>
+
+        <span class="c1"># Get rid of previous knots </span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;_knots.jsn&quot;</span><span class="p">):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s2">&quot;_knots.jsn&quot;</span><span class="p">)</span>        
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">spectrum</span><span class="o">.</span><span class="n">fit_continuum</span><span class="p">(</span><span class="n">knots</span><span class="o">=</span><span class="n">knots</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cont</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">spectrum</span><span class="o">.</span><span class="n">co</span></div></div>
+
+
+
+
+
+
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">rbcodes 0.1.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">rbcodes.IGM.ransac_contfit</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2022, Rongmon Bordoloi.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.0.2.
+    </div>
+  </body>
+</html>

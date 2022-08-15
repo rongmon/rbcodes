@@ -1,0 +1,244 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>rbcodes.IGM.rb_setline &#8212; rbcodes 0.1.3 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinxdoc.css" />
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">rbcodes 0.1.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">rbcodes.IGM.rb_setline</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for rbcodes.IGM.rb_setline</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot; Read in atomic line information for a given or approximate rest frame  wavelength.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">print_function</span><span class="p">,</span> <span class="n">absolute_import</span><span class="p">,</span> <span class="n">division</span><span class="p">,</span> <span class="n">unicode_literals</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">astropy.io</span> <span class="kn">import</span> <span class="n">ascii</span>
+<span class="kn">from</span> <span class="nn">pkg_resources</span> <span class="kn">import</span> <span class="n">resource_filename</span>
+
+
+
+<div class="viewcode-block" id="rb_setline"><a class="viewcode-back" href="../../../rbcodes.IGM.html#rbcodes.IGM.rb_setline.rb_setline">[docs]</a><span class="k">def</span> <span class="nf">rb_setline</span><span class="p">(</span><span class="n">lambda_rest</span><span class="p">,</span><span class="n">method</span><span class="p">,</span><span class="n">linelist</span><span class="o">=</span><span class="s1">&#39;atom&#39;</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Function to read in atomic line information for a given rest frame  wavelength.</span>
+<span class="sd">                           Or </span>
+<span class="sd">    For the line matching the closest wavelength. </span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">           lambda_rest :-  Rest Frame wavelength (in \AA) of the line to match</span>
+<span class="sd">            method     :-    &#39;closest&#39; -&gt;  If set will match the closest line.</span>
+<span class="sd">                              &#39;Exact&#39;  -&gt;  If set will match the exact wavelength.</span>
+<span class="sd"> </span>
+<span class="sd">    Returns</span>
+<span class="sd">    ----------</span>
+<span class="sd">        dic :- Dictionary with fval,lambda and species name.</span>
+
+<span class="sd">    Example:   str=rb_setline(2796.3,&#39;closest&#39;)</span>
+
+
+<span class="sd">    Written By: Rongmon Bordoloi                Jan 2018, Python 2.7</span>
+<span class="sd">    Edit:       Rongmon Bordoloi                            Sep 2018, Depreciated kwargs to be compatible with python 3</span>
+<span class="sd">   &quot;&quot;&quot;</span>
+    
+    <span class="c1">#if kwargs.has_key(&#39;linelist&#39;):</span>
+    <span class="c1">#   linelist=kwargs[&#39;linelist&#39;]</span>
+    <span class="c1">#else:</span>
+    <span class="c1">#   linelist=&#39;LLS&#39;</span>
+    
+    <span class="n">line_str</span><span class="o">=</span><span class="n">read_line_list</span><span class="p">(</span><span class="n">linelist</span><span class="p">)</span>
+    <span class="n">wavelist</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">line_str</span><span class="p">),))</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">line_str</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;object&#39;</span><span class="p">)</span>
+    <span class="n">fval</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">line_str</span><span class="p">),))</span>
+    <span class="k">if</span> <span class="n">linelist</span><span class="o">==</span><span class="s1">&#39;atom&#39;</span><span class="p">:</span>
+        <span class="n">gamma</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">line_str</span><span class="p">),))</span>
+
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">wavelist</span><span class="p">)):</span>
+        <span class="n">wavelist</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">double</span><span class="p">(</span><span class="n">line_str</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;wrest&#39;</span><span class="p">])</span>
+        <span class="n">fval</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">(</span><span class="n">line_str</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;fval&#39;</span><span class="p">])</span>
+        <span class="n">name</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">str</span><span class="p">(</span><span class="n">line_str</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;ion&#39;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">linelist</span><span class="o">==</span><span class="s1">&#39;atom&#39;</span><span class="p">:</span>
+            <span class="n">gamma</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">str</span><span class="p">(</span><span class="n">line_str</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;gamma&#39;</span><span class="p">])</span>
+
+    <span class="k">if</span> <span class="n">method</span><span class="o">==</span><span class="s1">&#39;Exact&#39;</span><span class="p">:</span>
+        <span class="n">q</span><span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">lambda_rest</span><span class="o">-</span><span class="n">wavelist</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-3</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">linelist</span><span class="o">==</span><span class="s1">&#39;atom&#39;</span><span class="p">:</span>
+            <span class="n">outstr</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;wave&#39;</span><span class="p">:</span><span class="n">wavelist</span><span class="p">[</span><span class="n">q</span><span class="p">],</span><span class="s1">&#39;fval&#39;</span><span class="p">:</span><span class="n">fval</span><span class="p">[</span><span class="n">q</span><span class="p">],</span><span class="s1">&#39;name&#39;</span><span class="p">:</span><span class="n">name</span><span class="p">[</span><span class="n">q</span><span class="p">],</span><span class="s1">&#39;gamma&#39;</span><span class="p">:</span><span class="n">gamma</span><span class="p">[</span><span class="n">q</span><span class="p">]}</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">outstr</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;wave&#39;</span><span class="p">:</span><span class="n">wavelist</span><span class="p">[</span><span class="n">q</span><span class="p">],</span><span class="s1">&#39;fval&#39;</span><span class="p">:</span><span class="n">fval</span><span class="p">[</span><span class="n">q</span><span class="p">],</span><span class="s1">&#39;name&#39;</span><span class="p">:</span><span class="n">name</span><span class="p">[</span><span class="n">q</span><span class="p">]}</span>
+
+
+    <span class="k">elif</span> <span class="n">method</span><span class="o">==</span><span class="s1">&#39;closest&#39;</span><span class="p">:</span>
+        <span class="n">idx</span><span class="o">=</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">lambda_rest</span><span class="o">-</span><span class="n">wavelist</span><span class="p">))</span><span class="o">.</span><span class="n">argmin</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">linelist</span><span class="o">==</span><span class="s1">&#39;atom&#39;</span><span class="p">:</span>
+            <span class="n">outstr</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;wave&#39;</span><span class="p">:</span><span class="n">wavelist</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span><span class="s1">&#39;fval&#39;</span><span class="p">:</span><span class="n">fval</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span><span class="s1">&#39;name&#39;</span><span class="p">:</span><span class="n">name</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span><span class="s1">&#39;gamma&#39;</span><span class="p">:</span><span class="n">gamma</span><span class="p">[</span><span class="n">idx</span><span class="p">]}</span>  
+
+        <span class="k">else</span><span class="p">:</span>
+
+            <span class="n">outstr</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;wave&#39;</span><span class="p">:</span><span class="n">wavelist</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span><span class="s1">&#39;fval&#39;</span><span class="p">:</span><span class="n">fval</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span><span class="s1">&#39;name&#39;</span><span class="p">:</span><span class="n">name</span><span class="p">[</span><span class="n">idx</span><span class="p">]}</span> 
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NameError</span><span class="p">(</span><span class="s1">&#39;Specify the matching method, closest or Exact&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">outstr</span></div>
+
+
+
+<div class="viewcode-block" id="read_line_list"><a class="viewcode-back" href="../../../rbcodes.IGM.html#rbcodes.IGM.rb_setline.read_line_list">[docs]</a><span class="k">def</span> <span class="nf">read_line_list</span><span class="p">(</span><span class="n">label</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Module to read a linelist defined by the label</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    lable : Label string [e.g. atom, LLS, LLS Small, LBG, Gal, Eiger_Strong]</span>
+<span class="sd">      Must include redshift</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    ----------</span>
+<span class="sd">    a dictionary with wrest, ion name and fvalues</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+
+    <span class="k">if</span> <span class="n">label</span><span class="o">==</span><span class="s1">&#39;atom&#39;</span><span class="p">:</span>
+        <span class="n">filename</span><span class="o">=</span><span class="n">resource_filename</span><span class="p">(</span><span class="s1">&#39;IGM&#39;</span><span class="p">,</span><span class="s1">&#39;lines/atom_full.dat&#39;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">label</span> <span class="o">==</span> <span class="s1">&#39;LLS&#39;</span><span class="p">:</span>
+        <span class="n">filename</span><span class="o">=</span><span class="n">resource_filename</span><span class="p">(</span><span class="s1">&#39;IGM&#39;</span><span class="p">,</span><span class="s1">&#39;lines/lls.lst&#39;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">label</span> <span class="o">==</span> <span class="s1">&#39;LLS Small&#39;</span><span class="p">:</span>
+        <span class="n">filename</span><span class="o">=</span><span class="n">resource_filename</span><span class="p">(</span><span class="s1">&#39;IGM&#39;</span><span class="p">,</span><span class="s1">&#39;lines/lls_sub.lst&#39;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">label</span> <span class="o">==</span> <span class="s1">&#39;DLA&#39;</span><span class="p">:</span>
+        <span class="n">filename</span><span class="o">=</span><span class="n">resource_filename</span><span class="p">(</span><span class="s1">&#39;IGM&#39;</span><span class="p">,</span><span class="s1">&#39;lines/dla.lst&#39;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">label</span> <span class="o">==</span> <span class="s1">&#39;LBG&#39;</span><span class="p">:</span>
+        <span class="n">filename</span><span class="o">=</span><span class="n">resource_filename</span><span class="p">(</span><span class="s1">&#39;IGM&#39;</span><span class="p">,</span><span class="s1">&#39;lines/lbg.lst&#39;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">label</span> <span class="o">==</span> <span class="s1">&#39;Gal&#39;</span><span class="p">:</span>
+        <span class="n">filename</span><span class="o">=</span><span class="n">resource_filename</span><span class="p">(</span><span class="s1">&#39;IGM&#39;</span><span class="p">,</span><span class="s1">&#39;lines/gal_vac.lst&#39;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">label</span> <span class="o">==</span> <span class="s1">&#39;Eiger_Strong&#39;</span><span class="p">:</span>
+        <span class="n">filename</span><span class="o">=</span><span class="n">resource_filename</span><span class="p">(</span><span class="s1">&#39;IGM&#39;</span><span class="p">,</span><span class="s1">&#39;lines/Eiger_Strong.lst&#39;</span><span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Give Correct LineList&#39;</span><span class="p">)</span>
+
+    <span class="n">data</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">if</span> <span class="n">label</span><span class="o">==</span><span class="s1">&#39;atom&#39;</span><span class="p">:</span>
+
+        <span class="n">s</span><span class="o">=</span><span class="n">ascii</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="s1">&#39;col1&#39;</span><span class="p">])):</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">source</span><span class="p">[</span><span class="s1">&#39;wrest&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="s1">&#39;col2&#39;</span><span class="p">][</span><span class="n">line</span><span class="p">])</span>
+            <span class="n">source</span><span class="p">[</span><span class="s1">&#39;ion&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">s</span><span class="p">[</span><span class="s1">&#39;col1&#39;</span><span class="p">][</span><span class="n">line</span><span class="p">]</span><span class="o">+</span><span class="s1">&#39; &#39;</span><span class="o">+</span><span class="n">np</span><span class="o">.</span><span class="n">str</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="s1">&#39;col2&#39;</span><span class="p">][</span><span class="n">line</span><span class="p">]))</span>
+            <span class="n">source</span><span class="p">[</span><span class="s1">&#39;fval&#39;</span><span class="p">]</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="s1">&#39;col3&#39;</span><span class="p">][</span><span class="n">line</span><span class="p">])</span>
+            <span class="n">source</span><span class="p">[</span><span class="s1">&#39;gamma&#39;</span><span class="p">]</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="s1">&#39;col4&#39;</span><span class="p">][</span><span class="n">line</span><span class="p">])</span>
+
+            <span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="p">((</span><span class="n">label</span> <span class="o">==</span><span class="s1">&#39;LBG&#39;</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="n">label</span> <span class="o">==</span><span class="s1">&#39;Gal&#39;</span><span class="p">)):</span>
+
+        <span class="n">s</span><span class="o">=</span><span class="n">ascii</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="s1">&#39;wrest&#39;</span><span class="p">])):</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">source</span><span class="p">[</span><span class="s1">&#39;wrest&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="s1">&#39;wrest&#39;</span><span class="p">][</span><span class="n">line</span><span class="p">])</span>
+            <span class="n">source</span><span class="p">[</span><span class="s1">&#39;ion&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">s</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">][</span><span class="n">line</span><span class="p">]</span><span class="o">+</span><span class="s1">&#39; &#39;</span><span class="o">+</span><span class="n">s</span><span class="p">[</span><span class="s1">&#39;transition&#39;</span><span class="p">][</span><span class="n">line</span><span class="p">]</span>
+            <span class="n">source</span><span class="p">[</span><span class="s1">&#39;fval&#39;</span><span class="p">]</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="s1">&#39;ID&#39;</span><span class="p">][</span><span class="n">line</span><span class="p">])</span>
+            <span class="n">source</span><span class="p">[</span><span class="s1">&#39;gamma&#39;</span><span class="p">]</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="s1">&#39;ID&#39;</span><span class="p">][</span><span class="n">line</span><span class="p">])</span>
+
+            <span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">label</span> <span class="o">==</span><span class="s1">&#39;Eiger_Strong&#39;</span><span class="p">:</span>
+
+        <span class="n">s</span><span class="o">=</span><span class="n">ascii</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="s1">&#39;wrest&#39;</span><span class="p">])):</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">source</span><span class="p">[</span><span class="s1">&#39;wrest&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="s1">&#39;wrest&#39;</span><span class="p">][</span><span class="n">line</span><span class="p">])</span>
+            <span class="n">source</span><span class="p">[</span><span class="s1">&#39;ion&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">s</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">][</span><span class="n">line</span><span class="p">]</span><span class="c1">#+&#39; &#39;+s[&#39;transition&#39;][line]</span>
+            <span class="n">source</span><span class="p">[</span><span class="s1">&#39;fval&#39;</span><span class="p">]</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="c1">#s[&#39;ID&#39;][line])</span>
+            <span class="n">source</span><span class="p">[</span><span class="s1">&#39;gamma&#39;</span><span class="p">]</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="c1">#s[&#39;ID&#39;][line])</span>
+
+            <span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+
+
+    <span class="k">else</span><span class="p">:</span>       
+        <span class="n">f</span><span class="o">=</span><span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+        <span class="n">header1</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">line</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="n">columns</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">source</span><span class="p">[</span><span class="s1">&#39;wrest&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">columns</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">source</span><span class="p">[</span><span class="s1">&#39;ion&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">columns</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="s1">&#39; &#39;</span><span class="o">+</span><span class="n">columns</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+            <span class="n">source</span><span class="p">[</span><span class="s1">&#39;fval&#39;</span><span class="p">]</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">columns</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+            <span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+
+
+    <span class="k">return</span> <span class="n">data</span></div>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">rbcodes 0.1.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">rbcodes.IGM.rb_setline</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2022, Rongmon Bordoloi.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.0.2.
+    </div>
+  </body>
+</html>
