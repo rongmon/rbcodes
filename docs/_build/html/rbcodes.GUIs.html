@@ -42,6 +42,7 @@
 </section>
 <section id="module-rbcodes.GUIs.PlotSpec_Integrated">
 <span id="rbcodes-guis-plotspec-integrated-module"></span><h2>rbcodes.GUIs.PlotSpec_Integrated module<a class="headerlink" href="#module-rbcodes.GUIs.PlotSpec_Integrated" title="Permalink to this headline">¶</a></h2>
+<p>Modules for PlotSpec_Integrated GUI</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="rbcodes.GUIs.PlotSpec_Integrated.Catalog">
 <em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">rbcodes.GUIs.PlotSpec_Integrated.</span></span><span class="sig-name descname"><span class="pre">Catalog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/PlotSpec_Integrated.html#Catalog"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.PlotSpec_Integrated.Catalog" title="Permalink to this definition">¶</a></dt>
@@ -324,10 +325,120 @@ Left == 1; Right == 3</p>
 </section>
 <section id="module-rbcodes.GUIs.interactive_cont_jn">
 <span id="rbcodes-guis-interactive-cont-jn-module"></span><h2>rbcodes.GUIs.interactive_cont_jn module<a class="headerlink" href="#module-rbcodes.GUIs.interactive_cont_jn" title="Permalink to this headline">¶</a></h2>
+<p>Interactive continuum fitter for jupyter notebook</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="rbcodes.GUIs.interactive_cont_jn.interactive_cont">
 <em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">rbcodes.GUIs.interactive_cont_jn.</span></span><span class="sig-name descname"><span class="pre">interactive_cont</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wave</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">error</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xlim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[-</span> <span class="pre">600.0,</span> <span class="pre">600.0]</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/interactive_cont_jn.html#interactive_cont"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.interactive_cont_jn.interactive_cont" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl>
+<dt>This is an interactive continuum fitter for 1D spectrum.</dt><dd><p>The purpose of this code is to create a spline continuum fit from selected points.
+The help scene activates by pressing h on the plot.</p>
+<p>The program only works properly if none of the toolbar buttons in the figure is activated.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="rbcodes.GUIs.interactive_cont_jn.interactive_cont.wave">
+<span class="sig-name descname"><span class="pre">wave</span></span><a class="headerlink" href="#rbcodes.GUIs.interactive_cont_jn.interactive_cont.wave" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p>numpy arary of wavelength</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="rbcodes.GUIs.interactive_cont_jn.interactive_cont.flux">
+<span class="sig-name descname"><span class="pre">flux</span></span><a class="headerlink" href="#rbcodes.GUIs.interactive_cont_jn.interactive_cont.flux" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p>numpy array of flux</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="rbcodes.GUIs.interactive_cont_jn.interactive_cont.error">
+<span class="sig-name descname"><span class="pre">error</span></span><a class="headerlink" href="#rbcodes.GUIs.interactive_cont_jn.interactive_cont.error" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p>numpy arrat of error [optional]</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="rbcodes.GUIs.interactive_cont_jn.interactive_cont.xlim">
+<span class="sig-name descname"><span class="pre">xlim</span></span><a class="headerlink" href="#rbcodes.GUIs.interactive_cont_jn.interactive_cont.xlim" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p>xrange optional</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">\*\*kwargs</span></span></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p>optional</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><strong>Continuum fit</strong></p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>handfitted numpy array of continuum</p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<p>Useful Keystrokes:</p>
+<blockquote>
+<div><blockquote>
+<div><p>Mouse Clicks:</p>
+<blockquote>
+<div><dl class="simple">
+<dt>Left Click<span class="classifier">Select the median flux value within +/- 5 pixel from the x-coordinate.</span></dt><dd><p>These points are used for the continuum fit.</p>
+</dd>
+</dl>
+<p>Right Click : Delete the nearest continuum point.</p>
+</div></blockquote>
+<p>Keystrokes:</p>
+<blockquote>
+<div><p>b     :    Select a point for continuum fit at that exact (x,y) coordinate.
+enter :    Perform a spline fit to data to create a continuum.
+n     :    Show the normalized spectrum.
+w     :    Only after pressing n: This will ourput the continuum.
+h     :    This Help screen.
+r     :    Reset fit.
+q     :    Quit Program.</p>
+</div></blockquote>
+</div></blockquote>
+</div></blockquote>
+<p>Written By:  Rongmon Bordoloi                                   July 13 2017.</p>
+<blockquote>
+<div><p>Basic code is taken from : <a class="reference external" href="http://www.ster.kuleuven.be/~pieterd/python/html/plotting/specnorm.html">http://www.ster.kuleuven.be/~pieterd/python/html/plotting/specnorm.html</a>
+Heavily modified by Rongmon Bordoloi July 13/14 2017.
+Modified to add custom points and changed the look of the plots.
+Also added custom input options to read different formats.
+Input file could be ascii, fits or pickle format
+Output will be in the same format as the input file.
+Added help feature and graceful exit option. - Now pressing q will exit the program at any stage
+—————————————————————————</p>
+</div></blockquote>
 <dl class="py method">
 <dt class="sig sig-object py" id="rbcodes.GUIs.interactive_cont_jn.interactive_cont.onclick">
 <span class="sig-name descname"><span class="pre">onclick</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/interactive_cont_jn.html#interactive_cont.onclick"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.interactive_cont_jn.interactive_cont.onclick" title="Permalink to this definition">¶</a></dt>
@@ -493,52 +604,17 @@ Left == 1; Right == 3</p>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>A spectrum read into a class. spectrum will have
 following properties:</p>
-<dl class="py attribute">
-<dt class="sig sig-object py" id="rbcodes.GUIs.rb_spec.rb_spec.wave">
-<span class="sig-name descname"><span class="pre">wave</span></span><a class="headerlink" href="#rbcodes.GUIs.rb_spec.rb_spec.wave" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="field-list simple">
-<dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>wavelength.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="rbcodes.GUIs.rb_spec.rb_spec.flux">
-<span class="sig-name descname"><span class="pre">flux</span></span><a class="headerlink" href="#rbcodes.GUIs.rb_spec.rb_spec.flux" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="field-list simple">
-<dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>flux.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="rbcodes.GUIs.rb_spec.rb_spec.error">
-<span class="sig-name descname"><span class="pre">error</span></span><a class="headerlink" href="#rbcodes.GUIs.rb_spec.rb_spec.error" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="field-list simple">
-<dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>error</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py">
-<span class="sig-name descname"><span class="pre">filename=filename</span> <span class="pre">and</span> <span class="pre">location</span></span></dt>
-<dd></dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py">
-<span class="sig-name descname"><span class="pre">filetype</span> <span class="pre">=</span> <span class="pre">False</span> <span class="pre">[default]</span></span></dt>
-<dd><p>ascii, fits, HSLA, xfits, p [pickle], temp, and linetools [uses linetools.io routine for this]</p>
 <dl class="field-list simple">
-<dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>other options</p>
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>wave</strong> (<em>wavelength.</em>) – </p></li>
+<li><p><strong>flux</strong> (<em>flux.</em>) – </p></li>
+<li><p><strong>error</strong> (<em>error</em>) – </p></li>
+<li><p><strong>and location</strong> (<em>filename=filename</em>) – </p></li>
+<li><p><strong>= False</strong><strong> [</strong><strong>default</strong><strong>]</strong> (<em>filetype</em>) – ascii, fits, HSLA, xfits, p [pickle], temp, and linetools [uses linetools.io routine for this]</p></li>
+</ul>
 </dd>
 </dl>
-</dd></dl>
-
 <dl class="simple">
 <dt>Optional:  All only valid for filetype=linetools option</dt><dd><p>efil= errorfile [Default None]</p>
 </dd>
@@ -586,8 +662,13 @@ Edit    : Rongmon Bordoloi      April 2022: Small updates to have all continuum 
 Edit    : Rongmon Bordoloi      April 2022: Added plotting sliced spectrum option</p>
 <p># WARNING: CALLING SEQUENCE HAS CHANGED SINCE APRIL 2022.
 CAREFULLY LOOK AT THE EXAMPLE BELOW</p>
-<dl>
-<dt>EXAMPLE:import numpy as np</dt><dd><p>import matplotlib
+</p>
+</dd>
+</dl>
+<p>Example:</p>
+<blockquote>
+<div><p>import numpy as np
+import matplotlib
 matplotlib.use(‘Qt5Agg’)
 import matplotlib.pyplot as plt
 from GUIs.rb_spec import rb_spec as r</p>
@@ -654,11 +735,7 @@ plt.step(s.velo,s.fnorm)
 plt.plot([-1500,1500],[1,1],’–‘)
 plt.xlim(xlim)
 plt.show()</p>
-</dd>
-</dl>
-</p>
-</dd>
-</dl>
+</div></blockquote>
 <dl class="py method">
 <dt class="sig sig-object py" id="rbcodes.GUIs.rb_spec.rb_spec.compute_EW">
 <span class="sig-name descname"><span class="pre">compute_EW</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lam_cen</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vmin</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-</span> <span class="pre">50.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vmax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">50.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'closest'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/rb_spec.html#rb_spec.compute_EW"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.rb_spec.rb_spec.compute_EW" title="Permalink to this definition">¶</a></dt>
@@ -746,7 +823,8 @@ linelist= Default LLS line linelist, otherwise uses the specified line list</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="rbcodes.GUIs.rb_spec.rb_spec.vpfit_singlet">
 <span class="sig-name descname"><span class="pre">vpfit_singlet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">FWHM</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">6.5</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/rb_spec.html#rb_spec.vpfit_singlet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.rb_spec.rb_spec.vpfit_singlet" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Test Wrapper to call vpfit GUI</p>
+</dd></dl>
 
 </dd></dl>
 
@@ -819,224 +897,11 @@ linelist= Default LLS line linelist, otherwise uses the specified line list</p>
 </dd></dl>
 
 </section>
-<section id="module-rbcodes.GUIs.test">
-<span id="rbcodes-guis-test-module"></span><h2>rbcodes.GUIs.test module<a class="headerlink" href="#module-rbcodes.GUIs.test" title="Permalink to this headline">¶</a></h2>
+<section id="rbcodes-guis-test-module">
+<h2>rbcodes.GUIs.test module<a class="headerlink" href="#rbcodes-guis-test-module" title="Permalink to this headline">¶</a></h2>
 </section>
-<section id="module-rbcodes.GUIs.test_new">
-<span id="rbcodes-guis-test-new-module"></span><h2>rbcodes.GUIs.test_new module<a class="headerlink" href="#module-rbcodes.GUIs.test_new" title="Permalink to this headline">¶</a></h2>
-<dl class="py class">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.Catalog">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">rbcodes.GUIs.test_new.</span></span><span class="sig-name descname"><span class="pre">Catalog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#Catalog"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.Catalog" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.HelpWindow">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">rbcodes.GUIs.test_new.</span></span><span class="sig-name descname"><span class="pre">HelpWindow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#HelpWindow"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.HelpWindow" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">PyQt5.QtWidgets.QWidget</span></code></p>
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.Identified_plotter">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">rbcodes.GUIs.test_new.</span></span><span class="sig-name descname"><span class="pre">Identified_plotter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#Identified_plotter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.Identified_plotter" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.LoadCatalog">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">rbcodes.GUIs.test_new.</span></span><span class="sig-name descname"><span class="pre">LoadCatalog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#LoadCatalog"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.LoadCatalog" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">PyQt5.QtWidgets.QWidget</span></code></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.LoadCatalog.browsefiles">
-<span class="sig-name descname"><span class="pre">browsefiles</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#LoadCatalog.browsefiles"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.LoadCatalog.browsefiles" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.LoadCatalog.plot_identified_lines">
-<span class="sig-name descname"><span class="pre">plot_identified_lines</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#LoadCatalog.plot_identified_lines"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.LoadCatalog.plot_identified_lines" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.LoadCatalog.populate_zabs_manager">
-<span class="sig-name descname"><span class="pre">populate_zabs_manager</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#LoadCatalog.populate_zabs_manager"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.LoadCatalog.populate_zabs_manager" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.Manual_Transition">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">rbcodes.GUIs.test_new.</span></span><span class="sig-name descname"><span class="pre">Manual_Transition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#Manual_Transition"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.Manual_Transition" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">PyQt5.QtWidgets.QWidget</span></code></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.Manual_Transition.line_change">
-<span class="sig-name descname"><span class="pre">line_change</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#Manual_Transition.line_change"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.Manual_Transition.line_change" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.Manual_Transition.transition_change">
-<span class="sig-name descname"><span class="pre">transition_change</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#Manual_Transition.transition_change"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.Manual_Transition.transition_change" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.Popup_col_density">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">rbcodes.GUIs.test_new.</span></span><span class="sig-name descname"><span class="pre">Popup_col_density</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#Popup_col_density"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.Popup_col_density" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">PyQt5.QtWidgets.QWidget</span></code></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.Popup_col_density.ion_selected">
-<span class="sig-name descname"><span class="pre">ion_selected</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#Popup_col_density.ion_selected"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.Popup_col_density.ion_selected" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.Redshift_Guess">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">rbcodes.GUIs.test_new.</span></span><span class="sig-name descname"><span class="pre">Redshift_Guess</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#Redshift_Guess"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.Redshift_Guess" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.SaveCatalog">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">rbcodes.GUIs.test_new.</span></span><span class="sig-name descname"><span class="pre">SaveCatalog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#SaveCatalog"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.SaveCatalog" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">PyQt5.QtWidgets.QWidget</span></code></p>
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.input_txt_dlg">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">rbcodes.GUIs.test_new.</span></span><span class="sig-name descname"><span class="pre">input_txt_dlg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Windowname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">instruction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_text</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'test'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#input_txt_dlg"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.input_txt_dlg" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.mainWindow">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">rbcodes.GUIs.test_new.</span></span><span class="sig-name descname"><span class="pre">mainWindow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wave</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">error</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zabs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#mainWindow"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.mainWindow" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">PyQt5.QtWidgets.QMainWindow</span></code></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.mainWindow.DrawLineList">
-<span class="sig-name descname"><span class="pre">DrawLineList</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">label</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'white'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hide</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Man_Transition</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#mainWindow.DrawLineList"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.mainWindow.DrawLineList" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.mainWindow.LoadCatalog_fn">
-<span class="sig-name descname"><span class="pre">LoadCatalog_fn</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#mainWindow.LoadCatalog_fn"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.mainWindow.LoadCatalog_fn" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.mainWindow.Refreshed">
-<span class="sig-name descname"><span class="pre">Refreshed</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#mainWindow.Refreshed"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.mainWindow.Refreshed" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.mainWindow.cellchanged">
-<span class="sig-name descname"><span class="pre">cellchanged</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#mainWindow.cellchanged"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.mainWindow.cellchanged" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.mainWindow.compute_EW">
-<span class="sig-name descname"><span class="pre">compute_EW</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lam</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lam_lim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lam_ylim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">err_flx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-</span> <span class="pre">99</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wrest</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#mainWindow.compute_EW"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.mainWindow.compute_EW" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.mainWindow.get_linelist">
-<span class="sig-name descname"><span class="pre">get_linelist</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#mainWindow.get_linelist"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.mainWindow.get_linelist" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.mainWindow.ontype">
-<span class="sig-name descname"><span class="pre">ontype</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#mainWindow.ontype"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.mainWindow.ontype" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.mainWindow.saveCatalog_fn">
-<span class="sig-name descname"><span class="pre">saveCatalog_fn</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#mainWindow.saveCatalog_fn"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.mainWindow.saveCatalog_fn" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.mainWindow.specplot">
-<span class="sig-name descname"><span class="pre">specplot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#mainWindow.specplot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.mainWindow.specplot" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.mainWindow.update_manager">
-<span class="sig-name descname"><span class="pre">update_manager</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#mainWindow.update_manager"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.mainWindow.update_manager" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.mainWindow.zabs_changed">
-<span class="sig-name descname"><span class="pre">zabs_changed</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#mainWindow.zabs_changed"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.mainWindow.zabs_changed" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.manage_identified_absorbers">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">rbcodes.GUIs.test_new.</span></span><span class="sig-name descname"><span class="pre">manage_identified_absorbers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#manage_identified_absorbers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.manage_identified_absorbers" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">PyQt5.QtWidgets.QWidget</span></code></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.manage_identified_absorbers.cellchanged">
-<span class="sig-name descname"><span class="pre">cellchanged</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#manage_identified_absorbers.cellchanged"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.manage_identified_absorbers.cellchanged" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.manage_identified_absorbers.get_index">
-<span class="sig-name descname"><span class="pre">get_index</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#manage_identified_absorbers.get_index"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.manage_identified_absorbers.get_index" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.manage_identified_absorbers.hide">
-<span class="sig-name descname"><span class="pre">hide</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#manage_identified_absorbers.hide"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.manage_identified_absorbers.hide" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.manage_identified_absorbers.plot">
-<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#manage_identified_absorbers.plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.manage_identified_absorbers.plot" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.manage_identified_absorbers.remove">
-<span class="sig-name descname"><span class="pre">remove</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#manage_identified_absorbers.remove"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.manage_identified_absorbers.remove" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.prepare_absorber_object">
-<span class="sig-prename descclassname"><span class="pre">rbcodes.GUIs.test_new.</span></span><span class="sig-name descname"><span class="pre">prepare_absorber_object</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">z_abs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wave</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">error</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">line_flg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'LLS'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vlim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[-</span> <span class="pre">1000,</span> <span class="pre">1000]</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#prepare_absorber_object"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.prepare_absorber_object" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.rb_plotspec">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">rbcodes.GUIs.test_new.</span></span><span class="sig-name descname"><span class="pre">rb_plotspec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wave</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">error</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zabs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#rb_plotspec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.rb_plotspec" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.vStack">
-<em class="property"><span class="pre">class</span> </em><span class="sig-prename descclassname"><span class="pre">rbcodes.GUIs.test_new.</span></span><span class="sig-name descname"><span class="pre">vStack</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wave</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">error</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">line_flg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zabs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vlim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[-</span> <span class="pre">1000.0,</span> <span class="pre">1000.0]</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#vStack"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.vStack" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.vStack.onkb">
-<span class="sig-name descname"><span class="pre">onkb</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#vStack.onkb"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.vStack.onkb" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.vStack.plotText">
-<span class="sig-name descname"><span class="pre">plotText</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">flag</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#vStack.plotText"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.vStack.plotText" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.vStack.plotstuff">
-<span class="sig-name descname"><span class="pre">plotstuff</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comment</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yrange</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#vStack.plotstuff"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.vStack.plotstuff" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="rbcodes.GUIs.test_new.vStack.vPlot">
-<span class="sig-name descname"><span class="pre">vPlot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ploti</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comment</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yrange</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/GUIs/test_new.html#vStack.vPlot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.GUIs.test_new.vStack.vPlot" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
+<section id="rbcodes-guis-test-new-module">
+<h2>rbcodes.GUIs.test_new module<a class="headerlink" href="#rbcodes-guis-test-new-module" title="Permalink to this headline">¶</a></h2>
 </section>
 <section id="module-rbcodes.GUIs.vStack">
 <span id="rbcodes-guis-vstack-module"></span><h2>rbcodes.GUIs.vStack module<a class="headerlink" href="#module-rbcodes.GUIs.vStack" title="Permalink to this headline">¶</a></h2>
@@ -1085,8 +950,8 @@ linelist= Default LLS line linelist, otherwise uses the specified line list</p>
 <li><a class="reference internal" href="#module-rbcodes.GUIs.rb_spec">rbcodes.GUIs.rb_spec module</a></li>
 <li><a class="reference internal" href="#module-rbcodes.GUIs.rb_specgui">rbcodes.GUIs.rb_specgui module</a></li>
 <li><a class="reference internal" href="#module-rbcodes.GUIs.rb_test">rbcodes.GUIs.rb_test module</a></li>
-<li><a class="reference internal" href="#module-rbcodes.GUIs.test">rbcodes.GUIs.test module</a></li>
-<li><a class="reference internal" href="#module-rbcodes.GUIs.test_new">rbcodes.GUIs.test_new module</a></li>
+<li><a class="reference internal" href="#rbcodes-guis-test-module">rbcodes.GUIs.test module</a></li>
+<li><a class="reference internal" href="#rbcodes-guis-test-new-module">rbcodes.GUIs.test_new module</a></li>
 <li><a class="reference internal" href="#module-rbcodes.GUIs.vStack">rbcodes.GUIs.vStack module</a></li>
 <li><a class="reference internal" href="#module-rbcodes.GUIs">Module contents</a></li>
 </ul>

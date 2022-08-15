@@ -1,3 +1,6 @@
+"""
+Modules for PlotSpec_Integrated GUI
+"""
 import numpy as np
 from scipy.interpolate import splrep,splev
 from IGM import rb_setline as line   

@@ -105,6 +105,21 @@ RB April 28, 2021, changed med_vel to weight be EW &amp; vel_disp</p>
 </section>
 <section id="module-rbcodes.IGM.lens_sep">
 <span id="rbcodes-igm-lens-sep-module"></span><h2>rbcodes.IGM.lens_sep module<a class="headerlink" href="#module-rbcodes.IGM.lens_sep" title="Permalink to this headline">¶</a></h2>
+<p>Example code to plot to plot distances for differetn lens separations</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="rbcodes.IGM.lens_sep.lens_sep">
+<span class="sig-prename descclassname"><span class="pre">rbcodes.IGM.lens_sep.</span></span><span class="sig-name descname"><span class="pre">lens_sep</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">zlist</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">array([0.8,</span> <span class="pre">0.85,</span> <span class="pre">0.9,</span> <span class="pre">0.95,</span> <span class="pre">1.0,</span> <span class="pre">1.05,</span> <span class="pre">1.1,</span> <span class="pre">1.15,</span> <span class="pre">1.2,</span> <span class="pre">1.25,</span> <span class="pre">1.3,</span> <span class="pre">1.35,</span> <span class="pre">1.4,</span> <span class="pre">1.45,</span> <span class="pre">1.5,</span> <span class="pre">1.55,</span> <span class="pre">1.6,</span> <span class="pre">1.65,</span> <span class="pre">1.7,</span> <span class="pre">1.75,</span> <span class="pre">1.8,</span> <span class="pre">1.85,</span> <span class="pre">1.9,</span> <span class="pre">1.95,</span> <span class="pre">2.0,</span> <span class="pre">2.05,</span> <span class="pre">2.1,</span> <span class="pre">2.15,</span> <span class="pre">2.2,</span> <span class="pre">2.25,</span> <span class="pre">2.3,</span> <span class="pre">2.35,</span> <span class="pre">2.4,</span> <span class="pre">2.45,</span> <span class="pre">2.5,</span> <span class="pre">2.55,</span> <span class="pre">2.6,</span> <span class="pre">2.65,</span> <span class="pre">2.7,</span> <span class="pre">2.75,</span> <span class="pre">2.8,</span> <span class="pre">2.85,</span> <span class="pre">2.9,</span> <span class="pre">2.95])</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/lens_sep.html#lens_sep"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.lens_sep.lens_sep" title="Permalink to this definition">¶</a></dt>
+<dd><p>Example code to plot to plot distances for differetn lens separations</p>
+<p>Parameters</p>
+<blockquote>
+<div><p>zlist= list of redshifts</p>
+</div></blockquote>
+<p>Returns</p>
+<blockquote>
+<div><p>Plot of physical separation vs redshift</p>
+</div></blockquote>
+</dd></dl>
+
 </section>
 <section id="module-rbcodes.IGM.lens_sep_to_kpc">
 <span id="rbcodes-igm-lens-sep-to-kpc-module"></span><h2>rbcodes.IGM.lens_sep_to_kpc module<a class="headerlink" href="#module-rbcodes.IGM.lens_sep_to_kpc" title="Permalink to this headline">¶</a></h2>
@@ -151,25 +166,19 @@ The initial continuum is fitted using a random sample consensus model.
 Then user has the option to tweak the fitted continuum by hand usling interactive
 linetools API and/or save the spectrum object.</p>
 <blockquote>
-<div><p>Attributes:</p>
-<blockquote>
-<div><dl class="simple">
-<dt>Input:</dt><dd><p>filename=input spectrum filename
+<div><p>filename=input spectrum filename
 efil = input error spectrum name [If it exists, otherwise None]
 window=    default [149], smoothing window
 mednorm = False [default], if set normalizes the spectrum with median value</p>
-</dd>
-</dl>
-<p>output: This gives a cont_fitter object with following attributes:</p>
+<p>This gives a cont_fitter object with following attributes:</p>
 <p>self.wave= wavelength</p>
 <p>self.flux= Flux
 self.error= error
 self.cont= Fitted continuum</p>
-</div></blockquote>
 <p>Written : Rongmon Bordoloi      August 2020
 Edit    : Rongmon Bordoloi      March 2022: Added more input options</p>
-<dl>
-<dt>EXAMPLE:</dt><dd><blockquote>
+<blockquote>
+<div><blockquote>
 <div><p>from IGM import ransac_contfit as c</p>
 </div></blockquote>
 <dl>
@@ -196,8 +205,7 @@ sp.save_spectrum(outputfilename)</p>
 from linetools.spectra.xspectrum1d import XSpectrum1D
 sp=XSpectrum1D.from_file(filename)
 sp.fit_continuum()</p>
-</dd>
-</dl>
+</div></blockquote>
 </div></blockquote>
 <dl class="py method">
 <dt class="sig sig-object py" id="rbcodes.IGM.ransac_contfit.cont_fitter.fit_continuum">
@@ -249,32 +257,35 @@ sp.fit_continuum()</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="rbcodes.IGM.rb_iter_contfit.rb_iter_contfit">
 <span class="sig-prename descclassname"><span class="pre">rbcodes.IGM.rb_iter_contfit.</span></span><span class="sig-name descname"><span class="pre">rb_iter_contfit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wave</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">error</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/rb_iter_contfit.html#rb_iter_contfit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.rb_iter_contfit.rb_iter_contfit" title="Permalink to this definition">¶</a></dt>
-<dd><p>Iterative continuum fitter using Legendre polynomials
-Input:  -</p>
-<blockquote>
-<div><blockquote>
-<div><p>wavelength array
-flux array
-error array</p>
-</div></blockquote>
-<dl class="simple">
+<dd><p>Iterative continuum fitter using Legendre polynomials</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>array</strong> (<em>error</em>) – </p></li>
+<li><p><strong>array</strong> – </p></li>
+<li><p><strong>array</strong> – <dl class="simple">
 <dt>optional input:</dt><dd><p>maxiter :-  maximum iteration [25 default]
 order   :-  polynomial order of fit [4 default]</p>
 </dd>
 </dl>
-</div></blockquote>
-<dl class="simple">
-<dt>output: -</dt><dd><p>fit_final : Final fitted continuum array
-resid_final : residual error array
-fit_error  : error on the fit [standard deviation of the residual]</p>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>fit_final</strong> (<em>Final fitted continuum array</em>)</p></li>
+<li><p><strong>resid_final</strong> (<em>residual error array</em>)</p></li>
+<li><p><strong>fit_error</strong> (<em>error on the fit [standard deviation of the residual]</em>)</p></li>
+</ul>
+</p>
 </dd>
 </dl>
 <p>Written by:  Rongmon Bordoloi
 Tested on Python 3.7  Sep 4 2019
 ————————–</p>
+<p class="rubric">Example</p>
 <dl>
-<dt>example :</dt><dd><p>from IGM import rb_iter_contfit as r
-out= r.rb_iter_contfit(wave,flux,error,order=5)</p>
+<dt>from IGM import rb_iter_contfit as r</dt><dd><p>out= r.rb_iter_contfit(wave,flux,error,order=5)</p>
 <p>out[0] = fitted continuum</p>
 </dd>
 </dl>
@@ -294,11 +305,10 @@ out= r.rb_iter_contfit(wave,flux,error,order=5)</p>
 <p>For the line matching the closest wavelength.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>lambda_rest</strong> – <dl class="simple">
-<dt>method     :-    ‘closest’ -&gt;  If set will match the closest line.</dt><dd><p>’Exact’  -&gt;  If set will match the exact wavelength.</p>
-</dd>
-</dl>
-</p>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>lambda_rest</strong> – </p></li>
+<li><p><strong>method</strong> – ‘Exact’  -&gt;  If set will match the exact wavelength.</p></li>
+</ul>
 </dd>
 <dt class="field-even">Returns</dt>
 <dd class="field-even"><p><strong>dic</strong></p>
@@ -310,7 +320,8 @@ out= r.rb_iter_contfit(wave,flux,error,order=5)</p>
 </p>
 </dd>
 </dl>
-<p>Example:   str=rb_setline(2796.3,’closest’)</p>
+<p class="rubric">Example</p>
+<p>str=rb_setline(2796.3,’closest’)</p>
 <p>Written By: Rongmon Bordoloi                Jan 2018, Python 2.7
 Edit:       Rongmon Bordoloi                            Sep 2018, Depreciated kwargs to be compatible with python 3</p>
 </dd></dl>
@@ -339,32 +350,31 @@ Edit:       Rongmon Bordoloi                            Sep 2018, Depreciated kw
 <dl class="py function">
 <dt class="sig sig-object py" id="rbcodes.IGM.rb_specbin.rb_specbin">
 <span class="sig-prename descclassname"><span class="pre">rbcodes.IGM.rb_specbin.</span></span><span class="sig-name descname"><span class="pre">rb_specbin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nbin</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/rbcodes/IGM/rb_specbin.html#rb_specbin"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#rbcodes.IGM.rb_specbin.rb_specbin" title="Permalink to this definition">¶</a></dt>
-<dd><blockquote>
-<div><blockquote>
-<div><blockquote>
-<div><p>This is a translation of x_specbin.pro from xidl.</p>
-<p>This function bins up 1D spectra in integer pixels. The routine returns a
-structure of flux and wavelength and variance that has been rebinned.</p>
-</div></blockquote>
-<dl class="simple">
-<dt>CALLING SEQUENCE:</dt><dd><p>bin = x_specbin(fx, nbin WAV, var)</p>
+<dd><dl class="simple">
+<dt>This function bins up 1D spectra in integer pixels. The routine returns a</dt><dd><p>structure of flux and wavelength and variance that has been rebinned.</p>
 </dd>
 </dl>
-<blockquote>
-<div><p>fx       - Flux
-nbin     - Number of pixels to bin on</p>
-</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>- Flux</strong> (<em>fx</em>) – </p></li>
+<li><p><strong>- Number of pixels to bin on</strong> (<em>nbin</em>) – </p></li>
+<li><p><strong>-- Input variance array</strong><strong> [</strong><strong>Optional</strong><strong>]</strong> (<em>VAR=</em>) – </p></li>
+<li><p><strong>-- Input wavelength array</strong><strong> [</strong><strong>Optional</strong><strong>]</strong> (<em>WAV=</em>) – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>bin       - Structure of data</p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<p>bin = rb_specbin(fx, 3)</p>
 <blockquote>
 <div><blockquote>
-<div><p>bin       - Structure of data</p>
-</div></blockquote>
-<p>Optional Input:
-VAR=  – Input variance array
-WAV=  – Input wavelength array</p>
-</div></blockquote>
-<dl class="simple">
-<dt>EXAMPLES:</dt><dd><p>bin = rb_specbin(fx, 3)</p>
-</dd>
+<div><dl class="simple">
 <dt>REVISION HISTORY:</dt><dd><p>Written by RB. June 2015</p>
 </dd>
 </dl>

@@ -53,29 +53,31 @@
 
 
 <div class="viewcode-block" id="cont_fitter"><a class="viewcode-back" href="../../../rbcodes.IGM.html#rbcodes.IGM.ransac_contfit.cont_fitter">[docs]</a><span class="k">class</span> <span class="nc">cont_fitter</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">   A continuum fitter class. This reads in a 1D spectrum and allows continuum fitting.</span>
+    <span class="sd">&quot;&quot;&quot;A continuum fitter class. This reads in a 1D spectrum and allows continuum fitting.</span>
 <span class="sd">   The initial continuum is fitted using a random sample consensus model.</span>
 <span class="sd">   Then user has the option to tweak the fitted continuum by hand usling interactive </span>
 <span class="sd">   linetools API and/or save the spectrum object.</span>
 
 
-<span class="sd">    Attributes:</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    -----------</span>
+<span class="sd">    </span>
+<span class="sd">    filename=input spectrum filename</span>
+<span class="sd">    efil = input error spectrum name [If it exists, otherwise None]</span>
+<span class="sd">    window=    default [149], smoothing window</span>
+<span class="sd">    mednorm = False [default], if set normalizes the spectrum with median value</span>
 
-<span class="sd">        Input:</span>
-<span class="sd">              filename=input spectrum filename</span>
-<span class="sd">              efil = input error spectrum name [If it exists, otherwise None]</span>
-<span class="sd">              window=    default [149], smoothing window</span>
-<span class="sd">              mednorm = False [default], if set normalizes the spectrum with median value</span>
 
+<span class="sd">    Returns</span>
+<span class="sd">    --------</span>
 
-<span class="sd">        output: This gives a cont_fitter object with following attributes:</span>
+<span class="sd">    This gives a cont_fitter object with following attributes:</span>
 
-<span class="sd">        self.wave= wavelength</span>
+<span class="sd">    self.wave= wavelength</span>
 
-<span class="sd">        self.flux= Flux</span>
-<span class="sd">        self.error= error</span>
-<span class="sd">        self.cont= Fitted continuum </span>
+<span class="sd">    self.flux= Flux</span>
+<span class="sd">    self.error= error</span>
+<span class="sd">    self.cont= Fitted continuum </span>
 
 
 <span class="sd">    Written : Rongmon Bordoloi      August 2020</span>
@@ -83,7 +85,10 @@
 
 <span class="sd">    Based on RANSAC continuum fitter written by Bin Liu Summer 2020.</span>
 <span class="sd">    --------------------------------------------------------------------------------------------</span>
-<span class="sd">    EXAMPLE: </span>
+<span class="sd">    </span>
+<span class="sd">    Example</span>
+<span class="sd">    -------</span>
+
 <span class="sd">               from IGM import ransac_contfit as c </span>
 
 <span class="sd">            Two ways to read in spectrum, from file: </span>

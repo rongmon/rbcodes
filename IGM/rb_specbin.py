@@ -2,36 +2,24 @@
 
 import math
 import numpy as np
-#binning function
-#bins up 1D spectra in integer pixels. 
-#The routine returns a structure of flux and wavelength and variance that has been rebinned.
 def rb_specbin(flux,nbin,**kwargs):
-    """
-    --------------------------------------------------------------------------------
-       This is a translation of x_specbin.pro from xidl. 
-      
-       This function bins up 1D spectra in integer pixels. The routine returns a
+    """This function bins up 1D spectra in integer pixels. The routine returns a
        structure of flux and wavelength and variance that has been rebinned.
-     
-      CALLING SEQUENCE:
-        bin = x_specbin(fx, nbin WAV, var)
-     
-      Parameters:
-      -----------
+    
+    Parameters
+    -----------
      
         fx       - Flux
         nbin     - Number of pixels to bin on
-     
-      Returns:
-      --------
+        VAR=  -- Input variance array [Optional]
+        WAV=  -- Input wavelength array [Optional]
+    
+    Returns
+    --------
         bin       - Structure of data
-     
-     
-       Optional Input: 
-       VAR=  -- Input variance array
-       WAV=  -- Input wavelength array
-     
-      EXAMPLES:
+      
+    Example
+    --------
         bin = rb_specbin(fx, 3)
      
      

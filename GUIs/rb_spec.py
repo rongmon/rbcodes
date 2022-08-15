@@ -10,7 +10,7 @@ class rb_spec(object):
     A spectrum read into a class. spectrum will have
     following properties:
 
-    Attributes
+    Parameters
     -----------
         wave: wavelength.
         flux: flux.
@@ -65,81 +65,83 @@ class rb_spec(object):
         # WARNING: CALLING SEQUENCE HAS CHANGED SINCE APRIL 2022.
         CAREFULLY LOOK AT THE EXAMPLE BELOW
 
-        --------------------------------------------------------------------------------------------
-        EXAMPLE:import numpy as np
-                import matplotlib
-                matplotlib.use('Qt5Agg')
-                import matplotlib.pyplot as plt
-                from GUIs.rb_spec import rb_spec as r 
+    Example:
+
+    --------------------------------------------------------------------------------------------
+        import numpy as np
+        import matplotlib
+        matplotlib.use('Qt5Agg')
+        import matplotlib.pyplot as plt
+        from GUIs.rb_spec import rb_spec as r 
     
-                # List of absorber redshifts
-                zabs=[0.511020,1.026311,1.564481]
-                transition= 2796.3
-                #Which absorber to analyze
-                index=0
-                filename='Quasar_Spectrum.fits'
-                #Read in file
-                s=r.from_file(filename,filetype='linetools')
-                   #-------------------------------------------------------------------------------
-                   # DETOUR --->
-                   #ALTERNATIVE 
-                   #IF YOU WANT TO DIRECTLY INJEST NUMPY ARRAYS DO THE FOLLOWING
-                   s=r.from_data(wave,flux,error)
-                   # HERE wave,flux,error are numpy arrays of wavelength,flux and error respectively.
-                   #-------------------------------------------------------------------------------
+        # List of absorber redshifts
+        zabs=[0.511020,1.026311,1.564481]
+        transition= 2796.3
+        #Which absorber to analyze
+        index=0
+        filename='Quasar_Spectrum.fits'
+        #Read in file
+        s=r.from_file(filename,filetype='linetools')
+           #-------------------------------------------------------------------------------
+           # DETOUR --->
+           #ALTERNATIVE 
+           #IF YOU WANT TO DIRECTLY INJEST NUMPY ARRAYS DO THE FOLLOWING
+           s=r.from_data(wave,flux,error)
+           # HERE wave,flux,error are numpy arrays of wavelength,flux and error respectively.
+           #-------------------------------------------------------------------------------
     
-                #Shift spectra to rest frame
-                s.shift_spec(zabs[index]);
-                #Velocity window around transition
-                xlim=[-1500,1500]
-                
-                #Slice Spectrum within that window
-                s.slice_spec(transition,xlim[0],xlim[1],use_vel=True);
+        #Shift spectra to rest frame
+        s.shift_spec(zabs[index]);
+        #Velocity window around transition
+        xlim=[-1500,1500]
+        
+        #Slice Spectrum within that window
+        s.slice_spec(transition,xlim[0],xlim[1],use_vel=True);
     
-                #Fit continuum Mask the regions defined by velocity
-                s.fit_continuum(mask=[-200,300,500,1100],domain=xlim,Legendre=3)
-                   #-------------------------------------------------------------------------------
-                   # DETOUR 1--->
+        #Fit continuum Mask the regions defined by velocity
+        s.fit_continuum(mask=[-200,300,500,1100],domain=xlim,Legendre=3)
+           #-------------------------------------------------------------------------------
+           # DETOUR 1--->
     
-                    #Alternative Fit continuum methods.
-                    #s.fit_continuum_ransac(window=149,mednorm=False)
+            #Alternative Fit continuum methods.
+            #s.fit_continuum_ransac(window=149,mednorm=False)
     
-                   #-------------------------------------------------------------------------------
-                   # DETOUR 2--->
+           #-------------------------------------------------------------------------------
+           # DETOUR 2--->
     
-                    #Aternate continuum fitting method [interactive]
-                    s.fit_continuum(Interactive=True)
-                    #Aternate continuum fitting method [input prefit continuum]
-                    # Length of prefit continuum array = length of sliced spectrum
-                    s.fit_continuum(Legendre=False,prefit_cont=cont_arrary)
-                   #-------------------------------------------------------------------------------
+            #Aternate continuum fitting method [interactive]
+            s.fit_continuum(Interactive=True)
+            #Aternate continuum fitting method [input prefit continuum]
+            # Length of prefit continuum array = length of sliced spectrum
+            s.fit_continuum(Legendre=False,prefit_cont=cont_arrary)
+           #-------------------------------------------------------------------------------
     
     
-                #Compute EW
-                #Compute equivalent width within a velocity window
-                s.compute_EW(transition,vmin=-200.,vmax=360.);
+        #Compute EW
+        #Compute equivalent width within a velocity window
+        s.compute_EW(transition,vmin=-200.,vmax=360.);
     
-                #save everything as a pickle file
-                s.save_slice('outfile.p')
+        #save everything as a pickle file
+        s.save_slice('outfile.p')
     
-                #plot the Full spectrum
-                s.plot_spec()
+        #plot the Full spectrum
+        s.plot_spec()
     
-                #Plot the sliced spectrum with the fitted continuum
-                s.plot_slice()
+        #Plot the sliced spectrum with the fitted continuum
+        s.plot_slice()
     
-                #plot the sliced and fitted continuum
-                #Plot stuff
-                plt.subplot(2,1,1)
-                plt.step(s.velo,s.flux_slice)
-                plt.step(s.velo,s.flux_slice/s.fnorm)
-                plt.xlim(xlim)
-                plt.subplot(2,1,2)
-                plt.step(s.velo,s.fnorm)
-                plt.plot([-1500,1500],[1,1],'--')
-                plt.xlim(xlim)
-                plt.show()
-        --------------------------------------------------------------------------------------------
+        #plot the sliced and fitted continuum
+        #Plot stuff
+        plt.subplot(2,1,1)
+        plt.step(s.velo,s.flux_slice)
+        plt.step(s.velo,s.flux_slice/s.fnorm)
+        plt.xlim(xlim)
+        plt.subplot(2,1,2)
+        plt.step(s.velo,s.fnorm)
+        plt.plot([-1500,1500],[1,1],'--')
+        plt.xlim(xlim)
+        plt.show()
+    --------------------------------------------------------------------------------------------
 
     """
     def __init__(self,wave,flux,error,filename=False):#,filetype=False, efil=None,**kwargs):
@@ -343,11 +345,9 @@ class rb_spec(object):
         #return self.wave_slice,self.error_slice,self.flux_slice,self.velo,self.linelist
 
     def fit_continuum(self,mask=False,domain=False,Legendre=False,**kwargs):
-        """
-        By default calls an interactive continuum fitter to the sliced spectrum.
+        """ By default calls an interactive continuum fitter to the sliced spectrum.
         Or an automated Legendre polynomial fitter if keyword set Legendre.
             Order is given by Legendre=order
-
         """
 
         if Legendre==False:
@@ -420,8 +420,7 @@ class rb_spec(object):
 
 
     def fit_continuum_ransac(self,window=149,mednorm=False):
-        """
-        Alternate continuum fitting method. Does iterative ransac continumm fitting.
+        """Alternate continuum fitting method. Does iterative ransac continumm fitting.
 
         """
         from IGM import ransac_contfit as cf 
@@ -436,8 +435,7 @@ class rb_spec(object):
 
 
     def compute_EW(self,lam_cen,vmin=-50.,vmax=50.,method='closest',plot=False):
-        """
-        Computes rest frame equivalent width and column density for a desired atomic line.
+        """Computes rest frame equivalent width and column density for a desired atomic line.
         Around the species lam_cen and given vmin and vmax keyword values. 
 
         """
@@ -469,8 +467,7 @@ class rb_spec(object):
 
 
     def plot_spec(self):
-        """
-        Quick wrapper to call an interactive plotter for the full spectrum as given in input file.
+        """Quick wrapper to call an interactive plotter for the full spectrum as given in input file.
         """
         #from GUIs import rb_plot_spec as sp
         #tt=sp.rb_plot_spec(self.wave,self.flux,self.error)
@@ -478,8 +475,7 @@ class rb_spec(object):
         tt=sp.rb_plotspec(self.wave,self.flux,self.error)
 
     def plot_slice(self):
-        """
-        Quick wrapper to call an interactive plotter for the full spectrum as given in input file.
+        """Quick wrapper to call an interactive plotter for the full spectrum as given in input file.
         """
         import matplotlib.pyplot as plt
         fig = plt.figure()
@@ -510,8 +506,7 @@ class rb_spec(object):
 
 
     def save_slice(self,outfilename):
-        """
-        Saves the slice object for future processing.
+        """Saves the slice object for future processing.
         """
         import pickle
         with open(outfilename, 'wb') as output:
@@ -519,8 +514,7 @@ class rb_spec(object):
 
 
     def plot_doublet(self,lam1,lam2,vmin=-600.,vmax=600.,method='closest'):
-        """
-        Plot a given doublet defined by the lam1 and lam2 wavelength centers.
+        """Plot a given doublet defined by the lam1 and lam2 wavelength centers.
         """
 
         from IGM import rb_setline as s
@@ -555,6 +549,8 @@ class rb_spec(object):
         plt.show()
 
     def vpfit_singlet(self,FWHM=6.5):
+        """Test Wrapper to call vpfit GUI
+        """
         from GUIs import rb_interactive_vpfit_singlet as vf 
         vt=vf.rb_interactive_vpfit_singlet(self.wave_slice,self.fnorm,self.enorm,self.transition);    
 

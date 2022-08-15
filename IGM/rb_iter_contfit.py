@@ -5,9 +5,10 @@ import warnings
 import pdb
 
 def rb_iter_contfit(wave,flux,error,**kwargs):
-    '''
-    Iterative continuum fitter using Legendre polynomials
-    Input:  -
+    """Iterative continuum fitter using Legendre polynomials
+    
+    Parameters
+    ----------
                 wavelength array
                 flux array 
                 error array
@@ -15,7 +16,8 @@ def rb_iter_contfit(wave,flux,error,**kwargs):
                 maxiter :-  maximum iteration [25 default]
                 order   :-  polynomial order of fit [4 default]
 
-    output: -
+    Returns
+    ---------
                fit_final : Final fitted continuum array
                resid_final : residual error array
                fit_error  : error on the fit [standard deviation of the residual]
@@ -24,12 +26,13 @@ def rb_iter_contfit(wave,flux,error,**kwargs):
     Tested on Python 3.7  Sep 4 2019
     --------------------------
 
-    example :
-        from IGM import rb_iter_contfit as r
+    Example
+    --------
+    from IGM import rb_iter_contfit as r
         out= r.rb_iter_contfit(wave,flux,error,order=5)
 
         out[0] = fitted continuum
-    '''
+    """
 
     if 'maxiter' in kwargs:
         maxiter=kwargs['maxiter']

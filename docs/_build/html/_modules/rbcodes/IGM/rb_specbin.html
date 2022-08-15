@@ -40,36 +40,25 @@
 
 <span class="kn">import</span> <span class="nn">math</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="c1">#binning function</span>
-<span class="c1">#bins up 1D spectra in integer pixels. </span>
-<span class="c1">#The routine returns a structure of flux and wavelength and variance that has been rebinned.</span>
 <div class="viewcode-block" id="rb_specbin"><a class="viewcode-back" href="../../../rbcodes.IGM.html#rbcodes.IGM.rb_specbin.rb_specbin">[docs]</a><span class="k">def</span> <span class="nf">rb_specbin</span><span class="p">(</span><span class="n">flux</span><span class="p">,</span><span class="n">nbin</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    --------------------------------------------------------------------------------</span>
-<span class="sd">       This is a translation of x_specbin.pro from xidl. </span>
-<span class="sd">      </span>
-<span class="sd">       This function bins up 1D spectra in integer pixels. The routine returns a</span>
+    <span class="sd">&quot;&quot;&quot;This function bins up 1D spectra in integer pixels. The routine returns a</span>
 <span class="sd">       structure of flux and wavelength and variance that has been rebinned.</span>
 <span class="sd">     </span>
-<span class="sd">      CALLING SEQUENCE:</span>
-<span class="sd">        bin = x_specbin(fx, nbin WAV, var)</span>
 <span class="sd">     </span>
-<span class="sd">      Parameters:</span>
-<span class="sd">      -----------</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    -----------</span>
 <span class="sd">     </span>
 <span class="sd">        fx       - Flux</span>
 <span class="sd">        nbin     - Number of pixels to bin on</span>
-<span class="sd">     </span>
-<span class="sd">      Returns:</span>
-<span class="sd">      --------</span>
+<span class="sd">        VAR=  -- Input variance array [Optional]</span>
+<span class="sd">        WAV=  -- Input wavelength array [Optional]</span>
+<span class="sd">    </span>
+<span class="sd">    Returns</span>
+<span class="sd">    --------</span>
 <span class="sd">        bin       - Structure of data</span>
-<span class="sd">     </span>
-<span class="sd">     </span>
-<span class="sd">       Optional Input: </span>
-<span class="sd">       VAR=  -- Input variance array</span>
-<span class="sd">       WAV=  -- Input wavelength array</span>
-<span class="sd">     </span>
-<span class="sd">      EXAMPLES:</span>
+<span class="sd">      </span>
+<span class="sd">    Example</span>
+<span class="sd">    --------</span>
 <span class="sd">        bin = rb_specbin(fx, 3)</span>
 <span class="sd">     </span>
 <span class="sd">     </span>

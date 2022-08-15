@@ -48,7 +48,7 @@
 <span class="sd">    A spectrum read into a class. spectrum will have</span>
 <span class="sd">    following properties:</span>
 
-<span class="sd">    Attributes</span>
+<span class="sd">    Parameters</span>
 <span class="sd">    -----------</span>
 <span class="sd">        wave: wavelength.</span>
 <span class="sd">        flux: flux.</span>
@@ -103,81 +103,83 @@
 <span class="sd">        # WARNING: CALLING SEQUENCE HAS CHANGED SINCE APRIL 2022.</span>
 <span class="sd">        CAREFULLY LOOK AT THE EXAMPLE BELOW</span>
 
-<span class="sd">        --------------------------------------------------------------------------------------------</span>
-<span class="sd">        EXAMPLE:import numpy as np</span>
-<span class="sd">                import matplotlib</span>
-<span class="sd">                matplotlib.use(&#39;Qt5Agg&#39;)</span>
-<span class="sd">                import matplotlib.pyplot as plt</span>
-<span class="sd">                from GUIs.rb_spec import rb_spec as r </span>
+<span class="sd">    Example:</span>
+
+<span class="sd">    --------------------------------------------------------------------------------------------</span>
+<span class="sd">        import numpy as np</span>
+<span class="sd">        import matplotlib</span>
+<span class="sd">        matplotlib.use(&#39;Qt5Agg&#39;)</span>
+<span class="sd">        import matplotlib.pyplot as plt</span>
+<span class="sd">        from GUIs.rb_spec import rb_spec as r </span>
 <span class="sd">    </span>
-<span class="sd">                # List of absorber redshifts</span>
-<span class="sd">                zabs=[0.511020,1.026311,1.564481]</span>
-<span class="sd">                transition= 2796.3</span>
-<span class="sd">                #Which absorber to analyze</span>
-<span class="sd">                index=0</span>
-<span class="sd">                filename=&#39;Quasar_Spectrum.fits&#39;</span>
-<span class="sd">                #Read in file</span>
-<span class="sd">                s=r.from_file(filename,filetype=&#39;linetools&#39;)</span>
-<span class="sd">                   #-------------------------------------------------------------------------------</span>
-<span class="sd">                   # DETOUR ---&gt;</span>
-<span class="sd">                   #ALTERNATIVE </span>
-<span class="sd">                   #IF YOU WANT TO DIRECTLY INJEST NUMPY ARRAYS DO THE FOLLOWING</span>
-<span class="sd">                   s=r.from_data(wave,flux,error)</span>
-<span class="sd">                   # HERE wave,flux,error are numpy arrays of wavelength,flux and error respectively.</span>
-<span class="sd">                   #-------------------------------------------------------------------------------</span>
+<span class="sd">        # List of absorber redshifts</span>
+<span class="sd">        zabs=[0.511020,1.026311,1.564481]</span>
+<span class="sd">        transition= 2796.3</span>
+<span class="sd">        #Which absorber to analyze</span>
+<span class="sd">        index=0</span>
+<span class="sd">        filename=&#39;Quasar_Spectrum.fits&#39;</span>
+<span class="sd">        #Read in file</span>
+<span class="sd">        s=r.from_file(filename,filetype=&#39;linetools&#39;)</span>
+<span class="sd">           #-------------------------------------------------------------------------------</span>
+<span class="sd">           # DETOUR ---&gt;</span>
+<span class="sd">           #ALTERNATIVE </span>
+<span class="sd">           #IF YOU WANT TO DIRECTLY INJEST NUMPY ARRAYS DO THE FOLLOWING</span>
+<span class="sd">           s=r.from_data(wave,flux,error)</span>
+<span class="sd">           # HERE wave,flux,error are numpy arrays of wavelength,flux and error respectively.</span>
+<span class="sd">           #-------------------------------------------------------------------------------</span>
 <span class="sd">    </span>
-<span class="sd">                #Shift spectra to rest frame</span>
-<span class="sd">                s.shift_spec(zabs[index]);</span>
-<span class="sd">                #Velocity window around transition</span>
-<span class="sd">                xlim=[-1500,1500]</span>
-<span class="sd">                </span>
-<span class="sd">                #Slice Spectrum within that window</span>
-<span class="sd">                s.slice_spec(transition,xlim[0],xlim[1],use_vel=True);</span>
+<span class="sd">        #Shift spectra to rest frame</span>
+<span class="sd">        s.shift_spec(zabs[index]);</span>
+<span class="sd">        #Velocity window around transition</span>
+<span class="sd">        xlim=[-1500,1500]</span>
+<span class="sd">        </span>
+<span class="sd">        #Slice Spectrum within that window</span>
+<span class="sd">        s.slice_spec(transition,xlim[0],xlim[1],use_vel=True);</span>
 <span class="sd">    </span>
-<span class="sd">                #Fit continuum Mask the regions defined by velocity</span>
-<span class="sd">                s.fit_continuum(mask=[-200,300,500,1100],domain=xlim,Legendre=3)</span>
-<span class="sd">                   #-------------------------------------------------------------------------------</span>
-<span class="sd">                   # DETOUR 1---&gt;</span>
+<span class="sd">        #Fit continuum Mask the regions defined by velocity</span>
+<span class="sd">        s.fit_continuum(mask=[-200,300,500,1100],domain=xlim,Legendre=3)</span>
+<span class="sd">           #-------------------------------------------------------------------------------</span>
+<span class="sd">           # DETOUR 1---&gt;</span>
 <span class="sd">    </span>
-<span class="sd">                    #Alternative Fit continuum methods.</span>
-<span class="sd">                    #s.fit_continuum_ransac(window=149,mednorm=False)</span>
+<span class="sd">            #Alternative Fit continuum methods.</span>
+<span class="sd">            #s.fit_continuum_ransac(window=149,mednorm=False)</span>
 <span class="sd">    </span>
-<span class="sd">                   #-------------------------------------------------------------------------------</span>
-<span class="sd">                   # DETOUR 2---&gt;</span>
+<span class="sd">           #-------------------------------------------------------------------------------</span>
+<span class="sd">           # DETOUR 2---&gt;</span>
 <span class="sd">    </span>
-<span class="sd">                    #Aternate continuum fitting method [interactive]</span>
-<span class="sd">                    s.fit_continuum(Interactive=True)</span>
-<span class="sd">                    #Aternate continuum fitting method [input prefit continuum]</span>
-<span class="sd">                    # Length of prefit continuum array = length of sliced spectrum</span>
-<span class="sd">                    s.fit_continuum(Legendre=False,prefit_cont=cont_arrary)</span>
-<span class="sd">                   #-------------------------------------------------------------------------------</span>
+<span class="sd">            #Aternate continuum fitting method [interactive]</span>
+<span class="sd">            s.fit_continuum(Interactive=True)</span>
+<span class="sd">            #Aternate continuum fitting method [input prefit continuum]</span>
+<span class="sd">            # Length of prefit continuum array = length of sliced spectrum</span>
+<span class="sd">            s.fit_continuum(Legendre=False,prefit_cont=cont_arrary)</span>
+<span class="sd">           #-------------------------------------------------------------------------------</span>
 <span class="sd">    </span>
 <span class="sd">    </span>
-<span class="sd">                #Compute EW</span>
-<span class="sd">                #Compute equivalent width within a velocity window</span>
-<span class="sd">                s.compute_EW(transition,vmin=-200.,vmax=360.);</span>
+<span class="sd">        #Compute EW</span>
+<span class="sd">        #Compute equivalent width within a velocity window</span>
+<span class="sd">        s.compute_EW(transition,vmin=-200.,vmax=360.);</span>
 <span class="sd">    </span>
-<span class="sd">                #save everything as a pickle file</span>
-<span class="sd">                s.save_slice(&#39;outfile.p&#39;)</span>
+<span class="sd">        #save everything as a pickle file</span>
+<span class="sd">        s.save_slice(&#39;outfile.p&#39;)</span>
 <span class="sd">    </span>
-<span class="sd">                #plot the Full spectrum</span>
-<span class="sd">                s.plot_spec()</span>
+<span class="sd">        #plot the Full spectrum</span>
+<span class="sd">        s.plot_spec()</span>
 <span class="sd">    </span>
-<span class="sd">                #Plot the sliced spectrum with the fitted continuum</span>
-<span class="sd">                s.plot_slice()</span>
+<span class="sd">        #Plot the sliced spectrum with the fitted continuum</span>
+<span class="sd">        s.plot_slice()</span>
 <span class="sd">    </span>
-<span class="sd">                #plot the sliced and fitted continuum</span>
-<span class="sd">                #Plot stuff</span>
-<span class="sd">                plt.subplot(2,1,1)</span>
-<span class="sd">                plt.step(s.velo,s.flux_slice)</span>
-<span class="sd">                plt.step(s.velo,s.flux_slice/s.fnorm)</span>
-<span class="sd">                plt.xlim(xlim)</span>
-<span class="sd">                plt.subplot(2,1,2)</span>
-<span class="sd">                plt.step(s.velo,s.fnorm)</span>
-<span class="sd">                plt.plot([-1500,1500],[1,1],&#39;--&#39;)</span>
-<span class="sd">                plt.xlim(xlim)</span>
-<span class="sd">                plt.show()</span>
-<span class="sd">        --------------------------------------------------------------------------------------------</span>
+<span class="sd">        #plot the sliced and fitted continuum</span>
+<span class="sd">        #Plot stuff</span>
+<span class="sd">        plt.subplot(2,1,1)</span>
+<span class="sd">        plt.step(s.velo,s.flux_slice)</span>
+<span class="sd">        plt.step(s.velo,s.flux_slice/s.fnorm)</span>
+<span class="sd">        plt.xlim(xlim)</span>
+<span class="sd">        plt.subplot(2,1,2)</span>
+<span class="sd">        plt.step(s.velo,s.fnorm)</span>
+<span class="sd">        plt.plot([-1500,1500],[1,1],&#39;--&#39;)</span>
+<span class="sd">        plt.xlim(xlim)</span>
+<span class="sd">        plt.show()</span>
+<span class="sd">    --------------------------------------------------------------------------------------------</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">wave</span><span class="p">,</span><span class="n">flux</span><span class="p">,</span><span class="n">error</span><span class="p">,</span><span class="n">filename</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span><span class="c1">#,filetype=False, efil=None,**kwargs):</span>
@@ -381,11 +383,9 @@
         <span class="c1">#return self.wave_slice,self.error_slice,self.flux_slice,self.velo,self.linelist</span>
 
 <div class="viewcode-block" id="rb_spec.fit_continuum"><a class="viewcode-back" href="../../../rbcodes.GUIs.html#rbcodes.GUIs.rb_spec.rb_spec.fit_continuum">[docs]</a>    <span class="k">def</span> <span class="nf">fit_continuum</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">mask</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">domain</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">Legendre</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        By default calls an interactive continuum fitter to the sliced spectrum.</span>
+        <span class="sd">&quot;&quot;&quot; By default calls an interactive continuum fitter to the sliced spectrum.</span>
 <span class="sd">        Or an automated Legendre polynomial fitter if keyword set Legendre.</span>
 <span class="sd">            Order is given by Legendre=order</span>
-
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">if</span> <span class="n">Legendre</span><span class="o">==</span><span class="kc">False</span><span class="p">:</span>
@@ -458,8 +458,7 @@
 
 
 <div class="viewcode-block" id="rb_spec.fit_continuum_ransac"><a class="viewcode-back" href="../../../rbcodes.GUIs.html#rbcodes.GUIs.rb_spec.rb_spec.fit_continuum_ransac">[docs]</a>    <span class="k">def</span> <span class="nf">fit_continuum_ransac</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">window</span><span class="o">=</span><span class="mi">149</span><span class="p">,</span><span class="n">mednorm</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Alternate continuum fitting method. Does iterative ransac continumm fitting.</span>
+        <span class="sd">&quot;&quot;&quot;Alternate continuum fitting method. Does iterative ransac continumm fitting.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="kn">from</span> <span class="nn">IGM</span> <span class="kn">import</span> <span class="n">ransac_contfit</span> <span class="k">as</span> <span class="n">cf</span> 
@@ -474,8 +473,7 @@
 
 
 <div class="viewcode-block" id="rb_spec.compute_EW"><a class="viewcode-back" href="../../../rbcodes.GUIs.html#rbcodes.GUIs.rb_spec.rb_spec.compute_EW">[docs]</a>    <span class="k">def</span> <span class="nf">compute_EW</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">lam_cen</span><span class="p">,</span><span class="n">vmin</span><span class="o">=-</span><span class="mf">50.</span><span class="p">,</span><span class="n">vmax</span><span class="o">=</span><span class="mf">50.</span><span class="p">,</span><span class="n">method</span><span class="o">=</span><span class="s1">&#39;closest&#39;</span><span class="p">,</span><span class="n">plot</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Computes rest frame equivalent width and column density for a desired atomic line.</span>
+        <span class="sd">&quot;&quot;&quot;Computes rest frame equivalent width and column density for a desired atomic line.</span>
 <span class="sd">        Around the species lam_cen and given vmin and vmax keyword values. </span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -507,8 +505,7 @@
 
 
 <div class="viewcode-block" id="rb_spec.plot_spec"><a class="viewcode-back" href="../../../rbcodes.GUIs.html#rbcodes.GUIs.rb_spec.rb_spec.plot_spec">[docs]</a>    <span class="k">def</span> <span class="nf">plot_spec</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Quick wrapper to call an interactive plotter for the full spectrum as given in input file.</span>
+        <span class="sd">&quot;&quot;&quot;Quick wrapper to call an interactive plotter for the full spectrum as given in input file.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1">#from GUIs import rb_plot_spec as sp</span>
         <span class="c1">#tt=sp.rb_plot_spec(self.wave,self.flux,self.error)</span>
@@ -516,8 +513,7 @@
         <span class="n">tt</span><span class="o">=</span><span class="n">sp</span><span class="o">.</span><span class="n">rb_plotspec</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">error</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="rb_spec.plot_slice"><a class="viewcode-back" href="../../../rbcodes.GUIs.html#rbcodes.GUIs.rb_spec.rb_spec.plot_slice">[docs]</a>    <span class="k">def</span> <span class="nf">plot_slice</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Quick wrapper to call an interactive plotter for the full spectrum as given in input file.</span>
+        <span class="sd">&quot;&quot;&quot;Quick wrapper to call an interactive plotter for the full spectrum as given in input file.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
         <span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
@@ -548,8 +544,7 @@
 
 
 <div class="viewcode-block" id="rb_spec.save_slice"><a class="viewcode-back" href="../../../rbcodes.GUIs.html#rbcodes.GUIs.rb_spec.rb_spec.save_slice">[docs]</a>    <span class="k">def</span> <span class="nf">save_slice</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">outfilename</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Saves the slice object for future processing.</span>
+        <span class="sd">&quot;&quot;&quot;Saves the slice object for future processing.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="kn">import</span> <span class="nn">pickle</span>
         <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">outfilename</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">output</span><span class="p">:</span>
@@ -557,8 +552,7 @@
 
 
 <div class="viewcode-block" id="rb_spec.plot_doublet"><a class="viewcode-back" href="../../../rbcodes.GUIs.html#rbcodes.GUIs.rb_spec.rb_spec.plot_doublet">[docs]</a>    <span class="k">def</span> <span class="nf">plot_doublet</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">lam1</span><span class="p">,</span><span class="n">lam2</span><span class="p">,</span><span class="n">vmin</span><span class="o">=-</span><span class="mf">600.</span><span class="p">,</span><span class="n">vmax</span><span class="o">=</span><span class="mf">600.</span><span class="p">,</span><span class="n">method</span><span class="o">=</span><span class="s1">&#39;closest&#39;</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Plot a given doublet defined by the lam1 and lam2 wavelength centers.</span>
+        <span class="sd">&quot;&quot;&quot;Plot a given doublet defined by the lam1 and lam2 wavelength centers.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="kn">from</span> <span class="nn">IGM</span> <span class="kn">import</span> <span class="n">rb_setline</span> <span class="k">as</span> <span class="n">s</span>
@@ -593,6 +587,8 @@
         <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="rb_spec.vpfit_singlet"><a class="viewcode-back" href="../../../rbcodes.GUIs.html#rbcodes.GUIs.rb_spec.rb_spec.vpfit_singlet">[docs]</a>    <span class="k">def</span> <span class="nf">vpfit_singlet</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">FWHM</span><span class="o">=</span><span class="mf">6.5</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Test Wrapper to call vpfit GUI</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="kn">from</span> <span class="nn">GUIs</span> <span class="kn">import</span> <span class="n">rb_interactive_vpfit_singlet</span> <span class="k">as</span> <span class="n">vf</span> 
         <span class="n">vt</span><span class="o">=</span><span class="n">vf</span><span class="o">.</span><span class="n">rb_interactive_vpfit_singlet</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wave_slice</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">fnorm</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">enorm</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">transition</span><span class="p">);</span>    </div></div>
 

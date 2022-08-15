@@ -36,7 +36,9 @@
           <div class="body" role="main">
             
   <h1>Source code for rbcodes.GUIs.interactive_cont_jn</h1><div class="highlight"><pre>
-<span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span></span><span class="sd">&quot;&quot;&quot;Interactive continuum fitter for jupyter notebook</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 <span class="kn">import</span> <span class="nn">ipywidgets</span> <span class="k">as</span> <span class="nn">widgets</span>
 <span class="c1"># Converting To velocities</span>
@@ -47,6 +49,60 @@
 
 
 <div class="viewcode-block" id="interactive_cont"><a class="viewcode-back" href="../../../rbcodes.GUIs.html#rbcodes.GUIs.interactive_cont_jn.interactive_cont">[docs]</a><span class="k">class</span> <span class="nc">interactive_cont</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;     This is an interactive continuum fitter for 1D spectrum.</span>
+<span class="sd">            The purpose of this code is to create a spline continuum fit from selected points.</span>
+<span class="sd">            The help scene activates by pressing h on the plot.</span>
+<span class="sd">    </span>
+<span class="sd">            The program only works properly if none of the toolbar buttons in the figure is activated. </span>
+<span class="sd">    </span>
+<span class="sd">        Attributes</span>
+<span class="sd">        ----------</span>
+<span class="sd">            wave :- numpy arary of wavelength</span>
+<span class="sd">            flux :- numpy array of flux</span>
+<span class="sd">            error:- numpy arrat of error [optional]</span>
+<span class="sd">            xlim:- xrange optional</span>
+<span class="sd">            **kwargs:- optional</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">            Continuum fit: handfitted numpy array of continuum</span>
+
+<span class="sd">        Example</span>
+<span class="sd">        ------</span>
+
+
+<span class="sd">            Useful Keystrokes:</span>
+<span class="sd">    </span>
+<span class="sd">                Mouse Clicks:</span>
+<span class="sd">                </span>
+<span class="sd">                    Left Click  : Select the median flux value within +/- 5 pixel from the x-coordinate.</span>
+<span class="sd">                                  These points are used for the continuum fit.</span>
+<span class="sd">                    Right Click : Delete the nearest continuum point.</span>
+<span class="sd">    </span>
+<span class="sd">                Keystrokes:</span>
+<span class="sd">                  </span>
+<span class="sd">                  b     :    Select a point for continuum fit at that exact (x,y) coordinate.</span>
+<span class="sd">                  enter :    Perform a spline fit to data to create a continuum.</span>
+<span class="sd">                  n     :    Show the normalized spectrum.</span>
+<span class="sd">                  w     :    Only after pressing n: This will ourput the continuum. </span>
+<span class="sd">                  h     :    This Help screen.</span>
+<span class="sd">                  r     :    Reset fit.</span>
+<span class="sd">                  q     :    Quit Program.</span>
+<span class="sd">             ---------------------------------------------------------------------------</span>
+<span class="sd">            Written By:  Rongmon Bordoloi                                   July 13 2017.</span>
+<span class="sd">    </span>
+<span class="sd">    </span>
+<span class="sd">            ----------------------------------------------------------------------------</span>
+<span class="sd">            </span>
+<span class="sd">            Basic code is taken from : http://www.ster.kuleuven.be/~pieterd/python/html/plotting/specnorm.html</span>
+<span class="sd">            Heavily modified by Rongmon Bordoloi July 13/14 2017.</span>
+<span class="sd">            Modified to add custom points and changed the look of the plots.</span>
+<span class="sd">            Also added custom input options to read different formats. </span>
+<span class="sd">            Input file could be ascii, fits or pickle format</span>
+<span class="sd">            Output will be in the same format as the input file. </span>
+<span class="sd">            Added help feature and graceful exit option. - Now pressing q will exit the program at any stage</span>
+<span class="sd">            ---------------------------------------------------------------------------</span>
+<span class="sd">        &quot;&quot;&quot;</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">wave</span><span class="p">,</span><span class="n">flux</span><span class="p">,</span><span class="n">error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">xlim</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mf">600.</span><span class="p">,</span><span class="mf">600.</span><span class="p">],</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">flux</span><span class="o">=</span><span class="n">flux</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">error</span><span class="o">=</span><span class="n">error</span>

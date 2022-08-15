@@ -1,86 +1,3 @@
-""" Interactive continuum fitter for 1D spectrum."""
-
-'''    
-        ---------------------------------------------------------------------------
-        This is an interactive continuum fitter for 1D spectrum.
-        The purpose of this code is to create a spline continuum fit from selected points.
-        The help scene activates by pressing h on the plot.
-
-        The program only works properly if none of the toolbar buttons in the figure is activated. 
-
-
-        Useful Keystrokes:
-
-            Mouse Clicks:
-            
-                Left Click  : Select the median flux value within +/- 5 pixel from the x-coordinate.
-                              These points are used for the continuum fit.
-                Right Click : Delete the nearest continuum point.
-
-            Keystrokes:
-              
-              b     :    Select a point for continuum fit at that exact (x,y) coordinate.
-              enter :    Perform a spline fit to data to create a continuum.
-              n     :    Show the normalized spectrum.
-              w     :    Only after pressing n, write fitted continuum to file. 
-                         [Output file saves wave, flux, error [if available], continuum]
-                         [output file is in same format as input file with *_norm.* appended to the name.]
-              h     :    This Help screen.
-              r     :    Reset fit.
-              q     :    Quit Program.
-        ---------------------------------------------------------------------------
-        Example:   Type in Terminal 
-
-                        Case I:
-                            > ipython rb_cont.py filename
-
-                            Where filename could be file.fits, file.txt, file.dat, or file.p 
-                            Fits and Pickle files should have dictionaries with keys = wave, flux and error [optional].
-                            ascii files should have tab seperated columns with wave,flux and error [optional]
-                            If it is none of these extentions then please specify as described below.
-
-
-                        Case II:
-                            > ipython rb_cont.py filename filetype
-
-                            Where filename could be file.fits, file.txt, file.dat, or file.p 
-                            Fits and Pickle files should have dictionaries with keys = wave, flux and error [optional].
-                            ascii files should have tab seperated columns with wave,flux and error [optional]
-
-                            filetype =  Type of file.
-                                filetype could be written as : fits [for fits files.]
-                                                             : ascii [for ascii files.]
-                                                             : p for [pickle files.]
-
-                        Case III: 
-
-                        Add this path to your .cshrc file 
-                            alias rb_cont   'ipython PATH_TO_THIS_FILE/rb_cont.py'
-
-                            then this file can be run as 
-                            > rb_cont filename
-                                Or
-                            > rb_cont filename filetype
-
-
-        ---------------------------------------------------------------------------
-        Written By:  Rongmon Bordoloi                                   July 13 2017.
-
-
-        ----------------------------------------------------------------------------
-        
-        Basic code is taken from : http://www.ster.kuleuven.be/~pieterd/python/html/plotting/specnorm.html
-        Heavily modified by Rongmon Bordoloi July 13/14 2017.
-        Modified to add custom points and changed the look of the plots.
-        Also added custom input options to read different formats. 
-        Input file could be ascii, fits or pickle format
-        Output will be in the same format as the input file. 
-        Added help feature and graceful exit option. - Now pressing q will exit the program at any stage
-        Added keyword xfits to read in xspecplot formatted files [RB 9.10.2017]
-        Did minor syntax change to fix saving file issue [RB 06.17.2019]
-        ---------------------------------------------------------------------------
-'''
-   
 import matplotlib
 matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
@@ -91,11 +8,13 @@ import sys
 import os
 
 def onclick(event):
-    # when none of the toolbar buttons is activated and the user clicks in the
-    # plot somewhere, compute the median value of the spectrum in a 10angstrom
-    # window around the x-coordinate of the clicked point. The y coordinate
-    # of the clicked point is not important. Make sure the continuum points
-    # `feel` it when it gets clicked, set the `feel-radius` (picker) to 5 points
+    """
+     when none of the toolbar buttons is activated and the user clicks in the
+     plot somewhere, compute the median value of the spectrum in a 10angstrom
+     window around the x-coordinate of the clicked point. The y coordinate
+     of the clicked point is not important. Make sure the continuum points
+     `feel` it when it gets clicked, set the `feel-radius` (picker) to 5 points
+     """
     toolbar = plt.get_current_fig_manager().toolbar
     if event.button==1 and toolbar.mode=='':
         window = ((event.xdata-5)<=wave) & (wave<=(event.xdata+5))
@@ -104,12 +23,13 @@ def onclick(event):
     plt.draw()
 
 def onpick(event):
-    # when the user clicks right on a continuum point, remove it
+    """ when the user clicks right on a continuum point, remove it"""
     if event.mouseevent.button==3:
         if hasattr(event.artist,'get_label') and event.artist.get_label()=='cont_pnt':
             event.artist.remove()
 
 def ontype(event):
+    """
     #---------------------------------------------------------------------------
     # When the user hits enter:
     # 1. Cycle through the artists in the current axes. If it is a continuum
@@ -127,6 +47,7 @@ def ontype(event):
     # Output will be in the same format as the input file. 
     # Added help feature and graceful exit option. - Now pressing q will exit the program at any stage
     #---------------------------------------------------------------------------
+    """
     if event.key=='enter':
         cont_pnt_coord = []
         for artist in plt.gca().get_children():
@@ -277,6 +198,97 @@ def ontype(event):
 
 
 if __name__ == "__main__":
+    """ Interactive continuum fitter for 1D spectrum.
+
+    parameters
+    ----------
+        
+        [str] Filename 
+
+    Returns
+    -------
+    [array] Fitted continuum
+        ---------------------------------------------------------------------------
+        This is an interactive continuum fitter for 1D spectrum.
+        The purpose of this code is to create a spline continuum fit from selected points.
+        The help scene activates by pressing h on the plot.
+
+        The program only works properly if none of the toolbar buttons in the figure is activated. 
+
+
+        Useful Keystrokes:
+
+            Mouse Clicks:
+            
+                Left Click  : Select the median flux value within +/- 5 pixel from the x-coordinate.
+                              These points are used for the continuum fit.
+                Right Click : Delete the nearest continuum point.
+
+            Keystrokes:
+              
+              b     :    Select a point for continuum fit at that exact (x,y) coordinate.
+              enter :    Perform a spline fit to data to create a continuum.
+              n     :    Show the normalized spectrum.
+              w     :    Only after pressing n, write fitted continuum to file. 
+                         [Output file saves wave, flux, error [if available], continuum]
+                         [output file is in same format as input file with *_norm.* appended to the name.]
+              h     :    This Help screen.
+              r     :    Reset fit.
+              q     :    Quit Program.
+        ---------------------------------------------------------------------------
+        Example:   Type in Terminal 
+
+                        Case I:
+                            > ipython rb_cont.py filename
+
+                            Where filename could be file.fits, file.txt, file.dat, or file.p 
+                            Fits and Pickle files should have dictionaries with keys = wave, flux and error [optional].
+                            ascii files should have tab seperated columns with wave,flux and error [optional]
+                            If it is none of these extentions then please specify as described below.
+
+
+                        Case II:
+                            > ipython rb_cont.py filename filetype
+
+                            Where filename could be file.fits, file.txt, file.dat, or file.p 
+                            Fits and Pickle files should have dictionaries with keys = wave, flux and error [optional].
+                            ascii files should have tab seperated columns with wave,flux and error [optional]
+
+                            filetype =  Type of file.
+                                filetype could be written as : fits [for fits files.]
+                                                             : ascii [for ascii files.]
+                                                             : p for [pickle files.]
+
+                        Case III: 
+
+                        Add this path to your .cshrc file 
+                            alias rb_cont   'ipython PATH_TO_THIS_FILE/rb_cont.py'
+
+                            then this file can be run as 
+                            > rb_cont filename
+                                Or
+                            > rb_cont filename filetype
+
+
+        ---------------------------------------------------------------------------
+        Written By:  Rongmon Bordoloi                                   July 13 2017.
+
+
+        ----------------------------------------------------------------------------
+        
+        Basic code is taken from : http://www.ster.kuleuven.be/~pieterd/python/html/plotting/specnorm.html
+        Heavily modified by Rongmon Bordoloi July 13/14 2017.
+        Modified to add custom points and changed the look of the plots.
+        Also added custom input options to read different formats. 
+        Input file could be ascii, fits or pickle format
+        Output will be in the same format as the input file. 
+        Added help feature and graceful exit option. - Now pressing q will exit the program at any stage
+        Added keyword xfits to read in xspecplot formatted files [RB 9.10.2017]
+        Did minor syntax change to fix saving file issue [RB 06.17.2019]
+        ---------------------------------------------------------------------------
+    """
+
+
     # Get the filename of the spectrum from the command line, and plot it
     filename = sys.argv[1]
 

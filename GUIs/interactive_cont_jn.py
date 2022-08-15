@@ -1,3 +1,5 @@
+"""Interactive continuum fitter for jupyter notebook
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 import ipywidgets as widgets
@@ -9,6 +11,60 @@ import os
 
 
 class interactive_cont(object):
+    """     This is an interactive continuum fitter for 1D spectrum.
+            The purpose of this code is to create a spline continuum fit from selected points.
+            The help scene activates by pressing h on the plot.
+    
+            The program only works properly if none of the toolbar buttons in the figure is activated. 
+    
+        Attributes
+        ----------
+            wave :- numpy arary of wavelength
+            flux :- numpy array of flux
+            error:- numpy arrat of error [optional]
+            xlim:- xrange optional
+            **kwargs:- optional
+
+        Returns
+        -------
+            Continuum fit: handfitted numpy array of continuum
+
+        Example
+        ------
+
+
+            Useful Keystrokes:
+    
+                Mouse Clicks:
+                
+                    Left Click  : Select the median flux value within +/- 5 pixel from the x-coordinate.
+                                  These points are used for the continuum fit.
+                    Right Click : Delete the nearest continuum point.
+    
+                Keystrokes:
+                  
+                  b     :    Select a point for continuum fit at that exact (x,y) coordinate.
+                  enter :    Perform a spline fit to data to create a continuum.
+                  n     :    Show the normalized spectrum.
+                  w     :    Only after pressing n: This will ourput the continuum. 
+                  h     :    This Help screen.
+                  r     :    Reset fit.
+                  q     :    Quit Program.
+             ---------------------------------------------------------------------------
+            Written By:  Rongmon Bordoloi                                   July 13 2017.
+    
+    
+            ----------------------------------------------------------------------------
+            
+            Basic code is taken from : http://www.ster.kuleuven.be/~pieterd/python/html/plotting/specnorm.html
+            Heavily modified by Rongmon Bordoloi July 13/14 2017.
+            Modified to add custom points and changed the look of the plots.
+            Also added custom input options to read different formats. 
+            Input file could be ascii, fits or pickle format
+            Output will be in the same format as the input file. 
+            Added help feature and graceful exit option. - Now pressing q will exit the program at any stage
+            ---------------------------------------------------------------------------
+        """
     def __init__(self,wave,flux,error=False,xlim=[-600.,600.],**kwargs):
         self.flux=flux
         self.error=error

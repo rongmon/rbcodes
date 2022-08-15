@@ -15,15 +15,19 @@ def rb_setline(lambda_rest,method,linelist='atom'):
 
     Parameters
     ----------
-           lambda_rest :-  Rest Frame wavelength (in \AA) of the line to match
-            method     :-    'closest' ->  If set will match the closest line.
-                              'Exact'  ->  If set will match the exact wavelength.
+    lambda_rest :-  Rest Frame wavelength (in \AA) of the line to match
+    method     :-   'closest' ->  If set will match the closest line.
+                    'Exact'  ->  If set will match the exact wavelength.
  
     Returns
     ----------
-        dic :- Dictionary with fval,lambda and species name.
+    
+    dic :- Dictionary with fval,lambda and species name.
 
-    Example:   str=rb_setline(2796.3,'closest')
+    Example
+    -------
+
+       str=rb_setline(2796.3,'closest')
 
 
     Written By: Rongmon Bordoloi                Jan 2018, Python 2.7

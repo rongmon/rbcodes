@@ -43,9 +43,10 @@
 <span class="kn">import</span> <span class="nn">pdb</span>
 
 <div class="viewcode-block" id="rb_iter_contfit"><a class="viewcode-back" href="../../../rbcodes.IGM.html#rbcodes.IGM.rb_iter_contfit.rb_iter_contfit">[docs]</a><span class="k">def</span> <span class="nf">rb_iter_contfit</span><span class="p">(</span><span class="n">wave</span><span class="p">,</span><span class="n">flux</span><span class="p">,</span><span class="n">error</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-    <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">    Iterative continuum fitter using Legendre polynomials</span>
-<span class="sd">    Input:  -</span>
+    <span class="sd">&quot;&quot;&quot;Iterative continuum fitter using Legendre polynomials</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
 <span class="sd">                wavelength array</span>
 <span class="sd">                flux array </span>
 <span class="sd">                error array</span>
@@ -53,7 +54,8 @@
 <span class="sd">                maxiter :-  maximum iteration [25 default]</span>
 <span class="sd">                order   :-  polynomial order of fit [4 default]</span>
 
-<span class="sd">    output: -</span>
+<span class="sd">    Returns</span>
+<span class="sd">    ---------</span>
 <span class="sd">               fit_final : Final fitted continuum array</span>
 <span class="sd">               resid_final : residual error array</span>
 <span class="sd">               fit_error  : error on the fit [standard deviation of the residual]</span>
@@ -62,12 +64,13 @@
 <span class="sd">    Tested on Python 3.7  Sep 4 2019</span>
 <span class="sd">    --------------------------</span>
 
-<span class="sd">    example :</span>
-<span class="sd">        from IGM import rb_iter_contfit as r</span>
+<span class="sd">    Example</span>
+<span class="sd">    --------</span>
+<span class="sd">    from IGM import rb_iter_contfit as r</span>
 <span class="sd">        out= r.rb_iter_contfit(wave,flux,error,order=5)</span>
 
 <span class="sd">        out[0] = fitted continuum</span>
-<span class="sd">    &#39;&#39;&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">if</span> <span class="s1">&#39;maxiter&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
         <span class="n">maxiter</span><span class="o">=</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;maxiter&#39;</span><span class="p">]</span>
