@@ -15,6 +15,7 @@ import sys
 sys.path.insert(0, os.path.abspath('../'))
 
 
+
 # -- Project information -----------------------------------------------------
 
 project = 'rbcodes'
@@ -32,35 +33,15 @@ release = '0.1.3'
 # ones.
 extensions = ['sphinx.ext.duration',
 	'sphinx.ext.autodoc',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.doctest',
-    'sphinx.ext.intersphinx',
-    'sphinx.ext.todo',
-    'sphinx.ext.coverage',
-    'sphinx.ext.mathjax',
-    'sphinx.ext.ifconfig',
-    'sphinx.ext.viewcode',
 ]
 
 
-# Napoleon settings 
-napoleon_numpy_docstring = True 
-napoleon_include_private_with_doc = False 
-napoleon_include_special_with_doc = True 
-napoleon_use_admonition_for_examples = False 
-napoleon_use_admonition_for_notes = False 
-napoleon_use_admonition_for_references = False 
-napoleon_use_ivar = False 
-napoleon_use_param = True 
-napoleon_use_rtype = True
 
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
 source_suffix = '.rst'
-
-
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.

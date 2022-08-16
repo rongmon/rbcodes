@@ -1,22 +1,26 @@
 import numpy as np
 def cone_search(ra_center,dec_center,ra_list,dec_list,angular_scale):
-    #--------------------------------------------------------
-    #  Function to do a cone search around any (ra,dec) pointing with respect
-    #  to a list of ra,dec entries.
-    #
-    #   Input:-   ra_center     = RA of center (Degrees)
-    #             dec_center    = DEC of center (Degrees) 
-    #             ra_list       = RA list of input catalogue (Degrees)
-    #             dec_list      = DEC list of input catalogue (Degrees) 
-    #             angular_scale = angular search radius in arcsec
-    #             
-    #
-    #   Output:-  out:- struture containing RA,DEC and logical operator
-    #               identifying the objects
-    #
-    #    Written by R.B.  Mar 11 2013
-    #---------------------------------------------------------
+    """
+    Function to do a cone search around any (ra,dec) pointing with respect
+    to a list of ra,dec entries.
 
+    Parameters
+    ----------
+    
+        ra_center     = RA of center (Degrees)
+        dec_center    = DEC of center (Degrees) 
+        ra_list       = RA list of input catalogue (Degrees)
+        dec_list      = DEC list of input catalogue (Degrees) 
+        angular_scale = angular search radius in arcsec
+               
+    
+    Returns
+    -------
+        out:- struture containing RA,DEC and logical operator identifying the objects
+    
+    Written by R.B.  Mar 11 2013
+    -------------------------------------------------------
+    """
     deg2rad=np.pi/180
     rad2deg=180./np.pi
 

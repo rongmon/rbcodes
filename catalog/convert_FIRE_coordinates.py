@@ -4,23 +4,29 @@ from astropy import units as u
 from astropy.io import fits
 
 def convert_epoch(filename):
-	''''--------------------------------------------
-	Function to take Magellan FIRE spectrum and use the header information
+	"""Function to take Magellan FIRE spectrum and use the header information
 	to transform the co-ordinates to J2000 epoch
 
-	Input:  Magellan FIRE 1d spectrum filename in fits format
+	Parameters
+	-----------
 
-	Return:
-	      astropy SkyCoord object in J2000 epoch
+	 Magellan FIRE 1d spectrum filename in fits format
+
+	Return
+	------
+	
+	astropy SkyCoord object in J2000 epoch
 
 
 
-	 Calling Sequence:
-	   from catalog.convert_FIRE_coordinates import convert_epoch
-	   s=convert_epoch('J0100+28_F.fits')
+	Example
+	-------
 
-	   #show results
-	   s.to_string('hmsdms')
+	from catalog.convert_FIRE_coordinates import convert_epoch
+	s=convert_epoch('J0100+28_F.fits')
+
+	#show results
+	s.to_string('hmsdms')
 
 
 	Note: Only for specific use of older Magellan FIRE QSO spectra.
@@ -28,7 +34,7 @@ def convert_epoch(filename):
 
 	Written By: Rongmon Bordoloi              May 2022
        ---------------------------------------------
-	'''
+	"""
 	hdu=fits.open(filename)
 	equinox     =  hdu[0].header['EQUINOX']
 	ra_deg1      =  hdu[0].header['RA']

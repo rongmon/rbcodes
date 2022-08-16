@@ -12,14 +12,6 @@ rbcodes.GUIs.PlotSpec\_Integrated module
    :undoc-members:
    :show-inheritance:
 
-rbcodes.GUIs.call\_linetools\_contfitter module
------------------------------------------------
-
-.. automodule:: rbcodes.GUIs.call_linetools_contfitter
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 rbcodes.GUIs.guess\_abs\_line\_vel\_gui module
 ----------------------------------------------
 
@@ -88,22 +80,6 @@ rbcodes.GUIs.rb\_test module
 ----------------------------
 
 .. automodule:: rbcodes.GUIs.rb_test
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-rbcodes.GUIs.test module
-------------------------
-
-.. automodule:: rbcodes.GUIs.test
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-rbcodes.GUIs.test\_new module
------------------------------
-
-.. automodule:: rbcodes.GUIs.test_new
    :members:
    :undoc-members:
    :show-inheritance:

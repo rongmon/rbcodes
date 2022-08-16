@@ -11,11 +11,7 @@ import os
 
 
 class interactive_cont(object):
-    """     This is an interactive continuum fitter for 1D spectrum.
-            The purpose of this code is to create a spline continuum fit from selected points.
-            The help scene activates by pressing h on the plot.
-    
-            The program only works properly if none of the toolbar buttons in the figure is activated. 
+    """This is an interactive continuum fitter for 1D spectrum.
     
         Attributes
         ----------
@@ -55,7 +51,9 @@ class interactive_cont(object):
     
     
             ----------------------------------------------------------------------------
-            
+            Note::The purpose of this code is to create a spline continuum fit from selected points. 
+            The help scene activates by pressing h on the plot. 
+            The program only works properly if none of the toolbar buttons in the figure is activated. 
             Basic code is taken from : http://www.ster.kuleuven.be/~pieterd/python/html/plotting/specnorm.html
             Heavily modified by Rongmon Bordoloi July 13/14 2017.
             Modified to add custom points and changed the look of the plots.

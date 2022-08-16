@@ -1,5 +1,5 @@
 .. rbcodes documentation master file, created by
-   sphinx-quickstart on Sun Aug 14 13:38:01 2022.
+   sphinx-quickstart on Mon Aug 15 13:21:13 2022.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
@@ -7,7 +7,6 @@ Welcome to rbcodes's documentation!
 ===================================
 
 **rbcodes** package contains a suite of python codes commonly used for astrophysical reserach by Rongmon Bordoloi. 
-
 
 Dependencies: astropy, lmfit, scipy, numpy, matplotlib, linetools
 
@@ -17,13 +16,14 @@ The GUIs folder contains several graphical user interfaces for astrophysics.
 .. note::
    This package is under active development and will be periodically updated.
 
-Contents
---------
+
+
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 4
    :caption: Contents:
 
    usage
+   modules
 
 
 

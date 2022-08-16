@@ -1,17 +1,14 @@
 """ Spectrum class to read in, analyze and measure absorption lines."""
-
 import numpy as np
 from scipy.interpolate import splrep,splev
 import sys
 import os
 import pdb
 class rb_spec(object):
-    """
-    A spectrum read into a class. spectrum will have
-    following properties:
+    """A spectrum read into a class, spectrum will have following properties.
 
-    Parameters
-    -----------
+    Attributes 
+    ----------
         wave: wavelength.
         flux: flux.
         error: error
@@ -19,11 +16,12 @@ class rb_spec(object):
         filetype = False [default] : other options 
                  ascii, fits, HSLA, xfits, p [pickle], temp, and linetools [uses linetools.io routine for this]
 
-    Optional:  All only valid for filetype=linetools option
-         efil= errorfile [Default None]
+        Optional: 
+            All only valid for filetype=linetools option
+            efil= errorfile [Default None]
 
     Returns
-    ---------
+    -------
         This gives a rb_spec object with following attributes:
 
         self.zabs= Absorber redshift
@@ -65,16 +63,14 @@ class rb_spec(object):
         # WARNING: CALLING SEQUENCE HAS CHANGED SINCE APRIL 2022.
         CAREFULLY LOOK AT THE EXAMPLE BELOW
 
-    Example:
-
-    --------------------------------------------------------------------------------------------
+    Example
+    -------
         import numpy as np
         import matplotlib
         matplotlib.use('Qt5Agg')
         import matplotlib.pyplot as plt
         from GUIs.rb_spec import rb_spec as r 
-    
-        # List of absorber redshifts
+        #List of absorber redshifts
         zabs=[0.511020,1.026311,1.564481]
         transition= 2796.3
         #Which absorber to analyze
@@ -82,14 +78,15 @@ class rb_spec(object):
         filename='Quasar_Spectrum.fits'
         #Read in file
         s=r.from_file(filename,filetype='linetools')
-           #-------------------------------------------------------------------------------
-           # DETOUR --->
-           #ALTERNATIVE 
-           #IF YOU WANT TO DIRECTLY INJEST NUMPY ARRAYS DO THE FOLLOWING
-           s=r.from_data(wave,flux,error)
-           # HERE wave,flux,error are numpy arrays of wavelength,flux and error respectively.
-           #-------------------------------------------------------------------------------
-    
+
+        #-------------------------------------------------------------------------------
+        # DETOUR --->
+        #ALTERNATIVE 
+        #IF YOU WANT TO DIRECTLY INJEST NUMPY ARRAYS DO THE FOLLOWING
+        s=r.from_data(wave,flux,error)
+        # HERE wave,flux,error are numpy arrays of wavelength,flux and error respectively.
+        #-------------------------------------------------------------------------------
+                
         #Shift spectra to rest frame
         s.shift_spec(zabs[index]);
         #Velocity window around transition
@@ -97,36 +94,34 @@ class rb_spec(object):
         
         #Slice Spectrum within that window
         s.slice_spec(transition,xlim[0],xlim[1],use_vel=True);
-    
+        
         #Fit continuum Mask the regions defined by velocity
         s.fit_continuum(mask=[-200,300,500,1100],domain=xlim,Legendre=3)
-           #-------------------------------------------------------------------------------
-           # DETOUR 1--->
-    
-            #Alternative Fit continuum methods.
-            #s.fit_continuum_ransac(window=149,mednorm=False)
-    
-           #-------------------------------------------------------------------------------
-           # DETOUR 2--->
-    
-            #Aternate continuum fitting method [interactive]
-            s.fit_continuum(Interactive=True)
-            #Aternate continuum fitting method [input prefit continuum]
-            # Length of prefit continuum array = length of sliced spectrum
-            s.fit_continuum(Legendre=False,prefit_cont=cont_arrary)
-           #-------------------------------------------------------------------------------
-    
-    
+        
+        #-------------------------------------------------------------------------------
+        # DETOUR 1--->
+        #Alternative Fit continuum methods.
+        #s.fit_continuum_ransac(window=149,mednorm=False)  
+        
+        #-------------------------------------------------------------------------------
+        # DETOUR 2--->
+        #Aternate continuum fitting method [interactive]
+        s.fit_continuum(Interactive=True)
+        #Aternate continuum fitting method [input prefit continuum]
+        # Length of prefit continuum array = length of sliced spectrum
+        s.fit_continuum(Legendre=False,prefit_cont=cont_arrary)
+        #-------------------------------------------------------------------------------
+        
         #Compute EW
         #Compute equivalent width within a velocity window
         s.compute_EW(transition,vmin=-200.,vmax=360.);
-    
+        
         #save everything as a pickle file
         s.save_slice('outfile.p')
-    
+        
         #plot the Full spectrum
         s.plot_spec()
-    
+        
         #Plot the sliced spectrum with the fitted continuum
         s.plot_slice()
     
@@ -141,14 +136,10 @@ class rb_spec(object):
         plt.plot([-1500,1500],[1,1],'--')
         plt.xlim(xlim)
         plt.show()
-    --------------------------------------------------------------------------------------------
-
     """
     def __init__(self,wave,flux,error,filename=False):#,filetype=False, efil=None,**kwargs):
         """ creates the spectrum object """
         #print('Initializing rb_spec object for absorption line analysis!')
-        
-
         self.wave=wave
         self.flux=flux
         self.error=error
@@ -306,18 +297,6 @@ class rb_spec(object):
 
 
         """
-        '''
-        if kwargs.has_key('method'):
-            method=kwargs['method']
-        else:
-            method='closest'
-
-        if kwargs.has_key('linelist'):
-            linelist=kwargs['linelist']
-        else:
-            linelist='LLS'
-        '''
-
         from IGM import rb_setline as s
 
         str=s.rb_setline(lam_rest,method,linelist=linelist)
@@ -346,7 +325,7 @@ class rb_spec(object):
 
     def fit_continuum(self,mask=False,domain=False,Legendre=False,**kwargs):
         """ By default calls an interactive continuum fitter to the sliced spectrum.
-        Or an automated Legendre polynomial fitter if keyword set Legendre.
+            Or an automated Legendre polynomial fitter if keyword set Legendre.
             Order is given by Legendre=order
         """
 
