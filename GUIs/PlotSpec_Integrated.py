@@ -404,6 +404,24 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             self.ax.set_xlim([xlim[0]-delx,xlim[0]])
             self.ax.set_ylim(ylim)
             self.spectrum.canvas.draw() 
+        #zoom out of xrange
+        elif (event.key == 'o'):
+            xlim=self.ax.get_xlim()
+            ylim=self.ax.get_ylim()
+            xcen = (xlim[0]+xlim[1])/2.0
+            delx   = xlim[1] - xcen
+            self.ax.set_xlim([xcen - 1.5*delx,xcen + 1.5*delx])
+            self.spectrum.canvas.draw() 
+
+        #guess line CIV
+        elif (event.key == 'C'):
+            wave0 = event.xdata        
+            self.check_lineid(wave0,'CIV')
+        #guess line MgII
+        elif (event.key == 'M'):
+            wave0 = event.xdata        
+            self.check_lineid(wave0,'MgII')
+            redraw = False
 
         elif event.key == 'Y':
             Windowname='Manual y-Limits'
@@ -739,7 +757,22 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
     def LoadCatalog_fn(self,parent):
         self.loading = LoadCatalog(parent)
         self.loading.show()
+
+    #This code will quickly draw some doublet lines on the canvas for a quicklook
+    def check_lineid(self, wave0, ion):
+        if (ion == 'CIV'):
+            wave1 = wave0 * 1550.77845 / 1548.2049           
+            z = wave0 / 1548.2049 - 1
+            print(f"CIV: z = {z}")
+        elif (ion == 'MgII'):
+            wave1 = wave0 * 2803.5314853 / 2796.3542699
+            z = wave0 / 2796.354 - 1
+            print(f"MgII: z = {z}")
         
+        self.ax.plot([wave0,wave0,wave1,wave1],[1,1.5,1.5,1],color='r')
+        self.canvas.draw()
+
+
     #spec plot is connected to the smoothing/unsmoothing events
     #flux is always stored as ax.lines[0], error as ax.lines[1]. So we can add two new S/US plots
     #replace lines[0] and [1], then delete the last two lines added to the ax.lines list to keep the reference as [1] and [0]

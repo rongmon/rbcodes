@@ -106,6 +106,19 @@ def read_line_list(label):
         filename=resource_filename('IGM','lines/gal_vac.lst')
     elif label == 'Eiger_Strong':
         filename=resource_filename('IGM','lines/Eiger_Strong.lst')
+    elif label == 'Gal_Em':
+        filename=resource_filename('IGM','lines/Galaxy_emission_Lines.lst')
+    elif label == 'Gal_Abs':
+        filename=resource_filename('IGM','lines/Galaxy_absorption_Lines.lst')
+    elif label == 'Gal_long':
+        filename=resource_filename('IGM','lines/Galaxy_Long_E_n_A.lst')
+    elif label == 'AGN':
+        filename=resource_filename('IGM','lines/AGN.lst')
+    elif label == 'HI_recomb':
+        filename=resource_filename('IGM','lines/HI_recombination.lst')
+    elif label == 'HI_recomb_light':
+        filename=resource_filename('IGM','lines/HI_recombination_light.lst')
+ 
 
     else:
         print('Give Correct LineList')
@@ -138,7 +151,7 @@ def read_line_list(label):
 
             data.append(source)
 
-    elif label =='Eiger_Strong':
+    elif (label =='Eiger_Strong') |(label =='Gal_Em') | (label =='Gal_Abs') |(label =='Gal_long') | (label =='AGN'):
 
         s=ascii.read(filename)
 
@@ -151,6 +164,17 @@ def read_line_list(label):
 
             data.append(source)
 
+    elif (label =='HI_recomb') |((label =='HI_recomb_light')):
+        s=ascii.read(filename)
+
+        for line in range(0,len(s['wrest'])):
+            source = {}
+            source['wrest'] = float(s['wrest'][line]*10**4)
+            source['ion'] = s['name'][line]#+' '+s['transition'][line]
+            source['fval']=float(0)#s['ID'][line])
+            source['gamma']=float(0)#s['ID'][line])
+
+            data.append(source)
 
     else:       
         f=open(filename,'r')
