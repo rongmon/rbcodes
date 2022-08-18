@@ -415,12 +415,14 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
 
         #guess line CIV
         elif (event.key == 'C'):
-            wave0 = event.xdata        
-            self.check_lineid(wave0,'CIV')
+            wave0 = event.xdata
+            yval=event.ydata        
+            self.check_lineid(wave0,'CIV',yval)
         #guess line MgII
         elif (event.key == 'M'):
-            wave0 = event.xdata        
-            self.check_lineid(wave0,'MgII')
+            wave0 = event.xdata
+            yval=event.ydata        
+            self.check_lineid(wave0,'MgII',yval)
             redraw = False
 
         elif event.key == 'Y':
@@ -759,17 +761,22 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         self.loading.show()
 
     #This code will quickly draw some doublet lines on the canvas for a quicklook
-    def check_lineid(self, wave0, ion):
-        if (ion == 'CIV'):
+    def check_lineid(self, wave0, ionname,yval):
+        if (ionname == 'CIV'):
             wave1 = wave0 * 1550.77845 / 1548.2049           
             z = wave0 / 1548.2049 - 1
             print(f"CIV: z = {z}")
-        elif (ion == 'MgII'):
+            self.message_window.setText(f"CIV: z = {z}")
+
+        elif (ionname == 'MgII'):
             wave1 = wave0 * 2803.5314853 / 2796.3542699
             z = wave0 / 2796.354 - 1
             print(f"MgII: z = {z}")
-        
-        self.ax.plot([wave0,wave0,wave1,wave1],[1,1.5,1.5,1],color='r')
+            self.message_window.setText(f"MgII: z = {z}")
+
+
+        self.ax.text(0.5*(wave0+wave1),yval+0.7,ionname +' z: ' +str(np.round(z,4)) ,rotation=90,verticalalignment='bottom')        
+        self.ax.plot([wave0,wave0,wave1,wave1],[yval,yval+.5,yval+.5,yval],color='r')
         self.canvas.draw()
 
 
