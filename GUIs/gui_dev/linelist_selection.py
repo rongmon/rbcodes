@@ -267,6 +267,10 @@ class LineListWidget(QWidget):
 			# replace estZ if z_guess is available
 			self.estZ.setText(str(self.round_to_sigfig(self.fitsobj.z_guess, 3)))
 			self.send_message.emit('Redshift posterior is found in the FITS file!')
+		if self.fitsobj.z_est is not None:
+			# change estZ from z_guess to z_est
+			self.estZ.setText(str(self.round_to_sigfig(self.fitsobj.z_est, 3)))
+			self.send_message.emit('Esimated redshift is found in the database!')
 
 	# action to "Add to Table below"
 	# log available values to DataFrame
