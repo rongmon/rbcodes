@@ -56,7 +56,7 @@ class CustomZTable(QtWidgets.QWidget):
 			ind = self.estZ[self.estZ['Name'] == sent_data['Name']].index.values[0]
 			s = self.estZ.iloc[ind].to_dict()
 			#print(s)
-			s.update(sent_data)
+			s.update(sent_data)                                                    
 			self.estZ.iloc[ind] = s
 		else:
 			self.estZ = self.estZ.append(sent_data, ignore_index=True)
@@ -73,7 +73,7 @@ class CustomZTable(QtWidgets.QWidget):
 			self.estZ.reset_index(inplace=True, drop=True)
 			self._update_table()
 			self.send_dictdata.emit(self.estZ.iloc[0].to_dict())
-			#print(self.estZ.iloc[0].to_dict())
+			print(self.estZ.iloc[0].to_dict())
 		else:
 			self.send_dictdata.emit({})
 

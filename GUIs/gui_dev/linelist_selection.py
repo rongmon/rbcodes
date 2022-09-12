@@ -263,14 +263,17 @@ class LineListWidget(QWidget):
 	# importing signal(FitsObj) to slot
 	def _on_sent_fitsobj(self, sent_fitsobj):
 		self.fitsobj = sent_fitsobj
-		if self.fitsobj.z_guess is not None:
+		'''
+		if self.fitsobj.z_est is not None:
+			# change estZ from z_guess to z_est
+			print('found nonzero z_est')
+			self.estZ.setText(str(self.round_to_sigfig(self.fitsobj.z_est, 3)))
+			self.send_message.emit('Esimated redshift is found in the database!')
+		elif self.fitsobj.z_guess is not None:
 			# replace estZ if z_guess is available
 			self.estZ.setText(str(self.round_to_sigfig(self.fitsobj.z_guess, 3)))
 			self.send_message.emit('Redshift posterior is found in the FITS file!')
-		if self.fitsobj.z_est is not None:
-			# change estZ from z_guess to z_est
-			self.estZ.setText(str(self.round_to_sigfig(self.fitsobj.z_est, 3)))
-			self.send_message.emit('Esimated redshift is found in the database!')
+		'''
 
 	# action to "Add to Table below"
 	# log available values to DataFrame
@@ -321,6 +324,7 @@ class LineListWidget(QWidget):
 					self.newz[1] = float(sent_dict['z_err'])
 
 				show_sigfig = 5
+				print(self.newz)
 				self.estZ.setText(str(self.round_to_sigfig(self.newz[0], show_sigfig)))
 				if not isnan(float(self.newz[1])):
 					self.estZstd.setText(str(self.round_to_sigfig(self.newz[1], show_sigfig)))
