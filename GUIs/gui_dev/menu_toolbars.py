@@ -37,6 +37,7 @@ class Custom_ToolBar(QToolBar):
 		self.filenames = []
 		self.filename = ''
 		self.display2d = None # displayed 2d spectrum
+		self.display2d_err = None # displayed 2d error spectrum
 		self.scale = 0
 		self.normalization = 0
 		self.manual = None # No user manual yet
@@ -363,8 +364,13 @@ class Custom_ToolBar(QToolBar):
 			# default is SCI
 			if (s == 'SCI') | (s == ''):
 				self.display2d = self.fitsobj.flux2d
+				self.display2d_err = self.fitsobj.error2d
 			else:
 				self.display2d = self.frames[s]
+				self.fitsobj.error2d = self.frames_err[s]
+				# select individual frame
+
+
 
 			# get current scaling and normalization variables
 			s_cur = self.s_combobox.currentIndex()
@@ -527,7 +533,7 @@ class Custom_ToolBar(QToolBar):
 				if self.mW.toggle_frames:
 					from gui_frame_io import ToggleFrames
 					toggle_f = ToggleFrames(self.filepaths[i-1])
-					self.frames, self.frames1d = toggle_f._check_available_frames()
+					self.frames, self.frames_err, self.frames1d = toggle_f._check_available_frames()
 
 					self.frame_combobox.clear()
 					for frame_name in self.frames.keys():
