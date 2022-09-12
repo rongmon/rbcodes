@@ -91,11 +91,14 @@ def shift2vel(z1,z2):
     return vel
 
 def grab_intervening_linelist(filename,z_gal,wrest_galaxy,wavelength):
-    s=ascii.read(filename)
-    ion=s['col1']
-    wrest=s['col2']
-    wobs=s['col3']
-    zobs=s['col4']
+    import pandas as pd 
+    #s=ascii.read(filename)
+    s=pd.read_csv(filename,sep=' ')
+    ion=s['Name'].values#s['col1']
+    wobs=s['Wave_obs'].values #s['col3']
+    zobs=s['Zabs'].values#s['col4']
+    wrest=wobs/(1.+zobs)#s['col2']
+
     spl=2.9979e5;  #speed of light
 
     #compute relative velocity difference with the host galaxy
@@ -142,7 +145,7 @@ def plot_intervening_lines(ax,outlist,delv):
                     color =clr['pale_red']
                 else:
                     color='b'
-                ax.text(vellist[index],1.05, np.str(outlist['ion'][index])+' '+ np.str(outlist['wrest'][index]),
+                ax.text(vellist[index],1.05, np.str(outlist['ion'][index])+' '+ np.str('%.0f' % outlist['wrest'][index]),
                     fontsize=8,rotation=90, rotation_mode='anchor',color=color)
                 ax.text(vellist[index]+50.,1.05, 'z = '+np.str('%.3f' % outlist['zobs'][index]),
                     fontsize=8,rotation=90, rotation_mode='anchor',color=color)

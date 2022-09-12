@@ -2,46 +2,48 @@
 
 import numpy as np
 def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
-    #------------------------------------------------------------------------------------------
-    #   Function to compute the equivalent width within a given velocity limits lmts=[vmin,vmax]
-    #           [Only good for high resolution spectra]
-    #  Caveats:- Not automated, must not include other absorption troughs within the velocity range.
-    # 
-    #   Input:- 
-    #           lam         :- Observed Wavelength vector (units of Angstrom)
-    #           flx         :- flux vector ( same length as wavelgnth vector, preferably continuum normalized)
-    #           wrest       :- rest frame wavelength of the line [used to make velcity cuts]
-    #           lmts        :- [vmin,vmax], the velocity window within which equivalent width is computed.
-    #           flx_err     :- error spectrum [same length as the flux vector]
-    #
-    #   OPTIONAL :-
-    #           f0=f0       :- fvalue of the transition 
-    #           zabs=zabs   :- absorber redshift
-    #           plot        :- plot keyword, default = no plots plot=0
-    #                           plot=1 or anything else will plot the corresponding spectrum 
-    #                            and the apparent optical depth of absorption. 
-    #
-    #
-    #
-    # Output:-  In a Python dictionary format
-    #           output['ew_tot']      :- rest frame equivalent width of the absorpiton system [Angstrom]
-    #           output['err_ew_tot']  :- error on rest fram equivalent width 
-    #           output['col']         :- AOD column denisty 
-    #           output['colerr']      :- 1 sigma error on AOD column density 
-    #           output['n']           :- AOD column density as a function of velocity
-    #           output['Tau_a']       :- AOD as a function of velocity
-    #           output['med_vel']     :- velocity centroid (Median Equivalent Width weighted velocity within lmts)
-    #           output['vel_disp']    : 1 sigma velocity dispersion
-    #           output['vel50_err']   : error on velocity centroid
-    #
-    #
-    #   Written :- Rongmon Bordoloi                             2nd November 2016
-    #-  I translated this from my matlab code compute_EW.m, which in turn is from Chris Thom's eqwrange.pro. 
-    #   This was tested with COS-Halos/Dwarfs data. 
-    #   Edit:  RB July 5 2017. Output is a dictionary. Edited minor dictionary arrangement
-    #          RB July 25 2019. Added med_vel
-    #          RB April 28, 2021, changed med_vel to weight be EW & vel_disp
-    #------------------------------------------------------------------------------------------
+    """
+    ------------------------------------------------------------------------------------------
+       Function to compute the equivalent width within a given velocity limits lmts=[vmin,vmax]
+               [Only good for high resolution spectra]
+      Caveats:- Not automated, must not include other absorption troughs within the velocity range.
+     
+       Parameters:- 
+               lam         :- Observed Wavelength vector (units of Angstrom)
+               flx         :- flux vector ( same length as wavelgnth vector, preferably continuum normalized)
+               wrest       :- rest frame wavelength of the line [used to make velcity cuts]
+               lmts        :- [vmin,vmax], the velocity window within which equivalent width is computed.
+               flx_err     :- error spectrum [same length as the flux vector]
+    
+       OPTIONAL :-
+               f0=f0       :- fvalue of the transition 
+               zabs=zabs   :- absorber redshift
+               plot        :- plot keyword, default = no plots plot=0
+                               plot=1 or anything else will plot the corresponding spectrum 
+                                and the apparent optical depth of absorption. 
+    
+    
+    
+        Returns:-  In a Python dictionary format
+               output['ew_tot']      :- rest frame equivalent width of the absorpiton system [Angstrom]
+               output['err_ew_tot']  :- error on rest fram equivalent width 
+               output['col']         :- AOD column denisty 
+               output['colerr']      :- 1 sigma error on AOD column density 
+               output['n']           :- AOD column density as a function of velocity
+               output['Tau_a']       :- AOD as a function of velocity
+               output['med_vel']     :- velocity centroid (Median Equivalent Width weighted velocity within lmts)
+               output['vel_disp']    : 1 sigma velocity dispersion
+               output['vel50_err']   : error on velocity centroid
+    
+    
+       Written :- Rongmon Bordoloi                             2nd November 2016
+    -  I translated this from my matlab code compute_EW.m, which in turn is from Chris Thom's eqwrange.pro. 
+       This was tested with COS-Halos/Dwarfs data. 
+       Edit:  RB July 5 2017. Output is a dictionary. Edited minor dictionary arrangement
+              RB July 25 2019. Added med_vel
+              RB April 28, 2021, changed med_vel to weight be EW & vel_disp
+    ------------------------------------------------------------------------------------------
+    """
     defnorm=1.0;
     spl=2.9979e5;  #speed of light
     if 'zabs' in kwargs:

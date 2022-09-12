@@ -6,25 +6,33 @@ from astropy.io import ascii
 from pkg_resources import resource_filename
 
 
-'''
- Function to read in atomic line information for a given rest frame  wavelength.
-                           Or 
- For the line matching the closest wavelength. 
 
- Input :
-           lambda_rest :-  Rest Frame wavelength (in \AA) of the line to match
-            method     :-    'closest' ->  If set will match the closest line.
-                              'Exact'  ->  If set will match the exact wavelength.
- 
- Output:    dic :- Dictionary with fval,lambda and species name.
-
- Example:   str=rb_setline(2796.3,'closest')
-
-
-Written By: Rongmon Bordoloi                Jan 2018, Python 2.7
-Edit:       Rongmon Bordoloi                            Sep 2018, Depreciated kwargs to be compatible with python 3
-'''
 def rb_setline(lambda_rest,method,linelist='atom'):
+    """
+    Function to read in atomic line information for a given rest frame  wavelength.
+                           Or 
+    For the line matching the closest wavelength. 
+
+    Parameters
+    ----------
+    lambda_rest :-  Rest Frame wavelength (in \AA) of the line to match
+    method     :-   'closest' ->  If set will match the closest line.
+                    'Exact'  ->  If set will match the exact wavelength.
+ 
+    Returns
+    ----------
+    
+    dic :- Dictionary with fval,lambda and species name.
+
+    Example
+    -------
+
+       str=rb_setline(2796.3,'closest')
+
+
+    Written By: Rongmon Bordoloi                Jan 2018, Python 2.7
+    Edit:       Rongmon Bordoloi                            Sep 2018, Depreciated kwargs to be compatible with python 3
+   """
     
     #if kwargs.has_key('linelist'):
     #   linelist=kwargs['linelist']
@@ -70,6 +78,18 @@ def rb_setline(lambda_rest,method,linelist='atom'):
 
 
 def read_line_list(label):
+    """Module to read a linelist defined by the label
+
+    Parameters
+    ----------
+    lable : Label string [e.g. atom, LLS, LLS Small, LBG, Gal, Eiger_Strong]
+      Must include redshift
+
+    Returns
+    ----------
+    a dictionary with wrest, ion name and fvalues
+
+    """
     
 
     if label=='atom':
@@ -86,6 +106,19 @@ def read_line_list(label):
         filename=resource_filename('IGM','lines/gal_vac.lst')
     elif label == 'Eiger_Strong':
         filename=resource_filename('IGM','lines/Eiger_Strong.lst')
+    elif label == 'Gal_Em':
+        filename=resource_filename('IGM','lines/Galaxy_emission_Lines.lst')
+    elif label == 'Gal_Abs':
+        filename=resource_filename('IGM','lines/Galaxy_absorption_Lines.lst')
+    elif label == 'Gal_long':
+        filename=resource_filename('IGM','lines/Galaxy_Long_E_n_A.lst')
+    elif label == 'AGN':
+        filename=resource_filename('IGM','lines/AGN.lst')
+    elif label == 'HI_recomb':
+        filename=resource_filename('IGM','lines/HI_recombination.lst')
+    elif label == 'HI_recomb_light':
+        filename=resource_filename('IGM','lines/HI_recombination_light.lst')
+ 
 
     else:
         print('Give Correct LineList')
@@ -118,7 +151,7 @@ def read_line_list(label):
 
             data.append(source)
 
-    elif label =='Eiger_Strong':
+    elif (label =='Eiger_Strong') |(label =='Gal_Em') | (label =='Gal_Abs') |(label =='Gal_long') | (label =='AGN'):
 
         s=ascii.read(filename)
 
@@ -131,6 +164,17 @@ def read_line_list(label):
 
             data.append(source)
 
+    elif (label =='HI_recomb') |((label =='HI_recomb_light')):
+        s=ascii.read(filename)
+
+        for line in range(0,len(s['wrest'])):
+            source = {}
+            source['wrest'] = float(s['wrest'][line]*10**4)
+            source['ion'] = s['name'][line]#+' '+s['transition'][line]
+            source['fval']=float(0)#s['ID'][line])
+            source['gamma']=float(0)#s['ID'][line])
+
+            data.append(source)
 
     else:       
         f=open(filename,'r')

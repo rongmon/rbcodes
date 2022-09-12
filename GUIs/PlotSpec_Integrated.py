@@ -1,3 +1,6 @@
+"""
+Modules for PlotSpec_Integrated GUI
+"""
 import numpy as np
 from scipy.interpolate import splrep,splev
 from IGM import rb_setline as line   
@@ -70,7 +73,18 @@ HELP = '''
                the active zabs will display what the redshift should be based on the 
                mouse x location
                
-       
+        'Right Click' :  Same as j.
+
+        -------Marking Doublets or Multiplets-------------
+
+        'M':   MgII (2796,2803)
+        'C':   CIV  (1548, 1550)
+        'F':   FeII (2600,2586,2382)
+        '6':   OVI  (1031, 1037)
+        '4':   SiIV (1393, 1402)
+        '8':   NeVIII (778, 770)
+        '2':   Lyb/Lya
+        '1':   Lya/Lyb
         
         --------Vstack GUI Keyboard Events--------
         Upon pressing 'v' in main canvas, a separate window will pop up
@@ -401,6 +415,61 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             self.ax.set_xlim([xlim[0]-delx,xlim[0]])
             self.ax.set_ylim(ylim)
             self.spectrum.canvas.draw() 
+        #zoom out of xrange
+        elif (event.key == 'o'):
+            xlim=self.ax.get_xlim()
+            ylim=self.ax.get_ylim()
+            xcen = (xlim[0]+xlim[1])/2.0
+            delx   = xlim[1] - xcen
+            self.ax.set_xlim([xcen - 1.5*delx,xcen + 1.5*delx])
+            self.spectrum.canvas.draw() 
+
+        #guess line CIV
+        elif (event.key == 'C'):
+            wave0 = event.xdata
+            yval=event.ydata        
+            self.check_lineid(wave0,'CIV',yval)
+        #guess line MgII
+        elif (event.key == 'M'):
+            wave0 = event.xdata
+            yval=event.ydata        
+            self.check_lineid(wave0,'MgII',yval)
+        #guess line FeII
+        elif (event.key == 'F'):
+            wave0 = event.xdata
+            yval=event.ydata        
+            self.check_lineid(wave0,'FeII',yval)
+
+        #guess line OVI
+        elif (event.key == '6'):
+            wave0 = event.xdata
+            yval=event.ydata        
+            self.check_lineid(wave0,'OVI',yval)
+
+        #guess line SiIV
+        elif (event.key == '4'):
+            wave0 = event.xdata
+            yval=event.ydata        
+            self.check_lineid(wave0,'SiIV',yval)
+
+        #guess line NeVIII
+        elif (event.key == '8'):
+            wave0 = event.xdata
+            yval=event.ydata        
+            self.check_lineid(wave0,'NeVIII',yval)
+
+        #guess line Lyb
+        elif (event.key == '2'):
+            wave0 = event.xdata
+            yval=event.ydata        
+            self.check_lineid(wave0,'Lyb',yval)
+
+        #guess line Lya
+        elif (event.key == '1'):
+            wave0 = event.xdata
+            yval=event.ydata        
+            self.check_lineid(wave0,'Lya',yval)
+
 
         elif event.key == 'Y':
             Windowname='Manual y-Limits'
@@ -736,7 +805,79 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
     def LoadCatalog_fn(self,parent):
         self.loading = LoadCatalog(parent)
         self.loading.show()
+
+    #This code will quickly draw some doublet lines on the canvas for a quicklook
+    def check_lineid(self, wave0, ionname,yval):
+        if (ionname == 'CIV'):
+            wave1 = wave0 * 1550.77845 / 1548.2049           
+            z = wave0 / 1548.2049 - 1
+            print(f"CIV: z = {z}")
+            self.message_window.setText(f"CIV: z = {z}")
+
+        elif (ionname == 'MgII'):
+            wave1 = wave0 * 2803.5314853 / 2796.3542699
+            z = wave0 / 2796.354 - 1
+            print(f"MgII: z = {z}")
+            self.message_window.setText(f"MgII: z = {z}")
+
+        elif (ionname == 'FeII'):
+            wave1 = wave0 * 2586.6495659 / 2600.1724835 
+            wave2=wave0 *2382.7641781/ 2600.1724835 
+            z = wave0 / 2600.1724835 - 1
+            print(f"FeII: z = {z}")
+            self.message_window.setText(f"FeII: z = {z}")
+
+        elif (ionname == 'OVI'):
+            wave1 = wave0 * 1037.6167 / 1031.9261
+            z = wave0 / 1031.9261 - 1
+            print(f"OVI: z = {z}")
+            self.message_window.setText(f"OVI: z = {z}")
+
+        elif (ionname == 'NeVIII'):
+            wave1 = wave0 * 780.324 / 770.409
+            z = wave0 / 770.409 - 1
+            print(f"NeVIII: z = {z}")
+            self.message_window.setText(f"NeVIII: z = {z}")
+
+        elif (ionname == 'SiIV'):
+            wave1 = wave0 *  1402.77291 / 1393.76018
+            z = wave0 / 1393.76018 - 1
+            print(f"SiIV: z = {z}")
+            self.message_window.setText(f"SiIV: z = {z}")
+
+        elif (ionname == 'SiIV'):
+            wave1 = wave0 *  1402.77291 / 1393.76018
+            z = wave0 / 1393.76018 - 1
+            print(f"SiIV: z = {z}")
+            self.message_window.setText(f"SiIV: z = {z}")
+
+        elif (ionname == 'Lyb'):
+            wave1 = wave0 *  1215.6701 / 1025.7223
+            z = wave0 / 1025.7223 - 1
+            print(f"HI: z = {z}")
+            self.message_window.setText(f"HI: z = {z}")
+
+        elif (ionname == 'Lya'):
+            wave1 = wave0 *   1025.7223/ 1215.6701
+            z = wave0 / 1215.6701 - 1
+            print(f"HI: z = {z}")
+            self.message_window.setText(f"HI: z = {z}")
+
+
+  
+               
+        self.ax.plot([wave0,wave0,wave1,wave1],[yval,yval+.5,yval+.5,yval],color='r')
         
+        if ionname == 'FeII':
+            self.ax.text(0.5*(wave0+wave2),yval+0.7,ionname +' z: ' +str(np.round(z,4)) ,rotation=90,verticalalignment='bottom') 
+            self.ax.plot([wave1,wave1,wave2,wave2],[yval,yval+.5,yval+.5,yval],color='r')
+        else:
+            self.ax.text(0.5*(wave0+wave1),yval+0.7,ionname +' z: ' +str(np.round(z,4)) ,rotation=90,verticalalignment='bottom') 
+
+
+        self.canvas.draw()
+
+
     #spec plot is connected to the smoothing/unsmoothing events
     #flux is always stored as ax.lines[0], error as ax.lines[1]. So we can add two new S/US plots
     #replace lines[0] and [1], then delete the last two lines added to the ax.lines list to keep the reference as [1] and [0]
