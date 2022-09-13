@@ -38,6 +38,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		# initialize some plotting parameters
 		self.wave, self.flux, self.error = [],[],[]
 		self.init_xlims, self.init_ylims = [],[]
+		self.cur_xlims, self.cur_ylims = [],[]
 		self.gxval, self.gyval = [], []
 		self.scale = 1. # 1D spec convolution kernel size
 		self.lineindex = -2
@@ -91,8 +92,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axes.lines[0] = self.axes.plot(wave, error, color='red')# label='Error')
 		self.axes.lines[1] = self.axes.plot(wave, flux, color='black')#, label='Flux')
 		#self.axes.legend(loc='upper right')
-		self.axes.set_ylim([-np.nanmin(flux)*0.01, np.nanmedian(flux)*3])
-		self.axes.set_xlim([np.nanmin(wave), np.nanmax(wave)])
+		
 		self.axes.set_xlabel('Wavelength (Angstrom)')
 		self.axes.set_ylabel('Flux')
 		self.axes.set_title(filename)
@@ -103,8 +103,20 @@ class MplCanvas(FigureCanvasQTAgg):
 		# update intiial plotting parameters
 		self.wave, self.flux, self.error = wave, flux, error
 		self.axnum = 1
-		self.init_xlims = self.axes.get_xlim()
-		self.init_ylims = self.axes.get_ylim()
+
+		if len(self.cur_ylims) > 0:
+			self.axes.set_ylim(self.cur_ylims)
+			self.axes.set_xlim(self.cur_xlims)
+			self.init_xlims = self.axes.get_xlim()
+			self.init_ylims = self.axes.get_ylim()
+
+		else:
+			self.axes.set_ylim([-np.nanmin(flux)*0.01, np.nanmedian(flux)*3])
+			self.axes.set_xlim([np.nanmin(wave), np.nanmax(wave)])
+			self.init_xlims = self.axes.get_xlim()
+			self.init_ylims = self.axes.get_ylim()
+			self.cur_xlims = self.axes.get_xlim()
+			self.cur_ylims = self.axes.get_ylim()
 
 	
 
@@ -112,15 +124,17 @@ class MplCanvas(FigureCanvasQTAgg):
 		'''Re-plot smoothed/unsmoothed spectrum
 		'''
 		axes = self.fig.gca()
-		xlim = axes.get_xlim()
-		ylim = axes.get_ylim()
+		self.cur_xlims = axes.get_xlim()
+		self.cur_ylims = axes.get_ylim()
 		
 		self.axes.lines[0] = self.axes.plot(wave, new_err, color='red')# label='Error')
 		self.axes.lines[1] = self.axes.plot(wave, new_spec, color='black')#, label='Flux')
 		# for a better y range
 		ytmp = np.nan_to_num(new_spec, nan=0., posinf=0., neginf=0.)
-		self.axes.set_ylim([np.nanmin(ytmp), np.nanmax(ytmp)])
-		self.axes.set_xlim([np.min(wave), np.max(wave)])
+		self.axes.set_ylim(self.cur_ylims)
+		self.axes.set_xlim(self.cur_xlims)
+		#self.axes.set_ylim([np.nanmin(ytmp), np.nanmax(ytmp)])
+		#self.axes.set_xlim([np.min(wave), np.max(wave)])
 
 		del self.axes.lines[2:]
 		self.draw()
@@ -319,7 +333,28 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axes.set_ylabel('Flux')
 		#xlim_spec1d = self.axes.get_xlim()
 		#self.axes.set_xlim(xlim_spec1d)
+		
+		# select only reasonable error region for y limits
+		#err_med, err_std = np.median(self.error), np.std(self.error)
+		#err_perc = 0.1 # 1.0%
+		#err_good = np.where((self.error > (err_med - err_std*err_perc)) & (self.error < (err_med + err_std*err_perc)))[0]
+		#self.cur_ylims = [np.nanmin(self.flux[err_good]), np.nanmax(self.flux[err_good])]
+
 		self.axes.set_xlim([np.nanmin(wave), np.nanmax(wave)])
+		if len(self.cur_ylims) > 0:
+			#print('preset y lim')
+			#print(self.cur_ylims)
+			tmp_ylim = list(self.cur_ylims)
+			tmp_ylim.sort()
+			self.cur_ylims = tmp_ylim.copy()
+			#print(tmp_ylim)
+			self.axes.set_ylim(self.cur_ylims)
+			self.init_xlims = self.axes.get_xlim()
+
+		else:
+			self.axes.set_ylim([-np.nanmin(self.flux)*0.01, np.nanmedian(self.flux)*3])
+			self.init_ylims = self.axes.get_ylim()
+			self.cur_ylims = self.axes.get_ylim()
 
 		# 2 spec plot...
 		# scaling first
@@ -432,12 +467,12 @@ class MplCanvas(FigureCanvasQTAgg):
 		'''Re-plot smoothed/unsmoothed spectrum
 		'''
 		axes = self.fig.gca()
-		xlim = axes.get_xlim()
-		ylim = axes.get_ylim()
+		self.cur_xlims = axes.get_xlim()
+		self.cur_ylims = axes.get_ylim()
 		self.axes.lines[0] = axes.plot(wave, new_err, color='red')# label='Error')
 		self.axes.lines[1] = axes.plot(wave, new_spec, color='black')#, label='Flux')
-		self.axes.set_xlim(xlim)
-		self.axes.set_ylim(ylim)
+		self.axes.set_xlim(self.cur_xlims)
+		self.axes.set_ylim(self.cur_ylims)
 
 		del self.axes.lines[2:]
 
@@ -545,6 +580,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				ylim = self.axes.get_ylim()
 				self.axes.set_ylim([ylim[0], event.ydata])
 				self.draw()
+				self.cur_ylims = self.axes.get_ylim()
 				self.send_message.emit('Flux MAX value in 1D plot changed.')
 
 		elif event.key == 'b':
@@ -553,6 +589,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				ylim = self.axes.get_ylim()
 				self.axes.set_ylim([event.ydata, ylim[-1]])
 				self.draw()
+				self.cur_ylims = self.axes.get_ylim()
 				self.send_message.emit('Flux MIN value in 1D plot changed.')
 
 		elif event.key == 'X':
@@ -653,8 +690,8 @@ class MplCanvas(FigureCanvasQTAgg):
 			if event.inaxes == self.axes:
 				ylimdialog = CustomLimDialog(axis='y')
 				if ylimdialog.exec_():
-					ylim = ylimdialog._getlim()
-					self.axes.set_ylim(ylim)
+					self.cur_ylims = ylimdialog._getlim()
+					self.axes.set_ylim(self.cur_ylims)
 
 					self.draw()
 				self.send_message.emit('Flux LIMITS in 1D spectrum are changed.')
@@ -682,8 +719,8 @@ class MplCanvas(FigureCanvasQTAgg):
 			if event.inaxes == self.axes:
 				xlimdialog = CustomLimDialog(axis='x')
 				if xlimdialog.exec_():
-					xlim = xlimdialog._getlim()
-					self.axes.set_xlim(xlim)
+					self.cur_xlims = xlimdialog._getlim()
+					self.axes.set_xlim(self.cur_xlims)
 					self._lines_in_current_range()
 					self.draw()
 				self.send_message.emit('Wavelength LIMITS in 1D spectrum are changed.')
