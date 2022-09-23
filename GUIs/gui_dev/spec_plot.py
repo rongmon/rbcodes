@@ -340,7 +340,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		#err_good = np.where((self.error > (err_med - err_std*err_perc)) & (self.error < (err_med + err_std*err_perc)))[0]
 		#self.cur_ylims = [np.nanmin(self.flux[err_good]), np.nanmax(self.flux[err_good])]
 
-		self.axes.set_xlim([np.nanmin(wave), np.nanmax(wave)])
+		#self.axes.set_xlim([np.nanmin(wave), np.nanmax(wave)])
 		if len(self.cur_ylims) > 0:
 			#print('preset y lim')
 			#print(self.cur_ylims)
@@ -355,6 +355,21 @@ class MplCanvas(FigureCanvasQTAgg):
 			self.axes.set_ylim([-np.nanmin(self.flux)*0.01, np.nanmedian(self.flux)*3])
 			self.init_ylims = self.axes.get_ylim()
 			self.cur_ylims = self.axes.get_ylim()
+
+		if len(self.cur_xlims) > 0:
+			#print('preset x lim')
+			#print(self.cur_xlims)
+			tmp_xlim = list(self.cur_xlims)
+			tmp_xlim.sort()
+			self.cur_xlims = tmp_xlim.copy()
+			#print(tmp_xlim)
+			self.axes.set_xlim(self.cur_xlims)
+			self.init_ylims = self.axes.get_ylim()
+
+		else:
+			self.axes.set_xlim([np.nanmin(wave), np.nanmax(wave)])
+			self.init_xlims = self.axes.get_xlim()
+			self.cur_xlims = self.axes.get_xlim()
 
 		# 2 spec plot...
 		# scaling first
@@ -599,6 +614,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.axes.set_xlim([xlim[0], event.xdata])
 				self._lines_in_current_range()
 				self.draw()
+				self.cur_xlims = self.axes.get_xlim()
 				self.send_message.emit('Wavelength MAX value in 1D plot changed.')
 
 		elif event.key == 'x':
@@ -608,6 +624,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.axes.set_xlim([event.xdata, xlim[-1]])
 				self._lines_in_current_range()
 				self.draw()
+				self.cur_xlims = self.axes.get_xlim()
 				self.send_message.emit('Wavelength MIN value in 1D plot changed.')
 
 		elif event.key == '[':
