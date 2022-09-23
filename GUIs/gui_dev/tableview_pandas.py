@@ -59,7 +59,10 @@ class CustomZTable(QtWidgets.QWidget):
 			if float(s['z_guess']) > 0:
 				#print(type(sent_data))
 				sent_data.pop('z_guess', None)
-			s.update(sent_data)                                                    
+			s.update(sent_data)  
+
+			# PRINT OUT measured redshifts and errors in the database
+			print(f"Redshift= {s['z']}; Error= {s['z_err']}")                                                  
 			self.estZ.iloc[ind] = s
 		else:
 			self.estZ = self.estZ.append(sent_data, ignore_index=True)
