@@ -56,6 +56,9 @@ class CustomZTable(QtWidgets.QWidget):
 			ind = self.estZ[self.estZ['Name'] == sent_data['Name']].index.values[0]
 			s = self.estZ.iloc[ind].to_dict()
 			#print(s)
+			if float(s['z_guess']) > 0:
+				#print(type(sent_data))
+				sent_data.pop('z_guess', None)
 			s.update(sent_data)                                                    
 			self.estZ.iloc[ind] = s
 		else:
