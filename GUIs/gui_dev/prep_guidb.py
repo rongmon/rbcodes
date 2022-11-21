@@ -55,7 +55,7 @@ class GUI_DataFrame():
                         self.gui_df = self.gui_df.append(
                             {'Name': filename, 
                             'RA': ra, 
-                            'DEC': ra, 
+                            'DEC': dec, 
                             'z': np.nan, 
                             'z_err': np.nan, 
                             'Confidence': '', 
