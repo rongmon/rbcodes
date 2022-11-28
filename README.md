@@ -35,7 +35,7 @@ The GUIs folder contains several graphical user interfaces for astrophysics.
 	6) rb_specgui: Wrapper for a complex 1d spectrum viwer and line identifier [Plotspec_integrated.py]. 
 	               This is the upgraded pyqt5 version of rb_plot_spec package.
         
-	7) gui_dev/main.py : This is a new GUI to measure redshifts of galaxies using 1d or 2d spectrum. 
+	7) zgui/main.py : This is a new GUI to measure redshifts of galaxies using 1d or 2d spectrum. 
 			     Can be used in batch mode and is optimized for JWST spectroscopy.
 
 
