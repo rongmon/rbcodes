@@ -80,6 +80,13 @@ class GUI_DataFrame():
                             header=True,
                             index=False)
         print('GUI database is saved at ' + save_path)
+        
+        # sort FITS filenames before saving as TXT file
+        # before sorting
+        #print(self.fitsfiles)
+        # after sorting
+        self.fitsfiles.sort()
+        #print(self.fitsfiles)
         with open(self.dirpath+'/'+'FITS_files.txt', 'w') as f:
             f.write('\n'.join(self.fitsfiles))
         print('A TXT file containing all FITS files is also created within the same folder.')
