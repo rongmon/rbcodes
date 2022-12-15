@@ -607,6 +607,16 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.cur_ylims = self.axes.get_ylim()
 				self.send_message.emit('Flux MIN value in 1D plot changed.')
 
+		elif event.key == 'A':
+			# reset x-axis only
+			if event.inaxes == self.axes:
+				xlim = self.axes.get_xlim()
+				self.axes.set_xlim([np.nanmin(self.wave), np.nanmax(self.wave)])
+				self._lines_in_current_range()
+				self.draw()
+				self.cur_xlims = self.axes.get_xlim()
+				self.send_message.emit('Reset X-Axis limit to min-max.')
+
 		elif event.key == 'X':
 			# set x axis max value
 			if event.inaxes == self.axes:
@@ -616,6 +626,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.draw()
 				self.cur_xlims = self.axes.get_xlim()
 				self.send_message.emit('Wavelength MAX value in 1D plot changed.')
+
 
 		elif event.key == 'x':
 			# set x axis min value
