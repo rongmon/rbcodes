@@ -56,6 +56,7 @@ HELP = '''
         'U':   Unsmooth spectra
         'x':   Sets left x limit (xmin)
         'X':   Sets right x limit (xmax)
+        'o':   Zoom out of x range
         ']':   Shifts canvas to the right
         '[':   Shifts canvas to the left
         'Y':   User can input their own y limits
