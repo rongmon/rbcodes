@@ -84,6 +84,8 @@ The utils folder contains several utility modules:
       3) readmultispec.py  : Read IRAF (echelle) spectrum in multispec format from a FITS file. Can read 
                              most multispec formats including linear, log, cubic spline, Chebyshev or 
                              Legendre dispersion spectra. I got this code from https://github.com/kgullikson88/General.
+			    
+We are constantly developing...
 
 	
 DOI
