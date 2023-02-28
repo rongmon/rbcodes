@@ -5,11 +5,11 @@ This is a public release of python codes commonly used for astrophysical reserac
 This package is constantly under development and will be periodically updated. 
 
 Add this folder to your pythonpath and you are good to go.
-## To make sure the GUIs function properly we recommend that you create a new environemnt as shown in requirements_simple.txt
+# To make sure the GUIs function properly we recommend that you create a new environemnt as shown in requirements_simple.txt
 
-## Dependencies:  astropy, lmfit, scipy, numpy, matplotlib, linetools
+# Dependencies:  astropy, lmfit, scipy, numpy, matplotlib, linetools
 
-## Partial Dependencies: PysimpleGUI for some GUIs. 
+# Partial Dependencies: PysimpleGUI for some GUIs. 
 
 The GUIs folder contains several graphical user interfaces for astrophysics. 
 
