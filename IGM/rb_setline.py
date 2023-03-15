@@ -7,7 +7,7 @@ from pkg_resources import resource_filename
 
 
 
-def rb_setline(lambda_rest,method,linelist='atom'):
+def rb_setline(lambda_rest,method,linelist='atom',target_name=None):
     """
     Function to read in atomic line information for a given rest frame  wavelength.
                            Or 
@@ -18,6 +18,7 @@ def rb_setline(lambda_rest,method,linelist='atom'):
     lambda_rest :-  Rest Frame wavelength (in \AA) of the line to match
     method     :-   'closest' ->  If set will match the closest line.
                     'Exact'  ->  If set will match the exact wavelength.
+                    'Name'   -> Match by name, USE WITH CARE. MUST INPUT OPTIONAL NAMELIST
  
     Returns
     ----------
@@ -56,6 +57,15 @@ def rb_setline(lambda_rest,method,linelist='atom'):
 
     if method=='Exact':
         q= np.where( (np.abs(lambda_rest-wavelist) < 1e-3))
+        if linelist=='atom':
+            outstr={'wave':wavelist[q],'fval':fval[q],'name':name[q],'gamma':gamma[q]}
+        else:
+            outstr={'wave':wavelist[q],'fval':fval[q],'name':name[q]}
+
+    if method=='Name':
+        #USE INPUT NAME LIST TO MATCH
+
+        q= np.where(name == target_name)
         if linelist=='atom':
             outstr={'wave':wavelist[q],'fval':fval[q],'name':name[q],'gamma':gamma[q]}
         else:

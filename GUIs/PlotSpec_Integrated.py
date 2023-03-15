@@ -56,6 +56,7 @@ HELP = '''
         'U':   Unsmooth spectra
         'x':   Sets left x limit (xmin)
         'X':   Sets right x limit (xmax)
+        'o':   Zoom out of x range
         ']':   Shifts canvas to the right
         '[':   Shifts canvas to the left
         'Y':   User can input their own y limits
@@ -239,8 +240,8 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         spacer = QHBoxLayout()
         plot_cat = QVBoxLayout()
         spacerItem = QtWidgets.QSpacerItem(100, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        spacer.addWidget(self.message_window,stretch=1.0)
-        spacer.addLayout(active_elem_layout,stretch=1.5)
+        spacer.addWidget(self.message_window,stretch=1)
+        spacer.addLayout(active_elem_layout,stretch=1)
         plot_cat.addWidget(plot)
         plot_cat.addWidget(catalog)
         plot_cat.addWidget(refresh)

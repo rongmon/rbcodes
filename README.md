@@ -5,10 +5,11 @@ This is a public release of python codes commonly used for astrophysical reserac
 This package is constantly under development and will be periodically updated. 
 
 Add this folder to your pythonpath and you are good to go.
+# To make sure the GUIs function properly we recommend that you create a new environemnt as shown in requirements_simple.txt
 
-Dependencies:  astropy, lmfit, scipy, numpy, matplotlib, linetools
+# Dependencies:  astropy, lmfit, scipy, numpy, matplotlib, linetools
 
-Partial Dependencies: PysimpleGUI for some GUIs. 
+# Partial Dependencies: PysimpleGUI for some GUIs. 
 
 The GUIs folder contains several graphical user interfaces for astrophysics. 
 
@@ -17,7 +18,7 @@ The GUIs folder contains several graphical user interfaces for astrophysics.
 	2) rb_spec.py :  An absorption line analysis pipeline. Allowing to create an object from an 1D 
 	                 spectrum do continuum fitting, measure equivalenth widths/column densities and
 	                 save the final data and measurements. Also allows the fitting of a simple Voigt profile. 
-	                 NOTE: Major overhawl to calling sequence since April 2022. See example in the file.
+	                 NOTE: Major overhaul to calling sequence since April 2022. See example in the file.
 
 	3) rb_interactive_vpfit_singlet.py : Interactive simple Voigt profile fitter [used with rb_spec.py]
 	                                    [ Look for rbvfit github repository for an interactive Voigt 
@@ -35,7 +36,7 @@ The GUIs folder contains several graphical user interfaces for astrophysics.
 	6) rb_specgui: Wrapper for a complex 1d spectrum viwer and line identifier [Plotspec_integrated.py]. 
 	               This is the upgraded pyqt5 version of rb_plot_spec package.
         
-	7) gui_dev/main.py : This is a new GUI to measure redshifts of galaxies using 1d or 2d spectrum. 
+	7) zgui/main.py : This is a new GUI to measure redshifts of galaxies using 1d or 2d spectrum. 
 			     Can be used in batch mode and is optimized for JWST spectroscopy.
 
 
@@ -84,6 +85,8 @@ The utils folder contains several utility modules:
       3) readmultispec.py  : Read IRAF (echelle) spectrum in multispec format from a FITS file. Can read 
                              most multispec formats including linear, log, cubic spline, Chebyshev or 
                              Legendre dispersion spectra. I got this code from https://github.com/kgullikson88/General.
+			    
+We are constantly developing...
 
 	
 DOI
