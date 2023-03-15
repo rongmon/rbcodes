@@ -533,8 +533,20 @@ class Custom_ToolBar(QToolBar):
 				if self.mW.toggle_frames:
 					from gui_frame_io import ToggleFrames
 					toggle_f = ToggleFrames(self.filepaths[i-1])
-					self.frames, self.frames_err, self.frames1d = toggle_f._check_available_frames()
+					tmp_var = toggle_f._check_available_frames()
+					self.frames, self.frames_err, self.frames1d = tmp_var
 
+					'''# CHECK
+					print('Frames:')
+					print(self.frames)
+					print('------------------------------------')
+					print('Error Frames:')
+					print(self.frames_err)
+					print('------------------------------------')
+					print('1D Frames:')
+					print(self.frames1d)
+					print('------------------------------------')
+					'''
 					self.frame_combobox.clear()
 					for frame_name in self.frames.keys():
 						if self.frames[frame_name] is not None:
