@@ -135,9 +135,6 @@ class LoadSpec():
 			self.fitsobj.flux = np.nan_to_num(fitsfile[1].data['flux_opt_ext'], nan=np.nan)
 			self.fitsobj.error = np.nan_to_num(fitsfile[1].data['flux_opt_ext_err'], nan=np.nan)
 			self.fitsobj.wave = fitsfile[1].data['wavelength']
-			wscale = self._scale_wave_unit(fitsfile[1].header)
-			self.fitsobj.wave *=wscale
-
 
 			# search 2D file and open
 			fnlist = fitsfile.filename().split('_')
@@ -280,15 +277,12 @@ class LoadSpec():
 		card='CUNIT1'
 		if not card in header:
 			raise ValueError("Header must contain 'CUNIT1' keywords.")
-		
-		# check units
-		wunit = header[card].rstrip().lstrip() # get rid of whitespace	
-		#micrometer to Angstrom
-		if wunit in ['um', 'micron', 'micrometer']:
+			#micrometer to Angstrom
+		if header[card] =='um':
 			wave *=10000. 
-		elif wunit in ['nm', 'nanometer']:
+		elif header[card]=='nm':
 			wave *=10
-		elif wunit in ['AA', 'Angstrom']:
+		elif header[card]=='Angstrom':
 		#elif header[card]=='AA':
 			wave=wave
 		else:
@@ -300,15 +294,12 @@ class LoadSpec():
 		card = 'TUNIT1'
 		if not card in header:
 			raise ValueError("Header must contain 'TUNIT1' keywords.")
-		
-		# check units
-		wunit = header[card].rstrip().lstrip() # get rid of whitespace
-		#micrometer to Angstrom
-		if wunit in ['um', 'micron', 'micrometer']:
+			#micrometer to Angstrom
+		if header[card] =='um':
 			scale = 10000. 
-		elif wunit in ['nm', 'nanometer']:
+		elif header[card]=='nm':
 			scale = 10.
-		elif wunit in ['AA', 'Angstrom']:
+		elif header[card]=='Angstrom':
 		#elif header[card]=='AA':
 			scale = 1.
 		else:
