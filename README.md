@@ -4,12 +4,19 @@ rbcodes
 This is a public release of python codes commonly used for astrophysical reserach by Rongmon Bordoloi.
 This package is constantly under development and will be periodically updated. 
 
+
+
+Installation:
+-------------
 Add this folder to your pythonpath and you are good to go.
-# To make sure the GUIs function properly we recommend that you create a new environemnt as shown in requirements_simple.txt
+To make sure the GUIs function properly we recommend that you create a new environemnt as shown in requirements_simple.txt
 
-# Dependencies:  astropy, lmfit, scipy, numpy, matplotlib, linetools
+	Dependencies:  astropy, lmfit, scipy, numpy, matplotlib, linetools
+	Partial Dependencies: PysimpleGUI for some GUIs. 
 
-# Partial Dependencies: PysimpleGUI for some GUIs. 
+
+Contents:
+---------
 
 The GUIs folder contains several graphical user interfaces for astrophysics. 
 
@@ -37,7 +44,7 @@ The GUIs folder contains several graphical user interfaces for astrophysics.
 	               This is the upgraded pyqt5 version of rb_plot_spec package.
         
 	7) zgui/main.py : This is a new GUI to measure redshifts of galaxies using 1d or 2d spectrum. 
-			     Can be used in batch mode and is optimized for JWST spectroscopy.
+			     Can be used in batch mode and is optimized for JWST NIRCam/Grism spectroscopy.
 
 
 
@@ -56,14 +63,16 @@ The IGM folder contains several python routines for intergalactic medium and cir
 	5) ransac_contfit.py : Powerful hybrid continuum fitter. Initial fit is done by an automated ransac 
 	                       algorithm, then allows user to tweak the fit using linetools.fit_continuum 
 	                       routine. Saves the fitted continuum and the 1D spectrum as a xspectrum1D object
-	                       Very helpful to fit a full quasar continuum.	
-	6) lens_sep_to_kpc.py :Function to compute physical separation between sightlines in a lensed quasar 	                       system under the thin lens approximation.
+	                       Very helpful to fit a full quasar continuum.
+			       
+	6) lens_sep_to_kpc.py :Function to compute physical separation between sightlines in a lensed quasar system under the thin lens approximation.
 
 The halo folder contains modules to compute NFW halo profiles
 
        1) rb_nfw.py      : Compute NFW halo profile
 
        2) mstar2mhalo.py : Convert stellar mass to Halo mass using Moster et al. 2010.
+       
 The stat folder contains several statistical codes:
 
        1) rb_wilsonscore.py :  Wilsonscore confidence intervals.
@@ -86,6 +95,12 @@ The utils folder contains several utility modules:
                              most multispec formats including linear, log, cubic spline, Chebyshev or 
                              Legendre dispersion spectra. I got this code from https://github.com/kgullikson88/General.
 			    
+The catalog folder contains codes for catalog search:
+
+	1)rb_search.py.    : Function to do a cone search around any (ra,dec) pointing with respect to a list of ra,dec entries.
+	2) convert_FIRE_coordinates.py:  Custom code only to take Magellan 1D FIRE spectrum and use the header information
+                                         to transform the co-ordinates to J2000 epoch.
+					 
 We are constantly developing...
 
 	
