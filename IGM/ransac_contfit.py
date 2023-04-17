@@ -62,7 +62,7 @@ class cont_fitter(object):
             
 
             Now fit continuum
-               sp=c.fit_continuum(window=149)
+               sp.fit_continuum(window=149)
 
                #AND YOU ARE DONE.
 
