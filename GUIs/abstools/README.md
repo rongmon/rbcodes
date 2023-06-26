@@ -34,7 +34,7 @@ lines=[1215.67,1260,1334,1393.9,1402,1548.3,1550,1526,1670]
 
 #Preprocessing:
 # Create an absorber class to feed into the main GUI
-absys=A.Absorber(z,wave,flux,error,lines=lines)   
+absys=A.Absorber(z,wave,flux,error,lines=lines,window_lim=[-2000,2000])   
 Abs=absys.ions
 
 

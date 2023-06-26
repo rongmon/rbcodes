@@ -847,8 +847,8 @@ class SavePage(QtWidgets.QWidget):
                         return self.closewin
                 else:
                     self.closewin = False
-            EW.append(np.round(parentvals.ions[ion]['EW']*1000,2))
-            EWsig.append(np.round(parentvals.ions[ion]['EWsig']*1000,2))
+            EW.append(np.round(parentvals.ions[ion]['EW'],2))
+            EWsig.append(np.round(parentvals.ions[ion]['EWsig'],2))
             N.append(np.round(np.log10(parentvals.ions[ion]['N']),2))
             Nsig.append(np.round(np.log10(parentvals.ions[ion]['Nsig']),2))
             Vel.append(np.round(parentvals.ions[ion]['med_vel'],2))
