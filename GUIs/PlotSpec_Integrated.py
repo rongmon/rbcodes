@@ -65,7 +65,7 @@ HELP = '''
 
         'H':   Help Window
         'v':   Opens Separate Vstack GUI for the user to identify detected transitions
-               Vstack commands will be discussed below
+               Vstack commands will be discussed below : press shift+S TO EXITß
         
         'j':   Designed to be used by zooming into a small region of the spectra,
                finding an absortion region, put mouse in the middle of that region.
