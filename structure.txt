@@ -1,0 +1,53 @@
+project_root_dir/
+│
+├── app/                 # Streamlit application code
+│   ├── __init__.py
+│   ├── main.py          # Main app
+│   ├── pages/           # Sub-pages of the app
+│   │   ├── __init__.py
+│   │   ├── page1.py
+│   │   ├── page2.py
+│   │   └── ...
+│   ├── components/      # UI components
+│   │   ├── __init__.py
+│   │   ├── component1.py
+│   │   ├── component2.py
+│   │   └── ...
+│   └── utils/           # Utilities for the app (eg. session state)
+│       ├── __init__.py
+│       ├── utils1.py
+│       ├── utils2.py
+│       └── ...
+│
+├── data_processing/     # Data processing code
+│   ├── __init__.py
+│   ├── fits_processing/   # FITS image data processing
+│   │   ├── __init__.py
+│   │   ├── fits_processing1.py
+│   │   └── ...
+│   ├── spectral_processing/  # Spectral astrophysical data processing
+│   │   ├── __init__.py
+│   │   ├── spectral_processing1.py
+│   │   └── ...
+│   └── utils/           # Utilities for the data processing (eg. data loading)
+│       ├── __init__.py
+│       ├── utils1.py
+│       ├── utils2.py
+│       └── ...
+│
+├── tests/               # Unit tests
+│   ├── __init__.py
+│   ├── test_fits_processing.py
+│   ├── test_spectral_processing.py
+│   └── ...
+│
+├── data/                # Data directory
+│   ├── fits/
+│   └── spectral/
+│
+├── docs/                # Documentation
+│
+├── .gitignore           # Specifies intentionally untracked files to ignore
+├── README.md            # Project description
+├── requirements.txt     # Python dependencies
+└── Dockerfile           # Docker configuration file
