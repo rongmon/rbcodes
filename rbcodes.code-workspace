@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../sightline-explorer"
+		},
+		{
+			"path": "../kcwitools"
+		},
+		{
+			"path": "../linetools"
+		}
+	],
+	"settings": {}
+}
