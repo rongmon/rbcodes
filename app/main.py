@@ -1,7 +1,5 @@
 import streamlit as st
 from matplotlib import pyplot as plt
-# import plotly.figure_factory as ff
-# import plotly.express as px
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 
@@ -62,7 +60,7 @@ def harmonize_data(statekey):
 
 
 def process_upload(*args):
-    ''' we'll use this to  '''
+    ''' this is a callback function for st.file_uploader() '''
 
     if args[0] == "ProcessA":
         statekey = 'A'
