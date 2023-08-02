@@ -6,7 +6,7 @@ dependencies:
   - python=3.9
   - streamlit
   - matplotlib==3.5.0
-  - astropy==5.3
+  - astropy==5
   # - scipy==1.7.3
   - plotly
   # - numpy
