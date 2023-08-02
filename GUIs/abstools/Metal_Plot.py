@@ -25,6 +25,8 @@ from PyQt5.QtGui import QPalette, QColor
 from astropy.table import Table
 from astropy.io import ascii
 
+import os
+
 HELP =  '''
         ---------------------------------------------------------------------------
         This is an interactive 1D absorption line measurement toolbox.
@@ -154,7 +156,7 @@ def plot_intervening_lines(ax,outlist,delv):
 
 class mainWindow(QtWidgets.QTabWidget):
     
-    def __init__(self,ions, parent=None,intervening=False):
+    def __init__(self,ions, parent=None,intervening=False, basedir="./"):
         #-----full spectra properties---------#
         self.z = ions['Target']['z']; self.flux = ions['Target']['flux']
         self.wave = ions['Target']['wave']; self.error = ions['Target']['error']
@@ -173,6 +175,7 @@ class mainWindow(QtWidgets.QTabWidget):
         self.Manual_Mask = None
         self.pFlag = 1
         self.intervening=intervening
+        self.basedir=basedir
         self.save = False
         super(mainWindow,self).__init__(parent)
         
@@ -425,6 +428,8 @@ class mainWindow(QtWidgets.QTabWidget):
                 for ii in range(self.nions[self.page]):
                     EW(self,self.page,ii,self.ions[self.keys[ii+self.page*6]]['EWlims'])
 
+        if event.key == 'q':
+            self.close()
             
         
         #use same range for all ion Velocity limits and directly measured by following with clicks bounds on a single subplot
@@ -864,7 +869,7 @@ class SavePage(QtWidgets.QWidget):
         pdflabel.setGeometry(100,100,400,30)
         
         self.pdfline = QLineEdit(self)
-        self.pdfline.setText('Spectrum_Analysis_z_'+str(parentvals.z)+'_Ions.pdf')
+        self.pdfline.setText(parentvals.basedir+'/Spectrum_Analysis_z_'+str(parentvals.z)+'_Ions.pdf')
         self.pdfline.setGeometry(100,125,300,30)
         
         self.pdfsave = QPushButton("save PDF",self)
@@ -875,7 +880,7 @@ class SavePage(QtWidgets.QWidget):
         tablelabel.setGeometry(100,175,400,30)
         
         self.tableline = QLineEdit(self)
-        self.tableline.setText("Spectrum_Analysis_z_"+str(parentvals.z)+"_Measurement_Table.dat")
+        self.tableline.setText(parentvals.basedir+"/Spectrum_Analysis_z_"+str(parentvals.z)+"_Measurement_Table.dat")
         self.tableline.setGeometry(100,200,300,30)
         
         self.tablesave = QPushButton("Save Table",self)
@@ -887,7 +892,7 @@ class SavePage(QtWidgets.QWidget):
         picklelabel.setGeometry(100,250,400,30)
         
         self.pickleline = QLineEdit(self)
-        self.pickleline.setText("Spectrum_Analysis_z_"+str(parentvals.z)+".p")
+        self.pickleline.setText(parentvals.basedir+"/Spectrum_Analysis_z_"+str(parentvals.z)+".p")
         self.pickleline.setGeometry(100,275,300,30)
         
         self.picklesave = QPushButton("Save Progress",self)
@@ -897,7 +902,10 @@ class SavePage(QtWidgets.QWidget):
         
 #Initial inputs and callable class to run proram        
 class Transitions:
-    def __init__(self,Abs,intervening=False):
+    def __init__(self, Abs, intervening=False, basedir="./"):
+        if not os.path.exists(basedir):
+            raise FileNotFoundError(f"basedir '{basedir}' does not exist")
+        
         if not QtWidgets.QApplication.instance():
             app = QtWidgets.QApplication(sys.argv)
             app.setStyle("Fusion")
@@ -941,7 +949,7 @@ class Transitions:
         #palette.setColor(QPalette.Text, QtCore.Qt.white)
 
         #app.setPalette(palette)
-        main = mainWindow(Abs,intervening=intervening)
+        main = mainWindow(Abs,intervening=intervening, basedir=basedir)
         main.resize(1400,900)
 
         main.show()

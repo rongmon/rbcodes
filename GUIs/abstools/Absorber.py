@@ -42,7 +42,8 @@ class Absorber:
 
             '''create window for flux,wave,error based on max and min velocity'''
             window = (ion_dict['vel']>window_lim[0]) & (ion_dict['vel']<window_lim[1])
-            ion_dict['flux'] = flux[window]; ion_dict['wave']=wave[window]
+            ion_dict['flux'] = flux[window]; 
+            ion_dict['wave']=wave[window]
             ion_dict['error'] = error[window]; ion_dict['vel'] = ion_dict['vel'][window]
 
             '''Initial Polyfit assuming a masked region of -200:200 and polyorder=4

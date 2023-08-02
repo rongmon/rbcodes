@@ -1287,7 +1287,7 @@ class SaveCatalog(QWidget):
                     directory.mkdir(exist_ok=True)
 
                 if ((self.LineLists == 'All') or (self.LineLists == 'Partial')):
-                    parent.line_list.to_csv(str((directory/'LineList_Identified.txt').resolve()), sep=' ')
+                    parent.line_list.to_csv(str((directory/'Identified_LineList.txt').resolve()), sep=' ')
 
 
                 file = directory / 'Absorber_Catalog.csv'
