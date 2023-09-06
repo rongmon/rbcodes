@@ -452,10 +452,17 @@ class MplCanvas(FigureCanvasQTAgg):
 									cmap=self.cur_cmap)
 
 		else:
+			#RB Hack hard coding the color map to show a given limit. 
+			#REVERT BACK AFTER ANALYSIS
+			#pos_ax2d = self.ax2d.imshow(img, origin='lower', 
+			#						vmin=scaled2d.min(), vmax=scaled2d.max() * 1.,
+			#						extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
+			#						cmap=self.cur_cmap)
 			pos_ax2d = self.ax2d.imshow(img, origin='lower', 
-									vmin=scaled2d.min(), vmax=scaled2d.max() * 1.,
+									vmin=-0.02, vmax=0.02,
 									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
 									cmap=self.cur_cmap)
+
 		del scaled2d # release memory
 		self.pos_ax2d = pos_ax2d
 		# save a colorbar object
