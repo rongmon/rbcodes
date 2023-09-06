@@ -1181,10 +1181,12 @@ class Manual_Transition(QWidget):
         self.layout.setAlignment(QtCore.Qt.AlignTop)
         self.setLayout(self.layout)
         self.combo_ll.currentIndexChanged.connect(lambda: self.line_change(parent))
-    
+
+
         
         #Obtain Absorber
         self.Transitions = QListWidget()
+        #Use the selected linelist for reading transitions
         data = line.read_line_list('LLS')
         self.wavelist = []
         for ii in range(len(data)):
@@ -1194,14 +1196,17 @@ class Manual_Transition(QWidget):
             
         self.layout.addWidget(self.Transitions)
         
-        #Need to obtain linelist
+    #Updating current linelist
+    #Need to obtain linelist
     def line_change(self,parent):
         parent.label = self.combo_ll.currentText()
         data = line.read_line_list(self.combo_ll.currentText())
         self.Transitions.clear()
+        self.wavelist.clear()
         
         for ii in range(len(data)):
             self.Transitions.addItem(data[ii]['ion'])
+            self.wavelist.append(data[ii]['wrest'])
             
     def transition_change(self,parent):
         
