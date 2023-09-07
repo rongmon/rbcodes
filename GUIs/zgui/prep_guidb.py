@@ -71,11 +71,14 @@ class GUI_DataFrame():
             print('Given path does not exist.')
 
     def print_database(self):
-        print(self.gui_df)
+        print(self.gui_df.sort_values(by=['Name'],ignore_index=True))
 
     def save_database(self, fname='z_guess_guidb'):
         save_path = self.dirpath+'/'+fname + '.csv'
-        self.gui_df.to_csv(save_path,
+        #sort the dataframe before saving
+
+        sorted_df=self.gui_df.sort_values(by=['Name'],ignore_index=True)
+        sorted_df.to_csv(save_path,
                             sep=',',
                             header=True,
                             index=False)
