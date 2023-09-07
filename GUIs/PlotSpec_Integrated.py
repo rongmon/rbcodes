@@ -147,7 +147,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         self.zabs=zabs
         self.lam_lim=[] #For compute_EW running tab
         self.lam_ylim=[]#For compute_EW running tab
-        self.label='None' # Initializing a label
+        self.label='None' # Initializing a label Name of the linelist
         
         #make longer color list
         clrlist=list(clr.keys())  
@@ -286,12 +286,39 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         self.spectrum.canvas.setFocus()
         self.cid = self.spectrum.canvas.mpl_connect('key_press_event',self.ontype)
         self.cid_m = self.spectrum.canvas.mpl_connect('button_press_event', self.onclick)
+        self.spectrum.canvas.mpl_connect('pick_event', self.onpick)
 
         
         try:
             self.abs_plot.table.cellChanged.connect(self.cellchanged)
         except:
             pass
+
+
+    #------------------------------------------
+    # To select absorption lines (testing phase)
+    def onpick(self,event):
+        txt = event.artist
+        obswv         = txt.get_position()[0]
+        ion           = txt.get_text().split()[0]
+        restwv_approx = txt.get_text().split()[1]
+        redshift = self.zabs
+        print('What does it Say----='+self.label)
+        data=line.read_line_list(self.label)
+        print(data)
+
+        for testline in range(0,len(data)):
+            if(np.abs(float(data[testline]['wrest']) - float(restwv_approx)) < 2.0):
+                restwv = testline
+                break
+
+        
+        newrow = (redshift,ion,restwv)
+        #self.idtable.add_row(newrow)
+        print(newrow)
+
+
+
 
     def onclick(self, event):
         '''Mouse click
@@ -302,6 +329,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             self.xdata = event.xdata
             self.manT = Manual_Transition(self)
             self.manT.show()
+
 
         
     #keyboard events
@@ -965,7 +993,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                     ss=self.ax.transData.transform((0, .9))
                     ydata=[0,ylim[1]]
                     lineplot,=self.ax.plot(xdata,ydata,'--',color=linecolor)                    
-                    tt=self.ax.text(xdata[0],0.75*ylim[1],data[i]['ion']+'  z='+ np.str(self.zabs),rotation=90)
+                    tt=self.ax.text(xdata[0],0.75*ylim[1],data[i]['ion']+'  z='+ np.str(self.zabs),rotation=90,picker=True)
                     
                     #append text and plot artist objects
                     tt_temp.append(tt)
