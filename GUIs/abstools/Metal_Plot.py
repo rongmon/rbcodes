@@ -26,6 +26,7 @@ from astropy.table import Table
 from astropy.io import ascii
 
 import os
+import time
 
 HELP =  '''
         ---------------------------------------------------------------------------
@@ -249,7 +250,11 @@ class mainWindow(QtWidgets.QTabWidget):
         self.cid3 = self.figs[0].canvas.mpl_connect("motion_notify_event",self.onmotion)
         
 #----------------Setup for Additional pages-----------#  
-        AddPage(self)
+        additional_pages = len(self.keys)//6 
+        if additional_pages > 0:
+            for ii in range(additional_pages):
+                AddPage(self)
+        # AddPage(self)
 
                        
 #---------------------Save Button/function----------------# 
@@ -399,8 +404,8 @@ class mainWindow(QtWidgets.QTabWidget):
         if event.key == 'up':
             if self.Lidx is not None:
                 key_idx = self.page*6+self.Lidx
-                
-                self.ions[self.keys[key_idx]]['order'] = self.ions[self.keys[key_idx]]['order']+1
+                if self.ions[self.keys[key_idx]]['order'] < 12: # legendre poly order is limited to 12
+                    self.ions[self.keys[key_idx]]['order'] = self.ions[self.keys[key_idx]]['order']+1
                 Plotting(self,self.Lidx,modify=True)
             else:
                 print('click on a left transition window first')
@@ -410,7 +415,8 @@ class mainWindow(QtWidgets.QTabWidget):
             if self.Lidx is not None:
                 key_idx = self.page*6+self.Lidx
 #                 if self.page == 0:
-                self.ions[self.keys[key_idx]]['order'] = self.ions[self.keys[key_idx]]['order']-1
+                if self.ions[self.keys[key_idx]]['order'] > 0: # don't want to decrement below 0
+                    self.ions[self.keys[key_idx]]['order'] = self.ions[self.keys[key_idx]]['order']-1
                 Plotting(self,self.Lidx,modify=True)
             else:
                 print('click on a transition window first')
@@ -429,7 +435,8 @@ class mainWindow(QtWidgets.QTabWidget):
                     EW(self,self.page,ii,self.ions[self.keys[ii+self.page*6]]['EWlims'])
 
         if event.key == 'q':
-            self.close()
+            os._exit(0)
+            # self.close()
             
         
         #use same range for all ion Velocity limits and directly measured by following with clicks bounds on a single subplot
@@ -460,10 +467,13 @@ class mainWindow(QtWidgets.QTabWidget):
 #------------------------------click button events----------------------------#        
             
     def onclick(self,event):              
-         
-        if event.button in [1,3]:
-            '''Left hand side is for fitting'''
+
+        # if event.inaxes is None: return
+
+        # if event.button in [1,3]:
                         
+        if event.inaxes in self.axesL[self.page]:
+            '''Left hand side is for fitting'''
                 # if not first canvas, +6 per pae is needed to appropraitely index the ions
             if self.Lidx is not None:
 
@@ -500,7 +510,7 @@ class mainWindow(QtWidgets.QTabWidget):
                 '''Right hand side for picking velocity limits for EW measurements'''
             check = []; 
                         
-                
+        if event.inaxes in self.axesR[self.page]:                
             if self.Ridx is not None:
                 key_idx = (self.page*6)+self.Ridx
 
@@ -553,17 +563,39 @@ class Plotting:
                 
                 #gray_idx is to avoid line plotted through spectra from discontinuity in flux/vel/err from wc mask.
                 #uses np.diff to find where wc (true/false array) changes and plots the line segments instead of the full line with missing values
-                if wc[0] == True:
-                    gray_idx = np.where(np.diff(wc,prepend=np.nan))[0][1:]
-                else:
-                    gray_idx = np.where(np.diff(wc,prepend=np.nan))[0]
+                # if wc[0] == True:
+                #     gray_idx = np.where(np.diff(wc,prepend=np.nan))[0][1:]
+                # else:
+                #     gray_idx = np.where(np.diff(wc,prepend=np.nan))[0]
                     
+                wc_extended = np.append(wc, False)  # Add a False at the end to handle transitions at the end
+
+                if wc[0] == True:
+                    gray_idx = np.where(np.diff(wc_extended, prepend=np.nan))[0][1:]
+                else:
+                    gray_idx = np.where(np.diff(wc_extended, prepend=np.nan))[0]
+
+                # If the number of indices is odd, append the last index
+                if len(gray_idx) % 2 == 1:
+                    gray_idx = np.append(gray_idx, len(wc) - 1)
+
                 parent.axesL[parent.page][ii].clear()
-                parent.axesL[parent.page][ii].step(vel,flux,color='k',where='mid');parent.axesL[parent.page][ii].step(vel,error,color='r',where='mid')
+                parent.axesL[parent.page][ii].step(vel,flux,color='k',where='mid')
+                parent.axesL[parent.page][ii].plot(vel,flux,'k.', ms=4)
+                parent.axesL[parent.page][ii].step(vel,error,color='r',where='mid')
+                parent.axesL[parent.page][ii].plot(vel,error,'r.', ms=4)
                 parent.axesL[parent.page][ii].step(vel,cont,color='b',where='mid')
+                parent.axesL[parent.page][ii].text(0.87, 0.85,'order:'+np.str('%2d' % order),transform=parent.axesL[parent.page][ii].transAxes,color=clr['teal'])
                 for zz in range(int(len(gray_idx)/2)):
                     #gray_idx = gray_idx-1
-                    parent.axesL[parent.page][ii].step(vel[gray_idx[zz*2]:gray_idx[2*zz+1]],flux[gray_idx[2*zz]:gray_idx[2*zz+1]],vel[gray_idx[2*zz]:gray_idx[2*zz+1]],error[gray_idx[2*zz]:gray_idx[2*zz+1]],where='mid',color='lightgray',linewidth=1.3,alpha=1)
+                    left_pt = gray_idx[2*zz]
+                    right_pt = gray_idx[2*zz+1]+1
+                    parent.axesL[parent.page][ii].step(vel[left_pt:right_pt], flux[left_pt:right_pt],
+                                                       vel[left_pt:right_pt], error[left_pt:right_pt],
+                                                       where='mid',color='lightgray',linewidth=1.3,alpha=1)
+                    parent.axesL[parent.page][ii].plot(vel[left_pt:right_pt], flux[left_pt:right_pt],
+                                                       vel[left_pt:right_pt], error[left_pt:right_pt],
+                                                       color='lightgray',marker='.', ms=4.5,alpha=1, linewidth=0.0)
 
             #clear axes to redraw modifications
             parent.axesR[parent.page][ii].clear()
@@ -774,15 +806,16 @@ class initialize:
         self.main_layout.addLayout(self.top_layout,stretch=1)
         self.main_layout.addWidget(parent.canvas[parent.page],stretch=7)
         self.main_layout.addLayout(self.bot_layout,stretch=0.5)
-        parent.tabs[1].setLayout(self.main_layout)
+        parent.tabs[parent.page].setLayout(self.main_layout)
         
         
         #len(parent.keys/6 -len(parent.page)) #can you make more general? you ave to
-        parent.nions.append(len(parent.keys)-6*parent.page)
+        nions = min(len(parent.keys)-6*parent.page,6) # nion = # of ions on this page, no more than 6
+        parent.nions.append(nions)
         
         #initializing left and right axes
         parent.axesL.append(list(range(6))); parent.axesR.append(list(range(6)))                   
-        for ii in range(parent.nions[parent.page]):
+        for ii in range(nions):
             parent.axesL[parent.page][ii] = parent.figs[parent.page].add_subplot(6,2,2*ii+1)
             parent.axesR[parent.page][ii] = parent.figs[parent.page].add_subplot(6,2,2*(ii+1))
             parent.figs[parent.page].subplots_adjust(hspace=0.01)
@@ -805,7 +838,7 @@ class HelpWindow(QtWidgets.QWidget):
 class SavePage(QtWidgets.QWidget):
     def __init__(self,parentvals,parent=None):
         super(SavePage, self).__init__(parent)
-        self.resize(700,400)
+        self.resize(700,450)
         
         def onpdf(self,parentvals):
             # need to eliminate highlighted axes
@@ -832,6 +865,26 @@ class SavePage(QtWidgets.QWidget):
                 pickle.dump(parentvals.ions,pklfile,protocol=pickle.HIGHEST_PROTOCOL)
             self.picklesave.setStyleSheet('background-color : green')
             parentvals.save = True
+
+        def onsaveall(self,parentvals, table):
+
+            onpdf(self,parentvals)
+            self.pdfsave.setStyleSheet('background-color : green')
+
+            # time.sleep(.25)
+            ontable(self,parentvals, table)
+            self.tablesave.setStyleSheet("background-color : green")
+
+            # time.sleep(.25)
+            self.picklesave.setStyleSheet('background-color : green')
+            onpickle(self,parentvals)
+
+            self.saveall.setStyleSheet('background-color : green')
+
+            parentvals.save = True
+
+
+
         # want to print out table to the user regardless of whether it is saved
         Table_e = Table()
         Table_e['Transitions'] = parentvals.keys
@@ -898,6 +951,10 @@ class SavePage(QtWidgets.QWidget):
         self.picklesave = QPushButton("Save Progress",self)
         self.picklesave.setGeometry(410,275,200,30)
         self.picklesave.clicked.connect(lambda: onpickle(self,parentvals))
+
+        self.saveall = QPushButton("Save ALL",self)
+        self.saveall.setGeometry(250,350,200,30)
+        self.saveall.clicked.connect(lambda: onsaveall(self,parentvals,Table_e))
 
         
 #Initial inputs and callable class to run proram        
