@@ -1,7 +1,7 @@
 import sys
 import os
 import plotly.graph_objs as go
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import QUrl
 
@@ -11,9 +11,6 @@ from astropy.io import fits
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-
-        # Create a QVBoxLayout to organize widgets
-        layout = QVBoxLayout()
 
         # Create a QWebEngineView widget to display the Plotly plot
         view = QWebEngineView()
