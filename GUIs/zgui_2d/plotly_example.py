@@ -14,7 +14,7 @@ class MainWindow(QMainWindow):
 
         # Create a QWebEngineView widget to display the Plotly plot
         view = QWebEngineView()
-        view.setGeometry(100, 100, 800, 600)
+        view.setGeometry(100, 100, 2000, 600)
 
         # Create a simple Plotly scatter plot
         #data = [go.Scatter(x=[1, 2, 3], y=[4, 1, 2], mode='markers', text=["Point 1", "Point 2", "Point 3"])]
