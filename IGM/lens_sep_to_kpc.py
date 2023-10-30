@@ -1,5 +1,4 @@
-from astropy.cosmology import Planck18_arXiv_v2 as cosmo
-import numpy as np
+from astropy.cosmology import Planck18 as cosmo
 import matplotlib.pyplot as plt
 import  astropy.units as u
 
