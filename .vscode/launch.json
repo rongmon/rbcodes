@@ -1,0 +1,17 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Debug rbspecgui.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/GUIs/rb_specgui.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["/Users/robertseaton/School/github_repos/CGM-learning/code/analysis/J1429+1202_231119/3_1d_combined_spectra_33.38-3x11/3_1d_combined_spectra_33.38-3x11.fits"]
+        }
+    ]
+}
