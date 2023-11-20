@@ -486,18 +486,20 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             self.help.show()
             
         elif event.key =='v':
-            #first check if absorber linelist has already been catologed.
-            if self.zabs in self.line_list.Zabs.tolist():
-                
-                #if so, ask user if they would like to re-eval the results
-                buttonReply = QMessageBox.question(self,"Reevaluate" ,"Current Zabs LineList already evaluated: Reevaluate and overwrite?",
-                                                   QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-                if buttonReply == QMessageBox.Yes:
-                    self.ion_selection = vStack(self,self.wave,self.flux,self.error,self.label,zabs=self.zabs)
+            # first check to see if we are in the main window or the vstack window
+            if not isinstance(self, vStack):
+                # check if absorber linelist has already been catologed.
+                if self.zabs in self.line_list.Zabs.tolist():
                     
-            #otherwise, proceed without manual consent
-            else:
-                self.ion_selection = vStack(self,self.wave,self.flux,self.error,self.label,zabs=self.zabs)
+                    #if so, ask user if they would like to re-eval the results
+                    buttonReply = QMessageBox.question(self,"Reevaluate" ,"Current Zabs LineList already evaluated: Reevaluate and overwrite?",
+                                                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                    if buttonReply == QMessageBox.Yes:
+                        self.ion_selection = vStack(self,self.wave,self.flux,self.error,self.label,zabs=self.zabs)
+                        
+                #otherwise, proceed without manual consent
+                else:
+                    self.ion_selection = vStack(self,self.wave,self.flux,self.error,self.label,zabs=self.zabs)
                 
 
 
@@ -645,6 +647,22 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                 self.FYval=[]
 
             self.spectrum.canvas.draw() 
+
+        elif event.key=='q' or event.key=='Q':
+            # sys.exit()
+            # self.manT.close()
+            # app.exit(0)
+            # QtWidgets.QApplication.instance().exit(0)
+            # self.close()
+            # self.destroy() # ha, kills the window but doesn't exit the application :(
+            # self.closeEvent(self) # nope
+            
+            # app = QtWidgets.QApplication.instance()
+            # sys.exit(app.exec_())
+
+            # the only way I have found to quit the application without segfaulting
+            os._exit(0) # though not advised as os._exit() DOESN'T call cleanup functions, flush of stdio buffers, etc.
+            # this PyQT crashing on exit has been around since 2004 (at least): https://bugzilla.redhat.com/show_bug.cgi?id=133375
 
 
     
@@ -1396,7 +1414,7 @@ class LoadCatalog(QWidget):
         layout1 = QHBoxLayout(self)
         layout2 = QHBoxLayout(self)
         
-        self.label = QLabel("Enter Zabs Manager dir+file (AbsorberCatalog.csv is default)")
+        self.label = QLabel("Enter Zabs Manager dir+file (Absorber_Catalog.csv is default)")
         self.entry = QLineEdit(self)
         self.browse = QPushButton("Browse")
         self.browse.clicked.connect(lambda: self.browsefiles(parent,0))
@@ -1450,12 +1468,14 @@ class LoadCatalog(QWidget):
             for files in os.listdir(dirs):
             #read in zabs manager
                 if files.endswith('.csv'):
-                    parent.zabs_list = pd.read_csv(files)
+                    fq_filename = os.path.join(dirs,files)
+                    parent.zabs_list = pd.read_csv(fq_filename)
                     parent.zabs_list = parent.zabs_list[parent.zabs_list.keys()[1:]]
                     self.populate_zabs_manager(parent)
                 #read in linelist manager
                 elif files.endswith('.txt'):
-                    parent.line_list = pd.read_csv(files,sep=' ')
+                    fq_filename = os.path.join(dirs,files)
+                    parent.line_list = pd.read_csv(fq_filename,sep=' ')
                     parent.line_list = parent.line_list[parent.line_list.keys()[1:]]
                     self.plot_identified_lines(parent)
 
@@ -1797,17 +1817,26 @@ class vStack:
         else:
             ploti=[ploti]
 
-
-
-
-
+        # clear the axes if needed
+        for i in range(self.plotppage):
+            if i not in ploti:
+                self.clearstuff(i)
+        # plot the things
         for i in ploti:
             self.plotstuff(i,comment=comment,yrange=yrange)
 
         self.fig.canvas.draw()
 
+    def clearstuff(self, i):
+        """ clearstuff() ensures that all the plots from the previously drawn page are cleared before plotting the next page"""
+        ax=self.axes[i % self.plotppage]
+        ax.clear()
+        ax.set_axis_off()
+
+
         
     def plotstuff(self,i,comment=False,yrange=False):
+        
         ax=self.axes[i % self.plotppage]
         #---------------Define variables for readability--------------#
         vel = self.ions[self.keys[i]]['vel']
