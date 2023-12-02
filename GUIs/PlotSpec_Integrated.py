@@ -672,7 +672,9 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                 self.FXval=[]
                 self.FYval=[]
 
-            self.spectrum.canvas.draw() 
+            self.spectrum.canvas.draw()
+        elif event.key=='q' or event.key=='Q':
+            os._exit(0) 
 
 
     
@@ -1758,13 +1760,13 @@ class vStack:
             self.page+=1
             if self.page>self.npages: 
                 self.page=1
-            self.vPlot()
+            self.vPlot(clearpage=True)
         #page left
         elif event.key=='<':
             self.page-=1
             if self.page<1: 
                 self.page=self.npages
-            self.vPlot()
+            self.vPlot(clearpage=True)
             
         #Toggle between detection-non-detection or blended    
         elif event.key =='w': #Detected,non-detected, blended-detection 
@@ -1823,21 +1825,31 @@ class vStack:
                     self.parent.abs_plot.table.cellWidget(row,2).setStyleSheet('background-color : QColor(53, 53, 53)')
             except:
                 pass
-    def vPlot(self,ploti=None,comment=False,yrange=None):#spec,i=0):
+    def vPlot(self,ploti=None,comment=False,yrange=None,clearpage=False):#spec,i=0):
         # global axesR
         if ploti is None:
             ploti=np.arange(self.plotppage*(self.page-1),min(self.plotppage*self.page,self.nions))
         else:
             ploti=[ploti]
 
-
-
-
-
+        # clear the axes if needed
+        if clearpage==True:
+            for i in range(self.plotppage):
+                if i not in ploti:
+                    self.clearstuff(i)
+        # plot the things
         for i in ploti:
             self.plotstuff(i,comment=comment,yrange=yrange)
 
         self.fig.canvas.draw()
+
+
+    def clearstuff(self, i):
+        """ clearstuff() ensures that all the plots from the previously drawn page are cleared before plotting the next page"""
+        ax=self.axes[i % self.plotppage]
+        ax.clear()
+        ax.set_axis_off()
+
 
         
     def plotstuff(self,i,comment=False,yrange=False):
