@@ -66,14 +66,14 @@ def Gaussian_filter(wav_array,twod):
 
 
 
-def filter_2D(wav_array,twod):
+def filter_2D(wav_array,twod,pix_radius=15,smoothing_kernel=19,dx=1,y_stddev=0.2):
     """
        Function to filter a 2D spectrum while masking regions around emission lines with a 2D Gaussian kernel
 
     """
-    dx=1.
-    pix_radius=15
-    smoothing_kernel=19
+    #dx=1.
+    #pix_radius=15
+    #smoothing_kernel=19
     #HeI 5016,5017.079
     #HeI 5876,5877.299
     #,7067.198,7283.356,8752.876,8865.217,9017.385,9071.1,9533.2,9231.547,9548.591,10052.13,10833.22,10941.09,12821.59,18756.13,19450.87,21661.2
@@ -98,7 +98,7 @@ def filter_2D(wav_array,twod):
                 ROI=((row - cen_y)**2 + (col - cen_x)**2 < (pix_radius)**2)
                 thistwod[ROI]=np.nan
 
-    kernel =  Gaussian2DKernel(x_stddev=smoothing_kernel,y_stddev=.2)
+    kernel =  Gaussian2DKernel(x_stddev=smoothing_kernel,y_stddev=y_stddev)
     #kernel=AiryDisk2DKernel(smoothing_kernel)
     cont = convolve_fft(thistwod, kernel,nan_treatment='interpolate')
 
