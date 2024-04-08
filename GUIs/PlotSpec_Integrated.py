@@ -266,7 +266,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         self.ax.set_xlabel('Wavelength')
         self.ax.set_ylabel('Flux')
         xr=[min(self.wave),max(self.wave)]
-        yr=[0.,np.median(flux)*2.5]
+        yr=[0.,np.nanmedian(flux)*2.5]
         self.ax.set_ylim(yr)
         self.ax.set_xlim(xr)
         self.init_ylims = self.ax.get_ylim()
@@ -577,7 +577,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                         logNerr = str(np.round(np.log10((N+Nerr)/(N-Nerr)/2),2))
                         formatName = '$N_{'+name[0]+'}$'
                         logN = Wval + 'log ' + formatName + ' [$cm^{-2}$]:'  + str(np.round(np.log10(N),2)) + ' +/- ' +logNerr
-                        self.ax.text(np.mean([self.lam_lim])+.05,np.max(self.lam_ylim)+0.2,logN, rotation=90,verticalalignment='bottom')
+                        self.ax.text(np.nanmean([self.lam_lim])+.05,np.max(self.lam_ylim)+0.2,logN, rotation=90,verticalalignment='bottom')
                         self.message_window.setText(Wval + 'N '+name[0] + '[1/cm^2]'+': '+str(np.round(np.log10(N),2)) + ' +/- ' +logNerr)
                         self.lam_lim=[]
                         self.lam_ylim=[]
@@ -599,7 +599,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                         self.ax.plot(wave_slice,cont,'r--')
 
                         Wval='EW [mAA]: '+ '%.1f' % EW + ' +/- ' + '%.1f' % sig_EW
-                        self.ax.text(np.mean([self.lam_lim]),np.max(self.lam_ylim)+0.2,Wval, rotation=90,verticalalignment='bottom')
+                        self.ax.text(np.nanmean([self.lam_lim]),np.max(self.lam_ylim)+0.2,Wval, rotation=90,verticalalignment='bottom')
                         self.message_window.setText(Wval)
                         self.lam_lim=[]
                         self.lam_ylim=[]
@@ -612,7 +612,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                     self.ax.plot(wave_slice,cont,'r--')
 
                     Wval='EW [mAA]: '+ '%.1f' % EW + ' +/- ' + '%.1f' % sig_EW
-                    self.ax.text(np.mean([self.lam_lim]),np.max(self.lam_ylim)+0.2,Wval, rotation=90,verticalalignment='bottom')
+                    self.ax.text(np.nanmean([self.lam_lim]),np.max(self.lam_ylim)+0.2,Wval, rotation=90,verticalalignment='bottom')
                     self.message_window.setText(Wval)
                     self.lam_lim=[]
                     self.lam_ylim=[]
@@ -661,9 +661,9 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                 values2=' Sig: '+'%.3f' %  g.parameters[2] 
 
 
-                self.message1=self.ax.text(np.mean(ww),np.max(self.FYval)+0.2,values0, rotation=90,verticalalignment='bottom')
-                self.message2=self.ax.text(np.mean(ww)+np.std(ww),np.max(self.FYval)+0.2,values1, rotation=90,verticalalignment='bottom')
-                self.message3=self.ax.text(np.mean(ww)-np.std(ww),np.max(self.FYval)+0.2,values2, rotation=90,verticalalignment='bottom')
+                self.message1=self.ax.text(np.nanmean(ww),np.max(self.FYval)+0.2,values0, rotation=90,verticalalignment='bottom')
+                self.message2=self.ax.text(np.nanmean(ww)+np.std(ww),np.max(self.FYval)+0.2,values1, rotation=90,verticalalignment='bottom')
+                self.message3=self.ax.text(np.nanmean(ww)-np.std(ww),np.max(self.FYval)+0.2,values2, rotation=90,verticalalignment='bottom')
 
 
 
@@ -1936,7 +1936,7 @@ class Popup_col_density(QWidget):
         logNerr = str(np.round(np.log10((N+Nerr)/(N-Nerr)/2),2))
         formatName = '$N_{'+parent.fval_name[item_idx]+'}$'
         logN = Wval + 'log ' + ' [$cm^{-2}$]: ' +str(np.round(np.log10(N),2)) + ' +/- ' +logNerr
-        parent.ax.text(np.mean([parent.lam_lim])+.05,np.max(parent.lam_ylim)+0.2,logN, rotation=90,verticalalignment='bottom')
+        parent.ax.text(np.nanmean([parent.lam_lim])+.05,np.max(parent.lam_ylim)+0.2,logN, rotation=90,verticalalignment='bottom')
         parent.message_window.setText(logN)
         parent.lam_lim=[]
         parent.lam_ylim=[]
