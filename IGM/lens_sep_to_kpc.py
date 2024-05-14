@@ -1,7 +1,7 @@
 from astropy.cosmology import Planck18 as cosmo
 import matplotlib.pyplot as plt
 import  astropy.units as u
-
+import numpy as np
 
 def lens_sep_to_kpc(delta_arcsec,zabs_list,z_lens,z_source):
     """        
@@ -36,7 +36,7 @@ def lens_sep_to_kpc(delta_arcsec,zabs_list,z_lens,z_source):
     """
 
 
-
+ 
     zabs_list=np.array(zabs_list)
     # Convert angular separation to radian
     theta_obs= np.deg2rad(delta_arcsec/3600.)
@@ -47,7 +47,7 @@ def lens_sep_to_kpc(delta_arcsec,zabs_list,z_lens,z_source):
     DL= cosmo.comoving_distance(z_lens)
     Dc= cosmo.comoving_distance(zabs_list)
 
-    dist= (theta_obs)*DL *(Ds -Dc)/((1.+z_source)* (Ds-DL))
+    dist= (theta_obs)*DL *(Ds -Dc)/((1.+zabs_list)* (Ds-DL))
     distlist=dist.to(u.kpc).value
 
     q=np.where((zabs_list <= z_lens))
