@@ -1,7 +1,7 @@
 """
 Example code to plot to plot distances for differetn lens separations
 """
-from astropy.cosmology import Planck18_arXiv_v2 as cosmo
+from astropy.cosmology import Planck18 as cosmo
 import numpy as np
 import matplotlib.pyplot as plt
 import  astropy.units as u
