@@ -1,9 +1,21 @@
 """ Spectrum class to read in, analyze and measure absorption lines."""
 import numpy as np
 from scipy.interpolate import splrep,splev
+from numpy.polynomial.legendre import Legendre
 import sys
 import os
 import pdb
+
+# Calculate the confidence bounds
+def calculate_confidence_bounds(x, model, cov_matrix):
+    # Evaluate the Legendre basis functions at the given x values
+    P = np.polynomial.legendre.legvander(x, model.degree)
+
+    # Propagate the parameter uncertainties to the fitted values
+    y_err = np.sqrt(np.sum((P @ cov_matrix) * P, axis=1))
+
+    return y_err
+
 class rb_spec(object):
     """A spectrum read into a class, spectrum will have following properties.
 
@@ -351,7 +363,8 @@ class rb_spec(object):
 
 
         else:
-            import numpy.polynomial.legendre as L
+            from astropy.modeling import models, fitting
+
             order=Legendre
             weight= 1./(self.error_slice**2.)
             
@@ -382,8 +395,32 @@ class rb_spec(object):
             qtq=np.where((q ==1))
 
             # Fitting the masked Data
-            e=L.Legendre.fit(self.velo[qtq],self.flux_slice[qtq],order,w=weight[qtq],domain=domain);
-            cont=e(self.velo)
+            #e=Legendre.fit(self.velo[qtq],self.flux_slice[qtq],order,w=weight[qtq],domain=domain);
+            #cont=e(self.velo)
+
+            legendre_init = models.Legendre1D(degree=order)
+            # Fit the model using Levenberg-Marquardt minimization
+            fitter = fitting.LevMarLSQFitter()
+            #fitter=fitting.LinearLSQFitter()
+            legendre_fit = fitter(legendre_init, self.velo[qtq],self.flux_slice[qtq],weights=weight[qtq])
+            cont=legendre_fit(self.velo)
+            # Calculate uncertainties (standard deviations) of the fitted parameters
+            cov_matrix = fitter.fit_info['param_cov']
+            if cov_matrix is not None:
+                param_uncertainties = np.sqrt(np.diag(cov_matrix))
+                print("Both statistical and continuum fitting error included.")
+                # Calculate the 1-sigma confidence bounds
+                self.cont_err = calculate_confidence_bounds(self.velo, legendre_fit, cov_matrix)
+                self.error_slice=np.sqrt((self.error_slice**2)+(self.cont_err**2))
+
+            else:
+                print("Covariance matrix is not available. The fit might be poorly constrained.")
+                print("Using only statistical error.")
+
+
+
+
+
             # Now mask the part of spectrum that we don't want to fit. 
             # Mask is created to have multiple low vel, high vel ranges.
             # e.g. mask = [-300.,-250.,100.,120.] will exclude -300,-250 and 100,120 km/s parts of the spectrum in the fit
