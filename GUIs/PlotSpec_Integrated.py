@@ -65,7 +65,9 @@ HELP = '''
 
         'H':   Help Window
         'v':   Opens Separate Vstack GUI for the user to identify detected transitions
-               Vstack commands will be discussed below : press shift+S TO EXITß
+               Vstack commands will be discussed below : press shift+S TO EXIT
+
+        'V':   Same as 'v' but now allows one to select the velocity axis manually 
         
         'j':   Designed to be used by zooming into a small region of the spectra,
                finding an absortion region, put mouse in the middle of that region.
@@ -527,6 +529,32 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             else:
                 self.ion_selection = vStack(self,self.wave,self.flux,self.error,self.label,zabs=self.zabs)
                 
+        elif event.key =='V':
+            """
+            Same as above but now allows one to chose custom x limit for velocity
+
+            """
+
+            Windowname='Manual velocity-Limits'
+            instruction='Input range (e.g. -1500,1500.)'
+            vlim, ok = QInputDialog.getText(self,Windowname,instruction)
+            if ok:
+                vlim = vlim.split(',')
+                vlim = np.array(vlim).astype('float32')
+            #first check if absorber linelist has already been catologed.
+            if self.zabs in self.line_list.Zabs.tolist():
+                
+                #if so, ask user if they would like to re-eval the results
+                buttonReply = QMessageBox.question(self,"Reevaluate" ,"Current Zabs LineList already evaluated: Reevaluate and overwrite?",
+                                                   QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                if buttonReply == QMessageBox.Yes:
+                    self.ion_selection = vStack(self,self.wave,self.flux,self.error,self.label,zabs=self.zabs,vlim=vlim)
+                    
+            #otherwise, proceed without manual consent
+            else:
+                self.ion_selection = vStack(self,self.wave,self.flux,self.error,self.label,zabs=self.zabs,vlim=vlim)
+
+
 
 
         elif event.key =='j':
