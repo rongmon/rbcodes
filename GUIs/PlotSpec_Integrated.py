@@ -1353,7 +1353,7 @@ class SaveCatalog(QWidget):
                     directory.mkdir(exist_ok=True)
 
                 if ((self.LineLists == 'All') or (self.LineLists == 'Partial')):
-                    parent.line_list.to_csv(str((directory/'LineList_Identified.txt').resolve()), sep=' ')
+                    parent.line_list.to_csv(str((directory/'Identified_Linelist.txt').resolve()), sep=' ')
 
 
                 file = directory / 'Absorber_Catalog.csv'
@@ -1462,7 +1462,7 @@ class LoadCatalog(QWidget):
         layout1 = QHBoxLayout(self)
         layout2 = QHBoxLayout(self)
         
-        self.label = QLabel("Enter Zabs Manager dir+file (AbsorberCatalog.csv is default)")
+        self.label = QLabel("Enter Zabs Manager dir+file (Absorber_Catalog.csv is default)")
         self.entry = QLineEdit(self)
         
         self.browse = QPushButton("Browse")
