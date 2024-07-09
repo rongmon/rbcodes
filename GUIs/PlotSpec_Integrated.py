@@ -1063,6 +1063,9 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
 
 class Redshift_Guess:
     def __init__(self,parent):
+        if parent.identified_line_active:
+            Identified_plotter(parent)
+
         parent.zabs = np.double(parent.active_zabs.text())
         color = parent.combo_color_main.currentText()
         label = parent.combo_lines.currentText()
@@ -1461,6 +1464,7 @@ class LoadCatalog(QWidget):
         
         self.label = QLabel("Enter Zabs Manager dir+file (AbsorberCatalog.csv is default)")
         self.entry = QLineEdit(self)
+        
         self.browse = QPushButton("Browse")
         self.browse.clicked.connect(lambda: self.browsefiles(parent,0))
         
@@ -1494,35 +1498,38 @@ class LoadCatalog(QWidget):
 #         self.entry.returnPressed.connect(self.button.click)
                                 
     def browsefiles(self,parent,method):
-        if method == 0: # get csv
-            fname,_ = QFileDialog.getOpenFileName(self, 'Open file', os.getcwd(),"CSV files (*csv)")
-            parent.zabs_list = pd.read_csv(fname)
-            parent.zabs_list = parent.zabs_list[parent.zabs_list.keys()[1:]]
-            #Populate zabs list and hide plots
-            self.populate_zabs_manager(parent)
+        try:
+            if method == 0: # get csv
+                fname,_ = QFileDialog.getOpenFileName(self, 'Open file', os.getcwd(),"CSV files (*csv)")
+                parent.zabs_list = pd.read_csv(fname)
+                parent.zabs_list = parent.zabs_list[parent.zabs_list.keys()[1:]]
+                #Populate zabs list and hide plots
+                self.populate_zabs_manager(parent)
             
+            elif method == 1: #get txt
+                fname,_ = QFileDialog.getOpenFileName(self, 'Open file', os.getcwd(),"Text files (*txt *.log)")
+                parent.line_list = pd.read_csv(fname,sep=' ')
+                parent.line_list = parent.line_list[parent.line_list.keys()[1:]]
+                self.plot_identified_lines(parent)
             
-        elif method == 1: #get txt
-            fname,_ = QFileDialog.getOpenFileName(self, 'Open file', os.getcwd(),"Text files (*txt *.log)")
-            parent.line_list = pd.read_csv(fname,sep=' ')
-            parent.line_list = parent.line_list[parent.line_list.keys()[1:]]
-            self.plot_identified_lines(parent)
-            
-        else:
-            dirs = QFileDialog.getExistingDirectory(self,"Open a folder",os.getenv("HOME"),QFileDialog.ShowDirsOnly)
-            for files in os.listdir(dirs):
-            #read in zabs manager
-                if files.endswith('.csv'):
-                    parent.zabs_list = pd.read_csv(files)
-                    parent.zabs_list = parent.zabs_list[parent.zabs_list.keys()[1:]]
-                    self.populate_zabs_manager(parent)
-                #read in linelist manager
-                elif files.endswith('.txt'):
-                    parent.line_list = pd.read_csv(files,sep=' ')
-                    parent.line_list = parent.line_list[parent.line_list.keys()[1:]]
-                    self.plot_identified_lines(parent)
+            else:
+                dirs = QFileDialog.getExistingDirectory(self,"Open a folder",os.getenv("HOME"),QFileDialog.ShowDirsOnly)
+                for files in os.listdir(dirs):
+                #read in zabs manager
+                    if files.endswith('.csv'):
+                        parent.zabs_list = pd.read_csv(files)
+                        parent.zabs_list = parent.zabs_list[parent.zabs_list.keys()[1:]]
+                        self.populate_zabs_manager(parent)
+                    #read in linelist manager
+                    elif files.endswith('.txt'):
+                        parent.line_list = pd.read_csv(files,sep=' ')
+                        parent.line_list = parent.line_list[parent.line_list.keys()[1:]]
+                        self.plot_identified_lines(parent)
 
-            self.close()
+                self.close()
+        except Exception as error:
+            print(error)
+        
     def populate_zabs_manager(self,parent):
         zabs = parent.zabs_list['Zabs'].values.tolist()
         self.green_index = []
