@@ -40,8 +40,8 @@ Abs=absys.ions
 
 #Optional: if you have a pre-identified intervening absorption line list, feed it in.
 # Interevening absorption line list
-path='/Users/bordoloi/Dropbox/COS-Pairs/Targets/PG0832+251/Data/'
-filename=path+'LineList_Identified.log'
+path='/SpecPlot_Projects/'
+filename=path+'Identified_Linelist.txt'
 
 # Intervening absorption line list is optional to show any intervening absorbers
 
