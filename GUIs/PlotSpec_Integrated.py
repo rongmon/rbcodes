@@ -1638,9 +1638,15 @@ class Identified_plotter:
             #if active remove plots and set indicator back to gray
             if parent.identified_line_active == True:
                 for ii in parent.identified_lines:
-                    ii.remove()
+                    try:
+                        ii.remove()
+                    except:
+                        pass
                 for ii in parent.identified_text:
-                    ii.remove()
+                    try:
+                        ii.remove()
+                    except:
+                        pass
                 parent.identified_text = []; parent.identified_lines = []
                 parent.Identified_line_plot.setStyleSheet('background-color : QColor(53, 53, 53)')
                 parent.identified_line_active = False
@@ -1720,14 +1726,17 @@ def prepare_absorber_object(z_abs,wave,flux,error,line_flg='LLS',vlim=[-1000,100
 
 class vStack:
     def __init__(self,parent,wave,flux,error,line_flg,zabs=0,vlim=[-1000.,1000.]):
+
         self.parent = parent
         self.parent_canvas = parent.canvas
         self.zabs=zabs
         self.vlim=vlim
-        self.ions=prepare_absorber_object(zabs,wave,flux,error,line_flg=line_flg)
+        self.ions=prepare_absorber_object(zabs,wave,flux,error,line_flg=line_flg,vlim=self.vlim)
         #-----full spectra properties---------#
-        self.z = self.ions['Target']['z']; self.flux = self.ions['Target']['flux']
-        self.wave = self.ions['Target']['wave']; self.error = self.ions['Target']['error']
+        self.z = self.ions['Target']['z']; 
+        self.flux = self.ions['Target']['flux']
+        self.wave = self.ions['Target']['wave']; 
+        self.error = self.ions['Target']['error']
         
                
         self.keys = list(self.ions.keys())[:-1] # last item is the full target spectrum
@@ -1868,7 +1877,7 @@ class vStack:
             ploti=[ploti]
 
         # clear the axes if needed
-        if clearpage==True:
+        if clearpage:
             for i in range(self.plotppage):
                 if i not in ploti:
                     self.clearstuff(i)
@@ -1913,11 +1922,13 @@ class vStack:
         ax.axvline(0,color=clr['light_gray'],linestyle='dotted')
         ax.text(x=0.05, y=0.815, s=name, fontsize=10, transform=ax.transAxes,color=clr['red'])
         ax.text(x=0.75, y=0.815, s='f0: '+str(f0), fontsize=10, transform=ax.transAxes,color=clr['red'])
-        
-        if comment != False:
+        ax.set_xlim(self.vlim)
+
+        if comment:
             ax.text(x=0.85, y=0.815, s=comment, fontsize=12, transform=ax.transAxes,color=clr['teal'])
-        if yrange != False:
-            ax.set_ylim(yrange)
+        if yrange:
+            ax.set_ylim(yrange) 
+            
 
         
         if flag is not None: #Display some measurement
