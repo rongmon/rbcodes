@@ -1724,7 +1724,7 @@ class vStack:
         self.parent_canvas = parent.canvas
         self.zabs=zabs
         self.vlim=vlim
-        self.ions=prepare_absorber_object(zabs,wave,flux,error,line_flg=line_flg)
+        self.ions=prepare_absorber_object(zabs,wave,flux,error,line_flg=line_flg,vlim=vlim)
         #-----full spectra properties---------#
         self.z = self.ions['Target']['z']; self.flux = self.ions['Target']['flux']
         self.wave = self.ions['Target']['wave']; self.error = self.ions['Target']['error']
@@ -1918,6 +1918,7 @@ class vStack:
             ax.text(x=0.85, y=0.815, s=comment, fontsize=12, transform=ax.transAxes,color=clr['teal'])
         if yrange != False:
             ax.set_ylim(yrange)
+        #ax.set_xlim(self.vlim)
 
         
         if flag is not None: #Display some measurement

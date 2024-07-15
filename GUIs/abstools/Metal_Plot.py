@@ -950,3 +950,4 @@ class Transitions:
         QtWidgets.QApplication.setQuitOnLastWindowClosed(True)
         app.exec_()
         app.quit()
+        #sys.exit()
