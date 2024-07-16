@@ -1260,6 +1260,10 @@ class Manual_Transition(QWidget):
     #Updating current linelist
     #Need to obtain linelist
     def line_change(self,parent):
+        
+        if parent.identified_line_active:
+            Identified_plotter(parent)
+
         parent.label = self.combo_ll.currentText()
         data = line.read_line_list(self.combo_ll.currentText())
         self.Transitions.clear()
@@ -1636,64 +1640,73 @@ class Identified_plotter:
             parent.message_window.setText("No transitions have been identified")
         else:
             #if active remove plots and set indicator back to gray
-            if parent.identified_line_active == True:
-                for ii in parent.identified_lines:
-                    try:
-                        ii.remove()
-                    except:
-                        pass
-                for ii in parent.identified_text:
-                    try:
-                        ii.remove()
-                    except:
-                        pass
-                parent.identified_text = []; parent.identified_lines = []
-                parent.Identified_line_plot.setStyleSheet('background-color : QColor(53, 53, 53)')
-                parent.identified_line_active = False
+            if parent.identified_line_active:
+                self.unplot_identified(parent)
             #else 
             else:
-                parent.identified_line_active = True
-                if parent.zabs_list.shape[0]>0:
-                    for z in parent.zabs_list.Zabs.tolist():
+                self.plot_identified(parent)
+            parent.spectrum.canvas.draw()
+
+    #Plots Identified Lines, own function reduces clutter allows for easier use.
+    def plot_identified(self,parent):
+        parent.identified_line_active = True
+        if parent.zabs_list.shape[0]>0:
+            for z in parent.zabs_list.Zabs.tolist():
+                index = parent.line_list[parent.line_list['Zabs'] == z].index
+                color = parent.zabs_list.color[parent.zabs_list.Zabs == z].values[0]
+                ylim=parent.ax.get_ylim()
+                for i in index:
+                    xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
+                    #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
+                    lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color=clr[color])
+                    tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
+                    parent.identified_lines.append(lineplot)
+                    parent.identified_text.append(tt)
+
+                
+            #if linelist has absorbers that are not cataloged
+            if len(np.unique(parent.line_list.Zabs.tolist())) > len(parent.zabs_list.Zabs.tolist()):
+                zabs_list = parent.zabs_list.Zabs.tolist()
+                line_list_zabs = np.unique(parent.line_list.Zabs.tolist())
+                for z in line_list_zabs:
+                    if z not in zabs_list:
                         index = parent.line_list[parent.line_list['Zabs'] == z].index
-                        color = parent.zabs_list.color[parent.zabs_list.Zabs == z].values[0]
                         ylim=parent.ax.get_ylim()
                         for i in index:
                             xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                             #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
-                            lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color=clr[color])
+                            lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color='y')
                             tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                             parent.identified_lines.append(lineplot)
                             parent.identified_text.append(tt)
-
-                
-                    #if linelist has absorbers that are not cataloged
-                    if len(np.unique(parent.line_list.Zabs.tolist())) > len(parent.zabs_list.Zabs.tolist()):
-                        zabs_list = parent.zabs_list.Zabs.tolist()
-                        line_list_zabs = np.unique(parent.line_list.Zabs.tolist())
-                        for z in line_list_zabs:
-                            if z not in zabs_list:
-                                index = parent.line_list[parent.line_list['Zabs'] == z].index
-                                ylim=parent.ax.get_ylim()
-                                for i in index:
-                                    xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
-                                    #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
-                                    lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color='y')
-                                    tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
-                                    parent.identified_lines.append(lineplot)
-                                    parent.identified_text.append(tt)
-                else:
-                    ylim=parent.ax.get_ylim()
-                    for i in range(parent.line_list.shape[0]):
-                        xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
-                        #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
-                        lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color='y')
-                        tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
-                        parent.identified_lines.append(lineplot)
-                        parent.identified_text.append(tt)
+        else:
+            ylim=parent.ax.get_ylim()
+            for i in range(parent.line_list.shape[0]):
+                xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
+                #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
+                lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color='y')
+                tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
+                parent.identified_lines.append(lineplot)
+                parent.identified_text.append(tt)
                                     
-                parent.Identified_line_plot.setStyleSheet('background-color : green')        
-            parent.spectrum.canvas.draw()
+        parent.Identified_line_plot.setStyleSheet('background-color : green')    
+
+    #Removes the Identified Lines, helps to prevent crashes and 
+    #ensures that Identified lines are removed using their own routine.
+    def unplot_identified(self,parent):
+        for ii in parent.identified_lines:
+            try:
+                ii.remove()
+            except:
+                pass
+        for ii in parent.identified_text:
+            try:
+                ii.remove()
+            except:
+                pass
+        parent.identified_text = []; parent.identified_lines = []
+        parent.Identified_line_plot.setStyleSheet('background-color : QColor(53, 53, 53)')
+        parent.identified_line_active = False
                 
                 
                 
@@ -1726,17 +1739,14 @@ def prepare_absorber_object(z_abs,wave,flux,error,line_flg='LLS',vlim=[-1000,100
 
 class vStack:
     def __init__(self,parent,wave,flux,error,line_flg,zabs=0,vlim=[-1000.,1000.]):
-
         self.parent = parent
         self.parent_canvas = parent.canvas
         self.zabs=zabs
         self.vlim=vlim
-        self.ions=prepare_absorber_object(zabs,wave,flux,error,line_flg=line_flg,vlim=self.vlim)
+        self.ions=prepare_absorber_object(zabs,wave,flux,error,line_flg=line_flg,vlim=vlim)
         #-----full spectra properties---------#
-        self.z = self.ions['Target']['z']; 
-        self.flux = self.ions['Target']['flux']
-        self.wave = self.ions['Target']['wave']; 
-        self.error = self.ions['Target']['error']
+        self.z = self.ions['Target']['z']; self.flux = self.ions['Target']['flux']
+        self.wave = self.ions['Target']['wave']; self.error = self.ions['Target']['error']
         
                
         self.keys = list(self.ions.keys())[:-1] # last item is the full target spectrum
@@ -1922,13 +1932,12 @@ class vStack:
         ax.axvline(0,color=clr['light_gray'],linestyle='dotted')
         ax.text(x=0.05, y=0.815, s=name, fontsize=10, transform=ax.transAxes,color=clr['red'])
         ax.text(x=0.75, y=0.815, s='f0: '+str(f0), fontsize=10, transform=ax.transAxes,color=clr['red'])
-        ax.set_xlim(self.vlim)
-
-        if comment:
+        
+        if comment != False:
             ax.text(x=0.85, y=0.815, s=comment, fontsize=12, transform=ax.transAxes,color=clr['teal'])
-        if yrange:
-            ax.set_ylim(yrange) 
-            
+        if yrange != False:
+            ax.set_ylim(yrange)
+        #ax.set_xlim(self.vlim)
 
         
         if flag is not None: #Display some measurement
