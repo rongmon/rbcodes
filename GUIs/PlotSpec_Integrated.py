@@ -1064,12 +1064,18 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
 class Redshift_Guess:
     def __init__(self,parent):
         if parent.identified_line_active:
-            Identified_plotter(parent)
+            Identified_plotter(parent) #Removes the Identified Lines
+            self.plot_guess(parent)
+            Identified_plotter(parent) #Plots Identified Lines Again
+        else: 
+            self.plot_guess(parent)
 
+    def plot_guess(self,parent):
         parent.zabs = np.double(parent.active_zabs.text())
         color = parent.combo_color_main.currentText()
         label = parent.combo_lines.currentText()
-        parent.DrawLineList(label,color=color,remove = True,hide =False)
+        parent.DrawLineList(label,color=color,remove = True,hide =False) #Suspect this can be changed to keep the Identified Lines
+                                                                         #Essentially treating the Identified Lines as their own entity.
 
         
 class manage_identified_absorbers(QWidget):
@@ -1261,8 +1267,10 @@ class Manual_Transition(QWidget):
     #Need to obtain linelist
     def line_change(self,parent):
         
+        identified_plotted = False
         if parent.identified_line_active:
             Identified_plotter(parent)
+            identified_plotted = True
 
         parent.label = self.combo_ll.currentText()
         data = line.read_line_list(self.combo_ll.currentText())
@@ -1272,6 +1280,11 @@ class Manual_Transition(QWidget):
         for ii in range(len(data)):
             self.Transitions.addItem(data[ii]['ion'])
             self.wavelist.append(data[ii]['wrest'])
+        
+        if identified_plotted:
+            Identified_plotter(parent)
+        
+
             
     def transition_change(self,parent):
         
