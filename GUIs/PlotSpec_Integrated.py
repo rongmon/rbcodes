@@ -94,7 +94,8 @@ HELP = '''
         
         '>':   Shifts page right (if more than one page)
         '<':   Shifts page left 
-        'w':   Will change the transition flag between detection and Non-detection
+        'w':   Will change the transition flag between detection, blended detection, 
+               low-confidence detection and Non-detection
         
         
         ------Notes-------
@@ -718,18 +719,18 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         flux1=flux1/continuum
         
         #Removing any NAN values 
-        sq=np.isnan(flux1);
+        sq=np.isnan(flux1)
         tmp_flx=sig_flx1[sq]
         flux1[sq]=tmp_flx
 
         #clip the spectrum. If the flux is less than 0+N*sigma, then we're saturated. Clip the flux array(to avoid inifinite optical depth) and set the saturated flag
         sat_lim=-.01
-        q=np.where(flux1<=sat_lim);
+        q=np.where(flux1<=sat_lim)
         tmp_flx=sig_flx1[q]
         flux1[q]=tmp_flx
-        q=np.where(flux1<=0.);
+        q=np.where(flux1<=0.)
         tmp_flx=sig_flx1[q]+0.01
-        flux1[q]=tmp_flx;
+        flux1[q]=tmp_flx
         
         
         EW=np.trapz(1.-flux1, x= ww)
@@ -743,19 +744,19 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             vel = ((lam-wrest*(1.0 + self.zabs))*self.c/(wrest*(1.0 + self.zabs)))[qtq]
             f0=fval
         #compute apparent optical depth
-            Tau_a =np.log(1./flux1);
+            Tau_a =np.log(1./flux1)
             #compute the median optical depth weighted velcity.
             Tau50=np.cumsum(Tau_a)/np.max(Tau_a)
             vel50=np.interp(0.5,Tau50,vel)
-            del_vel_j=np.diff(vel);
+            del_vel_j=np.diff(vel)
             del_vel_j=np.append([del_vel_j[0]],del_vel_j)
             # Column density per pixel as a function of velocity
-            nv = Tau_a/((2.654e-15)*f0*lambda_r);# in units cm^-2 / (km s^-1), SS91 
+            nv = Tau_a/((2.654e-15)*f0*lambda_r)# in units cm^-2 / (km s^-1), SS91 
             n = nv* del_vel_j# column density per bin obtained by multiplying differential Nv by bin width 
-            tauerr = err_flx[qtq]/flux1;
-            nerr = (tauerr/((2.654e-15)*f0*lambda_r))*del_vel_j; 
-            col = np.sum(n);
-            colerr = np.sum((nerr)**2.)**0.5;
+            tauerr = err_flx[qtq]/flux1
+            nerr = (tauerr/((2.654e-15)*f0*lambda_r))*del_vel_j 
+            col = np.sum(n)
+            colerr = np.sum((nerr)**2.)**0.5
             ww = ww*(1+self.zabs)
             return EW,sig_wtot,continuum,ww,col,colerr
         ww = ww*(1+self.zabs)
@@ -1266,7 +1267,7 @@ class Manual_Transition(QWidget):
     #Updating current linelist
     #Need to obtain linelist
     def line_change(self,parent):
-        
+
         identified_plotted = False
         if parent.identified_line_active:
             Identified_plotter(parent)
@@ -1281,7 +1282,7 @@ class Manual_Transition(QWidget):
             self.Transitions.addItem(data[ii]['ion'])
             self.wavelist.append(data[ii]['wrest'])
         
-        if identified_plotted:
+        if identified_plotted == True:
             Identified_plotter(parent)
         
 
@@ -1389,7 +1390,7 @@ class SaveCatalog(QWidget):
         
         #if more absorbers in zabs manager than unique zabs in linelist manager
         if (parent.zabs_list.shape[0] != len(np.unique(parent.line_list.Zabs.tolist()))) and (self.continueSaving==True) and (parent.line_list.shape[0] != 0):
-            buttonReply = QMessageBox.question(self,"Missing Linelist" ,"Missing linelists for the cataloged absorbers, continue?",QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            buttonReply = QMessageBox.question(self,"Missing Linelist" ,"Missing linelists for the catalogued absorbers, continue?",QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             
             if buttonReply == QMessageBox.Yes:
                 self.LineLists = 'Partial'
@@ -1671,6 +1672,7 @@ class Identified_plotter:
                 for i in index:
                     xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                     #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
+                    #if '#' in name
                     lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color=clr[color])
                     tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                     parent.identified_lines.append(lineplot)
@@ -1738,10 +1740,10 @@ def prepare_absorber_object(z_abs,wave,flux,error,line_flg='LLS',vlim=[-1000,100
 
     
     # select the lines within the wavelength range only
-    q= np.where((wavelist > np.min(wave)/(1.+z_abs)) &  (wavelist < (np.max(wave)/(1.+z_abs))));
+    q= np.where((wavelist > np.min(wave)/(1.+z_abs)) &  (wavelist < (np.max(wave)/(1.+z_abs))))
     
     # Total transitions visible within the wavelength window
-    nTot= len(q[0]);
+    nTot= len(q[0])
     
     wavelist_selected=wavelist[q]
     
@@ -1840,16 +1842,28 @@ class vStack:
             if event.inaxes in self.axes:
                 i=np.where(event.inaxes==self.axes)[0][0]+self.plotppage*(self.page-1)
                 #set up a dumb toggling cycle
-                temp_flag=self.ions[self.keys[i]]['flag']+1
-
-                if temp_flag==0:
-                    temp_flag =1
-                elif temp_flag==1:
-                    temp_flag==2
-                else:
+                temp_flag=self.ions[self.keys[i]]['flag']
+                '''
+                if temp_flag==0: #if not marked
+                    temp_flag = 1
+                elif temp_flag==1: #if currently detected
+                    temp_flag = 2
+                elif temp_flag==2: # if currently blended detection
+                    temp_flag = 3
+                else: 
                     temp_flag=0
+                '''
+                #Same Functionality with increased efficiency
+                temp_flag += 1
+                temp_flag = temp_flag % 4 
+                # Reduces the amount of boolean checks thus increasing efficiency
+
                 self.ions[self.keys[i]]['flag']= temp_flag#
                 self.vPlot(ploti=i,comment=False)
+
+                #Add potential flag HERE temp_flag = 3
+                #Make sure that it writes as potential
+                #Maybe draw line with different style
                 
         #save linelist
         elif event.key=='S':
@@ -1867,12 +1881,26 @@ class vStack:
             keys = list(self.ions.keys())
             # based on line evaluation, add lines to the overall zabs manager linelist ('flag=1' is detected lines to add)
             for key in keys[:-1]:
-                if self.ions[key]['flag'] == 1:
+                if self.ions[key]['flag'] == 1: #Line Detected
                     wave_obs = self.ions[key]['lam_0_z']
                     name = self.ions[key]['name']
                     zabs = self.ions['Target']['z']
                     new_row = pd.Series(data = {'Name': name, 'Wave_obs': wave_obs, 'Zabs': zabs})
                     self.parent.line_list=self.parent.line_list.append(new_row,ignore_index=True)
+                '''  
+                elif self.ions[key]['flag'] == 2: #Blended Line Detection
+                    wave_obs = self.ions[key]['lam_0_z']
+                    name = self.ions[key]['name']
+                    zabs = self.ions['Target']['z']
+                    new_row = pd.Series(data = {'Name': name + " [b]", 'Wave_obs': wave_obs, 'Zabs': zabs})
+                    self.parent.line_list=self.parent.line_list.append(new_row,ignore_index=True)
+                elif self.ions[key]['flag'] == 3: #Low Confidence Line Detection
+                    wave_obs = self.ions[key]['lam_0_z']
+                    name = self.ions[key]['name']
+                    zabs = self.ions['Target']['z']
+                    new_row = pd.Series(data = {'Name': name + " [p]", 'Wave_obs': wave_obs, 'Zabs': zabs})
+                    self.parent.line_list=self.parent.line_list.append(new_row,ignore_index=True) '''
+                
                     
             #lets keep zabs_list sorted by ascending zabs
             self.parent.line_list = self.parent.line_list.sort_values(by='Zabs')
@@ -1955,10 +1983,16 @@ class vStack:
         
         if flag is not None: #Display some measurement
             textout=self.plotText(flag=flag)
+
             if flag==1:
                 textcolor=clr['yellow']
+            elif flag == 2:
+                textcolor=clr['cyan']
+            elif flag == 3:
+                textcolor=clr['pale_red']
             else:
                 textcolor=clr['light_gray']
+
             ax.text(x=0.05, y=0.01, s=textout, fontsize=12, transform=ax.transAxes,color=textcolor)
     
     def plotText(self,flag=1):
@@ -1968,6 +2002,8 @@ class vStack:
             text='Non-Detection'      
         elif flag==2:
             text ='Blended-detection'
+        elif flag==3:
+            text = 'Low-Confidence Detection'
         return text
 
 #Initial inputs and callable class to run proram        
