@@ -1282,7 +1282,7 @@ class Manual_Transition(QWidget):
             self.Transitions.addItem(data[ii]['ion'])
             self.wavelist.append(data[ii]['wrest'])
         
-        if identified_plotted == True:
+        if identified_plotted:
             Identified_plotter(parent)
         
 
@@ -1672,8 +1672,12 @@ class Identified_plotter:
                 for i in index:
                     xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                     #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
-                    #if '#' in name
-                    lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color=clr[color])
+                    if '[b]' in parent.line_list.loc[i].Name: #Blended Detection Plotting
+                        lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'-.',color=clr[color])
+                    elif '[p]' in parent.line_list.loc[i].Name: #Possible Detection Plotting
+                        lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],':',color=clr[color])
+                    else: #Detection Plotting
+                        lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color=clr[color])
                     tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
                     parent.identified_lines.append(lineplot)
                     parent.identified_text.append(tt)
@@ -1881,13 +1885,16 @@ class vStack:
             keys = list(self.ions.keys())
             # based on line evaluation, add lines to the overall zabs manager linelist ('flag=1' is detected lines to add)
             for key in keys[:-1]:
+
+                if self.ions[key]['flag'] == 0: #Skip Over Non-Detections
+                    continue
+
                 if self.ions[key]['flag'] == 1: #Line Detected
                     wave_obs = self.ions[key]['lam_0_z']
                     name = self.ions[key]['name']
                     zabs = self.ions['Target']['z']
                     new_row = pd.Series(data = {'Name': name, 'Wave_obs': wave_obs, 'Zabs': zabs})
-                    self.parent.line_list=self.parent.line_list.append(new_row,ignore_index=True)
-                '''  
+                    self.parent.line_list=self.parent.line_list.append(new_row,ignore_index=True) 
                 elif self.ions[key]['flag'] == 2: #Blended Line Detection
                     wave_obs = self.ions[key]['lam_0_z']
                     name = self.ions[key]['name']
@@ -1899,7 +1906,7 @@ class vStack:
                     name = self.ions[key]['name']
                     zabs = self.ions['Target']['z']
                     new_row = pd.Series(data = {'Name': name + " [p]", 'Wave_obs': wave_obs, 'Zabs': zabs})
-                    self.parent.line_list=self.parent.line_list.append(new_row,ignore_index=True) '''
+                    self.parent.line_list=self.parent.line_list.append(new_row,ignore_index=True) 
                 
                     
             #lets keep zabs_list sorted by ascending zabs
