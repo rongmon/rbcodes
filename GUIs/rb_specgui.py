@@ -120,7 +120,16 @@ if __name__ == "__main__":
 
     #sp=XSpectrum1D.from_file('PG0832+251_nbin3_coadd.fits') 
     #r.rb_plot_spec(wave,flux/np.nanmedian(flux),error/np.nanmedian(flux))
-    r.rb_plotspec(wave,flux/np.nanmedian(flux),error/np.nanmedian(flux))
+    if np.nanmedian(flux)==0:
+        cnt=np.nanmean(flux)
+    elif (np.nanmedian(flux)==0) & (np.nanmean(flux)==0):
+        cnt= 1.
+    else:
+        cnt=np.nanmedian(flux)
+
+
+
+    r.rb_plotspec(wave,flux/cnt,error/cnt)
 
     plt.show() # show the window
  
