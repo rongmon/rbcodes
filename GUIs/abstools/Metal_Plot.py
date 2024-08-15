@@ -228,7 +228,7 @@ class mainWindow(QtWidgets.QTabWidget):
         
         self.main_layout.addLayout(self.top_layout,stretch=1)
         self.main_layout.addWidget(self.canvas[0],stretch=8)
-        self.main_layout.addLayout(self.bot_layout,stretch=0.5)
+        self.main_layout.addLayout(self.bot_layout,stretch=1)
         self.tabs[self.page].setLayout(self.main_layout)
         
         
@@ -768,7 +768,7 @@ class initialize:
                                    
         self.main_layout.addLayout(self.top_layout,stretch=1)
         self.main_layout.addWidget(parent.canvas[parent.page],stretch=7)
-        self.main_layout.addLayout(self.bot_layout,stretch=0.5)
+        self.main_layout.addLayout(self.bot_layout,stretch=1)
         parent.tabs[1].setLayout(self.main_layout)
         
         
