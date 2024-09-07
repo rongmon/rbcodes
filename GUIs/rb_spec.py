@@ -6,6 +6,25 @@ import sys
 import os
 import pdb
 
+import json
+
+def load_rb_spec_object(filename):
+    with open(filename, 'r') as f:
+        data = json.load(f)
+    from GUIs.rb_spec import rb_spec as r    
+    sp_n=r.from_data(np.array(data['wave_slice'])*(1.+data['zabs']),np.array(data['flux_slice']),np.array(data['error_slice']))
+    zabs=data['zabs']
+    transition=data['trans_wave']
+    sp_n.shift_spec(zabs);
+    sp_n.slice_spec(transition,data['slice_spec_lam_min'],data['slice_spec_lam_max'],use_vel=data['slice_spec_method']);
+    sp_n.fit_continuum(prefit_cont=np.array(data['cont']));
+    sp_n.compute_EW(transition,vmin=data['vmin'],vmax=data['vmax'],plot=False);
+    print('---Finished loading saved rb_spec object----')
+    
+    return sp_n
+
+
+
 # Calculate the confidence bounds
 def calculate_confidence_bounds(x, model, cov_matrix):
     # Evaluate the Legendre basis functions at the given x values
@@ -71,6 +90,7 @@ class rb_spec(object):
         Edit    : Rongmon Bordoloi      April 2022: Added different calling sequence to ingest numpy arrays directly. 
         Edit    : Rongmon Bordoloi      April 2022: Small updates to have all continuum fitting routines working
         Edit    : Rongmon Bordoloi      April 2022: Added plotting sliced spectrum option
+        Edit    : Rongmon Bordoloi      September 2024: Added saving as json option, and loading the json dictionary as a rb_spec object.
         
         # WARNING: CALLING SEQUENCE HAS CHANGED SINCE APRIL 2022.
         CAREFULLY LOOK AT THE EXAMPLE BELOW
@@ -328,6 +348,9 @@ class rb_spec(object):
         self.flux_slice=self.flux[q]
         self.error_slice=self.error[q]
         self.linelist=linelist
+        self.slice_spec_lam_min=lam_min
+        self.slice_spec_lam_max=lam_max
+        self.slice_spec_method=use_vel
 
         
         self.velo=vel[q]
@@ -521,12 +544,51 @@ class rb_spec(object):
         plt.show()
 
 
-    def save_slice(self,outfilename):
+    def save_slice(self,outfilename,file_format='pickle'):
         """Saves the slice object for future processing.
         """
-        import pickle
-        with open(outfilename, 'wb') as output:
-            pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
+        if file_format=='pickle':
+            import pickle
+            with open(outfilename, 'wb') as output:
+                pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
+        elif file_format=='json':
+            import json
+            #create a simple dictionary to save all output.
+            # NOTE this means that only outputs are saved and the object is not saved. 
+            #So you can't load the object and edit again.
+            # Writing JSON data to a file
+            #pdb.set_trace()
+            data_out={
+                    'zabs':self.zabs,
+                    'wave_slice':self.wave_slice.tolist(),
+                    'flux_slice':self.flux_slice.tolist(),
+                    'error_slice':self.error_slice.tolist(),
+                    'linelist':self.linelist,
+                    'velo':self.velo.tolist(),
+                    'cont':self.cont.tolist(),
+                    'fnorm':self.fnorm.tolist(),
+                    'enorm':self.enorm.tolist(),
+                    'trans':self.trans,
+                    'fval':self.fval,
+                    'trans_wave':self.trans_wave,
+                    'vmin':self.vmin,
+                    'vmax':self.vmax,
+                    'W':self.W,
+                    'W_e':self.W_e,
+                    'logN':self.logN,
+                    'logN_e':self.logN_e,
+                    'Tau':self.Tau.tolist(),
+                    'vel_centroid':self.vel_centroid,
+                    'vel_disp':self.vel_disp,
+                    'vel50_err':self.vel50_err,
+                    'slice_spec_lam_min':self.slice_spec_lam_min,
+                    'slice_spec_lam_max':self.slice_spec_lam_max,
+                    'slice_spec_method':self.slice_spec_method
+                    }
+
+            with open(outfilename, 'w') as json_file:
+                json.dump(data_out, json_file, indent=4)  # `indent=4` makes it pretty-printed
+
 
 
     def plot_doublet(self,lam1,lam2,vmin=-600.,vmax=600.,method='closest'):
