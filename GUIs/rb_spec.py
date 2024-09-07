@@ -148,9 +148,47 @@ class rb_spec(object):
         #Compute equivalent width within a velocity window
         s.compute_EW(transition,vmin=-200.,vmax=360.);
         
-        #save everything as a pickle file
+        # Saving the analysis
+        #--------------------
+        # There are two options:
+        # First method: save everything as a pickle file [default]
         s.save_slice('outfile.p')
+
+
+
+
+        #---------------------
+        # Second method: Saving information as a json file
+        s.save_slice('outfile.json',file_format='json')
         
+
+
+        #-----------------------------------------------------------
+        #Loading the saved rb_spec object from the above two methods
+
+        # Loading the rb_spec object back from the saved pickle file
+        import pickle
+        with open('outfile.p', 'rb') as f:
+            # Load the pickled data
+            sp_test = pickle.load(f)
+
+
+
+        ----------------------------------------------------------
+        # Loading the rb_spec object back from the saved json file
+        from GUIs.rb_spec import load_rb_spec_object as r_load
+        
+        f='outfile.json'
+
+        sp_test=r_load(f)
+
+
+
+
+
+
+        #-------------------------------------------------------------------------------
+        # Additional inspection routines        
         #plot the Full spectrum
         s.plot_spec()
         
@@ -560,14 +598,7 @@ class rb_spec(object):
             #pdb.set_trace()
             data_out={
                     'zabs':self.zabs,
-                    'wave_slice':self.wave_slice.tolist(),
-                    'flux_slice':self.flux_slice.tolist(),
-                    'error_slice':self.error_slice.tolist(),
                     'linelist':self.linelist,
-                    'velo':self.velo.tolist(),
-                    'cont':self.cont.tolist(),
-                    'fnorm':self.fnorm.tolist(),
-                    'enorm':self.enorm.tolist(),
                     'trans':self.trans,
                     'fval':self.fval,
                     'trans_wave':self.trans_wave,
@@ -577,10 +608,17 @@ class rb_spec(object):
                     'W_e':self.W_e,
                     'logN':self.logN,
                     'logN_e':self.logN_e,
-                    'Tau':self.Tau.tolist(),
                     'vel_centroid':self.vel_centroid,
                     'vel_disp':self.vel_disp,
                     'vel50_err':self.vel50_err,
+                    'wave_slice':self.wave_slice.tolist(),
+                    'flux_slice':self.flux_slice.tolist(),
+                    'error_slice':self.error_slice.tolist(),
+                    'velo':self.velo.tolist(),
+                    'cont':self.cont.tolist(),
+                    'fnorm':self.fnorm.tolist(),
+                    'enorm':self.enorm.tolist(),
+                    'Tau':self.Tau.tolist(),
                     'slice_spec_lam_min':self.slice_spec_lam_min,
                     'slice_spec_lam_max':self.slice_spec_lam_max,
                     'slice_spec_method':self.slice_spec_method
