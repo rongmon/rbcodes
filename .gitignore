@@ -21,3 +21,4 @@ IGM/__pycache__/rb_setline.cpython-37.pyc
 *.pyc
 GUIs/zgui/__pycache__/gui_io.cpython-39.pyc
 *.pyc
+*.pyc
