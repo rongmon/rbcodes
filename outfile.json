@@ -1,6 +1,7 @@
 {
     "zabs": 0.348,
     "linelist": "LLS",
+    "line_sel_flag": "closest",
     "trans": "HI 1025",
     "fval": 0.07912,
     "trans_wave": 1025.7223,

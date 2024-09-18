@@ -16,7 +16,7 @@ def load_rb_spec_object(filename):
     zabs=data['zabs']
     transition=data['trans_wave']
     sp_n.shift_spec(zabs);
-    sp_n.slice_spec(transition,data['slice_spec_lam_min'],data['slice_spec_lam_max'],use_vel=data['slice_spec_method']);
+    sp_n.slice_spec(transition,data['slice_spec_lam_min'],data['slice_spec_lam_max'],use_vel=data['slice_spec_method'],method=data['line_sel_flag'],linelist=data['linelist']);
     sp_n.fit_continuum(prefit_cont=np.array(data['cont']));
     sp_n.compute_EW(transition,vmin=data['vmin'],vmax=data['vmax'],plot=False);
     print('---Finished loading saved rb_spec object----')
@@ -393,6 +393,7 @@ class rb_spec(object):
         
         self.velo=vel[q]
         self.transition=str['wave']
+        self.line_sel_flag=method
 
         #return self.wave_slice,self.error_slice,self.flux_slice,self.velo,self.linelist
 
@@ -599,6 +600,7 @@ class rb_spec(object):
             data_out={
                     'zabs':self.zabs,
                     'linelist':self.linelist,
+                    'line_sel_flag':self.line_sel_flag,
                     'trans':self.trans,
                     'fval':self.fval,
                     'trans_wave':self.trans_wave,
