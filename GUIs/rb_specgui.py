@@ -44,7 +44,7 @@ if __name__ == "__main__":
         flux=np.array(dat[tab[1]])
         if (len(dat.keys())>=3):
             error=dat[tab[2]]
-    elif (filetype=='fits') | (filetype=='lt'):
+    elif (filetype=='fits') | (filetype=='lt')| (filetype=='linetools'):
         #Use linetools.io.readspec to read file
         #from linetools.spectra import io as tio
         if (len(sys.argv) >3):
