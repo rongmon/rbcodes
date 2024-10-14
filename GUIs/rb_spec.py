@@ -393,6 +393,7 @@ class rb_spec(object):
         
         self.velo=vel[q]
         self.transition=str['wave']
+        self.transition_name=str['name']
         self.line_sel_flag=method
 
         #return self.wave_slice,self.error_slice,self.flux_slice,self.velo,self.linelist
