@@ -853,7 +853,8 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         except: pass
     def zabs_changed(self):
         try: self.zabs = np.double(self.active_zabs.text())
-        except: self.active_zabs.setText("Please input numerical redshift")
+        except: pass
+        #self.active_zabs.setText("Please input numerical redshift")
             
     def saveCatalog_fn(self,parent):
         self.saving = SaveCatalog(parent)
