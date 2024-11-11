@@ -143,6 +143,12 @@ class rb_spec(object):
         # Length of prefit continuum array = length of sliced spectrum
         s.fit_continuum(Legendre=False,prefit_cont=cont_arrary)
         #-------------------------------------------------------------------------------
+        # DETOUR 3--->
+        #Aternate continuum fitting method, using sigma clipping
+        s.fit_continuum(domain=xlim,Legendre=3,sigma_clip=True)
+        #-------------------------------------------------------------------------------
+        
+       
         
         #Compute EW
         #Compute equivalent width within a velocity window
@@ -465,7 +471,25 @@ class rb_spec(object):
             # Fit the model using Levenberg-Marquardt minimization
             fitter = fitting.LevMarLSQFitter()
             #fitter=fitting.LinearLSQFitter()
-            legendre_fit = fitter(legendre_init, self.velo[qtq],self.flux_slice[qtq],weights=weight[qtq])
+            # Sigma clip the date for a better continuum fit. [Optional]
+            if 'sigma_clip' in kwargs:
+                from astropy.stats import sigma_clip
+                # Apply sigma clipping on the flux array
+                sel_flux=self.flux_slice[qtq]
+                sel_weight=weight[qtq]
+                sel_velo=self.velo[qtq]
+                clipped_flux = sigma_clip(sel_flux, sigma=3, maxiters=5,cenfunc=np.nanmedian)
+                # Mask for unclipped (valid) values
+                unclipped_mask = ~clipped_flux.mask
+                # Select unclipped flux values and corresponding wave values
+                unclipped_flux = sel_flux[unclipped_mask]
+                unclipped_vel = sel_velo[unclipped_mask]
+                unclipped_weigths=sel_weight[unclipped_mask]
+                legendre_fit = fitter(legendre_init, unclipped_vel,unclipped_flux,weights=unclipped_weigths)
+
+            else:
+                legendre_fit = fitter(legendre_init, self.velo[qtq],self.flux_slice[qtq],weights=weight[qtq])
+
             cont=legendre_fit(self.velo)
             # Calculate uncertainties (standard deviations) of the fitted parameters
             cov_matrix = fitter.fit_info['param_cov']

@@ -101,7 +101,7 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
 
 
 
-    print('W_lambda = ' + np.str('%.3f' % ew_tot) + ' +/- ' + np.str('%.3f' % err_ew_tot)  +'  \AA   over [' + np.str('%.1f' % np.round(lmts[0]))+' to ' +np.str('%.1f' % np.round(lmts[1])) + ']  km/s')
+    print('W_lambda = ' + str('%.3f' % ew_tot) + ' +/- ' + str('%.3f' % err_ew_tot)  +'  \AA   over [' + str('%.1f' % np.round(lmts[0]))+' to ' +str('%.1f' % np.round(lmts[1])) + ']  km/s')
     output={}
     output["ew_tot"]=ew_tot
     output["err_ew_tot"]=err_ew_tot
@@ -129,7 +129,7 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
         nerr = (tauerr/((2.654e-15)*f0*lambda_r))*del_vel_j; 
         col = np.sum(n[pix]);
         colerr = np.sum((nerr[pix])**2.)**0.5; 
-        print('Direct N = ' + np.str('%.3f' % np.log10(col))  +' +/- ' + np.str('%.3f' % (np.log10(col+colerr) - np.log10(col))) + ' cm^-2')
+        print('Direct N = ' + str('%.3f' % np.log10(col))  +' +/- ' + str('%.3f' % (np.log10(col+colerr) - np.log10(col))) + ' cm^-2')
         output["col"]=col
         output["colerr"]=colerr
         output["Tau_a"]=Tau_a
@@ -153,7 +153,7 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
         ax1.plot([-2500,2500],[1,1],'k:')       
         plt.plot([lmts[0],lmts[0]],[1.5,1.5],'r+',markersize=15)        
         plt.plot([lmts[1],lmts[1]],[1.5,1.5],'r+',markersize=15)    
-        plt.title(r' $W_{rest}$= ' + np.str('%.3f' % ew_tot) + ' $\pm$ ' + np.str('%.3f' % err_ew_tot) + ' $\AA$')
+        plt.title(r' $W_{rest}$= ' + str('%.3f' % ew_tot) + ' $\pm$ ' + str('%.3f' % err_ew_tot) + ' $\AA$')
         ax1.set_xlabel('vel [km/s]')
     
         ax2=fig.add_subplot(212)
