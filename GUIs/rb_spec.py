@@ -217,8 +217,8 @@ class rb_spec(object):
         """ creates the spectrum object """
         #print('Initializing rb_spec object for absorption line analysis!')
         self.wave=wave
-        self.flux=flux
-        self.error=error
+        self.flux=flux/np.nanmedian(flux)
+        self.error=error/np.nanmedian(flux)
         #self.wrest=wave*(1.+0.)
         #self.zabs=0.
         self.filename=filename
