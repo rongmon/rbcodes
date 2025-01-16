@@ -435,7 +435,7 @@ class rb_spec(object):
         #return self.cont,self.fnorm,self.enorm
 
 
-    def fit_continuum_ransac(self,window=149,mednorm=False):
+    def fit_continuum_ransac(self,window=149,mednorm=False,tweak=False):
         """Alternate continuum fitting method. Does iterative ransac continumm fitting.
 
         """
@@ -443,7 +443,9 @@ class rb_spec(object):
         #sp=cf.cont_fitter()
         sp=cf.cont_fitter.from_data(self.wave_slice,self.flux_slice,error=self.error_slice,mednorm=mednorm)
         sp.fit_continuum(window=window)
-
+        if tweak:
+            sp.tweak_continuum()
+        
         self.cont=sp.cont
         self.fnorm=self.flux_slice/self.cont
         self.enorm=self.error_slice/self.cont
