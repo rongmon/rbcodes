@@ -68,16 +68,16 @@ def rb_specbin(flux,nbin,**kwargs):
             if TFF == 1:
                 newWave[qq] = np.mean(wave[index])
     output={}
-    output['flux']=newFlux
+    output['flux']=newFlux[:-1]
 
     #returns = newFlux
     if TF == 1:
         #newVar is in second column of returns
         #returns = np.append(returns,newVar,axis = 1)
-        output['error']=np.sqrt(newVar/nbin)
+        output['error']=np.sqrt(newVar[:-1]/nbin)
     if TFF == 1:
         #returns = np.append(returns,newWave,axis = 1)
-        output['wave']=newWave
+        output['wave']=newWave[:-1]
 
 
 
