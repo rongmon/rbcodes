@@ -50,10 +50,10 @@ def rb_setline(lambda_rest,method,linelist='atom',target_name=None):
 
     for i in range(0,len(wavelist)):
         wavelist[i]=np.double(line_str[i]['wrest'])
-        fval[i]=np.float(line_str[i]['fval'])
-        name[i]=np.str(line_str[i]['ion'])
+        fval[i]=float(line_str[i]['fval'])
+        name[i]=str(line_str[i]['ion'])
         if linelist=='atom':
-            gamma[i]=np.str(line_str[i]['gamma'])
+            gamma[i]=str(line_str[i]['gamma'])
 
     if method=='Exact':
         q= np.where( (np.abs(lambda_rest-wavelist) < 1e-3))
@@ -142,7 +142,7 @@ def read_line_list(label):
         for line in range(0,len(s['col1'])):
             source = {}
             source['wrest'] = float(s['col2'][line])
-            source['ion'] = s['col1'][line]+' '+np.str(np.int(s['col2'][line]))
+            source['ion'] = s['col1'][line]+' '+str(np.int(s['col2'][line]))
             source['fval']=float(s['col3'][line])
             source['gamma']=float(s['col4'][line])
 
