@@ -44,6 +44,9 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
               RB April 28, 2021, changed med_vel to weight be EW & vel_disp
     ------------------------------------------------------------------------------------------
     """
+
+    verbose = kwargs.get('verbose', False)  # Default is False if not provided 
+
     defnorm=1.0;
     spl=2.9979e5;  #speed of light
     if 'zabs' in kwargs:
@@ -100,8 +103,8 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
     vel50_err = vel_disp/np.sqrt(len(ew))
 
 
-
-    print('W_lambda = ' + str('%.3f' % ew_tot) + ' +/- ' + str('%.3f' % err_ew_tot)  +'  \AA   over [' + str('%.1f' % np.round(lmts[0]))+' to ' +str('%.1f' % np.round(lmts[1])) + ']  km/s')
+    if verbose:
+        print('W_lambda = ' + str('%.3f' % ew_tot) + ' +/- ' + str('%.3f' % err_ew_tot)  +'  \AA   over [' + str('%.1f' % np.round(lmts[0]))+' to ' +str('%.1f' % np.round(lmts[1])) + ']  km/s')
     output={}
     output["ew_tot"]=ew_tot
     output["err_ew_tot"]=err_ew_tot
@@ -128,8 +131,9 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
         tauerr = flx_err/norm_flx;
         nerr = (tauerr/((2.654e-15)*f0*lambda_r))*del_vel_j; 
         col = np.sum(n[pix]);
-        colerr = np.sum((nerr[pix])**2.)**0.5; 
-        print('Direct N = ' + str('%.3f' % np.log10(col))  +' +/- ' + str('%.3f' % (np.log10(col+colerr) - np.log10(col))) + ' cm^-2')
+        colerr = np.sum((nerr[pix])**2.)**0.5;
+        if verbose:
+            print('Direct N = ' + str('%.3f' % np.log10(col))  +' +/- ' + str('%.3f' % (np.log10(col+colerr) - np.log10(col))) + ' cm^-2')
         output["col"]=col
         output["colerr"]=colerr
         output["Tau_a"]=Tau_a
