@@ -44,7 +44,7 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
               RB April 28, 2021, changed med_vel to weight be EW & vel_disp
     ------------------------------------------------------------------------------------------
     """
-    defnorm=1.0;
+    defnorm=1.0
     spl=2.9979e5;  #speed of light
     if 'zabs' in kwargs:
         zabs=kwargs['zabs']
@@ -62,18 +62,18 @@ def compute_EW(lam,flx,wrest,lmts,flx_err,plot=False,**kwargs):
 
     norm=defnorm
 
-    norm_flx=flx/norm;
-    flx_err=flx_err/norm;
-    sq=np.isnan(norm_flx);
+    norm_flx=flx/norm
+    flx_err=flx_err/norm
+    sq=np.isnan(norm_flx)
     tmp_flx=flx_err[sq]
     norm_flx[sq]=tmp_flx
     #clip the spectrum. If the flux is less than 0+N*sigma, then we're saturated. Clip the flux array(to avoid inifinite optical depth) and set the saturated flag
-    q=np.where(norm_flx<=sat_limit);
+    q=np.where(norm_flx<=sat_limit)
     tmp_flx=flx_err[q]
     norm_flx[q]=tmp_flx
-    q=np.where(norm_flx<=0.);
+    q=np.where(norm_flx<=0.)
     tmp_flx=flx_err[q]+0.01
-    norm_flx[q]=tmp_flx;
+    norm_flx[q]=tmp_flx
 
 
     del_lam_j=np.diff(lambda_r);

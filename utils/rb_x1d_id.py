@@ -3,12 +3,11 @@ import glob
 from astropy.io import fits
 
 def print_header(filenames):
-"""
-This function will read all fits files in a folder and print out the header info for raw spectra.
-It will print filename, exposure type, and object type entries from the header.
+    """
+        This function will read all fits files in a folder and print out the header info for raw spectra.
+        It will print filename, exposure type, and object type entries from the header.
 
-Written By: Rongmon Bordoloi April 2018
-"""
+        Written By: Rongmon Bordoloi April 2018"""
     files=glob.glob(filenames)
     for i in range(0,len(files)):
         hdul = fits.open(files[i])

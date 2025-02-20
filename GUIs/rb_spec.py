@@ -6,6 +6,28 @@ import sys
 import os
 import pdb
 
+<<<<<<< Updated upstream
+=======
+import json
+
+def load_rb_spec_object(filename):
+    with open(filename, 'r') as f:
+        data = json.load(f)
+    from GUIs.rb_spec import rb_spec as r    
+    sp_n=r.from_data(np.array(data['wave_slice'])*(1.+data['zabs']),np.array(data['flux_slice']),np.array(data['error_slice']))
+    zabs=data['zabs']
+    transition=data['trans_wave']
+    sp_n.shift_spec(zabs)
+    sp_n.slice_spec(transition,data['slice_spec_lam_min'],data['slice_spec_lam_max'],use_vel=data['slice_spec_method'],method=data['line_sel_flag'],linelist=data['linelist'])
+    sp_n.fit_continuum(prefit_cont=np.array(data['cont']))
+    sp_n.compute_EW(transition,vmin=data['vmin'],vmax=data['vmax'],plot=False)
+    print('---Finished loading saved rb_spec object----')
+    
+    return sp_n
+
+
+
+>>>>>>> Stashed changes
 # Calculate the confidence bounds
 def calculate_confidence_bounds(x, model, cov_matrix):
     # Evaluate the Legendre basis functions at the given x values
@@ -570,10 +592,4 @@ class rb_spec(object):
         """Test Wrapper to call vpfit GUI
         """
         from GUIs import rb_interactive_vpfit_singlet as vf 
-        vt=vf.rb_interactive_vpfit_singlet(self.wave_slice,self.fnorm,self.enorm,self.transition);    
-
-
-
-
-
-
+        vt=vf.rb_interactive_vpfit_singlet(self.wave_slice,self.fnorm,self.enorm,self.transition)
