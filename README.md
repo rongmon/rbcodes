@@ -94,6 +94,12 @@ The utils folder contains several utility modules:
       3) readmultispec.py  : Read IRAF (echelle) spectrum in multispec format from a FITS file. Can read 
                              most multispec formats including linear, log, cubic spline, Chebyshev or 
                              Legendre dispersion spectra. I got this code from https://github.com/kgullikson88/General.
+
+     4) cos_inspec.py      : Routine to quickly inspect HST/COS x1d files.
+
+     5) filter_2d_spec.py  : Custom routine to mask and filter JWST/NIRCam 2D grism spectra from the EIGER survey. [Optimized for a custom data format]
+
+     6) compute_SNR_1d.py  : Compute signal-to-noise ratio of an 1D spectrum and plot the result.
 			    
 The catalog folder contains codes for catalog search:
 
