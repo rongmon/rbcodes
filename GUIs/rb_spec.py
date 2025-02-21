@@ -8,22 +8,63 @@ import pdb
 
 import json
 
-def load_rb_spec_object(filename):
-    with open(filename, 'r') as f:
-        data = json.load(f)
-    from GUIs.rb_spec import rb_spec as r    
-    sp_n=r.from_data(np.array(data['wave_slice'])*(1.+data['zabs']),np.array(data['flux_slice']),np.array(data['error_slice']))
-    zabs=data['zabs']
-    transition=data['trans_wave']
-    sp_n.shift_spec(zabs);
-    sp_n.slice_spec(transition,data['slice_spec_lam_min'],data['slice_spec_lam_max'],use_vel=data['slice_spec_method'],method=data['line_sel_flag'],linelist=data['linelist']);
-    sp_n.fit_continuum(prefit_cont=np.array(data['cont']));
-    sp_n.compute_EW(transition,vmin=data['vmin'],vmax=data['vmax'],plot=False);
-    print('---Finished loading saved rb_spec object----')
-    
-    return sp_n
+#def load_rb_spec_object(filename):
+#    with open(filename, 'r') as f:
+#        data = json.load(f)
+#    from GUIs.rb_spec import rb_spec as r    
+#    sp_n=r.from_data(np.array(data['wave_slice'])*(1.+data['zabs']),np.array(data['flux_slice']),np.array(data['error_slice']))
+#    zabs=data['zabs']
+#    transition=data['trans_wave']
+#    sp_n.shift_spec(zabs);
+#    sp_n.slice_spec(transition,data['slice_spec_lam_min'],data['slice_spec_lam_max'],use_vel=data['slice_spec_method'],method=data['line_sel_flag'],linelist=data['linelist']);
+#    sp_n.fit_continuum(prefit_cont=np.array(data['cont']));
+#    sp_n.compute_EW(transition,vmin=data['vmin'],vmax=data['vmax'],plot=False);
+#    print('---Finished loading saved rb_spec object----')
+#    
+#    return sp_n
 
+def load_rb_spec_object(filename, verbose=True):
+    """
+    Load an rb_spec object from a JSON file and populate its attributes with precomputed values.
 
+    This function reads a JSON file containing precomputed spectral data, initializes an 
+    `rb_spec` object using key spectral arrays, and then dynamically sets all remaining 
+    attributes from the JSON data. Lists in the JSON file are converted to `numpy` arrays 
+    for consistency and efficient numerical operations.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the JSON file containing the spectral data.
+    verbose : bool, optional
+        If True, prints a message when loading is complete. Default is True.
+
+    Returns
+    -------
+    rb_spec
+        An instance of the `rb_spec` class with all attributes loaded from the JSON file.
+        Returns None if there is an error in loading the JSON file.
+
+    """
+    try:
+        with open(filename, 'r') as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        print(f"Error loading JSON file {filename}: {e}")
+        return None
+
+    spec_object = rb_spec.from_data(np.array(data['wave_slice'])*(1.+data['zabs']), np.array(data['flux_slice']), np.array(data['error_slice']))
+
+    # Set each value in json file as an attribute of the object
+    for key, value in data.items():
+        if isinstance(value, list):
+            value = np.array(value)  # Convert lists to numpy arrays
+        setattr(spec_object, key, value)
+
+    if verbose:
+        print('---Finished loading saved rb_spec object----')
+
+    return spec_object
 
 # Calculate the confidence bounds
 def calculate_confidence_bounds(x, model, cov_matrix):
@@ -410,6 +451,8 @@ class rb_spec(object):
             Order is given by Legendre=order
         """
 
+        verbose = kwargs.get('verbose', False)  # Default is False if not provided 
+
         if Legendre==False:
             #pdb.set_trace()
             if 'Interactive' in kwargs:
@@ -419,12 +462,14 @@ class rb_spec(object):
 
             if 'prefit_cont' in kwargs:
                 prefit_cont=kwargs['prefit_cont']
-                print('Using prefitted continuum...')
+                if verbose:
+                    print('Using prefitted continuum...')
                 if len(prefit_cont)==1:
                     prefit_cont=prefit_cont*np.ones(len(self.velo),)
                 cont=prefit_cont
             else:
-                print('Initializing interactive continuum fitter...')
+                if verbose:
+                    print('Initializing interactive continuum fitter...')
                 from GUIs import rb_fit_interactive_continuum as f
                 s=f.rb_fit_interactive_continuum(self.wave_slice,self.flux_slice,self.error_slice)
                 cont=s.cont
@@ -537,17 +582,18 @@ class rb_spec(object):
 
 
 
-    def compute_EW(self,lam_cen,vmin=-50.,vmax=50.,method='closest',plot=False):
+    def compute_EW(self, lam_cen, vmin=-50., vmax=50., method='closest', plot=False, **kwargs):
         """Computes rest frame equivalent width and column density for a desired atomic line.
         Around the species lam_cen and given vmin and vmax keyword values. 
 
         """
+        verbose = kwargs.get('verbose', False)  # Default is False if not provided
 
         from IGM import rb_setline as s
         str=s.rb_setline(lam_cen,method,linelist=self.linelist)
 
         from IGM import compute_EW as EW
-        out=EW.compute_EW(self.wave_slice,self.fnorm,str['wave'],[vmin,vmax],self.enorm,f0=str['fval'],zabs=0.,plot=plot)
+        out = EW.compute_EW(self.wave_slice,self.fnorm,str['wave'],[vmin,vmax],self.enorm,f0=str['fval'],zabs=0.,plot=plot, verbose=verbose)
 
         self.trans=str['name']
         self.fval=str['fval']
@@ -608,51 +654,85 @@ class rb_spec(object):
         plt.show()
 
 
-    def save_slice(self,outfilename,file_format='pickle'):
+    def save_slice(self, outfilename, file_format='pickle', verbose=True):
         """Saves the slice object for future processing.
+
+        Parameters:
+        -----------
+        outfilename : str
+            The file path to save the slice object.
+        file_format : str, optional
+            Format to save the object. Options: 'pickle' (default) or 'json'.
+
+        Notes:
+        ------
+        - Pickle saves the entire object for later editing.
+        - JSON saves only the output data, not the object, so it cannot be reloaded for editing.
         """
-        if file_format=='pickle':
+        if file_format == 'pickle':
             import pickle
             with open(outfilename, 'wb') as output:
                 pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
-        elif file_format=='json':
-            import json
-            #create a simple dictionary to save all output.
-            # NOTE this means that only outputs are saved and the object is not saved. 
-            #So you can't load the object and edit again.
-            # Writing JSON data to a file
-            #pdb.set_trace()
-            data_out={
-                    'zabs':self.zabs,
-                    'linelist':self.linelist,
-                    'line_sel_flag':self.line_sel_flag,
-                    'trans':self.trans,
-                    'fval':self.fval,
-                    'trans_wave':self.trans_wave,
-                    'vmin':self.vmin,
-                    'vmax':self.vmax,
-                    'W':self.W,
-                    'W_e':self.W_e,
-                    'logN':self.logN,
-                    'logN_e':self.logN_e,
-                    'vel_centroid':self.vel_centroid,
-                    'vel_disp':self.vel_disp,
-                    'vel50_err':self.vel50_err,
-                    'wave_slice':self.wave_slice.tolist(),
-                    'flux_slice':self.flux_slice.tolist(),
-                    'error_slice':self.error_slice.tolist(),
-                    'velo':self.velo.tolist(),
-                    'cont':self.cont.tolist(),
-                    'fnorm':self.fnorm.tolist(),
-                    'enorm':self.enorm.tolist(),
-                    'Tau':self.Tau.tolist(),
-                    'slice_spec_lam_min':self.slice_spec_lam_min,
-                    'slice_spec_lam_max':self.slice_spec_lam_max,
-                    'slice_spec_method':self.slice_spec_method
-                    }
 
-            with open(outfilename, 'w') as json_file:
-                json.dump(data_out, json_file, indent=4)  # `indent=4` makes it pretty-printed
+        elif file_format == 'json':
+            import json
+            import numpy as np
+
+            # Helper function to convert non-serializable objects
+            def convert_for_json(obj):
+                if isinstance(obj, np.integer):
+                    return int(obj)
+                elif isinstance(obj, np.floating):
+                    return float(obj)
+                elif isinstance(obj, np.ndarray):
+                    return obj.tolist()
+                else:
+                    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+            # Create a dictionary of data to save
+            data_out = {
+                'zabs': self.zabs,
+                'linelist': self.linelist,
+                'line_sel_flag': self.line_sel_flag,
+                'trans': self.trans,
+                'fval': self.fval,
+                'trans_wave': self.trans_wave,
+                'vmin': self.vmin,
+                'vmax': self.vmax,
+                'W': self.W,
+                'W_e': self.W_e,
+                'logN': self.logN,
+                'logN_e': self.logN_e,
+                'vel_centroid': self.vel_centroid,
+                'vel_disp': self.vel_disp,
+                'vel50_err': self.vel50_err,
+                'wave_slice': self.wave_slice,
+                'flux_slice': self.flux_slice,
+                'error_slice': self.error_slice,
+                'velo': self.velo,
+                'cont': self.cont,
+                'fnorm': self.fnorm,
+                'enorm': self.enorm,
+                'Tau': self.Tau,
+                'slice_spec_lam_min': self.slice_spec_lam_min,
+                'slice_spec_lam_max': self.slice_spec_lam_max,
+                'slice_spec_method': self.slice_spec_method
+            }
+
+            # Convert arrays to lists before saving
+            for key, value in data_out.items():
+                if isinstance(value, np.ndarray):
+                    data_out[key] = value.tolist()
+
+            # Write JSON data to a file with error handling
+            try:
+                with open(outfilename, 'w') as json_file:
+                    json.dump(data_out, json_file, indent=4, default=convert_for_json)
+                if verbose:
+                    print(f"File saved to {outfilename} successfully!")
+            except TypeError as e:
+                print(f"Error saving to JSON: {e}")
+
 
 
 
