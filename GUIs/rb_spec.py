@@ -615,6 +615,10 @@ class rb_spec(object):
         self.vel_centroid=out['med_vel']
         self.vel_disp=out['vel_disp']
         self.vel50_err = out['vel50_err'] 
+        if SNR:
+            self.SNR=out['SNR']
+        else:
+            self.SNR=-99
 
         #return self.trans,self.fval,self.vmin,self.vmax,self.trans_wave,self.W,self.W_e,self.logN,self.logN_e,self.Tau
 
@@ -710,6 +714,7 @@ class rb_spec(object):
                 'vel_centroid': self.vel_centroid,
                 'vel_disp': self.vel_disp,
                 'vel50_err': self.vel50_err,
+                'SNR':self.SNR
                 'wave_slice': self.wave_slice,
                 'flux_slice': self.flux_slice,
                 'error_slice': self.error_slice,
