@@ -589,13 +589,14 @@ class rb_spec(object):
         """
         verbose = kwargs.get('verbose', False)  # Default is False if not provided
         SNR=kwargs.get('SNR', False)  # Default is False if not provided
+        _binsize = kwargs.get('_binsize', 1)
 
 
         from IGM import rb_setline as s
         str=s.rb_setline(lam_cen,method,linelist=self.linelist)
 
         from IGM import compute_EW as EW
-        out = EW.compute_EW(self.wave_slice,self.fnorm,str['wave'],[vmin,vmax],self.enorm,f0=str['fval'],zabs=0.,plot=plot, verbose=verbose,SNR=SNR)
+        out = EW.compute_EW(self.wave_slice,self.fnorm,str['wave'],[vmin,vmax],self.enorm,f0=str['fval'],zabs=0.,plot=plot, verbose=verbose,SNR=SNR,_binsize=_binsize)
 
 
         self.trans=str['name']
@@ -657,7 +658,7 @@ class rb_spec(object):
         plt.show()
 
 
-    def save_slice(self, outfilename, file_format='pickle', verbose=True):
+    def save_slice(self, outfilename, file_format='json', verbose=True):
         """Saves the slice object for future processing.
 
         Parameters:

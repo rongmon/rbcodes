@@ -147,6 +147,8 @@ def compute_EW(lam, flx, wrest, lmts, flx_err, plot=False, **kwargs):
         ax1.plot([-2500, 2500], [1, 1], 'k:')
         ax1.plot([lmts[0], lmts[0]], [1.5, 1.5], 'r+', markersize=15)
         ax1.plot([lmts[1], lmts[1]], [1.5, 1.5], 'r+', markersize=15)
+        if SNR:
+            ax1.text(-600, 0.2, 'Median SNR: {:.1f}'.format(output["SNR"]))
         ax1.set_title(f'$W_{{rest}} = {ew_tot:.3f} \pm {err_ew_tot:.3f}$ Å')
         ax1.set_xlabel('Velocity [km/s]')
         ax1.legend()
