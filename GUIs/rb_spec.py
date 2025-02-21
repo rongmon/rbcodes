@@ -451,7 +451,9 @@ class rb_spec(object):
             Order is given by Legendre=order
         """
 
-        verbose = kwargs.get('verbose', False)  # Default is False if not provided 
+        verbose = kwargs.get('verbose', False)  # Default is False if not provided
+
+        n_sigma=kwargs.get('n_sigma',3) # sigma clipping level 
 
         if Legendre==False:
             #pdb.set_trace()
@@ -523,7 +525,7 @@ class rb_spec(object):
                 sel_flux=self.flux_slice[qtq]
                 sel_weight=weight[qtq]
                 sel_velo=self.velo[qtq]
-                clipped_flux = sigma_clip(sel_flux, sigma=2, maxiters=5,cenfunc=np.nanmedian)
+                clipped_flux = sigma_clip(sel_flux, sigma=n_sigma, maxiters=5,cenfunc=np.nanmedian)
                 # Mask for unclipped (valid) values
                 unclipped_mask = ~clipped_flux.mask
                 # Select unclipped flux values and corresponding wave values
