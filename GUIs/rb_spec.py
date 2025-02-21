@@ -523,7 +523,7 @@ class rb_spec(object):
                 sel_flux=self.flux_slice[qtq]
                 sel_weight=weight[qtq]
                 sel_velo=self.velo[qtq]
-                clipped_flux = sigma_clip(sel_flux, sigma=3, maxiters=5,cenfunc=np.nanmedian)
+                clipped_flux = sigma_clip(sel_flux, sigma=2, maxiters=5,cenfunc=np.nanmedian)
                 # Mask for unclipped (valid) values
                 unclipped_mask = ~clipped_flux.mask
                 # Select unclipped flux values and corresponding wave values
@@ -714,7 +714,7 @@ class rb_spec(object):
                 'vel_centroid': self.vel_centroid,
                 'vel_disp': self.vel_disp,
                 'vel50_err': self.vel50_err,
-                'SNR':self.SNR
+                'SNR':self.SNR,
                 'wave_slice': self.wave_slice,
                 'flux_slice': self.flux_slice,
                 'error_slice': self.error_slice,
