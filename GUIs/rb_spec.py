@@ -8,20 +8,6 @@ import pdb
 
 import json
 
-#def load_rb_spec_object(filename):
-#    with open(filename, 'r') as f:
-#        data = json.load(f)
-#    from GUIs.rb_spec import rb_spec as r    
-#    sp_n=r.from_data(np.array(data['wave_slice'])*(1.+data['zabs']),np.array(data['flux_slice']),np.array(data['error_slice']))
-#    zabs=data['zabs']
-#    transition=data['trans_wave']
-#    sp_n.shift_spec(zabs);
-#    sp_n.slice_spec(transition,data['slice_spec_lam_min'],data['slice_spec_lam_max'],use_vel=data['slice_spec_method'],method=data['line_sel_flag'],linelist=data['linelist']);
-#    sp_n.fit_continuum(prefit_cont=np.array(data['cont']));
-#    sp_n.compute_EW(transition,vmin=data['vmin'],vmax=data['vmax'],plot=False);
-#    print('---Finished loading saved rb_spec object----')
-#    
-#    return sp_n
 
 def load_rb_spec_object(filename, verbose=True):
     """
@@ -581,7 +567,7 @@ class rb_spec(object):
         from IGM import cont_fit_poly_ransac as cf 
         # Fit Legendre polynomial with RANSACdegree 
         # Fit polynomial using RANSAC
-        self.cont, self.cont_err = cf.fit_polynomial_ransac(self.wave_slice, self.flux_slice, self.error_slice, degree,residual_threshold=residual_threshold,_n_bootstrap=_n_bootstrap)
+        self.cont, self.cont_err = cf.fit_polynomial_ransac(self.wave_slice, self.flux_slice, self.error_slice, degree,residual_threshold=residual_threshold,n_bootstrap=_n_bootstrap)
 
         self.fnorm=self.flux_slice/self.cont
         self.error_slice=np.sqrt((self.error_slice**2)+(self.cont_err**2))

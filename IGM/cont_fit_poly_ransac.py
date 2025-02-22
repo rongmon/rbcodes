@@ -23,9 +23,10 @@ def fit_polynomial_ransac(wave, flux, error, degree, residual_threshold=0.5, n_b
     # Transform the wave values into polynomial features
     poly = PolynomialFeatures(degree)
     wave_poly = poly.fit_transform(wave.reshape(-1, 1))
-    
+    np.random.seed(42)
+
     # Apply RANSAC with a Linear Regression estimator (since RANSACRegressor needs a regression model)
-    ransac = RANSACRegressor(estimator=LinearRegression(), residual_threshold=residual_threshold)
+    ransac = RANSACRegressor(random_state=42,estimator=LinearRegression(), residual_threshold=residual_threshold)
     ransac.fit(wave_poly, flux)
 
     # Extract inliers
