@@ -443,7 +443,6 @@ class rb_spec(object):
         self.transition_name=str['name']
         self.line_sel_flag=method
 
-        #return self.wave_slice,self.error_slice,self.flux_slice,self.velo,self.linelist
 
     def fit_continuum(self,mask=False,domain=False,Legendre=False,**kwargs):
         """ By default calls an interactive continuum fitter to the sliced spectrum.
@@ -561,12 +560,34 @@ class rb_spec(object):
 
 
         self.cont=cont
-        self.fnorm=self.flux_slice/cont
-        self.enorm=self.error_slice/cont
+        self.fnorm=self.flux_slice/self.cont
+        self.enorm=self.error_slice/self.cont
 
 
 
         #return self.cont,self.fnorm,self.enorm
+
+    def fit_polynomial_ransac(self,degree=3,residual_threshold=0.1,**kwargs):
+        """
+          Alternate continuum fitting, using ransac to fit polynomial
+          degree: polynomial order
+
+        residual_threshold : important RANSAC paramerter to identify inmask points to fit
+
+        _n_bootstrap= number of bootstrap sampling to estimate fitting uncertainty [default = 100]
+        """
+        _n_bootstrap = kwargs.get('_n_bootstrap', 100)
+ 
+        from IGM import cont_fit_poly_ransac as cf 
+        # Fit Legendre polynomial with RANSACdegree 
+        # Fit polynomial using RANSAC
+        self.cont, self.cont_err = cf.fit_polynomial_ransac(self.wave_slice, self.flux_slice, self.error_slice, degree,residual_threshold=residual_threshold,_n_bootstrap=_n_bootstrap)
+
+        self.fnorm=self.flux_slice/self.cont
+        self.error_slice=np.sqrt((self.error_slice**2)+(self.cont_err**2))
+        self.enorm=self.error_slice/self.cont
+
+
 
 
     def fit_continuum_ransac(self,window=149,mednorm=False):
@@ -574,9 +595,10 @@ class rb_spec(object):
 
         """
         from IGM import ransac_contfit as cf 
-        #sp=cf.cont_fitter()
+        sp=cf.cont_fitter()
         sp=cf.cont_fitter.from_data(self.wave_slice,self.flux_slice,error=self.error_slice,mednorm=mednorm)
-        sp.fit_continuum(window=window)
+        sp.fit_continuum(window=window)        
+
 
         self.cont=sp.cont
         self.fnorm=self.flux_slice/self.cont
