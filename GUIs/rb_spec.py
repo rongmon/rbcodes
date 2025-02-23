@@ -6,8 +6,6 @@ import sys
 import os
 import pdb
 
-<<<<<<< Updated upstream
-=======
 import json
 
 def load_rb_spec_object(filename):
@@ -27,7 +25,6 @@ def load_rb_spec_object(filename):
 
 
 
->>>>>>> Stashed changes
 # Calculate the confidence bounds
 def calculate_confidence_bounds(x, model, cov_matrix):
     # Evaluate the Legendre basis functions at the given x values
