@@ -15,7 +15,6 @@ from astropy.io import ascii
 from utils import rb_utility as rt
 from matplotlib import rcParams
 rcParams['lines.linewidth'] = .9
-clr=rt.rb_set_color()
 import webbrowser
 from pkg_resources import resource_filename
 
@@ -24,6 +23,11 @@ from PyQt5.QtGui import QPalette, QColor
 
 from astropy.table import Table
 from astropy.io import ascii
+
+
+# Global Configuration
+spl = 2.9979e5  # km/s
+clr = rt.rb_set_color()
 
 HELP =  '''
         ---------------------------------------------------------------------------
@@ -84,9 +88,10 @@ HELP =  '''
 
 
 def shift2vel(z1,z2):
+    """Compute velocity shift given two redshifts."""
     # z1 at rest
     # z2 for which relative velocity is computed
-    spl=2.9979e5;  #speed of light
+    #spl=2.9979e5;  #speed of light
     vel=((1215.67*(1.+z2))-(1215.67*(1.0 + z1)))*spl/(1215.67*(1.0 + z1))#(self.wrest-str['wave']*(1.0 + 0.))*spl/(str['wave']*(1.0 + 0.))
     return vel
 
@@ -99,7 +104,7 @@ def grab_intervening_linelist(filename,z_gal,wrest_galaxy,wavelength):
     zobs=s['Zabs'].values#s['col4']
     wrest=wobs/(1.+zobs)#s['col2']
 
-    spl=2.9979e5;  #speed of light
+    #spl=2.9979e5;  #speed of light
 
     #compute relative velocity difference with the host galaxy
     delv=shift2vel(z_gal,zobs)
@@ -922,32 +927,16 @@ class Transitions:
 
 
 
-
-        #app = QtWidgets.QApplication(sys.argv)
-        # Force the style to be the same on all OSs:
-        #app.setStyle("Fusion")
-
-        # Now use a palette to switch to dark colors:
-        #palette = QPalette()
-        #palette.setColor(QPalette.Window, QColor(53, 53, 53))
-        #palette.setColor(QPalette.WindowText, QtCore.Qt.white)        
-        #palette.setColor(QPalette.Base, QColor(25, 25, 25))
-        #palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-        #palette.setColor(QPalette.Button, QColor(53, 53, 53))
-        #palette.setColor(QPalette.ButtonText, QtCore.Qt.white)
-        #palette.setColor(QPalette.BrightText, QtCore.Qt.red)
-        #palette.setColor(QPalette.Link, QColor(42, 130, 218))
-        #palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-        #palette.setColor(QPalette.Text, QtCore.Qt.white)
-
         #app.setPalette(palette)
         main = mainWindow(Abs,intervening=intervening)
         main.resize(1400,900)
 
         main.show()
+
         #app.exec_()
 
         QtWidgets.QApplication.setQuitOnLastWindowClosed(True)
-        app.exec_()
-        app.quit()
+        sys.exit(app.exec_())
+        #app.exec_()
+        #app.quit()
         #sys.exit()
