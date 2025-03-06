@@ -241,142 +241,103 @@ class rb_spec(object):
         plt.show()
     """
     def __init__(self,wave,flux,error,filename=False):#,filetype=False, efil=None,**kwargs):
-        """ creates the spectrum object """
-        #print('Initializing rb_spec object for absorption line analysis!')
-        self.wave=wave
-        self.flux=flux/np.nanmedian(flux)
-        self.error=error/np.nanmedian(flux)
-        #self.wrest=wave*(1.+0.)
-        #self.zabs=0.
-        self.filename=filename
+        """
+        Initializes a Spectrum object for absorption line analysis.
+
+        Parameters:
+        wave (array-like): Wavelength values.
+        flux (array-like): Flux values.
+        error (array-like): Error values.
+        filename (str, optional): Filename if reading from a file. Default is None.
+        """
+        self.wave = wave
+        median_flux = np.nanmedian(flux)
+        self.flux = flux / median_flux
+        self.error = error / median_flux
+        self.filename = filename
 
 
     @classmethod
     def from_file(cls,filename,filetype=False,efil=None,**kwargs):
 
-        if filetype==False:
-            #Take File Extention and try
-            if filename==False:
-                if 'wave' in kwargs:
-                    wave=kwargs['wave']
-                else:
-                    raise IOError("Input wavelength array")
-                if 'flux' in kwargs:
-                    flux=kwargs['flux']
-                else:
-                    raise IOError("Input flux array")
-                if 'error' in kwargs:
-                    error=kwargs['error']
-                else:
-                    raise IOError("Input error array")
+         """
+        Creates a Spectrum object from a file.
 
-            else:
-                tt=os.path.splitext(filename)[1]
-                if (tt=='txt')| (tt=='dat'):
-                    filetype='ascii'
-                else:
-                    filetype=tt[1:len(tt)] 
+        Parameters:
+        filename (str): Path to the file.
+        filetype (str, optional): Type of file (e.g., 'ascii', 'fits', 'HSLA', etc.). If None, it is inferred.
+        efil (str, optional): Error file if separate.
+        kwargs: Additional arguments for specific file readers.
 
+        Returns:
+        Spectrum: An instance of the Spectrum class.
+        """
+        if filename is None:
+            if 'wave' in kwargs and 'flux' in kwargs and 'error' in kwargs:
+                return cls(kwargs['wave'], kwargs['flux'], kwargs['error'])
+            raise IOError("Input wavelength, flux, and error arrays are required.")
 
-        # Read in Files in differet formats
-        if filetype=='ascii':
-            from astropy.io import ascii
-            dat=ascii.read(filename)
-            tab=dat.keys()
-            wave=np.array(dat[tab[0]])
-            flux=np.array(dat[tab[1]])
-            if (len(dat.keys())>=3):
-                error=dat[tab[2]]
-            else:
-                error=0.*flux
+        if filetype is None:
+            ext = os.path.splitext(filename)[1].lower()
+            filetype = 'ascii' if ext in ['.txt', '.dat'] else ext[1:]
 
-        elif filetype=='fits':
-            from astropy.io import fits
-            file=fits.open(filename)#(cwd+'/'+filename)
-            dat=file[1].data
-            tab=dat.names
-            wave=np.array(dat['wave'][0])
-            flux=np.array(dat['flux'][0])
-            if (len(tab)>=3):
-                error=np.array(dat['error'][0])
-            else:
-                error=0.*flux
-        elif filetype=='HSLA':
-            from astropy.io import fits
-            file=fits.open(filename)#(cwd+'/'+filename)
-            dat=file[1].data
-            tab=dat.names
-            wave=np.array(dat['WAVE'])
-            flux=np.array(dat['FLUX'])#/np.median(np.array(dat['FLUX']))
-            if (len(tab)>=3):
-                error=np.array(dat['ERROR'])#/np.median(np.array(dat['FLUX']))
-            else:
-                error=0.*flux
-
-
-        if filetype=='xfits':
+        if filetype == 'ascii':
+            data = ascii.read(filename)
+            keys = data.keys()
+            wave, flux = np.array(data[keys[0]]), np.array(data[keys[1]])
+            error = np.array(data[keys[2]]) if len(keys) >= 3 else np.zeros_like(flux)
+        
+        elif filetype in ['fits', 'HSLA']:
+            with fits.open(filename) as file:
+                data = file[1].data
+                wave, flux = np.array(data['WAVE']), np.array(data['FLUX'])
+                error = np.array(data['ERROR']) if 'ERROR' in data.names else np.zeros_like(flux)
+        
+        elif filetype == 'xfits':
             from linetools.spectra.xspectrum1d import XSpectrum1D  
-            sp=XSpectrum1D.from_file(filename)
-
-            wave=sp.wavelength.value
-            flux=sp.flux.value
-            error=sp.sig.value
-
-
-            if sp.co_is_set == True:
-                print('Normalizing spectrum using given continuum...')
-                flux=sp.flux.value/sp.co.value
-                error=sp.sig.value/sp.co.value
- 
-
-        elif filetype=='p':
-            import pickle
-            dat=pickle.load( open(filename, "rb" ))
-            #tab=dat.keys()
-            wave=np.array(dat['wave'])
-            flux=np.array(dat['flux'])
-            if (len(tab)>=3):
-                error=np.array(dat['error'])
-            else:
-                error=0.*flux
-        elif filetype=='temp':
-            from astropy.io import fits
-            file=fits.open(filename)#(cwd+'/'+filename)
-            #a=fits.open(path+'spec_knotA.fits')
-
-            wave=file[2].data
-            flux=file[0].data
-            error=file[1].data
-        #Use linetools.io.readspec to read file
-        elif filetype =='linetools':
+            sp = XSpectrum1D.from_file(filename)
+            wave, flux, error = sp.wavelength.value, sp.flux.value, sp.sig.value
+            if sp.co_is_set:
+                flux /= sp.co.value
+                error /= sp.co.value
+        
+        elif filetype == 'p':
+            with open(filename, "rb") as f:
+                data = pickle.load(f)
+            wave, flux = np.array(data['wave']), np.array(data['flux'])
+            error = np.array(data.get('error', np.zeros_like(flux)))
+        
+        elif filetype == 'temp':
+            with fits.open(filename) as file:
+                wave, flux, error = file[2].data, file[0].data, file[1].data
+        
+        elif filetype == 'linetools':
             from linetools.spectra import io as tio
-            sp=tio.readspec(filename,inflg=None, efil=efil,**kwargs)
-            wave=sp.wavelength.value
-            flux=sp.flux.value
-
-            if sp.sig_is_set == False:
-                print('Assuiming arbiarbitrary 10% error on flux')
-                error=0.1*flux
-            else:
-                error=sp.sig.value
-
-        return cls(wave,flux,error,filename=filename)
-
+            sp = tio.readspec(filename, inflg=None, efil=efil, **kwargs)
+            wave, flux = sp.wavelength.value, sp.flux.value
+            error = sp.sig.value if sp.sig_is_set else 0.1 * flux
+        
+        else:
+            raise ValueError("Unsupported file type: " + filetype)
+        
+        return cls(wave, flux, error, filename=filename)
 
     @classmethod
-    def from_data(cls,wave,flux,error):
+    def from_data(cls, wave, flux, error):
+        """
+        Creates a Spectrum object from given data arrays.
 
-        return cls(wave,flux,error,filename=None)
+        Parameters:
+        wave (array-like): Wavelength values.
+        flux (array-like): Flux values.
+        error (array-like): Error values.
+
+        Returns:
+        Spectrum: An instance of the Spectrum class.
+        """
+        return cls(wave, flux, error)
 
 
-        
-
-        #self.wave=wave
-        #self.flux=flux
-        #self.error=error
-        #self.wrest=wave*(1.+0.)
-        #self.zabs=0.
-    
     def shift_spec(self,zabs):
         """ Shifts wavelength to absorber rest frame"""
         self.wrest=self.wave/(1.+zabs)
