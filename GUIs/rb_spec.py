@@ -259,8 +259,7 @@ class rb_spec(object):
 
     @classmethod
     def from_file(cls,filename,filetype=False,efil=None,**kwargs):
-
-         """
+        """
         Creates a Spectrum object from a file.
 
         Parameters:
