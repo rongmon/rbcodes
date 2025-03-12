@@ -8,6 +8,7 @@ from IGM import rb_setline as line
 from scipy.interpolate import splrep,splev
 import sys
 import os
+from IPython.display import display
 
 
 class interactive_cont(object):
@@ -75,12 +76,13 @@ class interactive_cont(object):
         plt.ylabel('Flux')
 
         self.w = widgets.HTML()
+        display(self.w)
 
         cid = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
         cid1 = self.fig.canvas.mpl_connect('key_press_event', self.onpress)
         cid2=self.fig.canvas.mpl_connect('pick_event',self.onpick)
 
-        display(self.w)
+        
         
     def onclick(self,event):
         # when none of the toolbar buttons is activated and the user clicks in the
@@ -89,17 +91,20 @@ class interactive_cont(object):
         # of the clicked point is not important. Make sure the continuum points
         # `feel` it when it gets clicked, set the `feel-radius` (pickradius) to 5 points
         toolbar = plt.get_current_fig_manager().toolbar
-        self.w.value = 'button=%d, x=%d, y=%d, xdata=%f, ydata=%f'%(event.button, event.x, event.y, event.xdata, event.ydata)
+        #self.w.value = 'button=%d, x=%d, y=%d, xdata=%f, ydata=%f'%(event.button, event.x, event.y, event.xdata, event.ydata)
+        self.w.value = f'button={event.button}, x={event.x}, y={event.y}, xdata={event.xdata}, ydata={event.ydata}'
+
         if event.button==1 and toolbar.mode=='':
             window = ((event.xdata-2.5)<=self.wave) & (self.wave<=(event.xdata+2.5))
             y = np.median(self.flux[window])
             self.ax.plot(event.xdata,y,'ro',ms=5,picker=5,label='cont_pnt',markeredgecolor='k')
-               
+            display(self.w)   
     def onpick(self,event):
         # when the user clicks right on a continuum point, remove it
         if event.mouseevent.button==3:
             if hasattr(event.artist,'get_label') and event.artist.get_label()=='cont_pnt':
                 event.artist.remove()
+                display(self.w)
   
     def onpress(self,event):
         if event.key=='enter':
@@ -115,6 +120,7 @@ class interactive_cont(object):
             spline = splrep(x,y,k=3)
             continuum = splev(self.wave,spline)
             self.ax.plot(self.wave,continuum,'r-',lw=2,label='continuum')
+            display(self.w)
     
         # when the user hits 'n' and a spline-continuum is fitted, normalise the
         # spectrum
@@ -138,11 +144,11 @@ class interactive_cont(object):
         elif event.key=='r':
             self.ax.cla()
             self.ax.step(self.wave,self.flux,'b-')
-    
+            display(self.w)
         # when the user hits 'b': selects a handpicked x,y value
         elif event.key=='b':
             self.ax.plot(event.xdata,event.ydata,'ro',ms=5,picker=5,label='cont_pnt',markeredgecolor='k')
-    
+            display(self.w)
         #If the user presses 'h': The help is printed on the screen
         elif event.key=='h':
             print(
@@ -194,7 +200,7 @@ class interactive_cont(object):
         elif event.key=='q':
             self.w.value ='Good Bye!'
             plt.close()
-            
+                
     
         # when the user hits 'w': if the normalised spectrum exists, write it to a
         # file.

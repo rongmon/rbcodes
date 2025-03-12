@@ -401,7 +401,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
 #         # Smooth spectrum
         elif event.key=='S':
             self.vel[0] += 2
-            Filter_size=np.int(self.vel[0]) 
+            Filter_size=int(self.vel[0]) 
             self.smoothed_spectrum =convolve(self.flux, Box1DKernel(Filter_size))
             self.smoothed_error =convolve(self.error, Box1DKernel(Filter_size))
             self.specplot()
@@ -411,8 +411,8 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
             self.vel[0] -= 2
             if self.vel[0] <= 0:
                 self.vel[0]=1;
-            Filter_size=np.int(self.vel[0]) 
-            self.smoothed_spectrum =convolve(self.flux, Box1DKernel(Filter_size))#medfilt(flux,np.int(Filter_size))
+            Filter_size=int(self.vel[0]) 
+            self.smoothed_spectrum =convolve(self.flux, Box1DKernel(Filter_size))#medfilt(flux,int(Filter_size))
             self.smoothed_error =convolve(self.error, Box1DKernel(Filter_size))
             self.specplot()
     
@@ -1770,7 +1770,7 @@ class vStack:
                
         self.keys = list(self.ions.keys())[:-1] # last item is the full target spectrum
         
-        self.nions = np.int(len(self.keys))
+        self.nions = int(len(self.keys))
         #Flag to know if it is a detection or not
         #Set everything by default to non-detection
         for i in (self.keys):

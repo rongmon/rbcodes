@@ -142,7 +142,7 @@ def read_line_list(label):
         for line in range(0,len(s['col1'])):
             source = {}
             source['wrest'] = float(s['col2'][line])
-            source['ion'] = s['col1'][line]+' '+str(np.int(s['col2'][line]))
+            source['ion'] = s['col1'][line]+' '+str(int(s['col2'][line]))
             source['fval']=float(s['col3'][line])
             source['gamma']=float(s['col4'][line])
 

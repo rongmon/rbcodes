@@ -150,9 +150,9 @@ def plot_intervening_lines(ax,outlist,delv):
                     color =clr['pale_red']
                 else:
                     color='b'
-                ax.text(vellist[index],1.05, np.str(outlist['ion'][index])+' '+ np.str('%.0f' % outlist['wrest'][index]),
+                ax.text(vellist[index],1.05, str(outlist['ion'][index])+' '+ str('%.0f' % outlist['wrest'][index]),
                     fontsize=8,rotation=90, rotation_mode='anchor',color=color)
-                ax.text(vellist[index]+50.,1.05, 'z = '+np.str('%.3f' % outlist['zobs'][index]),
+                ax.text(vellist[index]+50.,1.05, 'z = '+str('%.3f' % outlist['zobs'][index]),
                     fontsize=8,rotation=90, rotation_mode='anchor',color=color)
 
 
@@ -612,7 +612,7 @@ class Plotting:
             #plot fvals
             #xloc = parent.axesR[parent.page][ii].get_xlim()[1]
             #yloc = parent.axesR[parent.page][ii].get_ylim()[1]
-            parent.axesR[parent.page][ii].text(0.85,0.85,'f: '+np.str('%.4f' % fvals),transform=parent.axesR[parent.page][ii].transAxes,color=clr['teal'])
+            parent.axesR[parent.page][ii].text(0.85,0.85,'f: '+str('%.4f' % fvals),transform=parent.axesR[parent.page][ii].transAxes,color=clr['teal'])
             
             #redraw MUST BE LAST ITEM IN LIST
             parent.figs[parent.page].canvas.draw()
@@ -668,9 +668,15 @@ class EW:
 # plots measurements, with toggle will display EW/N 
 class plotText:
     def __init__(self,parent,line):
-        EW_det_text= np.str('%.0f' % line['EW']) + ' $\pm$ ' + np.str('%.0f' % line['EWsig']) + ' m$\AA$'
-        EW_limit_text="<{:.0f} m$\AA$".format(2.*line['EWsig']) #+  ' m$\AA$'
-        logN_det_text= np.str('%.2f' % np.log10(line['N'])) +' $\pm$ ' + np.str('%.3f' % (np.log10(line['N']+line['Nsig']) - np.log10(line['N']))) + ' /cm$^2$'
+        #EW_det_text= str('%.0f' % line['EW']) + ' $\pm$ ' + str('%.0f' % line['EWsig']) + ' m$\AA$'
+        #EW_limit_text="<{:.0f} m$\AA$".format(2.*line['EWsig']) #+  ' m$\AA$'
+        #logN_det_text= str('%.2f' % np.log10(line['N'])) +' $\pm$ ' + str('%.3f' % (np.log10(line['N']+line['Nsig']) - np.log10(line['N']))) + ' /cm$^2$'
+
+        EW_det_text = str('%.0f' % line['EW']) + r' $\pm$ ' + str('%.0f' % line['EWsig']) + r' m$\AA$'
+        EW_limit_text = r"<{:.0f} m$\AA$".format(2.*line['EWsig'])
+        logN_det_text = str('%.2f' % np.log10(line['N'])) + r' $\pm$ ' + str('%.3f' % (np.log10(line['N']+line['Nsig']) - np.log10(line['N']))) + r' /cm$^2$'
+
+
 
         #line.flag is the line specific upper/lower/detections
         #pflag is the toggle button for which to show
@@ -865,7 +871,7 @@ class SavePage(QtWidgets.QWidget):
         print(Table_e)
         
         #pdf save
-        pdflabel = QLabel("Enter path and filename: (e.g. pathname\Ions.pdf)",self)
+        pdflabel = QLabel(r"Enter path and filename: (e.g. pathname\Ions.pdf)",self)
         pdflabel.setGeometry(100,100,400,30)
         
         self.pdfline = QLineEdit(self)
@@ -876,26 +882,26 @@ class SavePage(QtWidgets.QWidget):
         self.pdfsave.setGeometry(410,125,200,30)
         self.pdfsave.clicked.connect(lambda: onpdf(self,parentvals))
         #table save
-        tablelabel = QLabel("Enter path and filename: (e.g. pathname\Table.dat)",self)
+        tablelabel = QLabel(r"Enter path and filename: (e.g. pathname\Table.dat)",self)
         tablelabel.setGeometry(100,175,400,30)
         
         self.tableline = QLineEdit(self)
-        self.tableline.setText("Spectrum_Analysis_z_"+str(parentvals.z)+"_Measurement_Table.dat")
+        self.tableline.setText(r"Spectrum_Analysis_z_"+str(parentvals.z)+"_Measurement_Table.dat")
         self.tableline.setGeometry(100,200,300,30)
         
-        self.tablesave = QPushButton("Save Table",self)
+        self.tablesave = QPushButton(r"Save Table",self)
         self.tablesave.setGeometry(410,200,200,30)
         self.tablesave.clicked.connect(lambda: ontable(self,parentvals,Table_e))
         
         #pickle save
-        picklelabel = QLabel("Enter path and filename: (e.g. pathname\Table.p)",self)
+        picklelabel = QLabel(r"Enter path and filename: (e.g. pathname\Table.p)",self)
         picklelabel.setGeometry(100,250,400,30)
         
         self.pickleline = QLineEdit(self)
-        self.pickleline.setText("Spectrum_Analysis_z_"+str(parentvals.z)+".p")
+        self.pickleline.setText(r"Spectrum_Analysis_z_"+str(parentvals.z)+".p")
         self.pickleline.setGeometry(100,275,300,30)
         
-        self.picklesave = QPushButton("Save Progress",self)
+        self.picklesave = QPushButton(r"Save Progress",self)
         self.picklesave.setGeometry(410,275,200,30)
         self.picklesave.clicked.connect(lambda: onpickle(self,parentvals))
 
