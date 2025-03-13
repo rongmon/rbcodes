@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.linear_model import RANSACRegressor, LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 
-def fit_polynomial_ransac(wave, flux, error, degree, residual_threshold=0.5, n_bootstrap=False, verbose=True):
+def fit_polynomial_ransac(wave, flux, error, degree, residual_threshold=0.5, n_bootstrap=False, verbose=True, return_model=False):
     """
     Fits a polynomial using RANSAC to remove outliers and estimates uncertainty either by bootstrap resampling
     or by computing standard error if bootstrap is disabled.
@@ -15,12 +15,13 @@ def fit_polynomial_ransac(wave, flux, error, degree, residual_threshold=0.5, n_b
         residual_threshold (float): Threshold for identifying outliers based on residuals.
         n_bootstrap (int or bool): Number of bootstrap resampling iterations, or False to skip bootstrap.
         verbose (bool): If True, prints warnings about poor fit or insufficient inliers.
+        return_model (bool): If True, returns a function to evaluate the fitted model at new wavelengths.
     
     Returns:
         flux_fit (array): Best-fit polynomial evaluated at wave points.
         model_error (array): Estimated uncertainty in the fit.
+        model (callable, optional): Function to compute the continuum model at new wavelength values.
     """
-
     # Transform the wave values into polynomial features
     poly = PolynomialFeatures(degree)
     wave_poly = poly.fit_transform(wave.reshape(-1, 1))
@@ -32,8 +33,6 @@ def fit_polynomial_ransac(wave, flux, error, degree, residual_threshold=0.5, n_b
 
     # Extract inliers
     inliers = ransac.inlier_mask_
-
-    # Check if the RANSAC fit is unreliable
     num_inliers = np.sum(inliers)
     inlier_ratio = num_inliers / len(wave)
 
@@ -45,17 +44,17 @@ def fit_polynomial_ransac(wave, flux, error, degree, residual_threshold=0.5, n_b
 
     # If no inliers are found, return NaN arrays
     if num_inliers == 0:
-        return np.full_like(wave, np.nan), np.full_like(wave, np.nan)
+        return np.full_like(wave, np.nan), np.full_like(wave, np.nan), (lambda x: np.full_like(x, np.nan)) if return_model else None
 
     X_inliers, y_inliers, err_inliers = wave[inliers].reshape(-1, 1), flux[inliers], error[inliers]
-
+    
     # Fit the model using inliers only
     linreg = LinearRegression()
     linreg.fit(poly.transform(X_inliers), y_inliers)
-
+    
     # Get the fitted flux for all data points
     flux_fit = linreg.predict(poly.transform(wave.reshape(-1, 1)))
-
+    
     if n_bootstrap:
         # Bootstrap resampling to estimate model uncertainty
         bootstrap_predictions = np.zeros((n_bootstrap, len(wave)))
@@ -68,7 +67,7 @@ def fit_polynomial_ransac(wave, flux, error, degree, residual_threshold=0.5, n_b
             
             # Predict on the original data points
             bootstrap_predictions[i, :] = linreg.predict(poly.transform(wave.reshape(-1, 1)))
-
+        
         # Compute the standard deviation of bootstrap predictions (uncertainty)
         model_error = np.std(bootstrap_predictions, axis=0)
     
@@ -78,5 +77,12 @@ def fit_polynomial_ransac(wave, flux, error, degree, residual_threshold=0.5, n_b
         
         # Standard error per point using error propagation
         model_error = np.sqrt(np.mean(residuals**2)) * np.ones_like(flux_fit) / np.sqrt(num_inliers)
-
-    return flux_fit, model_error
+    
+    # Define the model function for new wavelength values
+    def model(wave_new):
+        return linreg.predict(poly.transform(np.array(wave_new).reshape(-1, 1)))
+    
+    if return_model:
+        return flux_fit, model_error, model
+    else:
+        return flux_fit, model_error
