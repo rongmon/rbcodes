@@ -13,9 +13,9 @@ from astropy.convolution import convolve, Box1DKernel
 from numpy import sqrt, pi, exp, linspace, loadtxt
 from lmfit import  Model
 from pkg_resources import resource_filename
-import PySimpleGUI as sg
+import FreeSimpleGUI as sg
 from IGM import rb_setline as line       
-import ipdb
+#import ipdb
 import pandas as pd
 
 import subprocess
