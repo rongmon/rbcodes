@@ -3,7 +3,7 @@ import os
 import numpy as np
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, 
                              QVBoxLayout, QWidget, QFileDialog, QSplitter,
-                             QLabel, QHBoxLayout, QSizePolicy)
+                             QLabel, QHBoxLayout, QSizePolicy,QInputDialog)
 from PyQt5.QtCore import Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -13,14 +13,14 @@ from linetools.spectra.io import readspec
 from RedshiftInputWidget import RedshiftInputWidget
 from MessageBox import MessageBox
 from astropy.convolution import convolve, Box1DKernel, Gaussian2DKernel
-
+from rbcodes.IGM import rb_setline as rb_setline
 class SpectralPlot(FigureCanvas):
     """
     A Matplotlib canvas for displaying spectral plots.
     Supports interactive key commands for adjusting axis limits and quitting the application.
     """
     # Add this line to the __init__ method of SpectralPlot:
-    def __init__(self, parent=None, width=10, height=8, dpi=100, message_box=None):
+    def __init__(self, parent=None, width=12, height=10, dpi=100, message_box=None):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
         super(SpectralPlot, self).__init__(self.fig)
         self.setParent(parent)
@@ -187,6 +187,26 @@ class SpectralPlot(FigureCanvas):
             if self.message_box:
                 self.message_box.on_sent_message(f"Shifted view right on panel {ax_index+1}", "#0000FF")
             self.draw()
+        elif event.key == 'Y':
+            Windowname='Manual y-Limits'
+            instruction='Input range (e.g. 0.,2.)'
+            ylim, ok = QInputDialog.getText(self,Windowname,instruction)
+            if ok:
+                ylimit = ylim.split(',')
+                ylimit = np.array(ylimit).astype('float32')
+                self.axes[ax_index].set_ylim(ylimit)
+                self.draw()
+
+        #zoom out of xrange
+        elif (event.key == 'o'):
+            xlim=self.axes[ax_index].get_xlim()
+            ylim=self.axes[ax_index].get_ylim()
+            xcen = (xlim[0]+xlim[1])/2.0
+            delx   = xlim[1] - xcen
+            self.axes[ax_index].set_xlim([xcen - 1.5*delx,xcen + 1.5*delx])
+            self.draw() 
+
+
 
         
 
@@ -235,7 +255,6 @@ class SpectralPlot(FigureCanvas):
         """
         self.redshift = redshift
         self.linelist = linelist
-        print(f"We received redshift z={redshift} with {linelist} line list. Plotting lines...")
         
         # If spectra are already loaded, update the plot with the new redshift lines
         if self.spectra and len(self.spectra) > 0:
@@ -263,45 +282,21 @@ class SpectralPlot(FigureCanvas):
         # Clear any existing redshift lines first
         self.clear_redshift_lines()
         
-        # Dictionary of common spectral lines (rest wavelengths in Angstroms)
-        common_lines = {
-            'LLS': {
-                'Lyα': 1215.67,
-                'N V': 1240.81,
-                'C IV': 1549.06,
-                'C III]': 1908.73,
-                'Mg II': 2798.75
-            },
-            'Galaxy': {
-                'Ca K': 3933.66,
-                'Ca H': 3968.47,
-                'G band': 4304.40,
-                'Hβ': 4861.33,
-                'Hα': 6562.80,
-                '[O II]': 3727.09,
-                '[O III]': 5006.84
-            }
-        }
+        # Read linelist - use a different variable name (not 'line')
+        line_list = rb_setline.read_line_list(self.linelist)
         
-        # Check if the specified linelist exists
-        if self.linelist not in common_lines:
-            if self.message_box:
-                self.message_box.on_sent_message(f"Unknown line list: {self.linelist}. Available lists: {', '.join(common_lines.keys())}", "#FF0000")
-            return
-        
-        lines = common_lines[self.linelist]
         self.redshift_lines = []  # Store references to lines for later removal
         
-        # Debug message with line information
-        line_info = ", ".join([f"{name}: {rest:.1f}→{rest*(1+self.redshift):.1f}Å" for name, rest in lines.items()])
-        if self.message_box:
-            self.message_box.on_sent_message(f"Plotting lines at z={self.redshift}: {line_info}", "#0000FF")
-        
+          
         # Draw vertical lines for each spectral feature
         lines_plotted = 0
-        for name, rest_wavelength in lines.items():
+        
+        for ix in range(0, len(line_list)):
+            # Loop through each transition
+            rest_wavelength = line_list[ix]['wrest']
+            transition_name = line_list[ix]['ion']
             # Calculate observed wavelength using the redshift
-            observed_wavelength = rest_wavelength * (1 + self.redshift)
+            observed_wavelength = rest_wavelength * (1. + self.redshift)
             
             # Draw on all axes
             for i, ax in enumerate(self.axes):
@@ -310,15 +305,15 @@ class SpectralPlot(FigureCanvas):
                 ylim = ax.get_ylim()
                 
                 # Always draw the line (even if outside current view)
-                line = ax.axvline(x=observed_wavelength, color='blue', linestyle='--', alpha=0.7)
-                self.redshift_lines.append(line)
+                line_obj = ax.axvline(x=observed_wavelength, color='blue', linestyle='--', alpha=0.7)
+                self.redshift_lines.append(line_obj)
                 
                 # Only add label if it's in view
                 if xlim[0] <= observed_wavelength <= xlim[1]:
                     y_pos = ylim[0] + 0.85 * (ylim[1] - ylim[0])  # 85% of the way up
-                    text = ax.text(observed_wavelength, y_pos, name, rotation=90, 
-                           horizontalalignment='right', verticalalignment='top',
-                           fontsize=8, color='blue')
+                    text = ax.text(observed_wavelength, y_pos, transition_name, rotation=90, 
+                          horizontalalignment='right', verticalalignment='top',
+                          fontsize=8, color='blue')
                     self.redshift_lines.append(text)
                     lines_plotted += 1
         
@@ -329,21 +324,18 @@ class SpectralPlot(FigureCanvas):
                 self.message_box.on_sent_message(f"Successfully plotted {lines_plotted} spectral lines", "#008000")
             else:
                 self.message_box.on_sent_message("No lines visible in current view. Try adjusting x-axis limits.", "#FFA500")
-    
+
     def clear_redshift_lines(self):
         """
         Removes any previously plotted redshift lines.
         """
         if hasattr(self, 'redshift_lines') and self.redshift_lines:
-            for line in self.redshift_lines:
+            for line_obj in self.redshift_lines:
                 try:
-                    line.remove()
+                    line_obj.remove()
                 except:
                     pass
             self.redshift_lines = []
-
-
-
 
 class MainWindow(QMainWindow):
     """

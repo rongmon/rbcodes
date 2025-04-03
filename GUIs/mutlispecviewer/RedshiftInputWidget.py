@@ -26,7 +26,7 @@ class RedshiftInputWidget(QWidget):
         
         linelist_label = QLabel("Line List:")
         self.linelist_combo = QComboBox()
-        self.linelist_combo.addItems(["None", "LLS","LLS_Small" ,"DLA"])  # Empty string as default "Select" option
+        self.linelist_combo.addItems(["None", "LLS","LLS Small" ,"DLA"])  # Empty string as default "Select" option
         
         submit_button = QPushButton("Submit")
         submit_button.clicked.connect(self.validate_and_submit)
@@ -82,10 +82,29 @@ class RedshiftInputWidget(QWidget):
         if redshift is not None:
             self.redshift_input.setText(str(redshift))
         
-        if linelist is not None and linelist in ["LLS", "DLA"]:
+        if linelist is not None and linelist in ["LLS", "LLS Small", "DLA"]:
             index = self.linelist_combo.findText(linelist)
             if index >= 0:
                 self.linelist_combo.setCurrentIndex(index)
+       # Add the set_redshift method to update the widget from external sources
+    def set_redshift(self, redshift):
+        """
+        Sets the redshift value in the input field programmatically
+        
+        :param redshift: The redshift value to set
+        """
+        try:
+            # Format the redshift to 6 decimal places and set in the text field
+            formatted_redshift = f"{float(redshift):.6f}"
+            self.redshift_input.setText(formatted_redshift)
+            
+            # Note: This only updates the display - it doesn't trigger the submitted signal
+            # If you want to automatically trigger calculation, you'd need to add:
+            # self.submitted.emit(float(formatted_redshift), self.linelist_combo.currentText())
+        except Exception as e:
+            print(f"Error setting redshift value: {str(e)}")
+            # If there's an error, set a fallback value
+            self.redshift_input.setText("0.000000")
 
 
 # Example of how to use this widget in an existing application
