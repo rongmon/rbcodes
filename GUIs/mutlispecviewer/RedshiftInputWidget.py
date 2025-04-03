@@ -10,10 +10,12 @@ class RedshiftInputWidget(QWidget):
     
     Signals:
         submitted(float, str): Emitted when valid data is submitted, containing the redshift value and selected line list
+        linelist_changed(str): Emitted when linelist selection changes
     """
     
-    # Define a custom signal that emits the redshift (float) and line list (str) when submitted
+    # Define custom signals
     submitted = pyqtSignal(float, str)
+    linelist_changed = pyqtSignal(float, str)  # New signal for linelist changes
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -23,15 +25,14 @@ class RedshiftInputWidget(QWidget):
         # Create widgets
         redshift_label = QLabel("Redshift Guess:")
         self.redshift_input = QLineEdit()
-        # Set initial redshift to 0.0
-        self.redshift_input.setText("0.0")
         
         linelist_label = QLabel("Line List:")
         self.linelist_combo = QComboBox()
-        self.linelist_combo.addItems(["None", "LLS","LLS Small" ,"DLA","LBG", "Gal", "Eiger_Strong"])  # Empty string as default "Select" option
+        self.linelist_combo.addItems(["None", "LLS", "LLS Small", "DLA", "LBG", "Gal", "Eiger_Strong"])  # Updated linelist options
         
-        # Set default line list to "LLS"
-        self.linelist_combo.setCurrentText("LLS")
+        # Connect linelist combo box change event
+        self.linelist_combo.currentIndexChanged.connect(self.on_linelist_changed)
+        
         submit_button = QPushButton("Submit")
         submit_button.clicked.connect(self.validate_and_submit)
         
@@ -51,6 +52,24 @@ class RedshiftInputWidget(QWidget):
         main_layout.addWidget(submit_button)
         
         self.setLayout(main_layout)
+    
+    def on_linelist_changed(self, index):
+        """Handle linelist selection change"""
+        try:
+            # Get the current redshift value
+            redshift_text = self.redshift_input.text().strip()
+            linelist = self.linelist_combo.currentText()
+            
+            try:
+                redshift = float(redshift_text)
+                # Emit the linelist_changed signal with current redshift and new linelist
+                self.linelist_changed.emit(redshift, linelist)
+            except ValueError:
+                # If the redshift is invalid, don't emit the signal
+                # Optionally, could show a warning here, but that might interrupt the workflow
+                pass
+        except Exception as e:
+            print(f"Error in linelist change handler: {str(e)}")
     
     def validate_and_submit(self):
         """Validate inputs and emit the submitted signal if valid"""
@@ -86,11 +105,12 @@ class RedshiftInputWidget(QWidget):
         if redshift is not None:
             self.redshift_input.setText(str(redshift))
         
-        if linelist is not None and linelist in ["LLS", "LLS Small", "DLA"]:
+        if linelist is not None and linelist in ["LLS", "LLS Small", "DLA", "LBG", "Gal", "Eiger_Strong"]:
             index = self.linelist_combo.findText(linelist)
             if index >= 0:
                 self.linelist_combo.setCurrentIndex(index)
-       # Add the set_redshift method to update the widget from external sources
+                
+    # Add the set_redshift method to update the widget from external sources
     def set_redshift(self, redshift):
         """
         Sets the redshift value in the input field programmatically
@@ -109,36 +129,3 @@ class RedshiftInputWidget(QWidget):
             print(f"Error setting redshift value: {str(e)}")
             # If there's an error, set a fallback value
             self.redshift_input.setText("0.000000")
-
-
-# Example of how to use this widget in an existing application
-if __name__ == "__main__":
-    # This is just for demonstration - not needed when embedding in your application
-    app = QApplication(sys.argv)
-    
-    # Create a main window
-    main_window = QWidget()
-    main_window.setWindowTitle("Redshift Input Example")
-    main_layout = QVBoxLayout()
-    
-    # Create and add our widget
-    redshift_widget = RedshiftInputWidget()
-    
-    # Connect to the signal
-    def on_submitted(redshift, linelist):
-        print(f"Submitted: Redshift = {redshift}, Line List = {linelist}")
-        QMessageBox.information(
-            main_window, 
-            "Submission Received", 
-            f"Redshift: {redshift}\nLine List: {linelist}"
-        )
-    
-    redshift_widget.submitted.connect(on_submitted)
-    
-    # Add to layout
-    main_layout.addWidget(redshift_widget)
-    main_window.setLayout(main_layout)
-    
-    # Show the window
-    main_window.show()
-    sys.exit(app.exec_())

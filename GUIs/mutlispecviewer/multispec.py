@@ -20,8 +20,6 @@ class SpectralPlot(FigureCanvas):
     A Matplotlib canvas for displaying spectral plots.
     Supports interactive key commands for adjusting axis limits and quitting the application.
     """
-    # Add this line to the __init__ method of SpectralPlot:
-
     def __init__(self, parent=None, width=12, height=10, dpi=100, message_box=None):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
         super(SpectralPlot, self).__init__(self.fig)
@@ -30,7 +28,8 @@ class SpectralPlot(FigureCanvas):
         self.axes = None  # Stores the Matplotlib subplot axes
         self.parent_window = parent  # Reference to the parent window for quitting
         self.scale = 1. # 1D spec convolution kernel size
-        self.redshift_lines = []  # Add this line to store references to plotted lines
+        self.redshift_lines = []  # Store references to plotted lines
+        self.quickid_lines = []  # New list to store quick line ID markers
         
         # Store reference to the message box
         self.message_box = message_box
@@ -129,7 +128,8 @@ class SpectralPlot(FigureCanvas):
             list_widget.itemClicked.connect(on_line_selected)
             
             # Show the dialog
-            dialog.exec_()        
+            dialog.exec_()
+            
     def plot_spectra(self, spectra):
         """
         Plots the given list of spectra as subplots.
@@ -140,7 +140,7 @@ class SpectralPlot(FigureCanvas):
         self.fig.clear()
         
         num_spectra = len(spectra)
-        self.num_spectra=num_spectra
+        self.num_spectra = num_spectra
         
         # Create subplots with reduced spacing
         self.axes = self.fig.subplots(num_spectra, 1, sharex=True)
@@ -161,7 +161,7 @@ class SpectralPlot(FigureCanvas):
             error = spec.sig.value if hasattr(spec, 'sig') else None
             filename = os.path.basename(spec.filename)
 
-            self.plot_one_spec(wave,flux,error,i,filename)
+            self.plot_one_spec(wave, flux, error, i, filename)
             
             # Store original view limits
             self.original_xlims.append(self.axes[i].get_xlim())
@@ -174,7 +174,7 @@ class SpectralPlot(FigureCanvas):
         # Send message if message box is available
         if self.message_box:
             self.message_box.on_sent_message(f"Plotted {num_spectra} spectra", "#008000")
-        
+    
     def on_key_press(self, event):
         """
         Handles key press events for interactive adjustments of the plots.
@@ -196,9 +196,18 @@ class SpectralPlot(FigureCanvas):
             self.parent_window.close()
             return
         
-        # Handle reset key 'r'
+        # Handle reset key 'r' to show original spectra and remove any transient lines
         if event.key == 'r':
             self.reset_view()
+            return
+        
+        # Handle capital R key to just remove the line identifications
+        if event.key == 'R':
+            self.clear_quickid_lines()
+            self.clear_redshift_lines()
+            self.draw()
+            if self.message_box:
+                self.message_box.on_sent_message("Cleared all line identifications", "#008000")
             return
         
         if x is None or y is None:
@@ -237,7 +246,6 @@ class SpectralPlot(FigureCanvas):
             if self.message_box:
                 self.message_box.on_sent_message(f"Set minimum y-limit to {y:.2f} on panel {ax_index+1}", "#0000FF")
             self.draw()
-
         elif event.key=='S':
             self.scale += 2
             # First grab the corresponding spectra 
@@ -248,11 +256,10 @@ class SpectralPlot(FigureCanvas):
             error = spec.sig.value if hasattr(spec, 'sig') else None
             new_flux = convolve(flux, Box1DKernel(self.scale))
             new_err = convolve(error, Box1DKernel(self.scale))
-            self.replot(wave, new_flux,new_err,ax_index,filename)
+            self.replot(wave, new_flux, new_err, ax_index, filename)
             self.draw()
 
             self.message_box.on_sent_message(f'Convolutional kernel size = {int(self.scale)}.')
-
         elif event.key=='U':
             self.scale -= 2
             # First grab the corresponding spectra 
@@ -263,13 +270,10 @@ class SpectralPlot(FigureCanvas):
             error = spec.sig.value if hasattr(spec, 'sig') else None
             new_flux = convolve(flux, Box1DKernel(self.scale))
             new_err = convolve(error, Box1DKernel(self.scale))
-            self.replot(wave, new_flux,new_err,ax_index,filename)
+            self.replot(wave, new_flux, new_err, ax_index, filename)
             self.draw()
 
             self.message_box.on_sent_message(f'Convolutional kernel size = {int(self.scale)}.')
-
-
-
         elif event.key=='[':
             xlim = self.axes[ax_index].get_xlim()
             delx = (xlim[-1] - xlim[0])
@@ -287,25 +291,42 @@ class SpectralPlot(FigureCanvas):
         elif event.key == 'Y':
             Windowname='Manual y-Limits'
             instruction='Input range (e.g. 0.,2.)'
-            ylim, ok = QInputDialog.getText(self,Windowname,instruction)
+            ylim, ok = QInputDialog.getText(self, Windowname, instruction)
             if ok:
                 ylimit = ylim.split(',')
                 ylimit = np.array(ylimit).astype('float32')
                 self.axes[ax_index].set_ylim(ylimit)
                 self.draw()
-
-        #zoom out of xrange
+        # zoom out of xrange
         elif (event.key == 'o'):
-            xlim=self.axes[ax_index].get_xlim()
-            ylim=self.axes[ax_index].get_ylim()
+            xlim = self.axes[ax_index].get_xlim()
+            ylim = self.axes[ax_index].get_ylim()
             xcen = (xlim[0]+xlim[1])/2.0
-            delx   = xlim[1] - xcen
-            self.axes[ax_index].set_xlim([xcen - 1.5*delx,xcen + 1.5*delx])
-            self.draw() 
+            delx = xlim[1] - xcen
+            self.axes[ax_index].set_xlim([xcen - 1.5*delx, xcen + 1.5*delx])
+            self.draw()
+            
+        # New quick line identification keystroke handlers
+        elif (event.key == 'C'):
+            self.check_lineid(event.xdata, 'CIV', event.ydata, ax_index)
+        elif (event.key == 'M'):
+            self.check_lineid(event.xdata, 'MgII', event.ydata, ax_index)
+        elif (event.key == 'F'):
+            self.check_lineid(event.xdata, 'FeII', event.ydata, ax_index)
+        elif (event.key == '6'):
+            self.check_lineid(event.xdata, 'OVI', event.ydata, ax_index)
+        elif (event.key == '4'):
+            self.check_lineid(event.xdata, 'SiIV', event.ydata, ax_index)
+        elif (event.key == '8'):
+            self.check_lineid(event.xdata, 'NeVIII', event.ydata, ax_index)
+        elif (event.key == '2'):
+            self.check_lineid(event.xdata, 'Lyb', event.ydata, ax_index)
+        elif (event.key == '1'):
+            self.check_lineid(event.xdata, 'Lya', event.ydata, ax_index)
 
     def reset_view(self):
         """
-        Resets the view to original x and y limits and removes all redshift lines.
+        Resets the view to original x and y limits and removes all lines.
         Called when 'r' key is pressed.
         """
         if not self.spectra or self.axes is None or len(self.axes) == 0:
@@ -317,8 +338,9 @@ class SpectralPlot(FigureCanvas):
             current_redshift = self.redshift
             current_linelist = self.linelist
             
-        # Clear any redshift lines
+        # Clear any redshift and quick ID lines
         self.clear_redshift_lines()
+        self.clear_quickid_lines()
         
         # Reset the scale to default
         self.scale = 1.0
@@ -351,30 +373,22 @@ class SpectralPlot(FigureCanvas):
         if self.message_box:
             self.message_box.on_sent_message("Reset view to original state", "#008000")
 
-    def replot(self, wave, new_spec, new_err,ax_index,filename):
+    def replot(self, wave, new_spec, new_err, ax_index, filename):
         '''Re-plot smoothed/unsmoothed spectrum
         '''
-
-
         self.cur_xlims = self.axes[ax_index].get_xlim()
         self.cur_ylims = self.axes[ax_index].get_ylim()
 
         self.axes[ax_index].clear() 
 
-        self.plot_one_spec(wave,new_spec,new_err,ax_index,filename)
+        self.plot_one_spec(wave, new_spec, new_err, ax_index, filename)
         
-        #self.axes[ax_index].plot(wave, new_err, color='red')# label='Error')
-        #self.axes[ax_index].plot(wave, new_spec, color='black')#, label='Flux')
-        # for a better y range
-        ytmp = np.nan_to_num(new_spec, nan=0., posinf=0., neginf=0.)
         self.axes[ax_index].set_ylim(self.cur_ylims)
         self.axes[ax_index].set_xlim(self.cur_xlims)
-
-        #del self.axes[ax_index].lines[2:]
         self.draw()
 
-    def plot_one_spec(self,wave,flux,error,index,filename):
-        
+    def plot_one_spec(self, wave, flux, error, index, filename):
+        """Plot a single spectrum panel"""
         self.axes[index].plot(wave, flux, 'k-', lw=1)
         if error is not None:
             self.axes[index].plot(wave, error, 'r-', lw=0.5, alpha=0.5)
@@ -440,6 +454,16 @@ class SpectralPlot(FigureCanvas):
         
         self.redshift_lines = []  # Store references to lines for later removal
         
+        # Get the full wavelength range from all spectra
+        wave_arrays = [spec.wavelength.value for spec in self.spectra]
+        
+        # Concatenate all wavelength arrays
+        all_wavelengths = np.concatenate(wave_arrays)
+        
+        # Get min and max directly
+        global_min_wave = np.min(all_wavelengths)
+        global_max_wave = np.max(all_wavelengths)
+        
         # Draw vertical lines for each spectral feature
         lines_plotted = 0
         
@@ -450,22 +474,26 @@ class SpectralPlot(FigureCanvas):
             # Calculate observed wavelength using the redshift
             observed_wavelength = rest_wavelength * (1. + self.redshift)
             
-            # Draw on all axes
-            for i, ax in enumerate(self.axes):
-                # Use stored limits from before clearing lines
-                xlim = current_xlims[i]
-                ylim = current_ylims[i]
-                
-                # Always draw the line (even if outside current view)
-                line_obj = ax.axvline(x=observed_wavelength, color='blue', linestyle='--', alpha=0.7)
-                self.redshift_lines.append(line_obj)
-                
-                # Only add label if it's in view
-                if xlim[0] <= observed_wavelength <= xlim[1]:
-                    y_pos = ylim[0] + 0.85 * (ylim[1] - ylim[0])  # 85% of the way up
-                    text = ax.text(observed_wavelength, y_pos, transition_name, rotation=90, 
-                          horizontalalignment='right', verticalalignment='top',
-                          fontsize=8, color='blue')
+            # Only plot lines within the full wavelength range of our spectra
+            if global_min_wave <= observed_wavelength <= global_max_wave:
+                # Draw on all axes
+                for i, ax in enumerate(self.axes):
+                    # Get the y-limits for this axis
+                    ylim = current_ylims[i]
+                    
+                    # Always draw the line if it's within the global wavelength range
+                    line_obj = ax.axvline(x=observed_wavelength, color='blue', linestyle='--', alpha=0.7)
+                    self.redshift_lines.append(line_obj)
+                    
+                    # Add label for all lines within the global range using relative coordinates
+                    # Use a fixed position 90% of the way up the panel
+                    y_range = ylim[1] - ylim[0]
+                    y_pos = ylim[0] + 0.9 * y_range  # 90% of the way up (closer to ymax)
+                    
+                    # Create text with relative coordinates (will adapt when y limits change)
+                    text = ax.text(observed_wavelength, 0.9, transition_name, rotation=90, 
+                           horizontalalignment='right', verticalalignment='top',
+                           fontsize=8, color='blue', transform=ax.get_xaxis_transform())
                     self.redshift_lines.append(text)
                     lines_plotted += 1
         
@@ -478,9 +506,9 @@ class SpectralPlot(FigureCanvas):
         
         if self.message_box:
             if lines_plotted > 0:
-                self.message_box.on_sent_message(f"Successfully plotted {lines_plotted} spectral lines", "#008000")
+                self.message_box.on_sent_message(f"Successfully plotted {lines_plotted} spectral lines across the full wavelength range", "#008000")
             else:
-                self.message_box.on_sent_message("No lines visible in current view. Try adjusting x-axis limits.", "#FFA500")
+                self.message_box.on_sent_message("No lines found within the wavelength range of your spectra.", "#FFA500")
 
     def clear_redshift_lines(self):
         """
@@ -493,6 +521,118 @@ class SpectralPlot(FigureCanvas):
                 except:
                     pass
             self.redshift_lines = []
+            
+    def clear_quickid_lines(self):
+        """
+        Removes any previously plotted quick ID lines.
+        """
+        if hasattr(self, 'quickid_lines') and self.quickid_lines:
+            for line_obj in self.quickid_lines:
+                try:
+                    line_obj.remove()
+                except:
+                    pass
+            self.quickid_lines = []
+    
+    def check_lineid(self, wave0, ionname, yval, ax_index):
+        """
+        This method quickly draws some doublet/multiplet lines on the canvas for a quicklook
+        
+        :param wave0: The observed wavelength where the user clicked
+        :param ionname: The ion to identify (e.g., 'CIV', 'MgII')
+        :param yval: The y-position where the user clicked
+        :param ax_index: The index of the active axis
+        """
+        if wave0 is None or yval is None:
+            if self.message_box:
+                self.message_box.on_sent_message("Invalid cursor position", "#FF0000")
+            return
+            
+        # Set the current axis
+        ax = self.axes[ax_index]
+        
+        # Get current y-limits to calculate relative positions
+        y_min, y_max = ax.get_ylim()
+        y_range = y_max - y_min
+        
+        # Calculate relative positions (as a fraction of the y-axis range)
+        # Position the base line at 70% of the y-axis height for better visibility
+        rel_pos = 0.7
+        
+        # Line height will be 15% of the y-axis range
+        line_height = 0.15
+        # Text position will be 20% of the y-axis range above the base
+        text_height = 0.2
+        
+        # Calculate the redshift and other lines based on the ion
+        if (ionname == 'CIV'):
+            wave1 = wave0 * 1550.77845 / 1548.2049
+            z = wave0 / 1548.2049 - 1
+            msg = f"CIV: z = {z:.6f}"
+        elif (ionname == 'MgII'):
+            wave1 = wave0 * 2803.5314853 / 2796.3542699
+            z = wave0 / 2796.354 - 1
+            msg = f"MgII: z = {z:.6f}"
+        elif (ionname == 'FeII'):
+            wave1 = wave0 * 2586.6495659 / 2600.1724835
+            wave2 = wave0 * 2382.7641781 / 2600.1724835
+            z = wave0 / 2600.1724835 - 1
+            msg = f"FeII: z = {z:.6f}"
+        elif (ionname == 'OVI'):
+            wave1 = wave0 * 1037.6167 / 1031.9261
+            z = wave0 / 1031.9261 - 1
+            msg = f"OVI: z = {z:.6f}"
+        elif (ionname == 'NeVIII'):
+            wave1 = wave0 * 780.324 / 770.409
+            z = wave0 / 770.409 - 1
+            msg = f"NeVIII: z = {z:.6f}"
+        elif (ionname == 'SiIV'):
+            wave1 = wave0 * 1402.77291 / 1393.76018
+            z = wave0 / 1393.76018 - 1
+            msg = f"SiIV: z = {z:.6f}"
+        elif (ionname == 'Lyb'):
+            wave1 = wave0 * 1215.6701 / 1025.7223
+            z = wave0 / 1025.7223 - 1
+            msg = f"HI Lyb: z = {z:.6f}"
+        elif (ionname == 'Lya'):
+            wave1 = wave0 * 1025.7223 / 1215.6701
+            z = wave0 / 1215.6701 - 1
+            msg = f"HI Lya: z = {z:.6f}"
+        else:
+            if self.message_box:
+                self.message_box.on_sent_message(f"Unknown ion: {ionname}", "#FF0000")
+            return
+            
+        # Display message
+        print(msg)
+        if self.message_box:
+            self.message_box.on_sent_message(msg, "#008000")
+            
+        # Convert relative positions back to data coordinates
+        y_pos = y_min + rel_pos * y_range
+        y_line_top = y_pos + line_height * y_range
+        y_text_pos = y_pos + text_height * y_range
+        
+        # Draw the line pattern with relative positioning
+        line, = ax.plot([wave0, wave0, wave1, wave1], [y_pos, y_line_top, y_line_top, y_pos], color='r')
+        self.quickid_lines.append(line)
+        
+        if ionname == 'FeII':
+            # Special case for FeII which has 3 lines
+            text = ax.text(0.5*(wave0+wave2), y_text_pos, f"{ionname} z: {z:.4f}", 
+                          rotation=0, verticalalignment='bottom', color='r')
+            line2, = ax.plot([wave1, wave1, wave2, wave2], [y_pos, y_line_top, y_line_top, y_pos], color='r')
+            self.quickid_lines.append(line2)
+        else:
+            text = ax.text(0.5*(wave0+wave1), y_text_pos, f"{ionname} z: {z:.4f}", 
+                          rotation=0, verticalalignment='bottom', color='r')
+            
+        self.quickid_lines.append(text)
+        self.draw()
+        
+        # Update the redshift widget with the calculated redshift
+        if hasattr(self.parent_window, 'redshift_widget'):
+            self.parent_window.redshift_widget.set_redshift(z)
 
 class MainWindow(QMainWindow):
     """
@@ -534,8 +674,9 @@ class MainWindow(QMainWindow):
         
         # Create redshift input widget
         self.redshift_widget = RedshiftInputWidget()
-        # Connect to the submitted signal
+        # Connect to both signals
         self.redshift_widget.submitted.connect(self.handle_redshift_submission)
+        self.redshift_widget.linelist_changed.connect(self.handle_redshift_submission)  # Use same handler
         
         # Add both widgets to the bottom layout
         bottom_layout.addWidget(self.redshift_widget)
@@ -552,8 +693,6 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(status_text)
         self.message_box.on_sent_message("Application ready. Select FITS files to begin.", "#000000")
     
-    
-
     def handle_redshift_submission(self, redshift, linelist):
         """
         Processes the redshift and linelist data submitted by the RedshiftInputWidget
@@ -581,8 +720,6 @@ class MainWindow(QMainWindow):
             error_msg = f"Error processing redshift: {str(e)}"
             print(error_msg)
             self.message_box.on_sent_message(error_msg, "#FF0000")
-
-
 
     def select_fits_files(self):
         """
@@ -616,7 +753,6 @@ class MainWindow(QMainWindow):
             error_message = f"Error: {str(e)}"
             self.statusBar().showMessage(error_message)
             self.message_box.on_sent_message(error_message, "#FF0000")
-
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
