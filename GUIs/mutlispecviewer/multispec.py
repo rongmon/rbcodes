@@ -53,11 +53,14 @@ class SpectralPlot(FigureCanvas):
         Handles mouse press events. Right-click shows a menu of possible spectral lines.
         """
         if event.button == 3:  # Right mouse button (button 3)
-            if not hasattr(self, 'linelist') or not self.spectra:
+            if not self.spectra:
                 if self.message_box:
-                    self.message_box.on_sent_message("Load spectra and set a redshift first", "#FF0000")
+                    self.message_box.on_sent_message("Load spectra", "#FF0000")
                 return
-                
+            if not hasattr(self, 'linelist') or self.linelist == "None":
+                if self.message_box:
+                    self.message_box.on_sent_message("No line list selected, defaulting to LLS", "#FFA500")
+                self.linelist='LLS'
             observed_wavelength = event.xdata
             if observed_wavelength is None:
                 if self.message_box:
@@ -391,9 +394,16 @@ class SpectralPlot(FigureCanvas):
         """
         self.redshift = redshift
         self.linelist = linelist
+
+        if self.linelist=="None":
+            # Clear any redshift lines
+            self.clear_redshift_lines()
+            self.fig.canvas.draw_idle()  # Ensure the figure updates
+            if self.message_box:
+                self.message_box.on_sent_message(f"{linelist} line list. Clearing lines...", "#0000FF")
         
         # If spectra are already loaded, update the plot with the new redshift lines
-        if self.spectra and len(self.spectra) > 0:
+        elif self.spectra and len(self.spectra) > 0:
             # Add debug message
             if self.message_box:
                 self.message_box.on_sent_message(f"Setting redshift z={redshift} with {linelist} line list. Plotting lines...", "#0000FF")

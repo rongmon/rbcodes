@@ -23,11 +23,15 @@ class RedshiftInputWidget(QWidget):
         # Create widgets
         redshift_label = QLabel("Redshift Guess:")
         self.redshift_input = QLineEdit()
+        # Set initial redshift to 0.0
+        self.redshift_input.setText("0.0")
         
         linelist_label = QLabel("Line List:")
         self.linelist_combo = QComboBox()
         self.linelist_combo.addItems(["None", "LLS","LLS Small" ,"DLA","LBG", "Gal", "Eiger_Strong"])  # Empty string as default "Select" option
         
+        # Set default line list to "LLS"
+        self.linelist_combo.setCurrentText("LLS")
         submit_button = QPushButton("Submit")
         submit_button.clicked.connect(self.validate_and_submit)
         
