@@ -14,12 +14,14 @@ from RedshiftInputWidget import RedshiftInputWidget
 from MessageBox import MessageBox
 from astropy.convolution import convolve, Box1DKernel, Gaussian2DKernel
 from rbcodes.IGM import rb_setline as rb_setline
+
 class SpectralPlot(FigureCanvas):
     """
     A Matplotlib canvas for displaying spectral plots.
     Supports interactive key commands for adjusting axis limits and quitting the application.
     """
     # Add this line to the __init__ method of SpectralPlot:
+
     def __init__(self, parent=None, width=12, height=10, dpi=100, message_box=None):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
         super(SpectralPlot, self).__init__(self.fig)
@@ -30,10 +32,6 @@ class SpectralPlot(FigureCanvas):
         self.scale = 1. # 1D spec convolution kernel size
         self.redshift_lines = []  # Add this line to store references to plotted lines
         
-        # Store original view limits for each spectrum
-        self.original_xlims = []  # Will store [min, max] x limits for each spectrum
-        self.original_ylims = []  # Will store [min, max] y limits for each spectrum
-    
         # Store reference to the message box
         self.message_box = message_box
         
@@ -47,6 +45,88 @@ class SpectralPlot(FigureCanvas):
         # Connect Matplotlib's key press event
         self.mpl_connect('key_press_event', self.on_key_press)
         
+        # Connect right-click event
+        self.mpl_connect('button_press_event', self.on_mouse_press)
+    
+    def on_mouse_press(self, event):
+        """
+        Handles mouse press events. Right-click shows a menu of possible spectral lines.
+        """
+        if event.button == 3:  # Right mouse button (button 3)
+            if not hasattr(self, 'linelist') or not self.spectra:
+                if self.message_box:
+                    self.message_box.on_sent_message("Load spectra and set a redshift first", "#FF0000")
+                return
+                
+            observed_wavelength = event.xdata
+            if observed_wavelength is None:
+                if self.message_box:
+                    self.message_box.on_sent_message("Click on a valid position on the plot", "#FF0000")
+                return
+                
+            # Read line list
+            line_list = rb_setline.read_line_list(self.linelist)
+            
+            # Create a dialog with line options
+            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QListWidget, QLabel
+            from PyQt5.QtCore import Qt
+            
+            dialog = QDialog(self.parent_window)
+            dialog.setWindowTitle("Line Identification")
+            layout = QVBoxLayout()
+            
+            info_label = QLabel(f"Observed Wavelength: {observed_wavelength:.2f}")
+            layout.addWidget(info_label)
+            
+            instruction_label = QLabel("Select a spectral line to compute redshift:")
+            layout.addWidget(instruction_label)
+            
+            list_widget = QListWidget()
+            for ix in range(len(line_list)):
+                rest_wavelength = line_list[ix]['wrest']
+                transition_name = line_list[ix]['ion']
+                # Calculate implied redshift if this line is selected
+                implied_redshift = (observed_wavelength / rest_wavelength) - 1.0
+                list_item_text = f"{transition_name} ({rest_wavelength:.2f} Å) → z = {implied_redshift:.4f}"
+                list_widget.addItem(list_item_text)
+            
+            layout.addWidget(list_widget)
+            dialog.setLayout(layout)
+            
+            # Connect selection event
+            def on_line_selected(item):
+                try:
+                    # Extract the selected line information
+                    selected_text = item.text()
+                    # Parse the transition name and rest wavelength from the text
+                    parts = selected_text.split('(')
+                    transition_name = parts[0].strip()
+                    rest_wavelength = float(parts[1].split('Å')[0].strip())
+                    
+                    # Calculate new redshift
+                    new_redshift = (observed_wavelength / rest_wavelength) - 1.0
+                    
+                    if self.message_box:
+                        self.message_box.on_sent_message(
+                            f"Line identified as {transition_name}, λrest = {rest_wavelength:.2f} Å, "
+                            f"implied z = {new_redshift:.6f}", "#008000")
+                    
+                    # Update redshift input and plot lines with new redshift
+                    if hasattr(self.parent_window, 'redshift_widget'):
+                        self.parent_window.redshift_widget.set_redshift(new_redshift)
+                        # Update the redshift value and replot lines
+                        self.redshift = new_redshift
+                        self.plot_redshift_lines()
+                    
+                    dialog.accept()  # Close the dialog
+                except Exception as e:
+                    if self.message_box:
+                        self.message_box.on_sent_message(f"Error processing selection: {str(e)}", "#FF0000")
+            
+            list_widget.itemClicked.connect(on_line_selected)
+            
+            # Show the dialog
+            dialog.exec_()        
     def plot_spectra(self, spectra):
         """
         Plots the given list of spectra as subplots.
@@ -433,21 +513,14 @@ class MainWindow(QMainWindow):
         
         # Create SpectralPlot with reference to the message box
         self.canvas = SpectralPlot(self, message_box=self.message_box)
-        
-        # Create a more compact toolbar
         self.toolbar = NavigationToolbar(self.canvas, self)
-        self.toolbar.setMaximumHeight(30)
         
-        # Add toolbar and canvas with more emphasis on canvas space
         main_layout.addWidget(self.toolbar)
-        main_layout.addWidget(self.canvas, 1)  # Give canvas a stretch factor of 1
-
+        main_layout.addWidget(self.canvas)
+    
         # Create bottom widget container with redshift inputs and message box
         bottom_widget = QWidget()
-        bottom_widget.setMaximumHeight(150)  # Limit the maximum height of bottom widget
         bottom_layout = QHBoxLayout(bottom_widget)
-        bottom_layout.setContentsMargins(5, 5, 5, 5)  # Reduce margins (left, top, right, bottom)
-        bottom_layout.setSpacing(5)  # Reduce spacing between widgets
         
         # Create redshift input widget
         self.redshift_widget = RedshiftInputWidget()
@@ -464,9 +537,12 @@ class MainWindow(QMainWindow):
         self.spectra = []  # Stores loaded spectra
         
         status_text = "Ready - Click on plot then use keys: x = set min x-limit, X = set max x-limit, "
-        status_text += "t = set max y-limit, b = set min y-limit, r = reset view, q = quit application"
+        status_text += "t = set max y-limit, b = set min y-limit, q = quit application, "
+        status_text += "Right-click = identify spectral lines"
         self.statusBar().showMessage(status_text)
         self.message_box.on_sent_message("Application ready. Select FITS files to begin.", "#000000")
+    
+    
 
     def handle_redshift_submission(self, redshift, linelist):
         """
