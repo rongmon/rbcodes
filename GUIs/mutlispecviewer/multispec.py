@@ -29,6 +29,10 @@ class SpectralPlot(FigureCanvas):
         self.parent_window = parent  # Reference to the parent window for quitting
         self.scale = 1. # 1D spec convolution kernel size
         self.redshift_lines = []  # Add this line to store references to plotted lines
+        
+        # Store original view limits for each spectrum
+        self.original_xlims = []  # Will store [min, max] x limits for each spectrum
+        self.original_ylims = []  # Will store [min, max] y limits for each spectrum
     
         # Store reference to the message box
         self.message_box = message_box
@@ -54,10 +58,19 @@ class SpectralPlot(FigureCanvas):
         
         num_spectra = len(spectra)
         self.num_spectra=num_spectra
+        
+        # Create subplots with reduced spacing
         self.axes = self.fig.subplots(num_spectra, 1, sharex=True)
+        
+        # Adjust the spacing between subplots
+        self.fig.subplots_adjust(hspace=0.1)  # Reduce vertical space between subplots
         
         if num_spectra == 1:
             self.axes = [self.axes]  # Ensure axes is always a list
+        
+        # Reset the original view limits storage
+        self.original_xlims = []
+        self.original_ylims = []
         
         for i, spec in enumerate(spectra):
             wave = spec.wavelength.value
@@ -67,16 +80,12 @@ class SpectralPlot(FigureCanvas):
 
             self.plot_one_spec(wave,flux,error,i,filename)
             
-            #self.axes[i].plot(wave, flux, 'k-', lw=1)
-            #if error is not None:
-            #    self.axes[i].plot(wave, error, 'r-', lw=0.5, alpha=0.5)
-            
-            #if i == num_spectra - 1:
-            #    self.axes[i].set_xlabel('Wavelength')
-            #self.axes[i].set_ylabel('Flux')            
-            #self.axes[i].set_title(filename, fontsize=10)
+            # Store original view limits
+            self.original_xlims.append(self.axes[i].get_xlim())
+            self.original_ylims.append(self.axes[i].get_ylim())
         
-        self.fig.tight_layout()
+        # Use tight_layout with padding parameters
+        self.fig.tight_layout(pad=1.0, h_pad=0.5, w_pad=1.0)
         self.draw()
         
         # Send message if message box is available
@@ -102,6 +111,11 @@ class SpectralPlot(FigureCanvas):
             if self.message_box:
                 self.message_box.on_sent_message("Exiting application...", "#FF0000")
             self.parent_window.close()
+            return
+        
+        # Handle reset key 'r'
+        if event.key == 'r':
+            self.reset_view()
             return
         
         if x is None or y is None:
@@ -206,11 +220,53 @@ class SpectralPlot(FigureCanvas):
             self.axes[ax_index].set_xlim([xcen - 1.5*delx,xcen + 1.5*delx])
             self.draw() 
 
-
-
+    def reset_view(self):
+        """
+        Resets the view to original x and y limits and removes all redshift lines.
+        Called when 'r' key is pressed.
+        """
+        if not self.spectra or self.axes is None or len(self.axes) == 0:
+            return
         
-
-
+        # Store current redshift and linelist information to reapply later if needed
+        had_redshift_lines = hasattr(self, 'redshift') and hasattr(self, 'linelist')
+        if had_redshift_lines:
+            current_redshift = self.redshift
+            current_linelist = self.linelist
+            
+        # Clear any redshift lines
+        self.clear_redshift_lines()
+        
+        # Reset the scale to default
+        self.scale = 1.0
+        
+        # Replot each spectrum with original data and limits
+        for i, spec in enumerate(self.spectra):
+            if i < len(self.original_xlims) and i < len(self.original_ylims):
+                # Get original data
+                wave = spec.wavelength.value
+                flux = spec.flux.value
+                error = spec.sig.value if hasattr(spec, 'sig') else None
+                filename = os.path.basename(spec.filename)
+                
+                # Clear and replot
+                self.axes[i].clear()
+                self.plot_one_spec(wave, flux, error, i, filename)
+                
+                # Set back to original limits
+                self.axes[i].set_xlim(self.original_xlims[i])
+                self.axes[i].set_ylim(self.original_ylims[i])
+        
+        # Update the canvas
+        self.draw()
+        
+        # Reapply the redshift lines if they existed before
+        if had_redshift_lines:
+            # Re-plot the redshift lines with the previously used values
+            self.plot_redshift_lines()
+        
+        if self.message_box:
+            self.message_box.on_sent_message("Reset view to original state", "#008000")
 
     def replot(self, wave, new_spec, new_err,ax_index,filename):
         '''Re-plot smoothed/unsmoothed spectrum
@@ -279,6 +335,13 @@ class SpectralPlot(FigureCanvas):
                 self.message_box.on_sent_message("Redshift or linelist not set", "#FF0000")
             return
         
+        # Store current axis limits before clearing lines
+        current_xlims = []
+        current_ylims = []
+        for ax in self.axes:
+            current_xlims.append(ax.get_xlim())
+            current_ylims.append(ax.get_ylim())
+            
         # Clear any existing redshift lines first
         self.clear_redshift_lines()
         
@@ -287,7 +350,6 @@ class SpectralPlot(FigureCanvas):
         
         self.redshift_lines = []  # Store references to lines for later removal
         
-          
         # Draw vertical lines for each spectral feature
         lines_plotted = 0
         
@@ -300,9 +362,9 @@ class SpectralPlot(FigureCanvas):
             
             # Draw on all axes
             for i, ax in enumerate(self.axes):
-                # Get current axis limits
-                xlim = ax.get_xlim()
-                ylim = ax.get_ylim()
+                # Use stored limits from before clearing lines
+                xlim = current_xlims[i]
+                ylim = current_ylims[i]
                 
                 # Always draw the line (even if outside current view)
                 line_obj = ax.axvline(x=observed_wavelength, color='blue', linestyle='--', alpha=0.7)
@@ -317,6 +379,11 @@ class SpectralPlot(FigureCanvas):
                     self.redshift_lines.append(text)
                     lines_plotted += 1
         
+        # Restore the axis limits after drawing lines
+        for i, ax in enumerate(self.axes):
+            ax.set_xlim(current_xlims[i])
+            ax.set_ylim(current_ylims[i])
+            
         self.fig.canvas.draw_idle()  # Ensure the figure updates
         
         if self.message_box:
@@ -366,14 +433,21 @@ class MainWindow(QMainWindow):
         
         # Create SpectralPlot with reference to the message box
         self.canvas = SpectralPlot(self, message_box=self.message_box)
-        self.toolbar = NavigationToolbar(self.canvas, self)
         
+        # Create a more compact toolbar
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        self.toolbar.setMaximumHeight(30)
+        
+        # Add toolbar and canvas with more emphasis on canvas space
         main_layout.addWidget(self.toolbar)
-        main_layout.addWidget(self.canvas)
+        main_layout.addWidget(self.canvas, 1)  # Give canvas a stretch factor of 1
 
         # Create bottom widget container with redshift inputs and message box
         bottom_widget = QWidget()
+        bottom_widget.setMaximumHeight(150)  # Limit the maximum height of bottom widget
         bottom_layout = QHBoxLayout(bottom_widget)
+        bottom_layout.setContentsMargins(5, 5, 5, 5)  # Reduce margins (left, top, right, bottom)
+        bottom_layout.setSpacing(5)  # Reduce spacing between widgets
         
         # Create redshift input widget
         self.redshift_widget = RedshiftInputWidget()
@@ -390,7 +464,7 @@ class MainWindow(QMainWindow):
         self.spectra = []  # Stores loaded spectra
         
         status_text = "Ready - Click on plot then use keys: x = set min x-limit, X = set max x-limit, "
-        status_text += "t = set max y-limit, b = set min y-limit, q = quit application"
+        status_text += "t = set max y-limit, b = set min y-limit, r = reset view, q = quit application"
         self.statusBar().showMessage(status_text)
         self.message_box.on_sent_message("Application ready. Select FITS files to begin.", "#000000")
 

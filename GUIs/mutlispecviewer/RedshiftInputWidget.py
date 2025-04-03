@@ -26,7 +26,7 @@ class RedshiftInputWidget(QWidget):
         
         linelist_label = QLabel("Line List:")
         self.linelist_combo = QComboBox()
-        self.linelist_combo.addItems(["None", "LLS","LLS Small" ,"DLA"])  # Empty string as default "Select" option
+        self.linelist_combo.addItems(["None", "LLS","LLS Small" ,"DLA","LBG", "Gal", "Eiger_Strong"])  # Empty string as default "Select" option
         
         submit_button = QPushButton("Submit")
         submit_button.clicked.connect(self.validate_and_submit)
