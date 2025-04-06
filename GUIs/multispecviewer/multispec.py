@@ -9,7 +9,10 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
-from linetools.spectra.io import readspec
+# Use XSpectrum1D to load the spectrum directly
+from linetools.spectra.xspectrum1d import XSpectrum1D
+import astropy.units as u
+
 from RedshiftInputWidget import RedshiftInputWidget
 from MessageBox import MessageBox
 from astropy.convolution import convolve, Box1DKernel, Gaussian2DKernel
@@ -146,7 +149,9 @@ class SpectralPlot(FigureCanvas):
         self.axes = self.fig.subplots(num_spectra, 1, sharex=True)
         
         # Adjust the spacing between subplots
-        self.fig.subplots_adjust(hspace=0.1)  # Reduce vertical space between subplots
+        self.fig.subplots_adjust(hspace=0.0)  # Reduce vertical space between subplots
+        # Use tight_layout with minimal padding
+        self.fig.tight_layout(pad=0.5, h_pad=0.0, w_pad=0.5)
         
         if num_spectra == 1:
             self.axes = [self.axes]  # Ensure axes is always a list
@@ -389,7 +394,8 @@ class SpectralPlot(FigureCanvas):
 
     def plot_one_spec(self, wave, flux, error, index, filename):
         """Plot a single spectrum panel"""
-        self.axes[index].plot(wave, flux, 'k-', lw=1)
+        flux_line, = self.axes[index].plot(wave, flux, 'k-', lw=1)
+
         if error is not None:
             self.axes[index].plot(wave, error, 'r-', lw=0.5, alpha=0.5)
             
@@ -397,7 +403,9 @@ class SpectralPlot(FigureCanvas):
             self.axes[index].set_xlabel('Wavelength')
         self.axes[index].set_ylabel('Flux')
             
-        self.axes[index].set_title(filename, fontsize=10)
+        # Add legend with filename
+        self.axes[index].legend([flux_line], [filename], loc='upper right', fontsize='small')
+
 
     def set_redshift_data(self, redshift, linelist):
         """
@@ -631,8 +639,8 @@ class SpectralPlot(FigureCanvas):
         self.draw()
         
         # Update the redshift widget with the calculated redshift
-        if hasattr(self.parent_window, 'redshift_widget'):
-            self.parent_window.redshift_widget.set_redshift(z)
+        #if hasattr(self.parent_window, 'redshift_widget'):
+        #    self.parent_window.redshift_widget.set_redshift(z)
 
 class MainWindow(QMainWindow):
     """
@@ -664,16 +672,24 @@ class MainWindow(QMainWindow):
         # Create SpectralPlot with reference to the message box
         self.canvas = SpectralPlot(self, message_box=self.message_box)
         self.toolbar = NavigationToolbar(self.canvas, self)
+
+        # Set the toolbar and canvas to expand
+        self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.toolbar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
         
         main_layout.addWidget(self.toolbar)
-        main_layout.addWidget(self.canvas)
+        main_layout.addWidget(self.canvas,10)
     
         # Create bottom widget container with redshift inputs and message box
         bottom_widget = QWidget()
         bottom_layout = QHBoxLayout(bottom_widget)
+        bottom_widget.setMaximumHeight(150)  # Limit the maximum height of the bottom widget
+
         
         # Create redshift input widget
         self.redshift_widget = RedshiftInputWidget()
+        self.redshift_widget.setMaximumWidth(600)  # Limit the width of the redshift widget
         # Connect to both signals
         self.redshift_widget.submitted.connect(self.handle_redshift_submission)
         self.redshift_widget.linelist_changed.connect(self.handle_redshift_submission)  # Use same handler
@@ -741,18 +757,58 @@ class MainWindow(QMainWindow):
     
     def load_fits_files(self, file_paths):
         """
-        Loads and plots the selected FITS files.
+        Loads and plots the selected FITS files using XSpectrum1D directly.
+        Adds error spectrum as 5% of flux if none exists.
         """
         try:
+            import numpy as np
+            
             self.spectra = []
-            for file_path in file_paths:
-                spec = readspec(file_path)
-                self.spectra.append(spec)
-            self.canvas.plot_spectra(self.spectra)
+            for file_path in file_paths:                
+                # First, load the spectrum to get wavelength and flux
+                try:
+                    temp_spec = XSpectrum1D.from_file(file_path)
+                    wave = temp_spec.wavelength.value
+                    flux = temp_spec.flux.value
+                    
+                    # Check if the original spectrum has an error array
+                    if temp_spec.sig_is_set:
+                        # Use the existing error array
+                        sig = temp_spec.sig.value
+                        spec = XSpectrum1D.from_tuple((wave, flux, sig), verbose=False)
+                    else:
+                        # Create error array as 5% of flux values
+                        sig_array = 0.05 * flux
+                        
+                        # Create a new spectrum with the error array
+                        spec = XSpectrum1D.from_tuple((wave, flux, sig_array), verbose=False)
+                        
+                        # Send message that we're assuming 5% error
+                        self.message_box.on_sent_message(
+                            f"No error spectrum found for {os.path.basename(file_path)}. " 
+                            f"Using 5% of flux values as error.", "#FFA500")
+                    
+                    # Set the filename attribute to match the original
+                    spec.filename = file_path
+                    
+                    self.spectra.append(spec)
+                    
+                except Exception as spec_error:
+                    self.message_box.on_sent_message(
+                        f"Error loading {os.path.basename(file_path)}: {str(spec_error)}. Skipping file.", 
+                        "#FF0000")
+                    continue
+            
+            if self.spectra:  # Only plot if we have loaded spectra
+                self.canvas.plot_spectra(self.spectra)
+            else:
+                self.message_box.on_sent_message("No spectra could be loaded.", "#FF0000")
         except Exception as e:
             error_message = f"Error: {str(e)}"
             self.statusBar().showMessage(error_message)
-            self.message_box.on_sent_message(error_message, "#FF0000")
+            self.message_box.on_sent_message(error_message, "#FF0000")   
+        
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()

@@ -939,21 +939,29 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
 
 
     #spec plot is connected to the smoothing/unsmoothing events
-    #flux is always stored as ax.lines[0], error as ax.lines[1]. So we can add two new S/US plots
-    #replace lines[0] and [1], then delete the last two lines added to the ax.lines list to keep the reference as [1] and [0]
     def specplot(self):
-        ax=self.spectrum.gca()
-        xlim=ax.get_xlim()
-        ylim=ax.get_ylim()
-        replace_flux = ax.step(self.wave,self.smoothed_spectrum,'-',lw=0.5,label='smooth',color=clr['white'])
-        self.ax.lines[1] = replace_flux[0]
-        del self.ax.lines[-1]
-        replace_error = ax.step(self.wave,self.smoothed_error,'-',lw=0.5,label='smooth',color=clr['pale_red'],zorder=2)
-        self.ax.lines[0] = replace_error[0]
-        del self.ax.lines[-1]
+        """
+        Updates the plot with smoothed spectrum.
+        This version simply updates the y-data of the existing line objects.
+        """
+        # Store current axis limits
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
         
-        self.spectrum.canvas.draw() 
+        # Update the y-data of existing line objects without creating new ones
+        if len(self.ax.lines) >= 2:
+            # Update flux line (index 1)
+            self.ax.lines[1].set_ydata(self.smoothed_spectrum)
+            
+            # Update error line (index 0)
+            self.ax.lines[0].set_ydata(self.smoothed_error)
         
+        # Restore axis limits
+        self.ax.set_xlim(xlim)
+        self.ax.set_ylim(ylim)
+        
+        # Redraw canvas
+        self.spectrum.canvas.draw()  
 
     # Read and draw linelist    
     def DrawLineList(self,label,color='white',remove = False,hide =False,Man_Transition = False):

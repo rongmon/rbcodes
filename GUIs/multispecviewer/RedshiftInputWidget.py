@@ -19,16 +19,26 @@ class RedshiftInputWidget(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        # Set default values
+        self.default_redshift = 0.0
+        self.default_linelist = "LLS"
         self.initUI()
         
     def initUI(self):
         # Create widgets
         redshift_label = QLabel("Redshift Guess:")
         self.redshift_input = QLineEdit()
+        # Set default redshift value
+        self.redshift_input.setText(f"{self.default_redshift:.6f}")
         
         linelist_label = QLabel("Line List:")
         self.linelist_combo = QComboBox()
         self.linelist_combo.addItems(["None", "LLS", "LLS Small", "DLA", "LBG", "Gal", "Eiger_Strong"])  # Updated linelist options
+        
+        # Set default line list
+        default_index = self.linelist_combo.findText(self.default_linelist)
+        if default_index >= 0:
+            self.linelist_combo.setCurrentIndex(default_index)
         
         # Connect linelist combo box change event
         self.linelist_combo.currentIndexChanged.connect(self.on_linelist_changed)
@@ -52,6 +62,12 @@ class RedshiftInputWidget(QWidget):
         main_layout.addWidget(submit_button)
         
         self.setLayout(main_layout)
+        
+        # Emit the initial values to ensure everything is synchronized at startup
+        try:
+            self.linelist_changed.emit(self.default_redshift, self.default_linelist)
+        except Exception as e:
+            print(f"Error emitting initial values: {str(e)}")
     
     def on_linelist_changed(self, index):
         """Handle linelist selection change"""
