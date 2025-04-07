@@ -224,6 +224,8 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         #Message Window for user
         self.message_window = QLabel("Message Window")
         self.message_window.setStyleSheet('background-color : black')
+        self.message_window.setText(f"Initializing with zabs = {zabs}")
+
         
         #active values layout (bottom of canvas layout)
         active_elem_layout = QtWidgets.QFormLayout()
@@ -262,6 +264,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         widget = QtWidgets.QWidget()
         widget.setLayout(main_layout)
         self.setCentralWidget(widget)
+        self.zabs_changed()
         self.show()
         #--------------------------end of layouts/widgets initialization------------#
         
@@ -2105,7 +2108,7 @@ class rb_plotspec():
 
         #app = QtWidgets.QApplication(sys.argv)
          # Force the style to be the same on all OSs:
-        main = mainWindow(wave,flux,error)
+        main = mainWindow(wave,flux,error, zabs=zabs) 
         main.resize(1700,900)
         
         #Center app on initialization

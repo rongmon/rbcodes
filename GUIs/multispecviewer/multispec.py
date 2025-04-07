@@ -680,6 +680,7 @@ class SpectralPlot(FigureCanvas):
         #if hasattr(self.parent_window, 'redshift_widget'):
         #    self.parent_window.redshift_widget.set_redshift(z)
 
+
     def plot_absorber_lines(self, absorber_id, z_abs, line_list, color):
         """
         Plot spectral lines for a specific absorber system.
@@ -687,7 +688,7 @@ class SpectralPlot(FigureCanvas):
         :param absorber_id: Unique identifier for this absorber system
         :param z_abs: Redshift of the absorber
         :param line_list: Name of the line list to use
-        :param color: Color to use for the lines
+        :param color: Color name to use for the lines
         :return: Success status
         """
         if not self.spectra or self.axes is None or len(self.axes) == 0:
@@ -738,6 +739,11 @@ class SpectralPlot(FigureCanvas):
         global_min_wave = np.min(all_wavelengths)
         global_max_wave = np.max(all_wavelengths)
         
+        # Get the color values from the dictionary
+        clr = rt.rb_set_color()
+        # Default to white if color isn't in the dictionary
+        color_value = clr.get(color, clr['white'])
+        
         # Draw vertical lines for each spectral feature
         lines_plotted = 0
         
@@ -755,8 +761,8 @@ class SpectralPlot(FigureCanvas):
                     # Get the y-limits for this axis
                     ylim = current_ylims[i]
                     
-                    # Draw the line with specified color
-                    line_obj = ax.axvline(x=observed_wavelength, color=color, linestyle='--', alpha=0.7)
+                    # Draw the line with color from the clr dictionary
+                    line_obj = ax.axvline(x=observed_wavelength, color=color_value, linestyle='--', alpha=0.7)
                     self.absorber_lines[absorber_id].append(line_obj)
                     
                     # Only add text labels in the top panel (index 0)
@@ -766,7 +772,7 @@ class SpectralPlot(FigureCanvas):
                         
                         text = ax.text(observed_wavelength, y_pos, transition_name, rotation=90, 
                                horizontalalignment='right', verticalalignment='top',
-                               fontsize=8, color=color)
+                               fontsize=8, color=color_value)
                         
                         # Add redshift indicator to the text
                         text_with_z = f"{transition_name} z={z_abs:.4f}"
@@ -789,37 +795,36 @@ class SpectralPlot(FigureCanvas):
             else:
                 self.message_box.on_sent_message(f"No lines found within wavelength range for z={z_abs:.6f}", "#FFA500")
         
-        return True
-    
-    
+        return True  
+        
     def remove_absorber_lines(self, absorber_id):
-        """
-        Remove all spectral lines for a specific absorber system.
+            """
+            Remove all spectral lines for a specific absorber system.
+            
+            :param absorber_id: Identifier for the absorber system to remove
+            :return: Success status
+            """
+            if not hasattr(self, 'absorber_lines') or absorber_id not in self.absorber_lines:
+                return False
+            
+            # Remove each line object
+            for line_obj in self.absorber_lines[absorber_id]:
+                try:
+                    line_obj.remove()
+                except:
+                    pass
+            
+            # Clear the list
+            self.absorber_lines[absorber_id] = []
+            
+            # Update the plot
+            self.fig.canvas.draw_idle()
+            
+            if self.message_box:
+                self.message_box.on_sent_message(f"Removed absorber system {absorber_id}", "#008000")
+            
+            return True
         
-        :param absorber_id: Identifier for the absorber system to remove
-        :return: Success status
-        """
-        if not hasattr(self, 'absorber_lines') or absorber_id not in self.absorber_lines:
-            return False
-        
-        # Remove each line object
-        for line_obj in self.absorber_lines[absorber_id]:
-            try:
-                line_obj.remove()
-            except:
-                pass
-        
-        # Clear the list
-        self.absorber_lines[absorber_id] = []
-        
-        # Update the plot
-        self.fig.canvas.draw_idle()
-        
-        if self.message_box:
-            self.message_box.on_sent_message(f"Removed absorber system {absorber_id}", "#008000")
-        
-        return True
-    
     def toggle_absorber_visibility(self, absorber_id):
         """
         Toggle visibility of lines for a specific absorber system.

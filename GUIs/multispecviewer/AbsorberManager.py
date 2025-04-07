@@ -1,9 +1,9 @@
 import pandas as pd
 from PyQt5.QtWidgets import (QWidget, QTableWidget, QTableWidgetItem, 
                              QHBoxLayout, QVBoxLayout, QComboBox, QPushButton,
-                             QHeaderView, QSizePolicy)
+                             QHeaderView, QSizePolicy, QApplication)
 from PyQt5.QtGui import QColor
-from PyQt5 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 from utils import rb_utility as rt
 clr = rt.rb_set_color()
 
@@ -11,6 +11,13 @@ class AbsorberManager(QWidget):
     """
     A widget for managing multiple absorber systems with their redshifts, line lists, and colors.
     Allows adding, removing, plotting, and hiding absorbers.
+    
+    Note: To fully support this widget, the parent should implement:
+    - plot_absorber_lines(row, z_abs, line_list, color) - Plot lines for this absorber
+    - remove_absorber_lines(row) - Remove lines for this absorber
+    - toggle_absorber_visibility(row) - Toggle visibility of absorber lines
+    - update_absorber_redshift(row, z_abs) - Update when redshift is changed manually
+    - renumber_absorber_lines(old_row, new_row) - Handle row renumbering after deletion
     """
     
     def __init__(self, parent=None, colors=None):
@@ -67,20 +74,124 @@ class AbsorberManager(QWidget):
             color_combo.addItem(color)
         self.table.setCellWidget(row_index, 2, color_combo)
         
-        # Plot button
-        plot_btn = QPushButton("Plot")
-        plot_btn.clicked.connect(lambda: self.plot_absorber(row_index))
+        # Plot button with direct row reference
+        plot_btn = QPushButton("Plot", self)
+        # Store the row index directly on the button
+        plot_btn.row_index = row_index
+        plot_btn.clicked.connect(self.plot_absorber_from_button)
         self.table.setCellWidget(row_index, 3, plot_btn)
         
-        # Remove button
-        remove_btn = QPushButton("Remove")
-        remove_btn.clicked.connect(lambda: self.remove_absorber(row_index))
+        # Remove button with direct row reference
+        remove_btn = QPushButton("Remove", self)
+        # Store the row index directly on the button
+        remove_btn.row_index = row_index
+        remove_btn.clicked.connect(self.remove_absorber_from_button)
         self.table.setCellWidget(row_index, 4, remove_btn)
         
-        # Hide button
-        hide_btn = QPushButton("Hide")
-        hide_btn.clicked.connect(lambda: self.toggle_hide_absorber(row_index))
+        # Hide button with direct row reference
+        hide_btn = QPushButton("Hide", self)
+        # Store the row index directly on the button
+        hide_btn.row_index = row_index
+        hide_btn.clicked.connect(self.toggle_hide_absorber_from_button)
         self.table.setCellWidget(row_index, 5, hide_btn)
+    
+    def get_index(self):
+        """
+        Gets the row and column of the clicked button.
+        This is a comprehensive approach based on PlotSpec_Integrated.
+        """
+        # Get the button that was clicked
+        button = QtWidgets.QApplication.focusWidget()
+        if not button:
+            return None, None
+            
+        # Try direct approach - check if the widget is in our table
+        for row in range(self.table.rowCount()):
+            for col in range(3, 6):  # Columns with buttons
+                if self.table.cellWidget(row, col) == button:
+                    print(f"Direct check - Button at row {row}, col {col}")
+                    return row, col
+        
+        # Try indexAt with button position (might not work reliably)
+        index = self.table.indexAt(button.pos())
+        if index.isValid():
+            row = index.row()
+            col = index.column()
+            print(f"IndexAt check - Button at row {row}, col {col}")
+            return row, col
+        
+        print("Could not determine button position")
+        return None, None
+    
+    def plot_absorber_from_button(self):
+        """Plot absorber using row index stored on the button"""
+        button = self.sender()
+        if hasattr(button, 'row_index'):
+            row = button.row_index
+            print(f"Plotting absorber at row {row}")
+            self.plot_absorber(row)
+        else:
+            print("Button does not have a row_index property")
+    
+    def remove_absorber_from_button(self):
+        """Remove absorber using row index stored on the button"""
+        button = self.sender()
+        if hasattr(button, 'row_index'):
+            row = button.row_index
+            print(f"Removing absorber at row {row}")
+            self.remove_absorber(row)
+        else:
+            print("Button does not have a row_index property")
+    
+    def toggle_hide_absorber_from_button(self):
+        """Toggle hide absorber using row index stored on the button"""
+        button = self.sender()
+        if hasattr(button, 'row_index'):
+            row = button.row_index
+            print(f"Toggling visibility of absorber at row {row}")
+            self.toggle_hide_absorber(row)
+        else:
+            print("Button does not have a row_index property")
+        
+    def get_button_row_index(self):
+        """
+        Gets the row index of the button that triggered the event.
+        This technique is adapted from PlotSpec_Integrated.
+        """
+        button = self.sender()
+        if not button:
+            return -1
+            
+        # First try to find the button directly in the table
+        for row in range(self.table.rowCount()):
+            for col in range(3, 6):  # Columns 3, 4, 5 contain our buttons
+                if self.table.cellWidget(row, col) == button:
+                    return row
+                    
+        # Fallback: try using position
+        index = self.table.indexAt(button.pos())
+        if index.isValid():
+            return index.row()
+            
+        return -1
+    
+    def plot_clicked(self):
+        """Handle Plot button click"""
+        row = self.get_button_row_index()
+        if row >= 0:
+            self.plot_absorber(row)
+            
+    def remove_clicked(self):
+        """Handle Remove button click"""
+        row = self.get_button_row_index()
+        if row >= 0:
+            self.remove_absorber(row)
+            
+    def hide_clicked(self):
+        """Handle Hide button click"""
+        row = self.get_button_row_index()
+        if row >= 0:
+            self.toggle_hide_absorber(row)
     
     def add_absorber(self, z_abs, line_list=None, color=None):
         """Add a new absorber to the manager"""
@@ -105,8 +216,17 @@ class AbsorberManager(QWidget):
             # No empty rows, add a new one
             new_row_idx = self.table.rowCount()
             self.table.setRowCount(new_row_idx + 1)
+            
+            # Important: Add widgets BEFORE populating to ensure button connections exist
             self._add_row_widgets(new_row_idx)
             self._populate_row(new_row_idx, z_abs, line_list, color)
+            
+        # Always ensure there's at least one empty row at the end for future entries
+        last_row = self.table.rowCount() - 1
+        if self.table.item(last_row, 1) is not None:  # If the last row is not empty
+            empty_row_idx = self.table.rowCount()
+            self.table.setRowCount(empty_row_idx + 1)
+            self._add_row_widgets(empty_row_idx)
         
         # Return success status
         return True
@@ -155,21 +275,30 @@ class AbsorberManager(QWidget):
     def remove_absorber(self, row):
         """Remove the absorber at the specified row"""
         try:
-            # Remove from dataframe if exists
+            # Call parent's method to remove absorber lines if available
+            if hasattr(self.parent, 'remove_absorber_lines'):
+                self.parent.remove_absorber_lines(row)
+            
+            # Need to get data before removing the row
             if row < len(self.absorbers_df):
+                # Remove from dataframe
                 self.absorbers_df = self.absorbers_df.drop(row).reset_index(drop=True)
             
-            # Clear the row in the table
+            # Remove the row from the table
             self.table.removeRow(row)
+            
+            # Update row_index for all buttons after the removed row
+            for r in range(row, self.table.rowCount()):
+                for c in range(3, 6):  # Button columns
+                    btn = self.table.cellWidget(r, c)
+                    if btn and hasattr(btn, 'row_index'):
+                        # Update the row index to match the new position
+                        btn.row_index = r
             
             # Add a new empty row at the end to maintain minimum rows
             new_row_idx = self.table.rowCount()
             self.table.insertRow(new_row_idx)
             self._add_row_widgets(new_row_idx)
-            
-            # Call parent's method to remove absorber lines if available
-            if hasattr(self.parent, 'remove_absorber_lines'):
-                self.parent.remove_absorber_lines(row)
                 
             return True
         except Exception as e:
@@ -201,15 +330,17 @@ class AbsorberManager(QWidget):
         """Handle manual edits to cells"""
         if column == 1:  # Redshift column
             try:
-                z_abs = float(self.table.item(row, 1).text())
-                
-                # Update dataframe
-                if row < len(self.absorbers_df):
-                    self.absorbers_df.at[row, 'Zabs'] = z_abs
-                
-                # Notify parent if needed
-                if hasattr(self.parent, 'update_absorber_redshift'):
-                    self.parent.update_absorber_redshift(row, z_abs)
+                # Only proceed if there's actually text in the cell
+                if self.table.item(row, 1) is not None and self.table.item(row, 1).text():
+                    z_abs = float(self.table.item(row, 1).text())
+                    
+                    # Update dataframe
+                    if row < len(self.absorbers_df):
+                        self.absorbers_df.at[row, 'Zabs'] = z_abs
+                    
+                    # Notify parent if needed
+                    if hasattr(self.parent, 'update_absorber_redshift'):
+                        self.parent.update_absorber_redshift(row, z_abs)
             except ValueError:
                 print("Invalid redshift value")
                 # Revert to previous value if in dataframe
@@ -228,7 +359,6 @@ class AbsorberManager(QWidget):
         return None
 
     def setup_dark_theme(self):
-        
         """
         Apply a dark theme similar to the main application's color scheme
         """
@@ -240,60 +370,70 @@ class AbsorberManager(QWidget):
         white_text = QColor(255, 255, 255)
         highlight_color = QColor(42, 130, 218)
         
-        # Fix around line 252-300
         dark_stylesheet = """
         QWidget {
-            background-color: """ + dark_background.name() + """;
-            color: """ + white_text.name() + """;
-            selection-background-color: """ + highlight_color.name() + """;
+            background-color: %s;
+            color: %s;
+            selection-background-color: %s;
         }
         
         QTableWidget {
-            background-color: """ + darker_background.name() + """;
-            alternate-background-color: """ + dark_background.name() + """;
-            color: """ + white_text.name() + """;
-            selection-background-color: """ + highlight_color.name() + """;
+            background-color: %s;
+            alternate-background-color: %s;
+            color: %s;
+            selection-background-color: %s;
         }
         
         QTableWidget::item {
-            background-color: """ + darker_background.name() + """;
-            color: """ + white_text.name() + """;
+            background-color: %s;
+            color: %s;
         }
         
         QTableWidget::item:selected {
-            background-color: """ + highlight_color.name() + """;
-            color: """ + white_text.name() + """;
+            background-color: %s;
+            color: %s;
         }
         
         QHeaderView::section {
-            background-color: """ + dark_background.name() + """;
-            color: """ + white_text.name() + """;
+            background-color: %s;
+            color: %s;
             padding: 5px;
-            border: 1px solid """ + darker_background.name() + """;
+            border: 1px solid %s;
         }
         
         QPushButton {
-            background-color: """ + dark_background.name() + """;
-            color: """ + white_text.name() + """;
-            border: 1px solid """ + highlight_color.name() + """;
+            background-color: %s;
+            color: %s;
+            border: 1px solid %s;
             padding: 5px;
         }
         
         QPushButton:hover {
-            background-color: """ + highlight_color.name() + """;
-            color: """ + white_text.name() + """;
+            background-color: %s;
+            color: %s;
         }
         
         QComboBox {
-            background-color: """ + darker_background.name() + """;
-            color: """ + white_text.name() + """;
-            selection-background-color: """ + highlight_color.name() + """;
+            background-color: %s;
+            color: %s;
+            selection-background-color: %s;
         }
         
         QComboBox::drop-down {
-            background-color: """ + dark_background.name() + """;
+            background-color: %s;
         }
-        """
+        """ % (
+            dark_background.name(), white_text.name(), highlight_color.name(),
+            darker_background.name(), dark_background.name(), white_text.name(), highlight_color.name(),
+            darker_background.name(), white_text.name(),
+            highlight_color.name(), white_text.name(),
+            dark_background.name(), white_text.name(), darker_background.name(),
+            dark_background.name(), white_text.name(), highlight_color.name(),
+            highlight_color.name(), white_text.name(),
+            darker_background.name(), white_text.name(), highlight_color.name(),
+            dark_background.name()
+        )
+        
         # Apply stylesheet
         self.setStyleSheet(dark_stylesheet)
         
