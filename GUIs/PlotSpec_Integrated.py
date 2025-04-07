@@ -338,23 +338,11 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
     #keyboard events
     def ontype(self,event):
         zabs=np.double(0.)
-        # when the user hits 'r': clear the axes (except flux and error) and return to the initial x&y lims
+        # when the user hits 'r': use the Refreshed method for consistency
         if event.key=='r':
-            #del self.ax.lines[2:]
-            self.lam_lim=[]
-            self.lam_ylim=[]
-            self.FXval=[]
-            self.FYval=[]
-
-            #self.ax.texts = []
-            #while self.ax.texts:
-            #    self.ax.texts.pop()
-            #while self.ax.collections:
-            #    self.ax.collections.pop()
-
-            self.ax.set_ylim(self.init_ylims)
-            self.ax.set_xlim(self.init_xlims)
+            self.Refreshed(self)
             self.spectrum.canvas.draw()
+
             
         #another refresh to keep the current flux values but remove the plotted lines
         elif event.key == 'R':
@@ -810,37 +798,58 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
 
                     self.spectrum.canvas.draw()
                     break
+
+
+
                     
-    def Refreshed(self,parent):
+    def Refreshed(self, parent):
+        # Reset view to initial limits
         self.ax.set_ylim(self.init_ylims)
         self.ax.set_xlim(self.init_xlims)
-        self.lam_lim=[]
-        self.lam_ylim=[]
-        self.FXval=[]
-        self.FYval=[]
-
         
+        # Clear any stored limits for EW or fitting
+        self.lam_lim = []
+        self.lam_ylim = []
+        self.FXval = []
+        self.FYval = []
+        
+        # Reset the smoothing filter size to 1 (no smoothing)
+        self.vel = np.array([1.])
+        
+        # Reset the smoothed spectrum to the original flux
+        self.smoothed_spectrum = self.flux
+        self.smoothed_error = self.error
+        
+        # Handle identified lines if active
         if self.identified_line_active == True:
             self.identified_line_active = False
             self.Identified_line_plot.setStyleSheet('background-color : QColor(53, 53, 53)')
             self.message_window.setText(" ")
-        if len(self.ax.lines)>2:
+            
+        # Clear excess plot elements
+        if len(self.ax.lines) > 2:
             del self.ax.lines[2:]
-            #self.ax.texts = []
+            
+            # Clear text elements
             while self.ax.texts:
                 self.ax.texts.pop()
+            
+            # Clear other collection elements
             while self.ax.collections:
                 self.ax.collections.pop()
-
+    
             try:
                 for ii in self.text[-1]:
                     ii.remove()
             except:
                 pass
-
-            #may need condition to change hide color to gray
-            self.spectrum.canvas.draw()
-        
+    
+            # Update the lines to show the original, non-smoothed spectrum
+            self.ax.lines[1].set_ydata(self.flux)  # Update flux line
+            self.ax.lines[0].set_ydata(self.error)  # Update error line
+            
+            # Redraw the canvas
+            self.spectrum.canvas.draw()        
     
     def cellchanged(self):
         col = self.abs_plot.table.currentColumn()
