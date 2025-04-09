@@ -247,7 +247,6 @@ class SpectralPlot(FigureCanvas):
         if event.key == 'r':
             self.reset_view()
             return
-        
         # Handle capital R key to just remove the line identifications
         if event.key == 'R':
             self.clear_quickid_lines()
@@ -256,13 +255,13 @@ class SpectralPlot(FigureCanvas):
             if self.message_box:
                 self.message_box.on_sent_message("Cleared all line identifications", "#008000")
             return
-        
+
         if x is None or y is None:
             print("No valid coordinates at cursor position")
             if self.message_box:
                 self.message_box.on_sent_message("No valid coordinates at cursor position", "#FF0000")
             return
-        
+
         ax_index = 0
         for i, ax in enumerate(self.axes):
             if event.inaxes == ax:
@@ -824,6 +823,8 @@ class SpectralPlot(FigureCanvas):
                 self.message_box.on_sent_message(f"Removed absorber system {absorber_id}", "#008000")
             
             return True
+
+
         
     def toggle_absorber_visibility(self, absorber_id):
         """
