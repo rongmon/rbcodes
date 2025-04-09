@@ -1,0 +1,459 @@
+"""
+Metal_Plot.py - Main module for the absorption line analysis toolbox.
+Updated with improved application exit handling to prevent segmentation faults.
+"""
+
+import sys
+import numpy as np
+import pickle
+from matplotlib import rcParams
+rcParams['lines.linewidth'] = .9
+import webbrowser
+from pkg_resources import resource_filename
+
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import (
+    QStyleFactory, QPushButton, QLineEdit, QMainWindow, 
+    QInputDialog, QLabel, QMessageBox, QScrollBar, 
+    QVBoxLayout, QHBoxLayout, QApplication, QFileDialog
+)
+from PyQt5.QtGui import QPalette, QColor
+from PyQt5.QtCore import QTimer
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+from matplotlib.figure import Figure
+
+from rbcodes.gui.abstools import Absorber
+from config import MAX_TABS, MAX_IONS_PER_TAB
+from plotting import Plotting
+from ui_components import HelpWindow, SavePage, PageManager
+from equivalent_width import EquivalentWidth
+from event_handler import EventHandler
+from cleanup import ResourceCleanup
+
+# Try to import JSON utilities, but don't fail if they're not available
+try:
+    from json_utils import load_from_json
+    JSON_SUPPORT = True
+except ImportError:
+    JSON_SUPPORT = False
+    print("JSON utilities not found. JSON loading support will be disabled.")
+
+
+class MainWindow(QtWidgets.QTabWidget):
+    """
+    Main application window for the absorption line analysis toolbox.
+    """
+    
+    def __init__(self, ions, parent=None, intervening=False):
+        # Check if this is a loaded file (complete ions dictionary with Target key)
+        self.loaded_file = isinstance(ions, dict) and 'Target' in ions
+        
+        if self.loaded_file:
+            # This is a pre-loaded complete ions dictionary
+            self.ions = ions
+            # Extract target properties from the loaded data
+            self.z = ions['Target']['z']
+            self.flux = ions['Target']['flux']
+            self.wave = ions['Target']['wave']
+            self.error = ions['Target']['error']
+            # Get keys without the Target key
+            self.keys = [key for key in ions.keys() if key != 'Target']
+        else:
+            # Extract full spectra properties from a new Absorber object
+            self.z = ions['Target']['z']
+            self.flux = ions['Target']['flux']
+            self.wave = ions['Target']['wave']
+            self.error = ions['Target']['error']
+            
+            # Initialize ions dictionary
+            self.ions = ions
+            self.keys = list(self.ions.keys())[:-1]  # Last item is the full target spectrum
+        
+        # Initialize parameters
+        self.old_axes = None
+        self.tab_names = ['Ions', 'Ions 2', 'Ions 3', 'Ions 4', 'Ions 5']
+        self.wc = None  # Initialize overall parameter
+        self.ylims = []
+        self.vclim = None
+        self.vclim_all = []
+        self.name = None
+        self.EWlim = [None, None]  # left, right
+        self.event_button = None
+        self.Manual_Mask = None
+        self.pFlag = 1
+        self.intervening = intervening
+        self.save = False
+        self.Lidx = None
+        self.Ridx = None
+        
+        # Initialize parent class
+        super(MainWindow, self).__init__(parent)
+        
+        # Initial page setup
+        self.page = 0
+        self.tabs = [QtWidgets.QWidget()]
+        self.addTab(self.tabs[self.page], self.tab_names[self.page])
+        self.figs = [Figure()]
+        self.canvas = [FigureCanvasQTAgg(self.figs[self.page])]
+
+                
+        self.nions = [len(self.keys)]
+        if self.nions[0] > 6:
+            self.nions[0] = 6
+        
+        # Set up focus for keyboard functionality
+        self.setParent(parent)
+        self.figs[0].canvas.setFocusPolicy(QtCore.Qt.ClickFocus)
+        self.figs[0].canvas.setFocus()
+        
+        # Set up UI layout
+        self.setup_ui()
+        
+        # Initialize axes
+        self.axesL = [list(range(MAX_IONS_PER_TAB))]
+        self.axesR = [list(range(MAX_IONS_PER_TAB))]
+        
+        for ii in range(self.nions[0]):
+            self.axesL[0][ii] = self.figs[0].add_subplot(MAX_IONS_PER_TAB, 2, 2 * ii + 1)
+            self.axesR[0][ii] = self.figs[0].add_subplot(MAX_IONS_PER_TAB, 2, 2 * (ii + 1))
+            self.figs[self.page].subplots_adjust(hspace=0.01)
+            Plotting.plot(self, ii, modify=True)
+        
+        # Set up event connections
+        self.setup_event_connections()
+        
+        # Set up additional pages if needed
+        PageManager.add_page(self)
+    
+    def setup_ui(self):
+        """Set up the user interface components."""
+        # Create control buttons
+        self.add_ion_button = QPushButton("Add Ion", self)
+        self.add_ion_button.setGeometry(630, 30, 200, 30)
+        self.add_ion_button.clicked.connect(lambda: self.NewTransition(self))
+        
+        self.openButton = QPushButton("Help", self)
+        self.openButton.setGeometry(830, 30, 200, 30)
+        self.openButton.clicked.connect(lambda: self.opensub(self))
+        
+        self.saveButton = QPushButton("Save", self)
+        self.saveButton.setGeometry(430, 30, 200, 30)
+        self.saveButton.clicked.connect(lambda: self.onsave(self))
+        
+        # Add load button (NEW)
+        self.loadButton = QPushButton("Load", self)
+        self.loadButton.setGeometry(230, 30, 200, 30)
+        self.loadButton.clicked.connect(lambda: self.onload(self))
+        
+        self.PageLabel = QtWidgets.QLabel("Page: " + str(self.currentIndex() + 1) + "/" + str(len(self.figs)), self)
+        self.PageLabel.setStyleSheet("font: 16pt;color: white;background-color:QColor(53, 53, 53)")
+        
+        # Create layouts
+        self.main_layout = QVBoxLayout()
+        self.top_layout = QHBoxLayout()
+        self.bot_layout = QHBoxLayout()
+        
+        self.spacerItem = QtWidgets.QSpacerItem(5, 10, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        
+        # Arrange widgets in layouts
+        self.top_layout.addItem(self.spacerItem)
+        self.top_layout.addWidget(self.loadButton)  # Add load button
+        self.top_layout.addWidget(self.saveButton)
+        self.top_layout.addWidget(self.add_ion_button)
+        self.top_layout.addWidget(self.openButton)
+        self.top_layout.addItem(self.spacerItem)
+        
+        self.bot_layout.addItem(self.spacerItem)
+        self.bot_layout.addWidget(self.PageLabel)
+        self.bot_layout.addItem(self.spacerItem)
+        
+        self.main_layout.addLayout(self.top_layout, stretch=1)
+        self.main_layout.addWidget(self.canvas[0], stretch=8)
+        self.main_layout.addLayout(self.bot_layout, stretch=1)
+        
+        self.tabs[self.page].setLayout(self.main_layout)
+        
+        # Set up page change handler
+        self.currentChanged.connect(lambda: self.getPage())
+    
+    def setup_event_connections(self):
+        """Set up event connections for mouse and keyboard input."""
+        # Set up connectivity
+        self.cid1 = self.figs[0].canvas.mpl_connect("button_press_event", self.onclick)
+        self.cid2 = self.figs[0].canvas.mpl_connect("key_press_event", self.onpress)
+        self.cid3 = self.figs[0].canvas.mpl_connect("motion_notify_event", self.onmotion)
+    
+    def getPage(self):
+        """Update page information when the tab changes."""
+        self.page = self.currentIndex()
+        self.PageLabel.setText("Page: " + str(self.page + 1) + "/" + str(len(self.figs)))
+    
+    def clean_exit(self):
+        """Properly clean up resources and exit the application."""
+        print("Cleaning up resources before exit...")
+        
+        try:
+            # Disconnect all matplotlib callbacks first
+            if hasattr(self, 'cid1'):
+                for attr_name in dir(self):
+                    if attr_name.startswith('cid') and hasattr(self, attr_name):
+                        cid = getattr(self, attr_name)
+                        if isinstance(cid, int):
+                            for fig in self.figs:
+                                try:
+                                    fig.canvas.mpl_disconnect(cid)
+                                except:
+                                    pass
+            
+            # Clean up large arrays to free memory
+            if hasattr(self, 'keys') and hasattr(self, 'ions'):
+                for key in self.keys:
+                    if key in self.ions:
+                        for item in ['vel', 'wave', 'flux', 'error', 'weight', 'cont']:
+                            if item in self.ions[key] and isinstance(self.ions[key][item], np.ndarray):
+                                self.ions[key][item] = np.array([])
+            
+            # Close all figures directly without using pyplot
+            if hasattr(self, 'figs'):
+                for fig in self.figs:
+                    if fig is not None:
+                        try:
+                            # Clear the figure
+                            fig.clear()
+                            
+                            # Close the canvas if it exists
+                            if hasattr(fig, 'canvas') and fig.canvas is not None:
+                                fig.canvas.close()
+                        except Exception as e:
+                            print(f"Warning during figure cleanup: {e}")
+            
+            # Clean up other attributes
+            self.axesL = None
+            self.axesR = None
+            self.old_axes = None
+            
+            # Force garbage collection
+            import gc
+            gc.collect()
+            
+            # Get the application instance
+            app = QApplication.instance()
+            if app:
+                # Schedule application exit with a small delay
+                QTimer.singleShot(100, app.quit)
+        
+        except Exception as e:
+            print(f"Error during cleanup: {e}")
+            # Still try to exit even if cleanup fails
+            app = QApplication.instance()
+            if app:
+                app.quit()
+    
+    def closeEvent(self, event):
+        """Handle application close event."""
+        try:
+            # Call our clean exit method
+            self.clean_exit()
+            
+            # Accept the close event
+            event.accept()
+        except Exception as e:
+            print(f"Error during closeEvent: {e}")
+            event.accept()
+    
+    def NewTransition(self, parent):
+        """Add a new transition to analyze."""
+        try:
+            # Get new transition wavelength from user
+            new_line, ok = QInputDialog.getDouble(self, 'Add Line', 'Enter new transition:')
+            
+            if ok:
+                # Create new absorber object for the line
+                new_abs = Absorber.Absorber(self.z, self.wave, self.flux, self.error, [new_line])
+                
+                # Update the ions dictionary
+                self.ions.update(new_abs.ions)
+                self.ions['Target'] = self.ions.pop('Target')  # Moves Target to last index
+                
+                # Add new key to the keys list
+                for key in list(new_abs.ions.keys())[:-1]:
+                    self.keys.append(key)
+                
+                # Determine whether to add to current page or create a new page
+                if self.nions[self.page] < 6:
+                    # Add to current page
+                    ii = self.nions[self.page]
+                    self.axesL[self.page][ii] = self.figs[self.page].add_subplot(MAX_IONS_PER_TAB, 2, 2 * ii + 1)
+                    self.axesR[self.page][ii] = self.figs[self.page].add_subplot(MAX_IONS_PER_TAB, 2, 2 * (ii + 1))
+                    self.figs[self.page].subplots_adjust(hspace=0.01)
+                    self.nions[self.page] = self.nions[self.page] + 1
+                    Plotting.plot(self, ii, modify=True)
+                else:
+                    # Need to add a new page
+                    PageManager.add_page(self)
+        
+        except Exception as e:
+            print(f"Error adding new transition: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to add transition: {e}")
+    
+    def onsave(self, parent):
+        """Open the save dialog."""
+        try:
+            self.savepg = SavePage(self)
+            if self.savepg.closewin is None:
+                return None
+            else:
+                self.savepg.show()
+        except Exception as e:
+            print(f"Error opening save dialog: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to open save dialog: {e}")
+    
+    def onload(self, parent):
+        """Open the load dialog."""
+        try:
+            # Check which format we support
+            if JSON_SUPPORT:
+                file_filter = "Analysis Files (*.p *.json);;Pickle Files (*.p);;JSON Files (*.json);;All Files (*)"
+            else:
+                file_filter = "Pickle Files (*.p);;All Files (*)"
+                
+            # Open file dialog
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "Load Analysis File", "", file_filter
+            )
+            
+            if not file_path:
+                return  # User cancelled
+                
+            if not os.path.exists(file_path):
+                QMessageBox.warning(self, "File Not Found", f"File not found: {file_path}")
+                return
+                
+            # Load the file based on extension
+            loaded_data = None
+            
+            if file_path.lower().endswith('.json'):
+                if not JSON_SUPPORT:
+                    QMessageBox.warning(
+                        self, "JSON Support Not Available", 
+                        "JSON utilities not found. Please install the json_utils.py module."
+                    )
+                    return
+                # Load from JSON
+                loaded_data = load_from_json(file_path)
+            
+            elif file_path.lower().endswith('.p'):
+                # Load from pickle
+                with open(file_path, 'rb') as f:
+                    loaded_data = pickle.load(f)
+            else:
+                QMessageBox.warning(
+                    self, "Unknown File Type", 
+                    "Unrecognized file extension. Please use .p for pickle files or .json for JSON files."
+                )
+                return
+                
+            if loaded_data is None:
+                QMessageBox.critical(self, "Loading Error", "Failed to load the analysis data.")
+                return
+                
+            # Confirm before replacing current analysis
+            reply = QMessageBox.question(
+                self, "Confirm Load", 
+                "Loading this file will replace your current analysis. Proceed?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            )
+            
+            if reply == QMessageBox.Yes:
+                # Close current window and open a new one with the loaded data
+                self.closeEvent = lambda event: event.accept()  # Override closeEvent to prevent cleanup
+                self.close()
+                
+                # Create new window with loaded data
+                # Need to access the calling module to create a new Transitions instance
+                from rbcodes.gui.abstools import Metal_Plot as M
+                M.Transitions(loaded_data, intervening=self.intervening)
+                
+        except Exception as e:
+            print(f"Error loading file: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to load file: {e}")
+    
+    def opensub(self, parent):
+        """Open the help window."""
+        try:
+            self.sub = HelpWindow()
+            self.sub.show()
+        except Exception as e:
+            print(f"Error opening help window: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to open help window: {e}")
+    
+    def onmotion(self, event):
+        """Handle mouse motion events."""
+        EventHandler.on_motion(self, event)
+    
+    def onpress(self, event):
+        """Handle key press events."""
+        EventHandler.on_press(self, event)
+    
+    def onclick(self, event):
+        """Handle mouse click events."""
+        EventHandler.on_click(self, event)
+        
+
+class Transitions:
+    """
+    Callable class to initialize and run the absorption line analysis application.
+    """
+    def __init__(self, Abs, intervening=False):
+        # Initialize QApplication if not already running
+        if not QtWidgets.QApplication.instance():
+            app = QtWidgets.QApplication(sys.argv)
+            app.setStyle("Fusion")
+            
+            # Set up dark theme
+            palette = QPalette()
+            palette.setColor(QPalette.Window, QColor(53, 53, 53))
+            palette.setColor(QPalette.WindowText, QtCore.Qt.white)        
+            palette.setColor(QPalette.Base, QColor(25, 25, 25))
+            palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+            palette.setColor(QPalette.Button, QColor(53, 53, 53))
+            palette.setColor(QPalette.ButtonText, QtCore.Qt.white)
+            palette.setColor(QPalette.BrightText, QtCore.Qt.red)
+            palette.setColor(QPalette.Link, QColor(42, 130, 218))
+            palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+            palette.setColor(QPalette.Text, QtCore.Qt.white)
+            
+            app.setPalette(palette)
+            create_new_app = True
+        else:
+            app = QtWidgets.QApplication.instance()
+            create_new_app = False
+        
+        # Create main window
+        main = MainWindow(Abs, intervening=intervening)
+        main.resize(1400, 900)
+        main.show()
+        
+        # Register cleanup handler
+        app.aboutToQuit.connect(lambda: self.ensure_exit())
+        
+        # Ensure application quits properly when using 'q' key
+        QtWidgets.QApplication.setQuitOnLastWindowClosed(True)
+        
+        # Start event loop only if we created a new app
+        if create_new_app:
+            try:
+                app.exec_()
+                # Ensure we exit after app.exec_() returns
+                sys.exit(0)
+            except Exception as e:
+                print(f"Error during application execution: {e}")
+                sys.exit(1)
+    
+    def ensure_exit(self):
+        """Ensure the application fully exits without segmentation fault."""
+        try:
+            # Force Python exit after QApplication has quit
+            QTimer.singleShot(200, lambda: sys.exit(0))
+        except:
+            sys.exit(0)
