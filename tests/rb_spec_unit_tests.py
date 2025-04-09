@@ -39,6 +39,7 @@ Key Parameters:
 
 Note: These tests are designed to be robust and accommodate 
 the natural variations found in astronomical spectral data.
+python -m unittest -v rb_spec_unit_tests.py
 """
 
 import os
