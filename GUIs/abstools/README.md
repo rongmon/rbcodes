@@ -1,77 +1,265 @@
-# Absorption toolbox
+# AbsTools: Absorption Line Analysis Toolbox
 
-A GUI toolbox for CGM/IGM absorption line analysis. 
-Can take one spectrum and interactively and simultaneously analyze several
-ions.
+AbsTools is an interactive toolkit for analyzing absorption lines in astronomical spectra. It provides a user-friendly graphical interface for continuum fitting, equivalent width measurements, and column density determinations of absorption features in spectra of the Circumgalactic Medium (CGM), Intergalactic Medium (IGM), and Interstellar Medium (ISM).
 
-Example:
+## Overview
 
-First Example shows how to start the GUI up from an ipython terminal
+AbsTools is currently part of the `rbcodes` package under `rbcodes.GUIs.abstools`. This README provides instructions on how to use the toolbox within this structure.
+
+### Features
+
+- **Interactive Continuum Fitting**: Fit polynomials to the spectrum continuum with adjustable orders and masked regions
+- **Equivalent Width Measurements**: Calculate equivalent widths and errors with user-defined velocity integration limits
+- **Column Density Calculations**: Determine column densities directly from absorption features
+- **Intervening Absorption Line Analysis**: Identify and analyze intervening absorption systems
+- **Multi-page Support**: Analyze up to 30 transitions simultaneously across 5 tabbed pages
+- **Save/Load Functionality**: Save your analysis in various formats (JSON, Pickle, PDF, data tables)
+
+## Dependencies
+
+AbsTools requires the following libraries:
+- Python 3.6 or higher
+- NumPy
+- Matplotlib
+- PyQt5
+- Pandas
+- Astropy
+- linetools
+
+## Quick Start
+
+There are three ways to start using AbsTools:
+
+### 1. Using the Launcher Script Directly (Simplest)
+
+If the abstools_launcher.py script is in your current directory or you've added it to your PATH:
+
+```bash
+python abstools_launcher.py
+```
+
+### 2. Using the AbsTools Launcher from Python
+
+The launcher provides a user-friendly GUI for setting up the analysis:
 
 ```python
+from rbcodes.GUIs.abstools.AbsToolsLauncher import AbsToolsLauncher
+from PyQt5.QtWidgets import QApplication
+import sys
 
-#Read in packages 
-from astropy.io import fits
-from GUIs.abstools import Absorber as A
-from GUIs.abstools import Metal_Plot as M   
+app = QApplication(sys.argv)
+launcher = AbsToolsLauncher()
+sys.exit(app.exec_())
+```
+
+### Adding AbsTools to Your PATH
+
+To make it easier to run the launcher from anywhere, you can:
+
+1. **Create a symbolic link** in a directory that's already in your PATH:
+   ```bash
+   # For Unix/Linux/MacOS
+   ln -s /path/to/rbcodes/GUIs/abstools/abstools_launcher.py /usr/local/bin/abstools
+   
+   # Then you can simply run:
+   abstools
+   ```
+
+2. **Add the directory to your PATH**:
+   ```bash
+   # For Bash/Zsh - add to your ~/.bashrc or ~/.zshrc
+   export PATH=$PATH:/path/to/rbcodes/GUIs/abstools
+   
+   # For C shell/tcsh - add to your ~/.cshrc or ~/.tcshrc
+   setenv PATH ${PATH}:/path/to/rbcodes/GUIs/abstools
+   
+   # For Windows - add to your system environment variables
+   # Or in PowerShell:
+   $env:Path += ";C:\path\to\rbcodes\GUIs\abstools"
+   ```
+
+3. **Create a simple wrapper script** in a directory that's in your PATH:
+   ```python
+   #!/usr/bin/env python
+   # Save this as 'abstools' somewhere in your PATH
+   
+   import sys
+   import os
+   
+   # Add the rbcodes package directory to Python's path
+   sys.path.append('/path/to/rbcodes')
+   
+   # Import and run the launcher
+   from GUIs.abstools.AbsToolsLauncher import run_launcher
+   run_launcher()
+   ```
+
+### 3. Using the API Directly
+
+For more control, you can use the AbsTools API directly:
+
+```python
+from linetools.spectra.xspectrum1d import XSpectrum1D
+from rbcodes.GUIs.abstools import Absorber as A
+from rbcodes.GUIs.abstools import Metal_Plot as M
+from pkg_resources import resource_filename
 
 # Read in the 1D spectrum to be analyzed
-filename='/Users/bordoloi/Dropbox/COS-Pairs/Targets/PG0832+251/Data/PG0832+251_nbin3_coadd.fits'
+# Using resource_filename to locate example data within the package
+filename = resource_filename('rbcodes', 'example-data/spectrum.fits')
+sp = XSpectrum1D.from_file(filename)
+wave = sp.wavelength.value
+flux = sp.flux.value
+error = sp.sig.value
 
+# Specify redshift at which to perform analysis
+z = 0.348
 
-a=fits.open(filename)
-wave=a[1].data['wave'][0]
-flux=a[1].data['flux'][0]   
-error=a[1].data['error'][0]  
-#------------------------------
+# Specify rest-frame wavelengths of absorption lines to analyze
+# Common lines: OVI doublet (1031.93, 1037.62), CIV doublet (1548.20, 1550.78)
+lines = [1031.93, 1037.62, 1215.67, 1548.20, 1550.78]
 
+# Create an absorber class with the data
+absys = A.Absorber(z, wave, flux, error, lines=lines, window_lim=[-2000, 2000])
+Abs = absys.ions
 
-#Specify redshift at which to perform analysis
-z=0.017
+# Launch the main GUI
+M.Transitions(Abs)
 
-#Give approximate absorption line rest frame wavelengths to be analyzed
-lines=[1215.67,1260,1334,1393.9,1402,1548.3,1550,1526,1670]
-
-#Preprocessing:
-# Create an absorber class to feed into the main GUI
-absys=A.Absorber(z,wave,flux,error,lines=lines,window_lim=[-2000,2000])   
-Abs=absys.ions
-
-
-#Optional: if you have a pre-identified intervening absorption line list, feed it in.
-# Interevening absorption line list
-path='/Users/bordoloi/WORK/python/rbcodes/GUIs/abstools/SpecPlot_Projects/'
-filename=path+'Identified_Linelist.txt'
-
-# Intervening absorption line list is optional to show any intervening absorbers
-
-#Run the main GUI
-M.Transitions(Abs,intervening=filename)
+# Optional: if you have pre-identified intervening absorption lines
+# M.Transitions(Abs, intervening='intervening_lines.txt')
 ```
 
-Second Example shows how to load up a saved analysis file
+## User Interface Guide
+
+### Main Interface Layout
+
+The AbsTools interface is divided into two columns:
+- **Left Side**: Raw spectrum with continuum fitting tools
+- **Right Side**: Normalized spectrum with velocity integration tools
+
+Each row represents a different absorption line transition.
+
+### Mouse Controls
+
+| Action | Description |
+|--------|-------------|
+| Left panel + Left mouse button (double click) | Add wavelength region to continuum fit |
+| Left panel + Right mouse button (double click) | Remove wavelength region from continuum fit |
+| Right panel + Left mouse button | Set lower velocity integration limit |
+| Right panel + Right mouse button | Set upper velocity integration limit |
+
+### Keyboard Controls
+
+| Key | Description |
+|-----|-------------|
+| Up arrow | Increase polynomial order for continuum fit |
+| Down arrow | Decrease polynomial order for continuum fit |
+| v | Manually enter regions to mask (left panel) or integration limits (right panel) |
+| V | Apply current velocity limits to all subplots |
+| m | Measure equivalent width for active subplot |
+| M | Measure equivalent width for all subplots |
+| 0 | Flag absorber as positive detection |
+| 1 | Flag absorber as upper limit |
+| 2 | Flag absorber as lower limit |
+| t | Toggle text display (equivalent width or column density) |
+| q | Exit application |
+
+## Workflow Example
+
+Here's a typical workflow for analyzing absorption lines:
+
+1. **Load Spectrum**: Start AbsTools with your spectrum
+2. **Continuum Fitting**:
+   - Click on the left panel to select a transition
+   - Use left/right mouse buttons to add/remove regions for continuum fitting
+   - Adjust polynomial order with up/down arrow keys
+   - Areas excluded from the fit appear grayed out
+
+3. **Measure Equivalent Widths**:
+   - Click on the right panel to select a transition
+   - Set velocity integration limits using left/right mouse buttons
+   - Press 'm' to measure the equivalent width
+   - For uncertain detections, flag them with keys 0/1/2
+
+4. **Save Results**:
+   - Click the "Save" button to open the save dialog
+   - Choose to save as PDF (plots), data table, pickle file, or JSON
+
+## Working with Saved Analysis Files
+
+AbsTools can save analysis in multiple formats:
+- **JSON**: Human-readable, portable format (recommended)
+- **Pickle**: Binary Python format
+- **Data Table**: ASCII tables of measurements
+- **PDF**: Plots of continuum fits and normalized spectra
+
+To load a previously saved analysis:
 
 ```python
-
-#First read in the saved file
 import pickle
-pfile='Spectrum_Analysis_z_0.017.p'
-with open(pfile,'rb') as pklfile:
-    absys=pickle.load(pklfile)
+import json
+from rbcodes.GUIs.abstools import Metal_Plot as M
 
-#Run the Master GUI
-from GUIs.abstools import Metal_Plot as M   
-M.Transitions(absys)
+# Load from pickle
+with open('analysis.p', 'rb') as f:
+    ions = pickle.load(f)
+
+# Or load from JSON using the included utilities
+from rbcodes.GUIs.abstools.json_utils import load_from_json
+ions = load_from_json('analysis.json')
+
+# Launch GUI with loaded data
+M.Transitions(ions)
 ```
 
+## Utility Scripts
 
------------------------------------------------------------------------------
+AbsTools includes several utility scripts for working with analysis data:
 
+### Extracting Measurements
 
-Dependencies:- PyQt5, astropy, rbcodes, numpy, matpltolib, pickle
+```python
+from rbcodes.GUIs.abstools.extract_abstools_measurements import extract_measurements_table
 
-May 2021.
+# Extract measurements to a DataFrame
+file_path = "Spectrum_Analysis_z_0.348.json"
+df = extract_measurements_table(file_path)
 
-Brought to you by Sean Clark and Rongmon Bordoloi.
+# View the measurements
+print(f"Measurements for spectrum at z = {df.attrs['redshift']}")
+print(df)
 
-Developed from a basic original code from Tom Cooper.
+# Export to CSV
+df.to_csv("measurements.csv", index=False)
+```
+
+### Batch Processing
+
+```python
+from rbcodes.GUIs.abstools.batch_process_abstools import batch_process_abstools_files, plot_ew_comparison
+
+# Process all JSON files in a directory
+json_pattern = "data/Spectrum_Analysis_*.json"
+measurements_df = batch_process_abstools_files(json_pattern)
+
+# Create comparison plot of specific ions across spectra
+ions_to_compare = ['OVI 1031.93', 'OVI 1037.62', 'CIV 1548.20', 'CIV 1550.78']
+fig, ax = plot_ew_comparison(measurements_df, ions_to_compare)
+fig.savefig("ew_comparison.png", dpi=300)
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Segmentation Fault on Exit**: If the application crashes on exit, make sure you're using the latest version which includes improved cleanup handling.
+
+2. **Missing Libraries**: Ensure all dependencies are properly installed. The error messages will indicate which libraries are missing.
+
+3. **JSON Support Unavailable**: If you see "JSON utilities not found" messages, make sure the `json_utils.py` module is accessible within the rbcodes package.
+
+## Acknowledgments
+
+AbsTools was developed by Sean Clark and Rongmon Bordoloi [2021]
+Major refactoring and update -> RB [2025]
