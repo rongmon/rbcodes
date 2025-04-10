@@ -14,7 +14,7 @@ import pandas as pd
 from scipy.interpolate import splrep, splev
 from scipy.optimize import curve_fit
 
-from IGM.rb_setline import read_line_list
+from rbcodes.igm.rb_setline import read_line_list
 
 class Gaussfit_2d(QWidget):
     send_linelist = pyqtSignal(object)

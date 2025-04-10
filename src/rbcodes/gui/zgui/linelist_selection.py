@@ -10,7 +10,7 @@ from PyQt5 import QtCore
 from PyQt5 import QtGui
 from PyQt5.QtGui import QDoubleValidator
 
-from IGM.rb_setline import read_line_list
+from rbcodes.igm.rb_setline import read_line_list
 
 LINELIST_DIR = os.path.dirname(os.path.abspath(__file__))
 

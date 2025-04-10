@@ -46,11 +46,11 @@ def main():
         if args.classic:
             print("Starting classic MultispecViewer...")
             # Import the classic version
-            from rbcodes.GUIs.multispecviewer.classic import multispec
+            from rbcodes.gui.multispecviewer.classic import multispec
         else:
             print("Starting new MultispecViewer...")
             # Import the new version
-            from rbcodes.GUIs.multispecviewer import multispec
+            from rbcodes.gui.multispecviewer import multispec
         
         # Both versions use the same initialization pattern
         app = multispec.QApplication(sys.argv)

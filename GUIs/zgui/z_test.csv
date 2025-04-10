@@ -1,7 +1,0 @@
-Name,RA,DEC,z,z_err,Confidence,Flag,Linelist,z_guess
-qso1,1.0,1.0,0.5,0.0001,0.9,Nicely done,
-qso2,1.4,22.0,6.5,0.5,0.1,Not so confident,
-qso3,195.1,-22.0,3.5,0.5.,0.01,Disgard! Not useful at all,
-sdss1,,,3.281848852924965,0.0015913767236616907,0.2,blabla,Gal,3.3
-test,,,-0.24878751183678854,-3.4853039960095825e-06,0.01,impossible,LBG,0.2
-sdss2,,,,,0.2,blabla,Gal,3.1

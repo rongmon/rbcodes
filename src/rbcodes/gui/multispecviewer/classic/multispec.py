@@ -13,10 +13,10 @@ import matplotlib.pyplot as plt
 from linetools.spectra.xspectrum1d import XSpectrum1D
 import astropy.units as u
 
-from rbcodes.GUIs.multispecviewer.classic.RedshiftInputWidget import RedshiftInputWidget
-from rbcodes.GUIs.multispecviewer.classic.MessageBox import MessageBox
+from rbcodes.gui.multispecviewer.classic.RedshiftInputWidget import RedshiftInputWidget
+from rbcodes.gui.multispecviewer.classic.MessageBox import MessageBox
 from astropy.convolution import convolve, Box1DKernel, Gaussian2DKernel
-from rbcodes.IGM import rb_setline as rb_setline
+from rbcodes.igm import rb_setline as rb_setline
 
 class SpectralPlot(FigureCanvas):
     """

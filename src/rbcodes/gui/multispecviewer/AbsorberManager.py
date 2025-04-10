@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (QWidget, QTableWidget, QTableWidgetItem,
                              QHeaderView, QSizePolicy, QApplication)
 from PyQt5.QtGui import QColor
 from PyQt5 import QtCore, QtGui, QtWidgets
-from utils import rb_utility as rt
+from rbcodes.utils import rb_utility as rt
 clr = rt.rb_set_color()
 
 class AbsorberManager(QWidget):

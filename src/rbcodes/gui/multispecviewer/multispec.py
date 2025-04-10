@@ -34,8 +34,8 @@ from astropy.convolution import convolve, Box1DKernel
 from RedshiftInputWidget import RedshiftInputWidget
 from MessageBox import MessageBox
 from AbsorberManager import AbsorberManager
-from rbcodes.IGM import rb_setline as rb_setline
-from utils import rb_utility as rt
+from rbcodes.igm import rb_setline as rb_setline
+from rbcodes.utils import rb_utility as rt
 
 
 
