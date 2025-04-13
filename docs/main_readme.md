@@ -45,7 +45,7 @@ conda install -c conda-forge --file requirements_simple.txt
    - Plot absorption lines at various redshifts
    - Equivalent width and Gaussian fitting
 5. [AbsTools](/docs/GUIs/AbsTools/README.md): Complex absorption line analysis GUI
-6. [rb_specgui](/docs/GUIs/rb_specgui.md): Advanced 1D spectrum viewer and line identifier
+6. [rb_specgui](/docs/GUIs/rb_specgui/rb_specgui.md): Advanced 1D spectrum viewer and line identifier
 7. [zgui/main.py](/docs/GUIs/zgui.md): Redshift measurement GUI for galaxies
    - Supports 1D and 2D spectra
    - Optimized for JWST NIRCam/Grism spectroscopy
