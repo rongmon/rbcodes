@@ -371,11 +371,18 @@ flowchart TB
     class launcher,api,loadfile entry;
 ```
 
+### Architecture Diagram
+
+The following diagram illustrates the relationship between all components of AbsTools:
+
+![AbsTools Architecture Diagram](https://github.com/username/rbcodes/blob/main/GUIs/abstools/docs/images/abstools_architecture.svg)
+
 ### User Workflow Diagram
 
 This diagram illustrates the typical user workflow when working with AbsTools:
 
-![AbsTools Architecture Diagram](https://github.com/rongmon/rbcodes/tree/master/GUIs/abstools/docs/images/abstools_architecture.svg)
+![AbsTools User Workflow](https://github.com/username/rbcodes/blob/main/GUIs/abstools/docs/images/abstools_workflow.svg)
+
 ## Troubleshooting
 
 ### Common Issues
