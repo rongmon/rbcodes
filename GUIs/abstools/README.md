@@ -280,6 +280,148 @@ AbsTools follows a modular architecture with components communicating via a sign
 
 The signal-slot communication system ensures robust coordination between components while preventing segmentation faults that could occur with direct coupling.
 
+### Architecture Diagram
+
+The following diagram illustrates the relationship between all components of AbsTools:
+
+```mermaid
+flowchart TB
+    subgraph "Entry Points"
+        launcher[AbsTools Launcher GUI]
+        api[Direct API Usage]
+        loadfile[Load Saved File]
+    end
+    
+    subgraph "Core Components"
+        absorber[Absorber Class]
+        metal_plot[Metal_Plot / MainWindow]
+        
+        subgraph "GUI Components"
+            page_manager[Page Manager]
+            save_page[Save Dialog]
+            help_window[Help Window]
+        end
+        
+        subgraph "Processing"
+            plotting[Plotting Engine]
+            event_handler[Event Handler]
+            equivalent_width[Equivalent Width Calculator]
+            signals[Signal-Slot Communication]
+        end
+        
+        subgraph "Data Handling"
+            json_utils[JSON Utilities]
+            cleanup[Resource Cleanup]
+        end
+    end
+    
+    subgraph "Utilities"
+        extract_measurements[Extract Measurements]
+        batch_processor[Batch Processor]
+        extract_data[Extract Raw Data]
+    end
+    
+    subgraph "File I/O"
+        save_json[Save JSON]
+        save_pickle[Save Pickle]
+        save_pdf[Save PDF]
+        save_table[Save Data Table]
+    end
+    
+    launcher --> absorber
+    api --> absorber
+    loadfile --> metal_plot
+    
+    absorber --> metal_plot
+    
+    metal_plot --> page_manager
+    metal_plot --> save_page
+    metal_plot --> help_window
+    metal_plot <--> signals
+    
+    signals <--> plotting
+    signals <--> event_handler
+    signals <--> equivalent_width
+    
+    metal_plot --> plotting
+    metal_plot --> event_handler
+    metal_plot --> equivalent_width
+    
+    save_page --> save_json
+    save_page --> save_pickle
+    save_page --> save_pdf
+    save_page --> save_table
+    
+    metal_plot --> cleanup
+    json_utils <--> save_json
+    
+    save_json -.-> extract_measurements
+    save_json -.-> batch_processor
+    save_json -.-> extract_data
+    save_pickle -.-> extract_measurements
+    
+    classDef core fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef io fill:#bbf,stroke:#333,stroke-width:1px;
+    classDef utils fill:#bfb,stroke:#333,stroke-width:1px;
+    classDef entry fill:#fbb,stroke:#333,stroke-width:1px;
+    
+    class absorber,metal_plot,signals core;
+    class save_json,save_pickle,save_pdf,save_table io;
+    class extract_measurements,batch_processor,extract_data utils;
+    class launcher,api,loadfile entry;
+```
+
+### User Workflow Diagram
+
+This diagram illustrates the typical user workflow when working with AbsTools:
+
+```mermaid
+flowchart TD
+    start([Start]) --> launcher[Launch AbsTools]
+    
+    launcher --> newAnalysis{New Analysis?}
+    newAnalysis -->|Yes| loadSpectrum[Load Spectrum File]
+    newAnalysis -->|No| loadSaved[Load Saved Analysis]
+    
+    loadSpectrum --> setParams[Set Parameters\nRedshift, Lines, Window]
+    loadSpectrum --> selectLines[Select Absorption Lines]
+    
+    setParams --> launchMain[Launch Main Interface]
+    selectLines --> launchMain
+    loadSaved --> launchMain
+    
+    launchMain --> continuumFit[Continuum Fitting]
+    continuumFit --> masking[Mask Regions\nPolynomial Order]
+    
+    masking --> setLimits[Set Integration Limits]
+    setLimits --> calcEW[Calculate Equivalent Width]
+    calcEW --> flagLine[Flag Line Type\nDetection/Limit]
+    
+    flagLine --> moreLines{More Lines?}
+    moreLines -->|Yes| continuumFit
+    
+    moreLines -->|No| saveResults[Save Results]
+    saveResults --> saveType{Save Format}
+    
+    saveType -->|JSON| saveJSON[Save JSON]
+    saveType -->|Pickle| savePickle[Save Pickle]
+    saveType -->|PDF| savePDF[Save PDF Plots]
+    saveType -->|Table| saveTable[Save Data Table]
+    
+    saveJSON --> end([End])
+    savePickle --> end
+    savePDF --> end
+    saveTable --> end
+    
+    classDef setup fill:#fbb,stroke:#333,stroke-width:1px;
+    classDef analysis fill:#bbf,stroke:#333,stroke-width:1px;
+    classDef save fill:#bfb,stroke:#333,stroke-width:1px;
+    
+    class launcher,loadSpectrum,setParams,selectLines,loadSaved setup;
+    class launchMain,continuumFit,masking,setLimits,calcEW,flagLine,moreLines analysis;
+    class saveResults,saveType,saveJSON,savePickle,savePDF,saveTable save;
+```
+
 ## Troubleshooting
 
 ### Common Issues
