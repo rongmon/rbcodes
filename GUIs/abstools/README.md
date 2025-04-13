@@ -4,7 +4,7 @@ AbsTools is an interactive toolkit for analyzing absorption lines in astronomica
 
 ## Overview
 
-AbsTools is currently part of the `rbcodes` package under `rbcodes.GUIs.abstools`. This README provides instructions on how to use the toolbox within this structure.
+AbsTools is part of the `rbcodes` package under `rbcodes.GUIs.abstools`. This README provides comprehensive instructions on using the toolbox, including the new launcher GUI.
 
 ### Features
 
@@ -13,7 +13,10 @@ AbsTools is currently part of the `rbcodes` package under `rbcodes.GUIs.abstools
 - **Column Density Calculations**: Determine column densities directly from absorption features
 - **Intervening Absorption Line Analysis**: Identify and analyze intervening absorption systems
 - **Multi-page Support**: Analyze up to 30 transitions simultaneously across 5 tabbed pages
-- **Save/Load Functionality**: Save your analysis in various formats (JSON, Pickle, PDF, data tables)
+- **Enhanced Save/Load Functionality**: Save your analysis in various formats (JSON, Pickle, PDF, data tables)
+- **Improved Error Handling**: Better error recovery and prevention of segmentation faults
+- **Signal-Slot Architecture**: Robust communication between application components
+- **User-Friendly Launcher**: New GUI for setting up and launching analysis sessions
 
 ## Dependencies
 
@@ -24,89 +27,39 @@ AbsTools requires the following libraries:
 - PyQt5
 - Pandas
 - Astropy
-- linetools
+- linetools (for spectrum handling)
 
 ## Quick Start
 
-There are three ways to start using AbsTools:
+There are now three ways to start using AbsTools:
 
-### 1. Using the Launcher Script Directly (Simplest)
+### 1. Using the AbsTools Launcher GUI (Recommended)
 
-If the abstools_launcher.py script is in your current directory or you've added it to your PATH:
+The new launcher GUI provides the simplest way to get started:
 
 ```bash
 python abstools_launcher.py
 ```
 
-### 2. Using the AbsTools Launcher from Python
+This opens a user-friendly interface where you can:
+- Load a spectrum file
+- Set the redshift
+- Select absorption lines to analyze
+- Configure analysis parameters
+- Load previously saved analysis sessions
 
-The launcher provides a user-friendly GUI for setting up the analysis:
+### 2. Using the AbsTools API Directly
 
-```python
-from rbcodes.GUIs.abstools.AbsToolsLauncher import AbsToolsLauncher
-from PyQt5.QtWidgets import QApplication
-import sys
-
-app = QApplication(sys.argv)
-launcher = AbsToolsLauncher()
-sys.exit(app.exec_())
-```
-
-### Adding AbsTools to Your PATH
-
-To make it easier to run the launcher from anywhere, you can:
-
-1. **Create a symbolic link** in a directory that's already in your PATH:
-   ```bash
-   # For Unix/Linux/MacOS
-   ln -s /path/to/rbcodes/GUIs/abstools/abstools_launcher.py /usr/local/bin/abstools
-   
-   # Then you can simply run:
-   abstools
-   ```
-
-2. **Add the directory to your PATH**:
-   ```bash
-   # For Bash/Zsh - add to your ~/.bashrc or ~/.zshrc
-   export PATH=$PATH:/path/to/rbcodes/GUIs/abstools
-   
-   # For C shell/tcsh - add to your ~/.cshrc or ~/.tcshrc
-   setenv PATH ${PATH}:/path/to/rbcodes/GUIs/abstools
-   
-   # For Windows - add to your system environment variables
-   # Or in PowerShell:
-   $env:Path += ";C:\path\to\rbcodes\GUIs\abstools"
-   ```
-
-3. **Create a simple wrapper script** in a directory that's in your PATH:
-   ```python
-   #!/usr/bin/env python
-   # Save this as 'abstools' somewhere in your PATH
-   
-   import sys
-   import os
-   
-   # Add the rbcodes package directory to Python's path
-   sys.path.append('/path/to/rbcodes')
-   
-   # Import and run the launcher
-   from GUIs.abstools.AbsToolsLauncher import run_launcher
-   run_launcher()
-   ```
-
-### 3. Using the API Directly
-
-For more control, you can use the AbsTools API directly:
+For more control or scripting, you can use the AbsTools API:
 
 ```python
 from linetools.spectra.xspectrum1d import XSpectrum1D
 from rbcodes.GUIs.abstools import Absorber as A
 from rbcodes.GUIs.abstools import Metal_Plot as M
-from pkg_resources import resource_filename
 
 # Read in the 1D spectrum to be analyzed
-# Using resource_filename to locate example data within the package
-filename = resource_filename('rbcodes', 'example-data/spectrum.fits')
+from pkg_resources import resource_filename
+filename = resource_filename('rbcodes', 'example-data/test.fits')
 sp = XSpectrum1D.from_file(filename)
 wave = sp.wavelength.value
 flux = sp.flux.value
@@ -130,7 +83,65 @@ M.Transitions(Abs)
 # M.Transitions(Abs, intervening='intervening_lines.txt')
 ```
 
-## User Interface Guide
+### 3. Loading a Saved Analysis Session
+
+To resume a previously saved analysis:
+
+```python
+from rbcodes.GUIs.abstools import Metal_Plot as M
+
+# For JSON files (recommended format)
+from rbcodes.GUIs.abstools.json_utils import load_from_json
+ions = load_from_json('analysis.json')
+
+# For pickle files
+import pickle
+with open('analysis.p', 'rb') as f:
+    ions = pickle.load(f)
+
+# Launch GUI with loaded data
+M.Transitions(ions)
+```
+
+## AbsTools Launcher GUI
+
+The new AbsTools Launcher provides a user-friendly interface for setting up analysis sessions.
+
+### Launcher Features
+
+- **Multiple Launch Modes**: Start a new analysis or load a saved session
+- **Spectrum Selection**: Browse for and load FITS, ASCII, or HDF5 spectrum files
+- **Absorption Line Presets**: Quickly select common absorption lines
+- **Parameter Configuration**: Set redshift, velocity window limits, and other parameters
+- **Settings Persistence**: Save and recall your settings between sessions
+- **Detailed Status Updates**: Track the progress of your analysis setup
+
+### Using the Launcher
+
+1. **Start the Launcher**:
+   ```bash
+   python abstools_launcher.py
+   ```
+
+2. **For New Analysis**:
+   - Select the "Load New Spectrum" tab
+   - Browse for your spectrum file
+   - Enter the redshift
+   - Select absorption lines (choose from presets or enter manually)
+   - Set velocity window limits
+   - Optionally specify an intervening absorbers file
+   - Click "Launch AbsTools"
+
+3. **For Saved Analysis**:
+   - Select the "Load Saved Analysis" tab
+   - Browse for your saved analysis file (.json or .p)
+   - Optionally specify an intervening absorbers file
+   - Click "Launch AbsTools"
+
+4. **Save Settings**:
+   - Click "Save Settings" to store your configuration for future use
+
+## Main Interface Guide
 
 ### Main Interface Layout
 
@@ -169,7 +180,7 @@ Each row represents a different absorption line transition.
 
 Here's a typical workflow for analyzing absorption lines:
 
-1. **Load Spectrum**: Start AbsTools with your spectrum
+1. **Load Spectrum**: Start AbsTools Launcher and select your spectrum file
 2. **Continuum Fitting**:
    - Click on the left panel to select a transition
    - Use left/right mouse buttons to add/remove regions for continuum fitting
@@ -184,7 +195,7 @@ Here's a typical workflow for analyzing absorption lines:
 
 4. **Save Results**:
    - Click the "Save" button to open the save dialog
-   - Choose to save as PDF (plots), data table, pickle file, or JSON
+   - Choose to save as PDF (plots), data table, pickle file, or JSON (recommended)
 
 ## Working with Saved Analysis Files
 
@@ -193,25 +204,6 @@ AbsTools can save analysis in multiple formats:
 - **Pickle**: Binary Python format
 - **Data Table**: ASCII tables of measurements
 - **PDF**: Plots of continuum fits and normalized spectra
-
-To load a previously saved analysis:
-
-```python
-import pickle
-import json
-from rbcodes.GUIs.abstools import Metal_Plot as M
-
-# Load from pickle
-with open('analysis.p', 'rb') as f:
-    ions = pickle.load(f)
-
-# Or load from JSON using the included utilities
-from rbcodes.GUIs.abstools.json_utils import load_from_json
-ions = load_from_json('analysis.json')
-
-# Launch GUI with loaded data
-M.Transitions(ions)
-```
 
 ## Utility Scripts
 
@@ -249,17 +241,69 @@ fig, ax = plot_ew_comparison(measurements_df, ions_to_compare)
 fig.savefig("ew_comparison.png", dpi=300)
 ```
 
+### Extracting Raw Data
+
+```python
+from rbcodes.GUIs.abstools.extract_abstools_data import load_abstools_analysis
+
+# Load the full analysis data
+file_path = "Spectrum_Analysis_z_0.348.json"
+ions = load_abstools_analysis(file_path)
+
+# Access flux, wavelength, and other data for an ion
+ion_name = list(ions.keys())[0]  # First ion
+wavelength = ions[ion_name]['wave']
+normalized_flux = ions[ion_name]['flux'] / ions[ion_name]['cont']
+velocity = ions[ion_name]['vel']
+
+# Now you can work with the raw data in your own code
+import matplotlib.pyplot as plt
+plt.figure()
+plt.step(velocity, normalized_flux, 'k', where='mid')
+plt.xlabel('Velocity (km/s)')
+plt.ylabel('Normalized Flux')
+plt.show()
+```
+
+## Architecture Overview
+
+AbsTools follows a modular architecture with components communicating via a signal-slot mechanism:
+
+1. **AbsToolsLauncher**: User interface for configuring and starting analysis sessions
+2. **Absorber**: Creates ion dictionaries from spectrum data
+3. **Metal_Plot / MainWindow**: Main application window and controller
+4. **PageManager**: Handles page (tab) creation and initialization
+5. **Plotting**: Manages all visualization aspects
+6. **EventHandler**: Processes user interactions (mouse/keyboard)
+7. **EquivalentWidth**: Performs line measurements and calculations
+8. **Utility Modules**: Support JSON handling, data extraction, batch processing
+
+The signal-slot communication system ensures robust coordination between components while preventing segmentation faults that could occur with direct coupling.
+
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Segmentation Fault on Exit**: If the application crashes on exit, make sure you're using the latest version which includes improved cleanup handling.
+1. **Missing Libraries**: Ensure all dependencies are properly installed. The error messages will indicate which libraries are missing.
 
-2. **Missing Libraries**: Ensure all dependencies are properly installed. The error messages will indicate which libraries are missing.
+2. **JSON Support Unavailable**: If you see "JSON utilities not found" messages, make sure the `json_utils.py` module is accessible within the rbcodes package.
 
-3. **JSON Support Unavailable**: If you see "JSON utilities not found" messages, make sure the `json_utils.py` module is accessible within the rbcodes package.
+3. **Spectrum Loading Errors**: Verify that your spectrum file is in a supported format (FITS, ASCII, HDF5). Check that the file contains flux, wavelength, and error arrays.
+
+4. **Lines Outside Observed Range**: If you specify lines that fall outside the wavelength range of your spectrum, AbsTools will warn you during initialization.
+
+5. **Launcher Script Path**: If the launcher can't find required modules, ensure the rbcodes package is in your Python path.
+
+### Error Recovery
+
+The updated AbsTools includes improved error handling:
+
+- Signals communicate errors to a central handler
+- Error messages are displayed in status bars and dialog boxes
+- Critical errors are caught without causing application crashes
+- Resource cleanup on exit prevents segmentation faults
 
 ## Acknowledgments
 
-AbsTools was developed by Sean Clark and Rongmon Bordoloi [2021]
-Major refactoring and update -> RB [2025]
+AbsTools was originally developed by Sean Clark and Rongmon Bordoloi [2021]
+Major refactoring and update with enhanced features by Rongmon Bordoloi [2025]

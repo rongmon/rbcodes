@@ -13,12 +13,13 @@ from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtWidgets import QPushButton, QLabel, QVBoxLayout, QHBoxLayout, QLineEdit, QInputDialog, QMessageBox
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
-from config import HELP_TEXT, MAX_IONS_PER_TAB
-from plotting import Plotting
+
+from rbcodes.GUIs.abstools.config import HELP_TEXT, MAX_IONS_PER_TAB
+from rbcodes.GUIs.abstools.plotting import Plotting
 
 # Import the JSON utilities
 try:
-    from json_utils import save_to_json, load_from_json
+    from rbcodes.GUIs.abstools.json_utils import save_to_json, load_from_json
     JSON_SUPPORT = True
 except ImportError:
     JSON_SUPPORT = False

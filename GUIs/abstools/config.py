@@ -5,7 +5,7 @@ used throughout the application.
 """
 
 import numpy as np
-from utils import rb_utility as rt
+from rbcodes.utils import rb_utility as rt
 
 # Physical constants
 SPEED_OF_LIGHT = 2.9979e5  # km/s

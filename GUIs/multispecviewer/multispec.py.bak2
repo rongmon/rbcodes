@@ -1,22 +1,59 @@
 import sys
 import os
 import numpy as np
+
+import matplotlib
+matplotlib.use('Qt5Agg')  # Set backend before importing pyplot
+import matplotlib.pyplot as plt
+
+
+
+# PyQt5 imports
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, 
                              QVBoxLayout, QWidget, QFileDialog, QSplitter,
-                             QLabel, QHBoxLayout, QSizePolicy,QInputDialog)
+                             QLabel, QHBoxLayout, QSizePolicy, QInputDialog,
+                             QDialog, QListWidget)
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPalette, QColor
+from PyQt5 import QtCore, QtGui
+
+# Matplotlib imports
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
-# Use XSpectrum1D to load the spectrum directly
+
+# Spectral data handling
 from linetools.spectra.xspectrum1d import XSpectrum1D
 import astropy.units as u
 
-from rbcodes.GUIs.multispecviewer.classic.RedshiftInputWidget import RedshiftInputWidget
-from rbcodes.GUIs.multispecviewer.classic.MessageBox import MessageBox
-from astropy.convolution import convolve, Box1DKernel, Gaussian2DKernel
+# Convolution and data processing
+from astropy.convolution import convolve, Box1DKernel
+
+# Custom local imports
+from rbcodes.GUIs.multispecviewer.RedshiftInputWidget import RedshiftInputWidget
+from rbcodes.GUIs.multispecviewer.MessageBox import MessageBox
+from rbcodes.GUIs.multispecviewer.AbsorberManager import AbsorberManager
 from rbcodes.IGM import rb_setline as rb_setline
+from rbcodes.utils import rb_utility as rt
+from rbcodes.GUIs.multispecviewer.LineSelectionDialog import LineSelectionDialog
+
+
+
+
+# Matplotlib dark theme setup
+plt.style.use('dark_background')
+matplotlib.rcParams.update({
+    'figure.facecolor': '#353535',     # Match the dark background
+    'axes.facecolor': '#353535',       # Dark background for axes
+    'axes.edgecolor': '#FFFFFF',       # White axes edges
+    'axes.labelcolor': '#FFFFFF',      # White label color
+    'xtick.color': '#FFFFFF',          # White x-tick labels
+    'ytick.color': '#FFFFFF',          # White y-tick labels
+    'grid.color': '#666666',           # Dark gray grid lines
+    'text.color': '#FFFFFF',           # White text
+    'lines.color': '#FFFFFF',          # White line color
+})
 
 class SpectralPlot(FigureCanvas):
     """
@@ -50,6 +87,7 @@ class SpectralPlot(FigureCanvas):
         # Connect right-click event
         self.mpl_connect('button_press_event', self.on_mouse_press)
     
+
     def on_mouse_press(self, event):
         """
         Handles mouse press events. Right-click shows a menu of possible spectral lines.
@@ -72,67 +110,36 @@ class SpectralPlot(FigureCanvas):
             # Read line list
             line_list = rb_setline.read_line_list(self.linelist)
             
-            # Create a dialog with line options
-            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QListWidget, QLabel
-            from PyQt5.QtCore import Qt
             
-            dialog = QDialog(self.parent_window)
-            dialog.setWindowTitle("Line Identification")
-            layout = QVBoxLayout()
+            # Create the dialog but don't show it yet
+            dialog = LineSelectionDialog(self.parent_window, observed_wavelength, line_list)
             
-            info_label = QLabel(f"Observed Wavelength: {observed_wavelength:.2f}")
-            layout.addWidget(info_label)
-            
-            instruction_label = QLabel("Select a spectral line to compute redshift:")
-            layout.addWidget(instruction_label)
-            
-            list_widget = QListWidget()
-            for ix in range(len(line_list)):
-                rest_wavelength = line_list[ix]['wrest']
-                transition_name = line_list[ix]['ion']
-                # Calculate implied redshift if this line is selected
-                implied_redshift = (observed_wavelength / rest_wavelength) - 1.0
-                list_item_text = f"{transition_name} ({rest_wavelength:.2f} Å) → z = {implied_redshift:.4f}"
-                list_widget.addItem(list_item_text)
-            
-            layout.addWidget(list_widget)
-            dialog.setLayout(layout)
-            
-            # Connect selection event
-            def on_line_selected(item):
-                try:
-                    # Extract the selected line information
-                    selected_text = item.text()
-                    # Parse the transition name and rest wavelength from the text
-                    parts = selected_text.split('(')
-                    transition_name = parts[0].strip()
-                    rest_wavelength = float(parts[1].split('Å')[0].strip())
+            # Define the handler for line selection
+            def on_line_selected(transition_name, rest_wavelength, new_redshift):
+                if self.message_box:
+                    self.message_box.on_sent_message(
+                        f"Line identified as {transition_name}, λrest = {rest_wavelength:.2f} Å, "
+                        f"implied z = {new_redshift:.6f}", "#008000")
+                
+                # Update redshift input and plot lines with new redshift
+                if hasattr(self.parent_window, 'redshift_widget'):
+                    # Get the current color from the redshift widget
+                    current_color = self.parent_window.redshift_widget.color_combo.currentText()
+                    current_linelist = self.parent_window.redshift_widget.linelist_combo.currentText()
                     
-                    # Calculate new redshift
-                    new_redshift = (observed_wavelength / rest_wavelength) - 1.0
-                    
-                    if self.message_box:
-                        self.message_box.on_sent_message(
-                            f"Line identified as {transition_name}, λrest = {rest_wavelength:.2f} Å, "
-                            f"implied z = {new_redshift:.6f}", "#008000")
-                    
-                    # Update redshift input and plot lines with new redshift
-                    if hasattr(self.parent_window, 'redshift_widget'):
-                        self.parent_window.redshift_widget.set_redshift(new_redshift)
-                        # Update the redshift value and replot lines
-                        self.redshift = new_redshift
-                        self.plot_redshift_lines()
-                    
-                    dialog.accept()  # Close the dialog
-                except Exception as e:
-                    if self.message_box:
-                        self.message_box.on_sent_message(f"Error processing selection: {str(e)}", "#FF0000")
+                    self.parent_window.redshift_widget.set_redshift(new_redshift)
+                    # Update the redshift value and replot lines with the current color
+                    self.redshift = new_redshift
+                    self.linelist = current_linelist
+                    self.line_color = current_color
+                    self.plot_redshift_lines()
             
-            list_widget.itemClicked.connect(on_line_selected)
+            # Connect the signal to our handler
+            dialog.lineSelected.connect(on_line_selected)
             
-            # Show the dialog
-            dialog.exec_()
-            
+            # Show the dialog non-modally
+            dialog.show()
+    
     def plot_spectra(self, spectra):
         """
         Plots the given list of spectra as subplots.
@@ -205,7 +212,6 @@ class SpectralPlot(FigureCanvas):
         if event.key == 'r':
             self.reset_view()
             return
-        
         # Handle capital R key to just remove the line identifications
         if event.key == 'R':
             self.clear_quickid_lines()
@@ -214,13 +220,13 @@ class SpectralPlot(FigureCanvas):
             if self.message_box:
                 self.message_box.on_sent_message("Cleared all line identifications", "#008000")
             return
-        
+
         if x is None or y is None:
             print("No valid coordinates at cursor position")
             if self.message_box:
                 self.message_box.on_sent_message("No valid coordinates at cursor position", "#FF0000")
             return
-        
+
         ax_index = 0
         for i, ax in enumerate(self.axes):
             if event.inaxes == ax:
@@ -393,31 +399,51 @@ class SpectralPlot(FigureCanvas):
         self.draw()
 
     def plot_one_spec(self, wave, flux, error, index, filename):
-        """Plot a single spectrum panel"""
-        flux_line, = self.axes[index].plot(wave, flux, 'k-', lw=1)
-
+        """Plot a single spectrum panel in step mode with specific dark theme colors"""
+        # Define colors for dark theme
+        pale_red = '#FF6B6B'  # Error spectrum color
+        white = '#FFFFFF'     # Flux spectrum color
+        
+        # Plot error spectrum in step mode
         if error is not None:
-            self.axes[index].plot(wave, error, 'r-', lw=0.5, alpha=0.5)
-            
+            self.axes[index].step(wave, error, '-', where='mid', color=pale_red, lw=0.5, alpha=0.5)
+        
+        # Plot flux spectrum in step mode
+        flux_line, = self.axes[index].step(wave, flux, '-', where='mid', color=white, lw=0.5)
+        
+        # Configure axes with dark theme colors
+        self.axes[index].set_facecolor('#353535')  # Dark background
+        self.axes[index].grid(True, linestyle='--', color='#666666', alpha=0.3)
+        
         if index == self.num_spectra - 1:
-            self.axes[index].set_xlabel('Wavelength')
-        self.axes[index].set_ylabel('Flux')
-            
+            self.axes[index].set_xlabel('Wavelength', color='#FFFFFF')
+        self.axes[index].set_ylabel('Flux', color='#FFFFFF')
+        
         # Add legend with filename
-        self.axes[index].legend([flux_line], [filename], loc='upper right', fontsize='small')
+        self.axes[index].legend([flux_line], [filename], loc='upper right', 
+                                 fontsize='small', 
+                                 facecolor='#353535', 
+                                 edgecolor='#FFFFFF', 
+                                 framealpha=0.5, 
+                                 labelcolor='#FFFFFF')
+        
 
-
-    def set_redshift_data(self, redshift, linelist):
+    def set_redshift_data(self, redshift, linelist, color='white'):
         """
         Receives redshift and linelist data from the main window.
         
         :param redshift: float, the redshift value
         :param linelist: str, the selected line list
+        :param color: str, the color to use for line plotting (default 'white')
         """
+        # Get color dictionary
+        clr = rt.rb_set_color()
+        
         self.redshift = redshift
         self.linelist = linelist
-
-        if self.linelist=="None":
+        self.line_color = color  # Store the color name, not the RGB value
+        
+        if self.linelist == "None":
             # Clear any redshift lines
             self.clear_redshift_lines()
             self.fig.canvas.draw_idle()  # Ensure the figure updates
@@ -428,95 +454,71 @@ class SpectralPlot(FigureCanvas):
         elif self.spectra and len(self.spectra) > 0:
             # Add debug message
             if self.message_box:
-                self.message_box.on_sent_message(f"Setting redshift z={redshift} with {linelist} line list. Plotting lines...", "#0000FF")
+                self.message_box.on_sent_message(f"Setting redshift z={redshift} with {linelist} line list in {color}", "#0000FF")
+            # Call plot_redshift_lines directly here to plot the lines immediately
             self.plot_redshift_lines()
+            # Explicitly update the canvas
+            self.fig.canvas.draw()
+
             if self.message_box:
                 self.message_box.on_sent_message(f"Applied redshift z={redshift} with {linelist} line list", "#008000")
         else:
             if self.message_box:
                 self.message_box.on_sent_message(f"No spectra loaded. Load spectra before applying redshift.", "#FF0000")
-
+    
     def plot_redshift_lines(self):
         """
         Plots spectral lines based on the redshift and linelist.
-        This method draws vertical lines at the expected wavelengths of 
-        common spectral features adjusted by the redshift.
         """
         if not hasattr(self, 'redshift') or not hasattr(self, 'linelist'):
             if self.message_box:
                 self.message_box.on_sent_message("Redshift or linelist not set", "#FF0000")
             return
         
-        # Store current axis limits before clearing lines
-        current_xlims = []
-        current_ylims = []
-        for ax in self.axes:
-            current_xlims.append(ax.get_xlim())
-            current_ylims.append(ax.get_ylim())
-            
-        # Clear any existing redshift lines first
+        # Clear any existing redshift lines
         self.clear_redshift_lines()
         
-        # Read linelist - use a different variable name (not 'line')
-        line_list = rb_setline.read_line_list(self.linelist)
+        # Use the color from the dictionary, with a fallback
+        clr = rt.rb_set_color()
+        line_color = clr.get(self.line_color, clr['white'])
         
-        self.redshift_lines = []  # Store references to lines for later removal
+        # Get the line list data
+        try:
+            line_data = rb_setline.read_line_list(self.linelist)
+        except Exception as e:
+            if self.message_box:
+                self.message_box.on_sent_message(f"Error reading line list: {str(e)}", "#FF0000")
+            return
         
-        # Get the full wavelength range from all spectra
+        # Get the full wavelength range
         wave_arrays = [spec.wavelength.value for spec in self.spectra]
-        
-        # Concatenate all wavelength arrays
         all_wavelengths = np.concatenate(wave_arrays)
-        
-        # Get min and max directly
         global_min_wave = np.min(all_wavelengths)
         global_max_wave = np.max(all_wavelengths)
         
         # Draw vertical lines for each spectral feature
-        lines_plotted = 0
-        
-        for ix in range(0, len(line_list)):
-            # Loop through each transition
-            rest_wavelength = line_list[ix]['wrest']
-            transition_name = line_list[ix]['ion']
-            # Calculate observed wavelength using the redshift
+        for ix in range(0, len(line_data)):
+            rest_wavelength = line_data[ix]['wrest']
+            transition_name = line_data[ix]['ion']
             observed_wavelength = rest_wavelength * (1. + self.redshift)
             
-            # Only plot lines within the full wavelength range of our spectra
             if global_min_wave <= observed_wavelength <= global_max_wave:
-                # Draw on all axes
                 for i, ax in enumerate(self.axes):
-                    # Get the y-limits for this axis
-                    ylim = current_ylims[i]
+                    line = ax.axvline(x=observed_wavelength, color=line_color, linestyle='--', alpha=0.7)
+                    self.redshift_lines.append(line)
                     
-                    # Always draw the line if it's within the global wavelength range
-                    line_obj = ax.axvline(x=observed_wavelength, color='blue', linestyle='--', alpha=0.7)
-                    self.redshift_lines.append(line_obj)
-                    
-                    # Add label for all lines within the global range using relative coordinates
-                    # Use a fixed position 90% of the way up the panel
-                    y_range = ylim[1] - ylim[0]
-                    y_pos = ylim[0] + 0.9 * y_range  # 90% of the way up (closer to ymax)
-                    
-                    # Create text with relative coordinates (will adapt when y limits change)
-                    text = ax.text(observed_wavelength, 0.9, transition_name, rotation=90, 
-                           horizontalalignment='right', verticalalignment='top',
-                           fontsize=8, color='blue', transform=ax.get_xaxis_transform())
-                    self.redshift_lines.append(text)
-                    lines_plotted += 1
-        
-        # Restore the axis limits after drawing lines
-        for i, ax in enumerate(self.axes):
-            ax.set_xlim(current_xlims[i])
-            ax.set_ylim(current_ylims[i])
-            
-        self.fig.canvas.draw_idle()  # Ensure the figure updates
-        
-        if self.message_box:
-            if lines_plotted > 0:
-                self.message_box.on_sent_message(f"Successfully plotted {lines_plotted} spectral lines across the full wavelength range", "#008000")
-            else:
-                self.message_box.on_sent_message("No lines found within the wavelength range of your spectra.", "#FFA500")
+                    # Only add text labels in the top panel (index 0)
+                    if i == 0:  # Only for the first/top panel
+                        ylim = ax.get_ylim()
+                        # Position the text within the plot bounds
+                        y_pos = ylim[0] + 0.85 * (ylim[1] - ylim[0])  # Position at 85% of y-axis range
+                        # Use transform=ax.get_xaxis_transform() to keep the text fixed in the y-direction
+                        text = ax.text(observed_wavelength, y_pos, f"{transition_name} z={self.redshift:.4f}", 
+                                    rotation=90, color=line_color, fontsize=8,
+                                    horizontalalignment='right', verticalalignment='top')
+                        self.redshift_lines.append(text)
+        self.fig.canvas.draw()  # Change from draw_idle() to draw() for immediate update
+
 
     def clear_redshift_lines(self):
         """
@@ -642,6 +644,186 @@ class SpectralPlot(FigureCanvas):
         #if hasattr(self.parent_window, 'redshift_widget'):
         #    self.parent_window.redshift_widget.set_redshift(z)
 
+
+    def plot_absorber_lines(self, absorber_id, z_abs, line_list, color):
+        """
+        Plot spectral lines for a specific absorber system.
+        
+        :param absorber_id: Unique identifier for this absorber system
+        :param z_abs: Redshift of the absorber
+        :param line_list: Name of the line list to use
+        :param color: Color name to use for the lines
+        :return: Success status
+        """
+        if not self.spectra or self.axes is None or len(self.axes) == 0:
+            if self.message_box:
+                self.message_box.on_sent_message("No spectra loaded - cannot plot absorber lines", "#FF0000")
+            return False
+        
+        # Skip if None is selected as the line list
+        if line_list == "None":
+            if self.message_box:
+                self.message_box.on_sent_message(f"'None' selected as line list - nothing to plot", "#FFA500")
+            return True
+        
+        # Store current axis limits before plotting
+        current_xlims = []
+        current_ylims = []
+        for ax in self.axes:
+            current_xlims.append(ax.get_xlim())
+            current_ylims.append(ax.get_ylim())
+        
+        # Initialize absorber_lines dictionary if it doesn't exist
+        if not hasattr(self, 'absorber_lines'):
+            self.absorber_lines = {}
+        
+        # Create entry for this absorber if needed
+        if absorber_id not in self.absorber_lines:
+            self.absorber_lines[absorber_id] = []
+        # Clear any existing lines for this absorber
+        else:
+            for line_obj in self.absorber_lines[absorber_id]:
+                try:
+                    line_obj.remove()
+                except:
+                    pass
+            self.absorber_lines[absorber_id] = []
+        
+        # Read the line list data
+        try:
+            line_data = rb_setline.read_line_list(line_list)
+        except Exception as e:
+            if self.message_box:
+                self.message_box.on_sent_message(f"Error reading line list {line_list}: {str(e)}", "#FF0000")
+            return False
+        
+        # Get the full wavelength range from all spectra
+        wave_arrays = [spec.wavelength.value for spec in self.spectra]
+        all_wavelengths = np.concatenate(wave_arrays)
+        global_min_wave = np.min(all_wavelengths)
+        global_max_wave = np.max(all_wavelengths)
+        
+        # Get the color values from the dictionary
+        clr = rt.rb_set_color()
+        # Default to white if color isn't in the dictionary
+        color_value = clr.get(color, clr['white'])
+        
+        # Draw vertical lines for each spectral feature
+        lines_plotted = 0
+        
+        for ix in range(0, len(line_data)):
+            # Loop through each transition
+            rest_wavelength = line_data[ix]['wrest']
+            transition_name = line_data[ix]['ion']
+            # Calculate observed wavelength using the redshift
+            observed_wavelength = rest_wavelength * (1. + z_abs)
+            
+            # Only plot lines within the full wavelength range of our spectra
+            if global_min_wave <= observed_wavelength <= global_max_wave:
+                # Draw on all axes
+                for i, ax in enumerate(self.axes):
+                    # Get the y-limits for this axis
+                    ylim = current_ylims[i]
+                    
+                    # Draw the line with color from the clr dictionary
+                    line_obj = ax.axvline(x=observed_wavelength, color=color_value, linestyle='--', alpha=0.7)
+                    self.absorber_lines[absorber_id].append(line_obj)
+                    
+                    # Only add text labels in the top panel (index 0)
+                    if i == 0:  # Only for the first/top panel
+                        y_range = ylim[1] - ylim[0]
+                        y_pos = ylim[0] + 0.85 * y_range  # 85% of the way up
+                        
+                        text = ax.text(observed_wavelength, y_pos, transition_name, rotation=90, 
+                               horizontalalignment='right', verticalalignment='top',
+                               fontsize=8, color=color_value)
+                        
+                        # Add redshift indicator to the text
+                        text_with_z = f"{transition_name} z={z_abs:.4f}"
+                        text.set_text(text_with_z)
+                        
+                        self.absorber_lines[absorber_id].append(text)
+                        
+                    lines_plotted += 1
+        
+        # Restore the axis limits after drawing lines
+        for i, ax in enumerate(self.axes):
+            ax.set_xlim(current_xlims[i])
+            ax.set_ylim(current_ylims[i])
+        
+        self.fig.canvas.draw_idle()  # Ensure the figure updates
+        
+        if self.message_box:
+            if lines_plotted > 0:
+                self.message_box.on_sent_message(f"Plotted {lines_plotted} lines for absorber at z={z_abs:.6f}", "#008000")
+            else:
+                self.message_box.on_sent_message(f"No lines found within wavelength range for z={z_abs:.6f}", "#FFA500")
+        
+        return True  
+        
+    def remove_absorber_lines(self, absorber_id):
+            """
+            Remove all spectral lines for a specific absorber system.
+            
+            :param absorber_id: Identifier for the absorber system to remove
+            :return: Success status
+            """
+            if not hasattr(self, 'absorber_lines') or absorber_id not in self.absorber_lines:
+                return False
+            
+            # Remove each line object
+            for line_obj in self.absorber_lines[absorber_id]:
+                try:
+                    line_obj.remove()
+                except:
+                    pass
+            
+            # Clear the list
+            self.absorber_lines[absorber_id] = []
+            
+            # Update the plot
+            self.fig.canvas.draw_idle()
+            
+            if self.message_box:
+                self.message_box.on_sent_message(f"Removed absorber system {absorber_id}", "#008000")
+            
+            return True
+
+
+        
+    def toggle_absorber_visibility(self, absorber_id):
+        """
+        Toggle visibility of lines for a specific absorber system.
+        
+        :param absorber_id: Identifier for the absorber system to toggle
+        :return: Success status
+        """
+        if not hasattr(self, 'absorber_lines') or absorber_id not in self.absorber_lines:
+            return False
+        
+        # Check if we have any lines for this absorber
+        if not self.absorber_lines[absorber_id]:
+            return False
+        
+        # Sample the first line to determine current visibility
+        first_line = self.absorber_lines[absorber_id][0]
+        is_visible = first_line.get_visible()
+        
+        # Toggle visibility for all lines in this absorber
+        for line_obj in self.absorber_lines[absorber_id]:
+            line_obj.set_visible(not is_visible)
+        
+        # Update the plot
+        self.fig.canvas.draw_idle()
+        
+        if self.message_box:
+            status = "Hidden" if is_visible else "Shown"
+            self.message_box.on_sent_message(f"{status} absorber system {absorber_id}", "#008000")
+        
+        return True
+    
+    
+    
 class MainWindow(QMainWindow):
     """
     Main application window for displaying spectral plots.
@@ -651,12 +833,29 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).__init__()
         
         self.setWindowTitle("FITS File Viewer")
-        self.setGeometry(100, 100, 1000, 800)
+        self.setGeometry(100, 100, 1700, 900)
         
+        # Dark theme palette similar to PlotSpec_Integrated
+        palette = QPalette()
+        palette.setColor(QPalette.Window, QColor(53, 53, 53))          # Dark background
+        palette.setColor(QPalette.WindowText, QtCore.Qt.white)         # White text
+        palette.setColor(QPalette.Base, QColor(25, 25, 25))            # Darker base
+        palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))   # Alternate dark background
+        palette.setColor(QPalette.Button, QColor(53, 53, 53))          # Button background
+        palette.setColor(QPalette.ButtonText, QtCore.Qt.white)         # Button text
+        palette.setColor(QPalette.BrightText, QtCore.Qt.red)           # Bright text (e.g., for warnings)
+        palette.setColor(QPalette.Link, QColor(42, 130, 218))          # Link color
+        palette.setColor(QPalette.Highlight, QColor(42, 130, 218))     # Highlight color
+        palette.setColor(QPalette.Text, QtCore.Qt.white)               # Text color
+        
+        # Apply the palette to the application
+        self.setPalette(palette)
+        self.setStyleSheet("QMainWindow { color: #FFFFFF; }")  # Add this line                
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
         
+
         # Layout of a file selection Button
         button_layout = QHBoxLayout()
         self.select_button = QPushButton("Select FITS Files")
@@ -672,29 +871,55 @@ class MainWindow(QMainWindow):
         # Create SpectralPlot with reference to the message box
         self.canvas = SpectralPlot(self, message_box=self.message_box)
         self.toolbar = NavigationToolbar(self.canvas, self)
-
+    
+        # Create a splitter for the main display area
+        self.main_splitter = QSplitter(Qt.Horizontal)
+        self.main_splitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
+        # Create the absorber manager
+        clr = rt.rb_set_color()
+        self.absorber_manager = AbsorberManager(self)#, colors=list(clr.keys())[1:])
+        self.absorber_manager.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
+        self.absorber_manager.setMinimumWidth(200)
+        self.absorber_manager.setMaximumWidth(300)
+        
+        # Add absorber manager to splitter
+        self.main_splitter.addWidget(self.absorber_manager)
+        
+        # Create a widget for the right side of the splitter (canvas and toolbar)
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.addWidget(self.toolbar)
+        right_layout.addWidget(self.canvas, 10)  # Canvas should expand to fill space
+        
         # Set the toolbar and canvas to expand
         self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.toolbar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-
         
-        main_layout.addWidget(self.toolbar)
-        main_layout.addWidget(self.canvas,10)
-    
+        # Add right widget to splitter
+        self.main_splitter.addWidget(right_widget)
+        
+        # Set initial sizes (20% for absorber manager, 80% for canvas)
+        self.main_splitter.setSizes([20, 80])
+        
+        # Add the splitter to the main layout
+        main_layout.addWidget(self.main_splitter, 10)
+        
         # Create bottom widget container with redshift inputs and message box
         bottom_widget = QWidget()
         bottom_layout = QHBoxLayout(bottom_widget)
         bottom_widget.setMaximumHeight(150)  # Limit the maximum height of the bottom widget
-
         
-        # Create redshift input widget
+        # Create redshift input widget with updated features
         self.redshift_widget = RedshiftInputWidget()
         self.redshift_widget.setMaximumWidth(600)  # Limit the width of the redshift widget
-        # Connect to both signals
-        self.redshift_widget.submitted.connect(self.handle_redshift_submission)
-        self.redshift_widget.linelist_changed.connect(self.handle_redshift_submission)  # Use same handler
         
-        # Add both widgets to the bottom layout
+        # Connect to signals from updated RedshiftInputWidget
+        self.redshift_widget.submitted.connect(self.handle_redshift_submission)
+        self.redshift_widget.linelist_changed.connect(self.handle_linelist_changed)
+        self.redshift_widget.catalog_clicked.connect(self.handle_catalog_clicked)
+        
+        # Add widgets to the bottom layout
         bottom_layout.addWidget(self.redshift_widget)
         bottom_layout.addWidget(self.message_box)
         
@@ -707,27 +932,31 @@ class MainWindow(QMainWindow):
         status_text += "t = set max y-limit, b = set min y-limit, q = quit application, "
         status_text += "Right-click = identify spectral lines"
         self.statusBar().showMessage(status_text)
-        self.message_box.on_sent_message("Application ready. Select FITS files to begin.", "#000000")
+        self.message_box.on_sent_message("Application ready. Select FITS files to begin.", "#FFFFFF")
     
-    def handle_redshift_submission(self, redshift, linelist):
+    
+    def handle_redshift_submission(self, redshift, linelist, color):
         """
-        Processes the redshift and linelist data submitted by the RedshiftInputWidget
-        and sends it to the SpectralPlot instance.
+        Processes the redshift and linelist data submitted from the RedshiftInputWidget.
+        Creates the appropriate lines on the plot.
         
         :param redshift: float, the redshift value
         :param linelist: str, the selected line list
+        :param color: str, the selected color
         """
         try:
             # Convert redshift to float (in case it's received as string)
             redshift = float(redshift)
             
-            print(f"Processing: z={redshift}, list={linelist}")
-            
             # Send a message to the message box
-            self.message_box.on_sent_message(f"Processing redshift z={redshift} with {linelist} line list", "#008000")
+            self.message_box.on_sent_message(f"Processing redshift z={redshift} with {linelist} line list in {color}", "#008000")
             
-            # Pass the data to the SpectralPlot instance
-            self.canvas.set_redshift_data(redshift, linelist)
+            # Set the redshift data on the canvas directly
+            self.canvas.set_redshift_data(redshift, linelist, color)
+            
+            # Explicitly call the plot_redshift_lines method to ensure lines are drawn
+            self.canvas.plot_redshift_lines()
+            
         except ValueError:
             error_msg = f"Invalid redshift value: {redshift}. Please enter a number."
             print(error_msg)
@@ -736,7 +965,88 @@ class MainWindow(QMainWindow):
             error_msg = f"Error processing redshift: {str(e)}"
             print(error_msg)
             self.message_box.on_sent_message(error_msg, "#FF0000")
+    
 
+    def handle_linelist_changed(self, redshift, linelist, color):
+        """
+        Handle linelist or color selection change in the redshift widget
+        
+        :param redshift: float, the current redshift value
+        :param linelist: str, the newly selected line list
+        :param color: str, the selected color
+        """
+        try:
+            # Clear existing lines and replot with new settings
+            self.canvas.clear_redshift_lines()
+            
+            if linelist == "None":
+                # Don't plot anything for "None" linelist
+                pass
+            elif self.canvas.spectra and len(self.canvas.spectra) > 0:
+                # Set the data and plot with new linelist/color
+                self.canvas.set_redshift_data(redshift, linelist, color)
+        except Exception as e:
+            self.message_box.on_sent_message(f"Error updating line list or color: {str(e)}", "#FF0000")    
+    
+    
+    def handle_catalog_clicked(self, redshift, linelist, color):
+        """
+        Handles the catalog button click. Adds the current redshift to the absorber manager.
+        
+        :param redshift: float, the redshift value
+        :param linelist: str, the selected line list
+        :param color: str, the selected color
+        """
+        try:
+            # Add to absorber manager
+            if self.absorber_manager.add_absorber(redshift, linelist, color):
+                self.message_box.on_sent_message(f"Added absorber z={redshift:.6f} to manager", "#008000")
+                
+                # Get the row of the newly added absorber
+                row = self.absorber_manager.get_absorber_count() - 1
+                
+                # Automatically plot the absorber lines
+                self.canvas.plot_absorber_lines(row, redshift, linelist, color)
+            else:
+                self.message_box.on_sent_message(f"Failed to add absorber z={redshift:.6f}", "#FF0000")
+        except Exception as e:
+            self.message_box.on_sent_message(f"Error adding to catalog: {str(e)}", "#FF0000")      
+    
+    
+    
+    
+        
+    # Add these methods to MainWindow:
+    
+    def plot_absorber_lines(self, row, z_abs, line_list, color):
+        """Wrapper to call the canvas's plot_absorber_lines method"""
+        return self.canvas.plot_absorber_lines(row, z_abs, line_list, color)
+    
+    def remove_absorber_lines(self, row):
+        """Wrapper to call the canvas's remove_absorber_lines method"""
+        return self.canvas.remove_absorber_lines(row)
+    
+    def toggle_absorber_visibility(self, row):
+        """Wrapper to call the canvas's toggle_absorber_visibility method"""
+        return self.canvas.toggle_absorber_visibility(row)
+    
+    def update_absorber_redshift(self, row, z_abs):
+        """
+        Update the redshift value for an absorber and replot its lines.
+        
+        :param row: The row index in the absorber manager
+        :param z_abs: The new redshift value
+        """
+        # Get the current line list and color for this absorber
+        absorber_data = self.absorber_manager.get_absorber_data(row)
+        if not absorber_data:
+            return
+        
+        # Remove existing lines
+        self.canvas.remove_absorber_lines(row)
+        
+        # Replot with the new redshift
+        self.canvas.plot_absorber_lines(row, z_abs, absorber_data['LineList'], absorber_data['Color'])  
     def select_fits_files(self):
         """
         Opens a file dialog for selecting FITS files and loads them for plotting.
@@ -806,9 +1116,8 @@ class MainWindow(QMainWindow):
         except Exception as e:
             error_message = f"Error: {str(e)}"
             self.statusBar().showMessage(error_message)
-            self.message_box.on_sent_message(error_message, "#FF0000")   
-        
-
+            self.message_box.on_sent_message(error_message, "#FF0000")        
+    
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()

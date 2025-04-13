@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (QWidget, QTableWidget, QTableWidgetItem,
                              QHeaderView, QSizePolicy, QApplication)
 from PyQt5.QtGui import QColor
 from PyQt5 import QtCore, QtGui, QtWidgets
-from rbcodes.utils import rb_utility as rt
+from utils import rb_utility as rt
 clr = rt.rb_set_color()
 
 class AbsorberManager(QWidget):
@@ -19,7 +19,7 @@ class AbsorberManager(QWidget):
     - update_absorber_redshift(row, z_abs) - Update when redshift is changed manually
     - renumber_absorber_lines(old_row, new_row) - Handle row renumbering after deletion
     """
-        
+    
     def __init__(self, parent=None, colors=None):
         super().__init__(parent)
         # Set up the dark theme after creating the widgets
@@ -44,26 +44,10 @@ class AbsorberManager(QWidget):
         
         # Create table for displaying absorbers
         self.table = QTableWidget(1, 6)  # Start with 1 row, will expand as needed
-        self.table.setHorizontalHeaderLabels(['LineList', 'z', 'Color', 'Plot', 'Remove', 'Hide'])
+        self.table.setHorizontalHeaderLabels(['Line Lists', 'z', 'Color', 'Plot', 'Remove', 'Hide'])
         
         # Configure table properties
-        header = self.table.horizontalHeader()
-        
-        # Customize column widths to prevent overlap
-        #header.setSectionResizeMode(0, QHeaderView.Stretch)  # Line Lists column stretches
-        header.setSectionResizeMode(0, QHeaderView.Interactive)
-        self.table.setColumnWidth(0, 80)  # Initial width
-        header.setMinimumSectionSize(50)  # Prevents column from getting too small
-
-        header.setSectionResizeMode(1, QHeaderView.Interactive)  # Redshift column
-        header.setSectionResizeMode(2, QHeaderView.Interactive)  # Color column
-
-        
-        # Fixed width for action buttons
-        for col in range(3, 6):
-            header.setSectionResizeMode(col, QHeaderView.Interactive)
-            self.table.setColumnWidth(col, 30)  # Adjust width as needed
-        
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
         # Set default widgets for initial rows
@@ -82,47 +66,16 @@ class AbsorberManager(QWidget):
         line_combo = QComboBox()
         for item in self.line_options:
             line_combo.addItem(item)
-        line_combo.setStyleSheet("""
-            QComboBox { 
-                background-color: #353535; 
-                color: white; 
-                border: 1px solid #2A82DA;
-            }
-            QComboBox::drop-down {
-                background-color: #2A82DA;
-            }
-        """)
         self.table.setCellWidget(row_index, 0, line_combo)
         
         # Color combo box
         color_combo = QComboBox()
         for color in self.colors:
             color_combo.addItem(color)
-        color_combo.setStyleSheet("""
-            QComboBox { 
-                background-color: #353535; 
-                color: white; 
-                border: 1px solid #2A82DA;
-            }
-            QComboBox::drop-down {
-                background-color: #2A82DA;
-            }
-        """)
         self.table.setCellWidget(row_index, 2, color_combo)
         
         # Plot button with direct row reference
         plot_btn = QPushButton("Plot", self)
-        plot_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2A82DA; 
-                color: white; 
-                border: none;
-                padding: 5px;
-            }
-            QPushButton:hover {
-                background-color: #4A9FEA;
-            }
-        """)
         # Store the row index directly on the button
         plot_btn.row_index = row_index
         plot_btn.clicked.connect(self.plot_absorber_from_button)
@@ -130,17 +83,6 @@ class AbsorberManager(QWidget):
         
         # Remove button with direct row reference
         remove_btn = QPushButton("Remove", self)
-        remove_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #FF6B6B; 
-                color: white; 
-                border: none;
-                padding: 5px;
-            }
-            QPushButton:hover {
-                background-color: #FF8A8A;
-            }
-        """)
         # Store the row index directly on the button
         remove_btn.row_index = row_index
         remove_btn.clicked.connect(self.remove_absorber_from_button)
@@ -148,17 +90,6 @@ class AbsorberManager(QWidget):
         
         # Hide button with direct row reference
         hide_btn = QPushButton("Hide", self)
-        hide_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #FFA500; 
-                color: white; 
-                border: none;
-                padding: 5px;
-            }
-            QPushButton:hover {
-                background-color: #FFB740;
-            }
-        """)
         # Store the row index directly on the button
         hide_btn.row_index = row_index
         hide_btn.clicked.connect(self.toggle_hide_absorber_from_button)

@@ -31,12 +31,11 @@ import astropy.units as u
 from astropy.convolution import convolve, Box1DKernel
 
 # Custom local imports
-from rbcodes.GUIs.multispecviewer.RedshiftInputWidget import RedshiftInputWidget
-from rbcodes.GUIs.multispecviewer.MessageBox import MessageBox
-from rbcodes.GUIs.multispecviewer.AbsorberManager import AbsorberManager
+from RedshiftInputWidget import RedshiftInputWidget
+from MessageBox import MessageBox
+from AbsorberManager import AbsorberManager
 from rbcodes.IGM import rb_setline as rb_setline
-from rbcodes.utils import rb_utility as rt
-from rbcodes.GUIs.multispecviewer.LineSelectionDialog import LineSelectionDialog
+from utils import rb_utility as rt
 
 
 
@@ -87,7 +86,6 @@ class SpectralPlot(FigureCanvas):
         # Connect right-click event
         self.mpl_connect('button_press_event', self.on_mouse_press)
     
-
     def on_mouse_press(self, event):
         """
         Handles mouse press events. Right-click shows a menu of possible spectral lines.
@@ -110,36 +108,73 @@ class SpectralPlot(FigureCanvas):
             # Read line list
             line_list = rb_setline.read_line_list(self.linelist)
             
+            # Create a dialog with line options
+            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QListWidget, QLabel
+            from PyQt5.QtCore import Qt
             
-            # Create the dialog but don't show it yet
-            dialog = LineSelectionDialog(self.parent_window, observed_wavelength, line_list)
+            dialog = QDialog(self.parent_window)
+            dialog.setWindowTitle("Line Identification")
+            layout = QVBoxLayout()
             
-            # Define the handler for line selection
-            def on_line_selected(transition_name, rest_wavelength, new_redshift):
-                if self.message_box:
-                    self.message_box.on_sent_message(
-                        f"Line identified as {transition_name}, λrest = {rest_wavelength:.2f} Å, "
-                        f"implied z = {new_redshift:.6f}", "#008000")
-                
-                # Update redshift input and plot lines with new redshift
-                if hasattr(self.parent_window, 'redshift_widget'):
-                    # Get the current color from the redshift widget
-                    current_color = self.parent_window.redshift_widget.color_combo.currentText()
-                    current_linelist = self.parent_window.redshift_widget.linelist_combo.currentText()
+            info_label = QLabel(f"Observed Wavelength: {observed_wavelength:.2f}")
+            layout.addWidget(info_label)
+            
+            instruction_label = QLabel("Select a spectral line to compute redshift:")
+            layout.addWidget(instruction_label)
+            
+            list_widget = QListWidget()
+            for ix in range(len(line_list)):
+                rest_wavelength = line_list[ix]['wrest']
+                transition_name = line_list[ix]['ion']
+                # Calculate implied redshift if this line is selected
+                implied_redshift = (observed_wavelength / rest_wavelength) - 1.0
+                list_item_text = f"{transition_name} ({rest_wavelength:.2f} Å) → z = {implied_redshift:.4f}"
+                list_widget.addItem(list_item_text)
+            
+            layout.addWidget(list_widget)
+            dialog.setLayout(layout)
+            
+            # Inside the on_line_selected function
+            def on_line_selected(item):
+                try:
+                    # Extract the selected line information
+                    selected_text = item.text()
+                    # Parse the transition name and rest wavelength from the text
+                    parts = selected_text.split('(')
+                    transition_name = parts[0].strip()
+                    rest_wavelength = float(parts[1].split('Å')[0].strip())
                     
-                    self.parent_window.redshift_widget.set_redshift(new_redshift)
-                    # Update the redshift value and replot lines with the current color
-                    self.redshift = new_redshift
-                    self.linelist = current_linelist
-                    self.line_color = current_color
-                    self.plot_redshift_lines()
+                    # Calculate new redshift
+                    new_redshift = (observed_wavelength / rest_wavelength) - 1.0
+                    
+                    if self.message_box:
+                        self.message_box.on_sent_message(
+                            f"Line identified as {transition_name}, λrest = {rest_wavelength:.2f} Å, "
+                            f"implied z = {new_redshift:.6f}", "#008000")
+                    
+                    # Update redshift input and plot lines with new redshift
+                    if hasattr(self.parent_window, 'redshift_widget'):
+                        # Get the current color from the redshift widget
+                        current_color = self.parent_window.redshift_widget.color_combo.currentText()
+                        current_linelist = self.parent_window.redshift_widget.linelist_combo.currentText()
+                        
+                        self.parent_window.redshift_widget.set_redshift(new_redshift)
+                        # Update the redshift value and replot lines with the current color
+                        self.redshift = new_redshift
+                        self.linelist = current_linelist
+                        self.line_color = current_color
+                        self.plot_redshift_lines()
+                    
+                    dialog.accept()  # Close the dialog
+                except Exception as e:
+                    if self.message_box:
+                        self.message_box.on_sent_message(f"Error processing selection: {str(e)}", "#FF0000")
+                        
+            list_widget.itemClicked.connect(on_line_selected)
             
-            # Connect the signal to our handler
-            dialog.lineSelected.connect(on_line_selected)
+            # Show the dialog
+            dialog.exec_()
             
-            # Show the dialog non-modally
-            dialog.show()
-    
     def plot_spectra(self, spectra):
         """
         Plots the given list of spectra as subplots.

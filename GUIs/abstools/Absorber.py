@@ -15,7 +15,7 @@ flux; wave; error; linelist; redshift; bin
 '''
 
 
-from IGM import rb_setline as rb_setline
+from rbcodes.IGM import rb_setline as rb_setline
 import numpy as np
 import numpy.polynomial.legendre as L
 c =  299792.458
@@ -67,23 +67,35 @@ class Absorber:
     
     
     
-    def __init__(self,z,wave,flux,error,lines=None,mask_init=[-200,200],window_lim=[-1000,1000],load_file = False,nofrills=False):
+    def __init__(self, z, wave, flux, error, lines=None, mask_init=[-200,200], window_lim=[-1000,1000], load_file=False, nofrills=False):
         mask = mask_init
-        self.z =z
+        self.z = z
         self.ions = {}
-
+    
         if lines:
+            valid_lines = []
+            wave_min, wave_max = np.min(wave), np.max(wave)
+            
             for line in lines:
-                line_dat = rb_setline.rb_setline(line,method='closest')
+                line_dat = rb_setline.rb_setline(line, method='closest')
+                redshifted_line = line_dat['wave'] * (1 + z)
                 
-                #if using Transition class uncomment below line. Also comment transition def, while uncommenting transition class, comment out lines 80-82
-                #self.ions[line_dat['name']] =Transition(line_dat,wave,flux,error,self.z,mask_init,window_lim)
-        
+                # Check if the line is within the observable range
+                if (redshifted_line + (window_lim[1]/299792.458)*redshifted_line) < wave_min or \
+                   (redshifted_line + (window_lim[0]/299792.458)*redshifted_line) > wave_max:
+                    print(f"Warning: Line {line_dat['name']} at {line_dat['wave']:.2f} Å (redshifted to {redshifted_line:.2f} Å) is outside the observed range.")
+                    continue
+                    
+                valid_lines.append(line)
+                
                 self.ions[line_dat['name']] = {}
                 ion_dict = self.ions[line_dat['name']]
-                self.Transition(ion_dict,line_dat,wave,flux,error,z,mask,window_lim,nofrills=nofrills)
-                                
-            #last dictionary item for full spectra data                    
+                self.Transition(ion_dict, line_dat, wave, flux, error, z, mask, window_lim, nofrills=nofrills)
+            
+            if not valid_lines:
+                print("Error: None of the specified lines are within the observed wavelength range.")
+                
+            # last dictionary item for full spectra data                    
             self.ions['Target'] = {}
             self.ions['Target']['flux'] = flux
             self.ions['Target']['wave'] = wave

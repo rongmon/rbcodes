@@ -46,7 +46,7 @@ def main():
         if args.classic:
             print("Starting classic MultispecViewer...")
             # Import the classic version
-            from rbcodes.GUIs.multispecviewer.classic import multispec
+            from rbcodes.GUIs.multispecviewer.classic import multispec_classic as multispec
         else:
             print("Starting new MultispecViewer...")
             # Import the new version

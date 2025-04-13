@@ -1,11 +1,14 @@
 """
 Metal_Plot.py - Main module for the absorption line analysis toolbox.
-Updated with improved application exit handling to prevent segmentation faults.
+Updated with improved signal-slot communication and error handling for greater stability.
 """
-
+import matplotlib
+matplotlib.use('Qt5Agg')  # Set this before importing any matplotlib modules
 import sys
+import os
 import numpy as np
 import pickle
+import json
 from matplotlib import rcParams
 rcParams['lines.linewidth'] = .9
 import webbrowser
@@ -18,33 +21,86 @@ from PyQt5.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QApplication, QFileDialog
 )
 from PyQt5.QtGui import QPalette, QColor
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, pyqtSignal, QObject
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
 
-from GUIs.abstools import Absorber
-from config import MAX_TABS, MAX_IONS_PER_TAB
-from plotting import Plotting
-from ui_components import HelpWindow, SavePage, PageManager
-from equivalent_width import EquivalentWidth
-from event_handler import EventHandler
-from cleanup import ResourceCleanup
+#import rbcodes modules
+from rbcodes.GUIs.abstools import Absorber
+from rbcodes.GUIs.abstools.config import MAX_TABS, MAX_IONS_PER_TAB
+from rbcodes.GUIs.abstools.plotting import Plotting
+from rbcodes.GUIs.abstools.ui_components import HelpWindow, SavePage, PageManager
+from rbcodes.GUIs.abstools.equivalent_width import EquivalentWidth
+from rbcodes.GUIs.abstools.event_handler import EventHandler
+from rbcodes.GUIs.abstools.cleanup import ResourceCleanup
+
 
 # Try to import JSON utilities, but don't fail if they're not available
 try:
-    from json_utils import load_from_json
+    from rbcodes.GUIs.abstools.json_utils import load_from_json, save_to_json
     JSON_SUPPORT = True
 except ImportError:
     JSON_SUPPORT = False
     print("JSON utilities not found. JSON loading support will be disabled.")
 
 
+class MainWindowSignals(QObject):
+    """
+    Signal definitions for the MainWindow class to enable robust signal-slot communication.
+    """
+    data_updated = pyqtSignal(dict)            # General data update signal
+    ion_selected = pyqtSignal(str, int)        # ion name, index
+    continuum_fitted = pyqtSignal(object)      # continuum data
+    ew_measured = pyqtSignal(str, float, float)  # ion name, EW value, EW error
+    tab_changed = pyqtSignal(int)              # page index
+    error_occurred = pyqtSignal(str)           # error message
+    status_message = pyqtSignal(str)           # status message
+    file_loaded = pyqtSignal(str)              # file path
+    file_saved = pyqtSignal(str)               # file path
+
+
+class AbsToolsCanvas(FigureCanvasQTAgg):
+    """
+    Custom Matplotlib canvas for AbsTools with improved error handling.
+    """
+    
+    def __init__(self, parent=None, width=6, height=4, dpi=100):
+        self.fig = Figure(figsize=(width, height), dpi=dpi)
+        super().__init__(self.fig)
+
+
+        
+        # Make canvas focusable
+        self.fig.canvas.setFocusPolicy(QtCore.Qt.ClickFocus)
+        self.fig.canvas.setFocus()
+        
+        # Store parent for signal access
+        self.parent = parent
+        
+    def safe_draw(self):
+        """Safe drawing method with fallback"""
+        try:
+            self.draw_idle()
+        except Exception as e:
+            print(f"Error in draw_idle: {e}")
+            try:
+                self.draw()
+            except Exception as e2:
+                print(f"Critical drawing error: {e2}")
+                if hasattr(self.parent, 'signals'):
+                    self.parent.signals.error_occurred.emit(f"Failed to update display: {str(e2)}")
+
+
 class MainWindow(QtWidgets.QTabWidget):
     """
     Main application window for the absorption line analysis toolbox.
+    Improved with signal-slot communication for better stability.
     """
     
     def __init__(self, ions, parent=None, intervening=False):
+        # Initialize signals
+        self.signals = MainWindowSignals()
+        
         # Check if this is a loaded file (complete ions dictionary with Target key)
         self.loaded_file = isinstance(ions, dict) and 'Target' in ions
         
@@ -93,18 +149,18 @@ class MainWindow(QtWidgets.QTabWidget):
         self.page = 0
         self.tabs = [QtWidgets.QWidget()]
         self.addTab(self.tabs[self.page], self.tab_names[self.page])
-        self.figs = [Figure()]
-        self.canvas = [FigureCanvasQTAgg(self.figs[self.page])]
-
-                
+        # Create canvas first, then use its figure
+        self.canvas = [AbsToolsCanvas(self, width=15, height=9, dpi=100)]
+        self.figs = [self.canvas[0].fig]  # Use the figure from the canvas
+                        
         self.nions = [len(self.keys)]
         if self.nions[0] > 6:
             self.nions[0] = 6
         
         # Set up focus for keyboard functionality
         self.setParent(parent)
-        self.figs[0].canvas.setFocusPolicy(QtCore.Qt.ClickFocus)
-        self.figs[0].canvas.setFocus()
+        self.canvas[0].setFocusPolicy(QtCore.Qt.ClickFocus)  # Apply focus to canvas directly
+        self.canvas[0].setFocus()
         
         # Set up UI layout
         self.setup_ui()
@@ -122,12 +178,55 @@ class MainWindow(QtWidgets.QTabWidget):
         # Set up event connections
         self.setup_event_connections()
         
+        # Connect signals
+        self.connect_signals()
+        
         # Set up additional pages if needed
         PageManager.add_page(self)
+    
+    def connect_signals(self):
+        """Connect internal signals to their slots."""
+        self.signals.error_occurred.connect(self.show_error_message)
+        self.signals.status_message.connect(self.show_status_message)
+        self.signals.tab_changed.connect(self.update_tab_display)
+        self.signals.data_updated.connect(self.process_data_update)
+        self.signals.file_loaded.connect(lambda path: self.statusBar().showMessage(f"Loaded file: {path}"))
+        self.signals.file_saved.connect(lambda path: self.statusBar().showMessage(f"Saved file: {path}"))
+    
+    def show_error_message(self, message):
+        """Display an error message dialog."""
+        QMessageBox.warning(self, "Error", message)
+    
+    def show_status_message(self, message):
+        """Display a message in the status bar."""
+        if hasattr(self, 'status_bar'):
+            self.status_bar.showMessage(message)
+        else:
+            print(message)  # Fallback
+    
+    def update_tab_display(self, page_index):
+        """Update display when tab changes."""
+        self.PageLabel.setText(f"Page: {page_index + 1}/{len(self.figs)}")
+    
+    def process_data_update(self, update_info):
+        """Process data update signals."""
+        action = update_info.get('action', '')
+        
+        if action == 'continuum_updated':
+            ion_idx = update_info.get('ion_index')
+            if ion_idx is not None and ion_idx < len(self.keys):
+                Plotting.plot(self, ion_idx % 6, modify=False, Print=False)
+        
+        elif action == 'ew_measured':
+            ion_name = update_info.get('ion_name')
+            if ion_name in self.keys:
+                ion_idx = self.keys.index(ion_name)
+                Plotting.plot(self, ion_idx % 6, modify=False, Print=True)
     
     def setup_ui(self):
         """Set up the user interface components."""
         # Create control buttons
+        self.status_bar = QtWidgets.QStatusBar()
         self.add_ion_button = QPushButton("Add Ion", self)
         self.add_ion_button.setGeometry(630, 30, 200, 30)
         self.add_ion_button.clicked.connect(lambda: self.NewTransition(self))
@@ -140,7 +239,7 @@ class MainWindow(QtWidgets.QTabWidget):
         self.saveButton.setGeometry(430, 30, 200, 30)
         self.saveButton.clicked.connect(lambda: self.onsave(self))
         
-        # Add load button (NEW)
+        # Add load button
         self.loadButton = QPushButton("Load", self)
         self.loadButton.setGeometry(230, 30, 200, 30)
         self.loadButton.clicked.connect(lambda: self.onload(self))
@@ -148,16 +247,17 @@ class MainWindow(QtWidgets.QTabWidget):
         self.PageLabel = QtWidgets.QLabel("Page: " + str(self.currentIndex() + 1) + "/" + str(len(self.figs)), self)
         self.PageLabel.setStyleSheet("font: 16pt;color: white;background-color:QColor(53, 53, 53)")
         
+            
         # Create layouts
         self.main_layout = QVBoxLayout()
         self.top_layout = QHBoxLayout()
         self.bot_layout = QHBoxLayout()
-        
+            
         self.spacerItem = QtWidgets.QSpacerItem(5, 10, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         
         # Arrange widgets in layouts
         self.top_layout.addItem(self.spacerItem)
-        self.top_layout.addWidget(self.loadButton)  # Add load button
+        self.top_layout.addWidget(self.loadButton)
         self.top_layout.addWidget(self.saveButton)
         self.top_layout.addWidget(self.add_ion_button)
         self.top_layout.addWidget(self.openButton)
@@ -170,6 +270,10 @@ class MainWindow(QtWidgets.QTabWidget):
         self.main_layout.addLayout(self.top_layout, stretch=1)
         self.main_layout.addWidget(self.canvas[0], stretch=8)
         self.main_layout.addLayout(self.bot_layout, stretch=1)
+        # Add status bar to the bottom
+        self.main_layout.addWidget(self.status_bar)
+    
+        self.tabs[self.page].setLayout(self.main_layout)
         
         self.tabs[self.page].setLayout(self.main_layout)
         
@@ -186,69 +290,27 @@ class MainWindow(QtWidgets.QTabWidget):
     def getPage(self):
         """Update page information when the tab changes."""
         self.page = self.currentIndex()
-        self.PageLabel.setText("Page: " + str(self.page + 1) + "/" + str(len(self.figs)))
+        self.signals.tab_changed.emit(self.page)
     
     def clean_exit(self):
         """Properly clean up resources and exit the application."""
-        print("Cleaning up resources before exit...")
-        
         try:
-            # Disconnect all matplotlib callbacks first
-            if hasattr(self, 'cid1'):
-                for attr_name in dir(self):
-                    if attr_name.startswith('cid') and hasattr(self, attr_name):
-                        cid = getattr(self, attr_name)
-                        if isinstance(cid, int):
-                            for fig in self.figs:
-                                try:
-                                    fig.canvas.mpl_disconnect(cid)
-                                except:
-                                    pass
+            print("Cleaning up resources before exit...")
             
-            # Clean up large arrays to free memory
-            if hasattr(self, 'keys') and hasattr(self, 'ions'):
-                for key in self.keys:
-                    if key in self.ions:
-                        for item in ['vel', 'wave', 'flux', 'error', 'weight', 'cont']:
-                            if item in self.ions[key] and isinstance(self.ions[key][item], np.ndarray):
-                                self.ions[key][item] = np.array([])
+            # Use the ResourceCleanup class for a thorough cleanup
+            from cleanup import ResourceCleanup
+            ResourceCleanup.safe_exit(self)
             
-            # Close all figures directly without using pyplot
-            if hasattr(self, 'figs'):
-                for fig in self.figs:
-                    if fig is not None:
-                        try:
-                            # Clear the figure
-                            fig.clear()
-                            
-                            # Close the canvas if it exists
-                            if hasattr(fig, 'canvas') and fig.canvas is not None:
-                                fig.canvas.close()
-                        except Exception as e:
-                            print(f"Warning during figure cleanup: {e}")
+            # This line should never be reached due to os._exit in safe_exit
+            import os
+            os._exit(0)
             
-            # Clean up other attributes
-            self.axesL = None
-            self.axesR = None
-            self.old_axes = None
-            
-            # Force garbage collection
-            import gc
-            gc.collect()
-            
-            # Get the application instance
-            app = QApplication.instance()
-            if app:
-                # Schedule application exit with a small delay
-                QTimer.singleShot(100, app.quit)
-        
         except Exception as e:
             print(f"Error during cleanup: {e}")
-            # Still try to exit even if cleanup fails
-            app = QApplication.instance()
-            if app:
-                app.quit()
-    
+            # Force immediate exit even if cleanup fails
+            import os
+            os._exit(0)
+        
     def closeEvent(self, event):
         """Handle application close event."""
         try:
@@ -259,6 +321,7 @@ class MainWindow(QtWidgets.QTabWidget):
             event.accept()
         except Exception as e:
             print(f"Error during closeEvent: {e}")
+            self.signals.error_occurred.emit(f"Error during application exit: {str(e)}")
             event.accept()
     
     def NewTransition(self, parent):
@@ -279,6 +342,9 @@ class MainWindow(QtWidgets.QTabWidget):
                 for key in list(new_abs.ions.keys())[:-1]:
                     self.keys.append(key)
                 
+                # Emit signal for data update
+                self.signals.data_updated.emit({"action": "add_ion", "ion": key})
+                
                 # Determine whether to add to current page or create a new page
                 if self.nions[self.page] < 6:
                     # Add to current page
@@ -291,10 +357,12 @@ class MainWindow(QtWidgets.QTabWidget):
                 else:
                     # Need to add a new page
                     PageManager.add_page(self)
+                
+                self.signals.status_message.emit(f"Added new transition: {key}")
         
         except Exception as e:
             print(f"Error adding new transition: {e}")
-            QMessageBox.warning(self, "Error", f"Failed to add transition: {e}")
+            self.signals.error_occurred.emit(f"Failed to add transition: {str(e)}")
     
     def onsave(self, parent):
         """Open the save dialog."""
@@ -304,9 +372,10 @@ class MainWindow(QtWidgets.QTabWidget):
                 return None
             else:
                 self.savepg.show()
+                self.signals.status_message.emit("Save dialog opened")
         except Exception as e:
             print(f"Error opening save dialog: {e}")
-            QMessageBox.warning(self, "Error", f"Failed to open save dialog: {e}")
+            self.signals.error_occurred.emit(f"Failed to open save dialog: {str(e)}")
     
     def onload(self, parent):
         """Open the load dialog."""
@@ -326,7 +395,7 @@ class MainWindow(QtWidgets.QTabWidget):
                 return  # User cancelled
                 
             if not os.path.exists(file_path):
-                QMessageBox.warning(self, "File Not Found", f"File not found: {file_path}")
+                self.signals.error_occurred.emit(f"File not found: {file_path}")
                 return
                 
             # Load the file based on extension
@@ -334,8 +403,7 @@ class MainWindow(QtWidgets.QTabWidget):
             
             if file_path.lower().endswith('.json'):
                 if not JSON_SUPPORT:
-                    QMessageBox.warning(
-                        self, "JSON Support Not Available", 
+                    self.signals.error_occurred.emit(
                         "JSON utilities not found. Please install the json_utils.py module."
                     )
                     return
@@ -344,17 +412,20 @@ class MainWindow(QtWidgets.QTabWidget):
             
             elif file_path.lower().endswith('.p'):
                 # Load from pickle
-                with open(file_path, 'rb') as f:
-                    loaded_data = pickle.load(f)
+                try:
+                    with open(file_path, 'rb') as f:
+                        loaded_data = pickle.load(f)
+                except Exception as e:
+                    self.signals.error_occurred.emit(f"Failed to load pickle file: {str(e)}")
+                    return
             else:
-                QMessageBox.warning(
-                    self, "Unknown File Type", 
+                self.signals.error_occurred.emit(
                     "Unrecognized file extension. Please use .p for pickle files or .json for JSON files."
                 )
                 return
                 
             if loaded_data is None:
-                QMessageBox.critical(self, "Loading Error", "Failed to load the analysis data.")
+                self.signals.error_occurred.emit("Failed to load the analysis data.")
                 return
                 
             # Confirm before replacing current analysis
@@ -374,38 +445,76 @@ class MainWindow(QtWidgets.QTabWidget):
                 from GUIs.abstools import Metal_Plot as M
                 M.Transitions(loaded_data, intervening=self.intervening)
                 
+                self.signals.file_loaded.emit(file_path)
+                
         except Exception as e:
             print(f"Error loading file: {e}")
-            QMessageBox.warning(self, "Error", f"Failed to load file: {e}")
+            self.signals.error_occurred.emit(f"Failed to load file: {str(e)}")
     
     def opensub(self, parent):
         """Open the help window."""
         try:
             self.sub = HelpWindow()
             self.sub.show()
+            self.signals.status_message.emit("Help window opened")
         except Exception as e:
             print(f"Error opening help window: {e}")
-            QMessageBox.warning(self, "Error", f"Failed to open help window: {e}")
+            self.signals.error_occurred.emit(f"Failed to open help window: {str(e)}")
     
     def onmotion(self, event):
         """Handle mouse motion events."""
-        EventHandler.on_motion(self, event)
+        try:
+            EventHandler.on_motion(self, event)
+        except Exception as e:
+            print(f"Error in motion handler: {e}")
+            # We don't show errors for motion events to avoid overwhelming the user
     
     def onpress(self, event):
         """Handle key press events."""
-        EventHandler.on_press(self, event)
+        try:
+            EventHandler.on_press(self, event)
+        except Exception as e:
+            print(f"Error in key press handler: {e}")
+            self.signals.error_occurred.emit(f"Error processing keyboard command: {str(e)}")
     
     def onclick(self, event):
         """Handle mouse click events."""
-        EventHandler.on_click(self, event)
+        try:
+            EventHandler.on_click(self, event)
+        except Exception as e:
+            print(f"Error in mouse click handler: {e}")
+            self.signals.error_occurred.emit(f"Error processing mouse click: {str(e)}")
+            self.vclim = None  # Reset in case of error
         
 
 class Transitions:
     """
     Callable class to initialize and run the absorption line analysis application.
+    Improved with better error handling and application lifecycle management.
     """
     def __init__(self, Abs, intervening=False):
         # Initialize QApplication if not already running
+        app = self._setup_application()
+        
+        # Create main window
+        main = MainWindow(Abs, intervening=intervening)
+        main.resize(1400, 900)
+        main.show()
+        
+        # Register cleanup handler
+        app.aboutToQuit.connect(lambda: self.ensure_exit()) 
+        
+        # Connect signals for error handling
+        if hasattr(main, 'signals'):
+            main.signals.error_occurred.connect(
+                lambda msg: QMessageBox.warning(main, "Error", msg)
+            )
+        
+        # Start event loop only if we created a new app
+        self._run_application(app)
+    
+    def _setup_application(self):
+        """Set up the QApplication with proper error handling"""
         if not QtWidgets.QApplication.instance():
             app = QtWidgets.QApplication(sys.argv)
             app.setStyle("Fusion")
@@ -424,24 +533,19 @@ class Transitions:
             palette.setColor(QPalette.Text, QtCore.Qt.white)
             
             app.setPalette(palette)
-            create_new_app = True
+            return app
         else:
-            app = QtWidgets.QApplication.instance()
-            create_new_app = False
-        
-        # Create main window
-        main = MainWindow(Abs, intervening=intervening)
-        main.resize(1400, 900)
-        main.show()
-        
-        # Register cleanup handler
-        app.aboutToQuit.connect(lambda: self.ensure_exit())
-        
+            return QtWidgets.QApplication.instance()
+    
+    def _run_application(self, app):
+        """Run the application event loop with error handling"""
         # Ensure application quits properly when using 'q' key
         QtWidgets.QApplication.setQuitOnLastWindowClosed(True)
         
-        # Start event loop only if we created a new app
-        if create_new_app:
+        # Check if this is a new app instance we created
+        is_new_app = app == QtWidgets.QApplication.instance()
+        
+        if is_new_app:
             try:
                 app.exec_()
                 # Ensure we exit after app.exec_() returns
@@ -453,7 +557,10 @@ class Transitions:
     def ensure_exit(self):
         """Ensure the application fully exits without segmentation fault."""
         try:
-            # Force Python exit after QApplication has quit
-            QTimer.singleShot(200, lambda: sys.exit(0))
+            print("Forcing immediate exit...")
+            import os
+            os._exit(0)  # Force immediate exit with no cleanup
         except:
-            sys.exit(0)
+            # This should never be reached, but just in case:
+            import os
+            os._exit(1)

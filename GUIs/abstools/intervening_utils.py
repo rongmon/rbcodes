@@ -6,8 +6,8 @@ intervening absorption line data.
 
 import numpy as np
 import pandas as pd
-from config import SPEED_OF_LIGHT, COLORS
-from config import shift2vel
+from rbcodes.GUIs.abstools.config import SPEED_OF_LIGHT, COLORS
+from rbcodes.GUIs.abstools.config import shift2vel
 
 def grab_intervening_linelist(filename, z_gal, wrest_galaxy, wavelength):
     """

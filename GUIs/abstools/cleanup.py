@@ -1,216 +1,177 @@
 """
-Cleanup module for the absorption line analysis toolbox.
-This module handles proper resource cleanup to prevent memory leaks
-and segmentation faults on application exit.
+Resource cleanup module for the absorption line analysis toolbox.
+This module provides functions for safely cleaning up resources and preventing
+segmentation faults when closing the application.
 """
 
-import gc
 import sys
+import gc
 import weakref
-import numpy as np
+from PyQt5.QtWidgets import QApplication
 
 class ResourceCleanup:
     """
-    Class for managing resource cleanup and preventing segmentation faults.
+    Class for safely cleaning up resources to prevent segmentation faults.
     """
     
     @staticmethod
-    def disconnect_mpl_callbacks(figure):
+    def disconnect_matplotlib_events(window):
         """
-        Disconnect all matplotlib callbacks from a figure safely.
+        Safely disconnect all matplotlib event handlers.
         
         Parameters:
         -----------
-        figure : matplotlib.figure.Figure
-            The figure to disconnect callbacks from
-            
-        Returns:
-        --------
-        None
-        """
-        if hasattr(figure, 'canvas') and figure.canvas is not None:
-            # Store all callback IDs
-            callback_ids = []
-            
-            # Get callbacks from the canvas
-            if hasattr(figure.canvas, 'callbacks') and figure.canvas.callbacks is not None:
-                try:
-                    for cid in figure.canvas.callbacks.callbacks:
-                        callback_ids.append(cid)
-                except:
-                    # If we can't get the callbacks, just move on
-                    pass
-                    
-            # Disconnect each callback
-            for cid in callback_ids:
-                try:
-                    figure.canvas.mpl_disconnect(cid)
-                except:
-                    # Ignore errors when disconnecting
-                    pass
-    
-    @staticmethod
-    def cleanup_figures(figures):
-        """
-        Clean up matplotlib figures safely without causing segmentation faults.
-        
-        Parameters:
-        -----------
-        figures : list
-            List of matplotlib figures to clean up
-            
-        Returns:
-        --------
-        None
-        """
-        if figures is not None:
-            for fig in figures:
-                if fig is not None:
-                    # Disconnect all callbacks first
-                    ResourceCleanup.disconnect_mpl_callbacks(fig)
-                    
-                    # Close the figure directly without using pyplot
-                    try:
-                        # Clear the figure
-                        fig.clear()
-                        
-                        # Close the canvas if it exists
-                        if hasattr(fig, 'canvas') and fig.canvas is not None:
-                            fig.canvas.close()
-                    except Exception as e:
-                        print(f"Warning during figure cleanup: {e}")
-            
-            # Clear the figures list
-            figures.clear()
-    
-    @staticmethod
-    def cleanup_qt_widgets(widgets):
-        """
-        Clean up PyQt widgets safely.
-        
-        Parameters:
-        -----------
-        widgets : list
-            List of PyQt widgets to clean up
-            
-        Returns:
-        --------
-        None
-        """
-        if widgets is not None:
-            for widget in widgets:
-                if widget is not None:
-                    try:
-                        # Schedule for deletion later
-                        widget.deleteLater()
-                    except:
-                        # Ignore errors in widget cleanup
-                        pass
-            
-            # Clear the widgets list
-            widgets.clear()
-    
-    @staticmethod
-    def cleanup_application(parent):
-        """
-        Clean up all resources associated with the application.
-        
-        Parameters:
-        -----------
-        parent : mainWindow instance
-            The parent window containing all resources
-            
-        Returns:
-        --------
-        None
+        window : MainWindow instance
+            The main window containing matplotlib connections
         """
         try:
-            # Disconnect all matplotlib callbacks first
-            if hasattr(parent, 'cid1'):
-                for attr_name in dir(parent):
-                    if attr_name.startswith('cid') and hasattr(parent, attr_name):
-                        cid = getattr(parent, attr_name)
-                        if isinstance(cid, int):
-                            for fig in parent.figs:
-                                try:
-                                    fig.canvas.mpl_disconnect(cid)
-                                except:
-                                    pass
-            
-            # Clean up large data arrays to free memory
-            if hasattr(parent, 'keys') and hasattr(parent, 'ions'):
-                for key in parent.keys:
-                    if key in parent.ions:
-                        for item in ['vel', 'wave', 'flux', 'error', 'weight', 'cont']:
-                            if item in parent.ions[key] and isinstance(parent.ions[key][item], np.ndarray):
-                                parent.ions[key][item] = np.array([])
-            
-            # Clean up matplotlib figures
-            if hasattr(parent, 'figs'):
-                ResourceCleanup.cleanup_figures(parent.figs)
-            
-            # Clean up Qt widgets
-            if hasattr(parent, 'tabs'):
-                ResourceCleanup.cleanup_qt_widgets(parent.tabs)
-            
-            # Clean up canvas objects
-            if hasattr(parent, 'canvas'):
-                ResourceCleanup.cleanup_qt_widgets(parent.canvas)
-            
-            # Clean up axes
-            if hasattr(parent, 'axesL'):
-                parent.axesL = None
-            if hasattr(parent, 'axesR'):
-                parent.axesR = None
-            parent.old_axes = None
-            
-            # Force garbage collection
-            gc.collect()
-            
+            # Get all attributes that may be connection IDs
+            for attr_name in dir(window):
+                if attr_name.startswith('cid') and isinstance(getattr(window, attr_name), int):
+                    cid = getattr(window, attr_name)
+                    
+                    # Try to disconnect from all canvases
+                    for canvas in window.canvas:
+                        try:
+                            if hasattr(canvas, 'mpl_disconnect'):
+                                canvas.mpl_disconnect(cid)
+                                print(f"Disconnected event handler {attr_name}")
+                        except Exception as e:
+                            print(f"Error disconnecting {attr_name}: {e}")
         except Exception as e:
-            print(f"Error during cleanup: {e}")
-
+            print(f"Error in disconnect_matplotlib_events: {e}")
+    
     @staticmethod
-    def register_cleanup_on_exit(app, parent):
+    def clear_matplotlib_figures(window):
         """
-        Register cleanup functions to be called on application exit.
+        Safely clear all matplotlib figures.
         
         Parameters:
         -----------
-        app : QApplication
-            The Qt application instance
-        parent : mainWindow instance
-            The parent window containing all resources
-            
-        Returns:
-        --------
-        None
+        window : MainWindow instance
+            The main window containing matplotlib figures
         """
-        from PyQt5.QtCore import QObject, pyqtSignal, QTimer
-        
-        # Create a cleanup handler
-        class CleanupHandler(QObject):
-            aboutToQuit = pyqtSignal()
+        try:
+            import matplotlib.pyplot as plt
             
-            def __init__(self, parent):
-                super().__init__()
-                self.parent_ref = weakref.ref(parent)
+            # Clear and close all figures
+            for i, fig in enumerate(window.figs):
+                try:
+                    # Remove all axes and clear the figure
+                    if hasattr(fig, 'clear'):
+                        fig.clear()
+                    
+                    # Close the figure
+                    plt.close(fig)
+                    print(f"Cleared figure {i}")
+                except Exception as e:
+                    print(f"Error clearing figure {i}: {e}")
+        except Exception as e:
+            print(f"Error in clear_matplotlib_figures: {e}")
+    
+    @staticmethod
+    def disconnect_qt_signals(window):
+        """
+        Safely disconnect all Qt signals.
+        
+        Parameters:
+        -----------
+        window : MainWindow instance
+            The main window containing Qt signals
+        """
+        try:
+            # Try to disconnect MainWindowSignals
+            if hasattr(window, 'signals'):
+                # The following uses a try/except for each signal to ensure
+                # one failure doesn't prevent disconnecting other signals
                 
-            def cleanup(self):
-                parent = self.parent_ref()
-                if parent is not None:
-                    try:
-                        ResourceCleanup.cleanup_application(parent)
-                        
-                        # Schedule application termination after a brief delay
-                        QTimer.singleShot(200, lambda: sys.exit(0))
-                    except Exception as e:
-                        print(f"Error during cleanup: {e}")
-                        sys.exit(0)  # Exit anyway
+                # Note: The proper way to disconnect signals varies depending on your PyQt version
+                # and how the connections were established. This is a general approach.
+                
+                signals = window.signals
+                
+                try:
+                    if hasattr(signals, 'error_occurred'):
+                        signals.error_occurred.disconnect()
+                except Exception as e:
+                    print(f"Error disconnecting error_occurred: {e}")
+                
+                try:
+                    if hasattr(signals, 'status_message'):
+                        signals.status_message.disconnect()
+                except Exception as e:
+                    print(f"Error disconnecting status_message: {e}")
+                
+                try:
+                    if hasattr(signals, 'tab_changed'):
+                        signals.tab_changed.disconnect()
+                except Exception as e:
+                    print(f"Error disconnecting tab_changed: {e}")
+                
+                try:
+                    if hasattr(signals, 'data_updated'):
+                        signals.data_updated.disconnect()
+                except Exception as e:
+                    print(f"Error disconnecting data_updated: {e}")
+                
+                try:
+                    if hasattr(signals, 'file_loaded'):
+                        signals.file_loaded.disconnect()
+                except Exception as e:
+                    print(f"Error disconnecting file_loaded: {e}")
+                
+                try:
+                    if hasattr(signals, 'file_saved'):
+                        signals.file_saved.disconnect()
+                except Exception as e:
+                    print(f"Error disconnecting file_saved: {e}")
+        except Exception as e:
+            print(f"Error in disconnect_qt_signals: {e}")
+    
+
+    @staticmethod
+    def safe_exit(window):
+        """
+        Perform a safe exit of the application to prevent segmentation faults.
         
-        # Create and connect the handler
-        handler = CleanupHandler(parent)
-        app.aboutToQuit.connect(handler.cleanup)
-        
-        # Keep a reference to the handler to prevent it from being garbage collected
-        parent._cleanup_handler = handler
+        Parameters:
+        -----------
+        window : MainWindow instance
+            The main window to properly close
+        """
+        try:
+            print("Starting safe application exit...")
+            
+            # Step 1: Disconnect all matplotlib events
+            ResourceCleanup.disconnect_matplotlib_events(window)
+            
+            # Step 2: Clear and close matplotlib figures
+            ResourceCleanup.clear_matplotlib_figures(window)
+            
+            # Step 3: Disconnect all Qt signals
+            ResourceCleanup.disconnect_qt_signals(window)
+            
+            # Step 4: Clear references to large objects
+            try:
+                for attr_name in ['axesL', 'axesR', 'canvas', 'figs', 'ions']:
+                    if hasattr(window, attr_name):
+                        setattr(window, attr_name, None)
+                print("Cleared large object references")
+            except Exception as e:
+                print(f"Error clearing references: {e}")
+            
+            # Step 5: Force a garbage collection run
+            gc.collect()
+            print("Garbage collection complete")
+            
+            # Step 6: IMPORTANT - Use os._exit instead of sys.exit
+            # This bypasses all Python cleanup which might be triggering the segfault
+            print("Exiting application immediately...")
+            import os
+            os._exit(0)  # Force immediate termination with no cleanup
+                    
+        except Exception as e:
+            print(f"Error during safe exit: {e}")
+            # If all else fails, force an immediate exit
+            import os
+            os._exit(1)    

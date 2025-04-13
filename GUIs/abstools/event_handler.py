@@ -2,12 +2,13 @@
 Event handler module for the absorption line analysis toolbox.
 This module handles all user interactions including mouse clicks,
 key presses, and mouse motion events.
+Improved with signal-slot communication and better error handling.
 """
 
 import numpy as np
 from PyQt5.QtWidgets import QInputDialog
-from plotting import Plotting
-from equivalent_width import EquivalentWidth
+from rbcodes.GUIs.abstools.plotting import Plotting
+from rbcodes.GUIs.abstools.equivalent_width import EquivalentWidth
 
 class EventHandler:
     """
@@ -85,6 +86,7 @@ class EventHandler:
                             
         except Exception as e:
             print(f"Error in motion event handler: {e}")
+            # We don't signal errors for motion events since they happen frequently
             
     @staticmethod
     def on_press(parent, event):
@@ -126,9 +128,24 @@ class EventHandler:
                             
                             wc = ((vel < mask[0]) | (vel > mask[1])) & wc
                             parent.ions[parent.keys[key_idx]]['wc'] = wc
+                            
+                            # Signal that mask has been updated
+                            if hasattr(parent, 'signals'):
+                                parent.signals.data_updated.emit({
+                                    "action": "mask_updated",
+                                    "ion_index": key_idx,
+                                    "mask_limits": mask.tolist()
+                                })
+                            
                             Plotting.plot(parent, parent.Lidx, modify=True)
+                            
+                            if hasattr(parent, 'signals'):
+                                parent.signals.status_message.emit(f"Mask region set: {mask[0]}-{mask[1]}")
+                                
                         except Exception as e:
                             print(f"Error processing mask limits: {e}")
+                            if hasattr(parent, 'signals'):
+                                parent.signals.error_occurred.emit(f"Invalid mask format: {str(e)}")
                             
                 # Check if we're in the right panel
                 elif parent.Ridx is not None and parent.old_axes in parent.axesR[parent.page]:
@@ -147,18 +164,48 @@ class EventHandler:
                             
                             parent.ions[parent.keys[key_idx]]['EWlims'][0] = integ_lims[0]
                             parent.ions[parent.keys[key_idx]]['EWlims'][1] = integ_lims[1]
+                            
+                            # Signal that EW limits have been updated
+                            if hasattr(parent, 'signals'):
+                                parent.signals.data_updated.emit({
+                                    "action": "ew_limits_updated",
+                                    "ion_index": key_idx,
+                                    "ew_limits": integ_lims.tolist()
+                                })
+                                
                             Plotting.plot(parent, parent.Ridx, modify=False, Print=False)
+                            
+                            if hasattr(parent, 'signals'):
+                                parent.signals.status_message.emit(f"Integration limits set: {integ_lims[0]}-{integ_lims[1]}")
+                                
                         except Exception as e:
                             print(f"Error processing integration limits: {e}")
+                            if hasattr(parent, 'signals'):
+                                parent.signals.error_occurred.emit(f"Invalid integration limit format: {str(e)}")
             
             # Handle 'up' arrow key for increasing polynomial order                
             elif event.key == 'up':
                 if parent.Lidx is not None:
                     key_idx = parent.page * 6 + parent.Lidx
                     parent.ions[parent.keys[key_idx]]['order'] += 1
+                    
+                    # Signal that polynomial order has changed
+                    if hasattr(parent, 'signals'):
+                        parent.signals.data_updated.emit({
+                            "action": "poly_order_changed",
+                            "ion_index": key_idx,
+                            "new_order": parent.ions[parent.keys[key_idx]]['order']
+                        })
+                    
                     Plotting.plot(parent, parent.Lidx, modify=True)
+                    
+                    if hasattr(parent, 'signals'):
+                        parent.signals.status_message.emit(f"Polynomial order increased to {parent.ions[parent.keys[key_idx]]['order']}")
                 else:
-                    print('Click on a left transition window first')
+                    if hasattr(parent, 'signals'):
+                        parent.signals.status_message.emit('Click on a left transition window first')
+                    else:
+                        print('Click on a left transition window first')
             
             # Handle 'down' arrow key for decreasing polynomial order
             elif event.key == 'down':
@@ -167,37 +214,97 @@ class EventHandler:
                     parent.ions[parent.keys[key_idx]]['order'] -= 1
                     if parent.ions[parent.keys[key_idx]]['order'] < 0:
                         parent.ions[parent.keys[key_idx]]['order'] = 0
+                    
+                    # Signal that polynomial order has changed
+                    if hasattr(parent, 'signals'):
+                        parent.signals.data_updated.emit({
+                            "action": "poly_order_changed",
+                            "ion_index": key_idx,
+                            "new_order": parent.ions[parent.keys[key_idx]]['order']
+                        })
+                    
                     Plotting.plot(parent, parent.Lidx, modify=True)
+                    
+                    if hasattr(parent, 'signals'):
+                        parent.signals.status_message.emit(f"Polynomial order decreased to {parent.ions[parent.keys[key_idx]]['order']}")
                 else:
-                    print('Click on a transition window first')
+                    if hasattr(parent, 'signals'):
+                        parent.signals.status_message.emit('Click on a transition window first')
+                    else:
+                        print('Click on a transition window first')
             
             # Handle 'm' key for measuring equivalent width of current subplot
             elif event.key == 'm':
                 if parent.Ridx is not None:
                     key_idx = parent.page * 6 + parent.Ridx
-                    EquivalentWidth.calculate(
+                    success = EquivalentWidth.calculate(
                         parent, parent.page, parent.Ridx,
                         parent.ions[parent.keys[key_idx]]['EWlims']
                     )
+                    
+                    if success and hasattr(parent, 'signals'):
+                        # Get the calculated values
+                        ion_name = parent.keys[key_idx]
+                        ew_value = parent.ions[ion_name]['EW']
+                        ew_error = parent.ions[ion_name]['EWsig']
+                        
+                        # Signal that EW has been measured
+                        parent.signals.ew_measured.emit(ion_name, ew_value, ew_error)
+                        parent.signals.status_message.emit(f"Measured EW for {ion_name}: {ew_value:.2f} ± {ew_error:.2f} mÅ")
                 else:
-                    print('Click on a right transition window first')
+                    if hasattr(parent, 'signals'):
+                        parent.signals.status_message.emit('Click on a right transition window first')
+                    else:
+                        print('Click on a right transition window first')
             
             # Handle 'M' key for measuring equivalent width of all subplots
             elif event.key == 'M':
+                measured_count = 0
+                total_ions = 0
+                
                 for jj in range(len(parent.figs)):
                     orig_page = parent.page
                     parent.page = jj
                     for ii in range(parent.nions[parent.page]):
-                        EquivalentWidth.calculate(
+                        total_ions += 1
+                        key_idx = ii + parent.page * 6
+                        success = EquivalentWidth.calculate(
                             parent, parent.page, ii,
-                            parent.ions[parent.keys[ii + parent.page * 6]]['EWlims']
+                            parent.ions[parent.keys[key_idx]]['EWlims']
                         )
+                        if success:
+                            measured_count += 1
+                            
+                            if hasattr(parent, 'signals'):
+                                # Get the calculated values
+                                ion_name = parent.keys[key_idx]
+                                ew_value = parent.ions[ion_name]['EW']
+                                ew_error = parent.ions[ion_name]['EWsig']
+                                
+                                # Signal that EW has been measured
+                                parent.signals.ew_measured.emit(ion_name, ew_value, ew_error)
+                        
                     parent.page = orig_page
+                
+                if hasattr(parent, 'signals'):
+                    if measured_count == total_ions:
+                        parent.signals.status_message.emit(f"Measured EW for all {measured_count} transitions")
+                    else:
+                        parent.signals.status_message.emit(f"Measured EW for {measured_count} of {total_ions} transitions")
             
             # Handle 'V' key for applying current velocity limits to all ions
             elif event.key == 'V':
                 if parent.Ridx is not None:
-                    EWlims = parent.ions[parent.keys[parent.Ridx + 6 * parent.page]]['EWlims']
+                    key_idx = parent.Ridx + 6 * parent.page
+                    EWlims = parent.ions[parent.keys[key_idx]]['EWlims']
+                    
+                    # Signal that EW limits will be applied to all ions
+                    if hasattr(parent, 'signals'):
+                        parent.signals.data_updated.emit({
+                            "action": "ew_limits_global_update",
+                            "ew_limits": EWlims
+                        })
+                    
                     for jj in range(len(parent.figs)):
                         orig_page = parent.page
                         parent.page = jj
@@ -205,21 +312,53 @@ class EventHandler:
                             parent.ions[parent.keys[ii + parent.page * 6]]['EWlims'] = EWlims
                             Plotting.plot(parent, ii, modify=False, Print=False)
                         parent.page = orig_page
+                    
+                    if hasattr(parent, 'signals'):
+                        parent.signals.status_message.emit(f"Applied velocity limits {EWlims[0]:.1f}-{EWlims[1]:.1f} to all transitions")
                 else:
-                    print('Click on a right transition window first')
+                    if hasattr(parent, 'signals'):
+                        parent.signals.status_message.emit('Click on a right transition window first')
+                    else:
+                        print('Click on a right transition window first')
             
             # Handle numeric keys for flagging absorber detection type
             elif event.key in ['0', '1', '2']:
                 if parent.Ridx is not None:
                     key_idx = parent.page * 6 + parent.Ridx
-                    parent.ions[parent.keys[key_idx]]['flag'] = int(event.key)
+                    flag_value = int(event.key)
+                    parent.ions[parent.keys[key_idx]]['flag'] = flag_value
+                    
+                    # Signal that the flag has been changed
+                    if hasattr(parent, 'signals'):
+                        flag_types = {0: "Detection", 1: "Upper Limit", 2: "Lower Limit"}
+                        parent.signals.data_updated.emit({
+                            "action": "flag_updated",
+                            "ion_index": key_idx,
+                            "flag": flag_value,
+                            "flag_type": flag_types.get(flag_value, "Unknown")
+                        })
+                        parent.signals.status_message.emit(f"Set {parent.keys[key_idx]} as {flag_types.get(flag_value, 'Unknown')}")
+                    
                     Plotting.plot(parent, parent.Ridx, modify=False, Print=True)
                 else:
-                    print('Click on a right transition window first')
+                    if hasattr(parent, 'signals'):
+                        parent.signals.status_message.emit('Click on a right transition window first')
+                    else:
+                        print('Click on a right transition window first')
             
             # Handle 't' key for toggling EW/N display mode
             elif event.key == 't':
                 parent.pFlag = (parent.pFlag + 1) % 3
+                display_modes = ["None", "Equivalent Width", "Column Density"]
+                
+                if hasattr(parent, 'signals'):
+                    parent.signals.data_updated.emit({
+                        "action": "display_mode_changed",
+                        "display_mode": parent.pFlag,
+                        "display_name": display_modes[parent.pFlag]
+                    })
+                    parent.signals.status_message.emit(f"Display mode changed to: {display_modes[parent.pFlag]}")
+                
                 for jj in range(len(parent.figs)):
                     orig_page = parent.page
                     parent.page = jj
@@ -230,6 +369,9 @@ class EventHandler:
             # Handle 'q' key for graceful exit
             elif event.key == 'q':
                 print("Exit requested via 'q' key press")
+                if hasattr(parent, 'signals'):
+                    parent.signals.status_message.emit("Exiting application...")
+                
                 # Use the clean_exit method for a proper shutdown
                 if hasattr(parent, 'clean_exit'):
                     parent.clean_exit()
@@ -241,6 +383,9 @@ class EventHandler:
             print(f"Error in key press event handler: {e}")
             import traceback
             traceback.print_exc()  # Full stack trace for debugging
+            
+            if hasattr(parent, 'signals'):
+                parent.signals.error_occurred.emit(f"Error processing keyboard command: {str(e)}")
             
     @staticmethod
     def on_click(parent, event):
@@ -271,6 +416,9 @@ class EventHandler:
                         parent.vclim = [event.xdata]
                         parent.axesL[parent.page][parent.Lidx].plot(event.xdata, event.ydata, 'ro', ms=5)
                         parent.figs[parent.page].canvas.draw()
+                        
+                        if hasattr(parent, 'signals'):
+                            parent.signals.status_message.emit(f"Set first continuum mask point at {event.xdata:.1f}")
                     else:
                         # Handle second click to set second velocity limit and update mask
                         vclim = np.sort(np.append(parent.vclim, event.xdata))
@@ -279,11 +427,23 @@ class EventHandler:
                         
                         if event.button == 1:  # Left click adds to masks
                             wc = ((vel < vclim[0]) | (vel > vclim[1])) & wc
+                            action_type = "added"
                         else:  # Right click removes mask
                             wc = ((vel > vclim[0]) & (vel < vclim[1])) | wc
+                            action_type = "removed"
                             
                         # Update wc for plotting
                         parent.ions[parent.keys[key_idx]]['wc'] = wc
+                        
+                        # Signal that the mask has been updated
+                        if hasattr(parent, 'signals'):
+                            parent.signals.data_updated.emit({
+                                "action": "mask_updated",
+                                "ion_index": key_idx,
+                                "mask_limits": vclim.tolist(),
+                                "mask_action": action_type
+                            })
+                            parent.signals.status_message.emit(f"{action_type.capitalize()} mask region: {vclim[0]:.1f}-{vclim[1]:.1f}")
                         
                         # Replot
                         Plotting.plot(parent, parent.Lidx, modify=True)
@@ -296,6 +456,17 @@ class EventHandler:
                     if event.button == 1:
                         parent.EWlim[0] = event.xdata  # Used for plotting all with same range 'V' command
                         parent.ions[parent.keys[key_idx]]['EWlims'][0] = event.xdata
+                        
+                        # Signal that EW limit has been updated
+                        if hasattr(parent, 'signals'):
+                            parent.signals.data_updated.emit({
+                                "action": "ew_limit_updated",
+                                "ion_index": key_idx,
+                                "limit_type": "left",
+                                "value": event.xdata
+                            })
+                            parent.signals.status_message.emit(f"Set left integration limit to {event.xdata:.1f}")
+                        
                         # Plot selected limits
                         Plotting.plot(parent, parent.Ridx, modify=False, Print=False)
                         
@@ -303,8 +474,21 @@ class EventHandler:
                     elif event.button == 3:
                         parent.EWlim[1] = event.xdata
                         parent.ions[parent.keys[key_idx]]['EWlims'][1] = event.xdata
+                        
+                        # Signal that EW limit has been updated
+                        if hasattr(parent, 'signals'):
+                            parent.signals.data_updated.emit({
+                                "action": "ew_limit_updated",
+                                "ion_index": key_idx,
+                                "limit_type": "right",
+                                "value": event.xdata
+                            })
+                            parent.signals.status_message.emit(f"Set right integration limit to {event.xdata:.1f}")
+                        
                         Plotting.plot(parent, parent.Ridx, modify=False, Print=False)
                         
         except Exception as e:
             print(f"Error in mouse click event handler: {e}")
+            if hasattr(parent, 'signals'):
+                parent.signals.error_occurred.emit(f"Error processing mouse click: {str(e)}")
             parent.vclim = None  # Reset in case of error
