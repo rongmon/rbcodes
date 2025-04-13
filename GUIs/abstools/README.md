@@ -375,53 +375,7 @@ flowchart TB
 
 This diagram illustrates the typical user workflow when working with AbsTools:
 
-```mermaid
-flowchart TD
-    start([Start]) --> launcher[Launch AbsTools]
-    
-    launcher --> newAnalysis{New Analysis?}
-    newAnalysis -->|Yes| loadSpectrum[Load Spectrum File]
-    newAnalysis -->|No| loadSaved[Load Saved Analysis]
-    
-    loadSpectrum --> setParams[Set Parameters\nRedshift, Lines, Window]
-    loadSpectrum --> selectLines[Select Absorption Lines]
-    
-    setParams --> launchMain[Launch Main Interface]
-    selectLines --> launchMain
-    loadSaved --> launchMain
-    
-    launchMain --> continuumFit[Continuum Fitting]
-    continuumFit --> masking[Mask Regions\nPolynomial Order]
-    
-    masking --> setLimits[Set Integration Limits]
-    setLimits --> calcEW[Calculate Equivalent Width]
-    calcEW --> flagLine[Flag Line Type\nDetection/Limit]
-    
-    flagLine --> moreLines{More Lines?}
-    moreLines -->|Yes| continuumFit
-    
-    moreLines -->|No| saveResults[Save Results]
-    saveResults --> saveType{Save Format}
-    
-    saveType -->|JSON| saveJSON[Save JSON]
-    saveType -->|Pickle| savePickle[Save Pickle]
-    saveType -->|PDF| savePDF[Save PDF Plots]
-    saveType -->|Table| saveTable[Save Data Table]
-    
-    saveJSON --> end([End])
-    savePickle --> end
-    savePDF --> end
-    saveTable --> end
-    
-    classDef setup fill:#fbb,stroke:#333,stroke-width:1px;
-    classDef analysis fill:#bbf,stroke:#333,stroke-width:1px;
-    classDef save fill:#bfb,stroke:#333,stroke-width:1px;
-    
-    class launcher,loadSpectrum,setParams,selectLines,loadSaved setup;
-    class launchMain,continuumFit,masking,setLimits,calcEW,flagLine,moreLines analysis;
-    class saveResults,saveType,saveJSON,savePickle,savePDF,saveTable save;
-```
-
+![AbsTools Architecture Diagram](https://github.com/rongmon/rbcodes/tree/master/GUIs/abstools/docs/images/abstools_architecture.svg)
 ## Troubleshooting
 
 ### Common Issues

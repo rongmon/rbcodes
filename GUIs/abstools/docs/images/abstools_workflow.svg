@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="700" height="700" xmlns="http://www.w3.org/2000/svg">
+  <!-- Definitions -->
+  <defs>
+    <marker id="workflow-arrow" viewBox="0 -5 10 10" refX="8" refY="0" 
+            markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,-5L10,0L0,5" fill="#333"/>
+    </marker>
+  </defs>
+  
+  <!-- Workflow steps -->
+  <!-- Terminators -->
+  <ellipse cx="350" cy="50" rx="60" ry="25" fill="#ddd" stroke="#333" />
+  <text x="350" y="55" text-anchor="middle" font-size="12" font-weight="bold">Start</text>
+  
+  <ellipse cx="350" cy="650" rx="60" ry="25" fill="#ddd" stroke="#333" />
+  <text x="350" y="655" text-anchor="middle" font-size="12" font-weight="bold">End</text>
+  
+  <!-- Process boxes -->
+  <!-- Setup phase -->
+  <rect x="290" y="90" width="120" height="40" rx="5" fill="#fbb" stroke="#333" />
+  <text x="350" y="115" text-anchor="middle" font-size="12">Launch AbsTools</text>
+  
+  <rect x="170" y="170" width="120" height="40" rx="5" fill="#fbb" stroke="#333" />
+  <text x="230" y="195" text-anchor="middle" font-size="12">Load Spectrum File</text>
+  
+  <rect x="410" y="170" width="120" height="40" rx="5" fill="#fbb" stroke="#333" />
+  <text x="470" y="195" text-anchor="middle" font-size="12">Load Saved Analysis</text>
+  
+  <rect x="170" y="240" width="120" height="40" rx="5" fill="#fbb" stroke="#333" />
+  <text x="230" y="260" text-anchor="middle" font-size="12">Set Parameters</text>
+  <text x="230" y="275" text-anchor="middle" font-size="10">Redshift, Lines, Window</text>
+  
+  <!-- Analysis phase -->
+  <rect x="290" y="310" width="120" height="40" rx="5" fill="#bbf" stroke="#333" />
+  <text x="350" y="335" text-anchor="middle" font-size="12">Launch Main Interface</text>
+  
+  <rect x="290" y="370" width="120" height="40" rx="5" fill="#bbf" stroke="#333" />
+  <text x="350" y="395" text-anchor="middle" font-size="12">Continuum Fitting</text>
+  
+  <rect x="290" y="430" width="120" height="40" rx="5" fill="#bbf" stroke="#333" />
+  <text x="350" y="450" text-anchor="middle" font-size="12">Mask Regions</text>
+  <text x="350" y="465" text-anchor="middle" font-size="10">Polynomial Order</text>
+  
+  <rect x="290" y="490" width="120" height="40" rx="5" fill="#bbf" stroke="#333" />
+  <text x="350" y="515" text-anchor="middle" font-size="12">Set Integration Limits</text>
+  
+  <rect x="290" y="550" width="120" height="40" rx="5" fill="#bbf" stroke="#333" />
+  <text x="350" y="570" text-anchor="middle" font-size="12">Calculate EW</text>
+  <text x="350" y="585" text-anchor="middle" font-size="10">Flag Detection Type</text>
+  
+  <!-- Save phase -->
+  <rect x="290" y="610" width="120" height="40" rx="5" fill="#bfb" stroke="#333" />
+  <text x="350" y="635" text-anchor="middle" font-size="12">Save Results</text>
+  
+  <!-- Decision diamonds -->
+  <polygon points="350,140 380,170 350,200 320,170" fill="#f0f0f0" stroke="#333" />
+  <text x="350" y="175" text-anchor="middle" font-size="12">New Analysis?</text>
+  
+  <polygon points="230,290 260,320 230,350 200,320" fill="#f0f0f0" stroke="#333" />
+  <text x="230" y="325" text-anchor="middle" font-size="12">More Lines?</text>
+  
+  <!-- Connections -->
+  <g id="connections" stroke="#333" stroke-width="1.5" fill="none" marker-end="url(#workflow-arrow)">
+    <!-- Start to Launch -->
+    <path d="M350,75 L350,90" />
+    
+    <!-- Launch to Decision -->
+    <path d="M350,130 L350,140" />
+    
+    <!-- Decision to Load options -->
+    <path d="M320,170 L290,170 L290,190" />
+    <text x="300" y="165" font-size="10">Yes</text>
+    
+    <path d="M380,170 L410,170 L410,190" />
+    <text x="400" y="165" font-size="10">No</text>
+    
+    <!-- Load Spectrum to Set Parameters -->
+    <path d="M230,210 L230,240" />
+    
+    <!-- Set Parameters to Launch Main -->
+    <path d="M230,280 L230,330 L290,330" />
+    
+    <!-- Load Saved to Launch Main -->
+    <path d="M470,210 L470,330 L410,330" />
+    
+    <!-- Launch Main to Continuum Fitting -->
+    <path d="M350,350 L350,370" />
+    
+    <!-- Continuum Fitting to Mask Regions -->
+    <path d="M350,410 L350,430" />
+    
+    <!-- Mask Regions to Set Integration Limits -->
+    <path d="M350,470 L350,490" />
+    
+    <!-- Set Integration Limits to Calculate EW -->
+    <path d="M350,530 L350,550" />
+    
+    <!-- Calculate EW to More Lines decision -->
+    <path d="M350,590 L230,590 L230,350" />
+    
+    <!-- More Lines loop back -->
+    <path d="M200,320 L150,320 L150,395 L290,395" />
+    <text x="160" y="315" font-size="10">Yes</text>
+    
+    <!-- More Lines to Save Results -->
+    <path d="M260,320 L450,320 L450,635 L410,635" />
+    <text x="440" y="315" font-size="10">No</text>
+    
+    <!-- Save Results to End -->
+    <path d="M350,650 L350,625" />
+  </g>
+</svg>

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+  <!-- Main sections -->
+  <g id="sections">
+    <!-- Entry Points -->
+    <rect x="50" y="50" width="700" height="80" rx="5" fill="#ffcccc" stroke="#333" />
+    <text x="60" y="70" font-weight="bold" font-size="14">Entry Points</text>
+    
+    <!-- Core Components -->
+    <rect x="50" y="150" width="700" height="250" rx="5" fill="#ffccff" stroke="#333" />
+    <text x="60" y="170" font-weight="bold" font-size="14">Core Components</text>
+    
+    <!-- Utilities -->
+    <rect x="50" y="420" width="700" height="80" rx="5" fill="#ccffcc" stroke="#333" />
+    <text x="60" y="440" font-weight="bold" font-size="14">Utilities</text>
+    
+    <!-- File I/O -->
+    <rect x="50" y="520" width="700" height="80" rx="5" fill="#ccccff" stroke="#333" />
+    <text x="60" y="540" font-weight="bold" font-size="14">File I/O</text>
+  </g>
+  
+  <!-- Arrow definitions -->
+  <defs>
+    <marker id="arrowhead" viewBox="0 -5 10 10" refX="8" refY="0" 
+            markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,-5L10,0L0,5" fill="#333"/>
+    </marker>
+  </defs>
+  
+  <!-- Components -->
+  <g id="components">
+    <!-- Entry Points -->
+    <rect x="120" y="85" width="160" height="30" rx="5" fill="#fbb" stroke="#333" />
+    <text x="200" y="105" text-anchor="middle" font-size="12">AbsTools Launcher GUI</text>
+    
+    <rect x="320" y="85" width="160" height="30" rx="5" fill="#fbb" stroke="#333" />
+    <text x="400" y="105" text-anchor="middle" font-size="12">Direct API Usage</text>
+    
+    <rect x="520" y="85" width="160" height="30" rx="5" fill="#fbb" stroke="#333" />
+    <text x="600" y="105" text-anchor="middle" font-size="12">Load Saved File</text>
+    
+    <!-- Core Components -->
+    <rect x="120" y="185" width="160" height="30" rx="5" fill="#f9f" stroke="#333" />
+    <text x="200" y="205" text-anchor="middle" font-size="12">Absorber Class</text>
+    
+    <rect x="120" y="235" width="160" height="30" rx="5" fill="#f9f" stroke="#333" />
+    <text x="200" y="255" text-anchor="middle" font-size="12">Metal_Plot / MainWindow</text>
+    
+    <rect x="320" y="185" width="160" height="30" rx="5" fill="#ddf" stroke="#333" />
+    <text x="400" y="205" text-anchor="middle" font-size="12">Page Manager</text>
+    
+    <rect x="320" y="235" width="160" height="30" rx="5" fill="#ddf" stroke="#333" />
+    <text x="400" y="255" text-anchor="middle" font-size="12">Save Dialog</text>
+    
+    <rect x="320" y="285" width="160" height="30" rx="5" fill="#ddf" stroke="#333" />
+    <text x="400" y="305" text-anchor="middle" font-size="12">Help Window</text>
+    
+    <rect x="520" y="185" width="160" height="30" rx="5" fill="#fdd" stroke="#333" />
+    <text x="600" y="205" text-anchor="middle" font-size="12">Plotting Engine</text>
+    
+    <rect x="520" y="235" width="160" height="30" rx="5" fill="#fdd" stroke="#333" />
+    <text x
