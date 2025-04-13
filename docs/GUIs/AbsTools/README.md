@@ -376,7 +376,7 @@ flowchart TB
 
 This diagram illustrates the typical user workflow when working with AbsTools:
 
-![AbsTools User Workflow](https://github.com/rongmon/rbcodes/blob/master/GUIs/abstools/docs/images/abstools_workflow.svg)
+![AbsTools User Workflow](https://github.com/rongmon/rbcodes/blob/master/docs/GUIs/AbsTools/images/abstools_workflow.svg)
 
 ## Troubleshooting
 
