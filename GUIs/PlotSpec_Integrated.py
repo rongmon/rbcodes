@@ -3,17 +3,18 @@ Modules for PlotSpec_Integrated GUI
 """
 import numpy as np
 from scipy.interpolate import splrep,splev
-from IGM import rb_setline as line   
+
+
 from astropy.modeling import models, fitting    
 import pdb
 import sys
 import os
 from pathlib import Path
-from utils import rb_utility as rt
 import matplotlib as mpl
 mpl.use('Qt5Agg')
 mpl.rcParams['lines.linewidth'] = .9
-clr=rt.rb_set_color()
+
+
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import (QApplication, QWidget, QPushButton, QComboBox,QHBoxLayout,QFileDialog,
     QLineEdit, QInputDialog,QListWidget, QVBoxLayout, QListWidgetItem,QLabel,QTableWidget,QGridLayout,QMessageBox,QBoxLayout,QDesktopWidget)
@@ -28,8 +29,22 @@ from matplotlib.backends.backend_qt5agg import (
     NavigationToolbar2QT as NavigationToolbar,
 )
 from matplotlib.figure import Figure
-from GUIs import guess_abs_line_vel_gui as g
-from GUIs.abstools import Absorber as A 
+
+#rbcodes import 
+
+try:
+    from rbcodes.IGM import rb_setline as line   
+    from rbcodes.GUIs import guess_abs_line_vel_gui as g
+    from rbcodes.GUIs.abstools import Absorber as A 
+    from rbcodes.utils import rb_utility as rt
+
+except:
+    from IGM import rb_setline as line   
+    from GUIs import guess_abs_line_vel_gui as g
+    from GUIs.abstools import Absorber as A 
+    from utils import rb_utility as rt
+
+clr=rt.rb_set_color()
 
 
 

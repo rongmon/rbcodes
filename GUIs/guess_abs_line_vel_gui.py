@@ -1,17 +1,23 @@
 import numpy as np
-from IGM import rb_setline as line       
-from utils import rb_utility as rt
 import matplotlib as mpl
 #mpl.use('TkAgg')
 mpl.rcParams['lines.linewidth'] = .9
-clr=rt.rb_set_color()
-from GUIs.abstools import Absorber as A
 import matplotlib.pyplot as plt 
 plt.style.use('dark_background')
-
 import sys
 from PyQt5.QtWidgets import (QApplication, QWidget, QPushButton, 
 QLineEdit, QInputDialog)
+
+try:
+    from rbcodes.IGM import rb_setline as line       
+    from rbcodes.utils import rb_utility as rt
+    from rbcodes.GUIs.abstools import Absorber as A
+except:
+    from IGM import rb_setline as line       
+    from utils import rb_utility as rt
+    from GUIs.abstools import Absorber as A
+
+clr=rt.rb_set_color()
 
 
 def prepare_absorber_object(z_abs,wave,flux,error,line_flg='LLS',vlim=[-1000,1000]):

@@ -17,7 +17,11 @@ from pathlib import Path
 import logging
 
 from linetools.spectra.xspectrum1d import XSpectrum1D
-from GUIs import PlotSpec_Integrated as r
+
+try:
+    from rbcodes.GUIs import PlotSpec_Integrated as r
+except:
+    from GUIs import PlotSpec_Integrated as r
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
