@@ -1,7 +1,9 @@
 from scipy.special import ndtri
 import numpy as np
 def rb_wilsonscore(count,nobs,confint):
-	"""This function computes the wilson score confidence intervals Score Interval for a binomial distribution. 
+	"""
+
+      This function computes the wilson score confidence intervals Score Interval for a binomial distribution. 
 	
 	    Paramters
 	    ---------

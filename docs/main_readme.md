@@ -11,7 +11,7 @@ This package is constantly under development and will be periodically updated.
 
 ### Create Conda Environment
 ```bash
-# Create the environment with Python 3.9.5
+# Create the environment with Python 3.9.6
 conda create -n myenv python=3.9.6
 
 # Activate the environment
@@ -29,60 +29,72 @@ conda install -c conda-forge --file requirements_simple.txt
   - numpy
   - matplotlib
   - linetools
-- Partial Dependencies: PysimpleGUI for some GUIs
 
 ## Contents
 
 ### Graphical User Interfaces (GUIs)
-1. [rb_cont.py](/docs/GUIs/rb_cont.md): Simple interactive continuum fitter
-2. [rb_spec.py](/docs/GUIs/rb_spec.md): Absorption line analysis pipeline
-   - Continuum fitting
-   - Equivalent width/column density measurements
-   - Simple Voigt profile fitting
-3. [rb_interactive_vpfit_singlet.py](/docs/GUIs/rb_interactive_vpfit_singlet.md): Interactive Voigt profile fitter
-4. [rb_plot_spec.py](/docs/GUIs/rb_plot_spec.md): Spectrum plotting and analysis tool
-   - Pan and zoom spectrum
-   - Plot absorption lines at various redshifts
-   - Equivalent width and Gaussian fitting
-5. [AbsTools](/docs/GUIs/AbsTools/README.md): Complex absorption line analysis GUI
-6. [rb_specgui](/docs/GUIs/rb_specgui/rb_specgui.md): Advanced 1D spectrum viewer and line identifier
-7. [zgui/main.py](/docs/GUIs/zgui.md): Redshift measurement GUI for galaxies
-   - Supports 1D and 2D spectra
-   - Optimized for JWST NIRCam/Grism spectroscopy
+    1. [rb_cont.py](/docs/GUIs/rb_cont.md): Simple interactive continuum fitter
+    2. [rb_spec.py](/docs/GUIs/rb_spec.md): Absorption line analysis pipeline
+       - Continuum fitting
+       - Equivalent width/column density measurements
+       - Simple Voigt profile fitting
+    3. [rb_interactive_vpfit_singlet.py](/docs/GUIs/rb_interactive_vpfit_singlet.md): Interactive Voigt profile     fitter
+    4. [rb_plot_spec.py](/docs/GUIs/rb_plot_spec.md): Spectrum plotting and analysis tool
+       - Pan and zoom spectrum
+       - Plot absorption lines at various redshifts
+       - Equivalent width and Gaussian fitting
+    5. [AbsTools](/docs/GUIs/AbsTools/README.md): Complex absorption line analysis GUI
+    6. [rb_specgui](/docs/GUIs/rb_specgui/rb_specgui.md): Advanced 1D spectrum viewer and line identifier
+    7. [zgui/main.py](/docs/GUIs/zgui.md): Redshift measurement GUI for galaxies
+       - Supports 1D and 2D spectra
+       - Optimized for JWST NIRCam/Grism spectroscopy
 
 ### Intergalactic Medium (IGM) Tools
 
 [Full Documentation](/docs/IGM/IGM_README.md)
 
-1. [compute_EW.py](/docs/IGM/compute_EW.md): Equivalent width and column density calculations
-2. [rb_setline.py](/docs/IGM/rb_setline.md): Atomic transition and f-value finder
-3. [rb_iter_contfit.py](/docs/IGM/rb_iter_contfit.md): Iterative continuum fitting
-4. [rb_specbin.py](/docs/IGM/rb_specbin.md): Spectrum rebinning
-5. [ransac_contfit.py](/docs/IGM/ransac_contfit.md): Advanced continuum fitting
-6. [lens_sep_to_kpc.py](/docs/IGM/lens_sep_to_kpc.md): Sightline separation calculation
-
+    1. compute_EW.py: Equivalent width and column density calculations
+    2. rb_setline.py: Atomic transition and f-value finder
+    3. rb_iter_contfit.py: Iterative continuum fitting
+    4. rb_specbin.py: Spectrum rebinning
+    5. ransac_contfit.py: Advanced continuum fitting
+    6. lens_sep_to_kpc.py: Sightline separation calculation
+    
 ### Halo Analysis
-1. [rb_nfw.py](/docs/halo/rb_nfw.md): NFW halo profile computation
-2. [mstar2mhalo.py](/docs/halo/mstar2mhalo.md): Stellar mass to halo mass conversion
+       1) rb_nfw.py      : Compute NFW halo profile
+       2) mstar2mhalo.py : Convert stellar mass to Halo mass using Moster et al. 2010.
 
 ### Statistical Tools
-1. [rb_wilsonscore.py](/docs/rbstat/rb_wilsonscore.md): Wilson score confidence intervals
-2. [rb_boot.py](/docs/rbstat/rb_boot.md): Bootstrap function
+[Full Documentation](/docs/rbstat/rb_stat_readme.md)
+
+    1. rb_wilsonscore.py: Wilson score confidence intervals
+    2. rb_boot.py: Bootstrap function
 
 ### Lensing
-1. [lens_ang_sep.py](/docs/lensing/lens_ang_sep.md): Deflection matrix ray tracing
+    1. lens_ang_sep.py: Deflection matrix ray tracing
 
 ### Utility Modules
-1. [rb_utility.py](/docs/utils/rb_utility.md): Utility functions
-2. [rb_x1d_id.py](/docs/utils/rb_x1d_id.md): HST/COS x1d fits file header info
-3. [readmultispec.py](/docs/utils/readmultispec.md): IRAF spectrum reader
-4. [cos_inspect.py](/docs/utils/cos_inspect.md): HST/COS file inspector
-5. [filter_2d_spec.py](/docs/utils/filter_2d_spec.md): JWST/NIRCam 2D grism spectra filter
-6. [compute_SNR_1d.py](/docs/utils/compute_SNR_1d.md): Signal-to-noise ratio computation
+     1) rb_utility.py     :  Several utility functions
+
+      2) rb_x1d_id.py      : This function will read all HST/COS x1d fits files in a folder and print out
+                             the header info for raw spectra. It will print filename, exposure type, 
+                             and object type entries from the header.
+
+      3) readmultispec.py  : Read IRAF (echelle) spectrum in multispec format from a FITS file. Can read 
+                             most multispec formats including linear, log, cubic spline, Chebyshev or 
+                             Legendre dispersion spectra. I got this code from https://github.com/kgullikson88/General.
+
+     4) cos_inspec.py      : Routine to quickly inspect HST/COS x1d files.
+
+     5) filter_2d_spec.py  : Custom routine to mask and filter JWST/NIRCam 2D grism spectra from the EIGER survey. [Optimized for a custom data format]
+
+     6) compute_SNR_1d.py  : Compute signal-to-noise ratio of an 1D spectrum and plot the result.
+             
 
 ### Catalog Tools
-1. [rb_search.py](/docs/catalog/rb_search.md): Cone search utility
-2. [convert_FIRE_coordinates.py](/docs/catalog/convert_FIRE_coordinates.md): Coordinate transformation
+    1)rb_search.py.    : Function to do a cone search around any (ra,dec) pointing with respect to a list of  ra,dec entries.
+    2) convert_FIRE_coordinates.py:  Custom code only to take Magellan 1D FIRE spectrum and use the header  information
+                                          to transform the co-ordinates to J2000 epoch.
 
 ## Contributing
 - Package is under active development

@@ -1,8 +1,12 @@
-import numpy as np
-def bootstrap(data, bootnum=100, samples=None, bootfunc=None):
-    """
+# Project Documentation
 
-    Performs bootstrap resampling on numpy arrays.
+*Auto-generated documentation from docstrings*
+
+## Functions
+
+### bootstrap() (`rb_boot`)
+
+Performs bootstrap resampling on numpy arrays.
 
     Bootstrap resampling is used to understand confidence intervals of sample
     estimates. This function returns versions of the dataset resampled with
@@ -31,26 +35,29 @@ def bootstrap(data, bootnum=100, samples=None, bootfunc=None):
     boot : numpy.ndarray
         Bootstrapped data. Each row is a bootstrap resample of the data.
 
-    """
-    if samples is None:
-        samples = data.shape[0]
+### rb_wilsonscore() (`rb_wilsonscore`)
 
-    #make sure the input is sane
-    assert samples > 0, "samples cannot be less than one"
-    assert bootnum > 0, "bootnum cannot be less than one"
+This function computes the wilson score confidence intervals Score Interval for a binomial distribution. 
+	
+	    Paramters
+	    ---------
+	        count   =    Number of successes
+	        nobs    =    Number of total Trials
+	        confint =    Confindence interval for which Wilson Score is computed [e.g. confint =0.95 2\sigma]
+	
+	    Returns
+	    -------
+			center =  gives the center of the score intervals given the data
+	        hi     =   Upper bound for given confint
+	        lo     =   Lower bound for given confint
+	
+	    Example
+	    -------
 
-    if bootfunc is None:
-        resultdims = (bootnum,) + (samples,) + data.shape[1:]
-        boot = np.empty(resultdims)
-    else:
-        resultdims = (bootnum,)
-        boot = np.empty(resultdims)
+	        import rb_wilsonscore as w
+	        XC, hi, lo = w.rb_wilsonscore(10.,20.,.95)
+	
+	    Written by :   Rongmon Bordoloi  Nov 2017
+	    Tested on  : Python 2.7, 3.x
+	-----------------------------------------------------------------------------------
 
-    for i in range(bootnum):
-        bootarr = np.random.randint(low=0,high=data.shape[0],size=samples)
-        if bootfunc is None:
-            boot[i] = data[bootarr]
-        else:
-            boot[i] = bootfunc(data[bootarr])
-
-    return boot
