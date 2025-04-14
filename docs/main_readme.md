@@ -51,6 +51,9 @@ conda install -c conda-forge --file requirements_simple.txt
    - Optimized for JWST NIRCam/Grism spectroscopy
 
 ### Intergalactic Medium (IGM) Tools
+
+[Full Documentation](/docs/IGM/IGM_README.md)
+
 1. [compute_EW.py](/docs/IGM/compute_EW.md): Equivalent width and column density calculations
 2. [rb_setline.py](/docs/IGM/rb_setline.md): Atomic transition and f-value finder
 3. [rb_iter_contfit.py](/docs/IGM/rb_iter_contfit.md): Iterative continuum fitting
