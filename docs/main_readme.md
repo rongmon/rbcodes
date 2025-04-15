@@ -33,22 +33,22 @@ conda install -c conda-forge --file requirements_simple.txt
 ## Contents
 
 ### Graphical User Interfaces (GUIs)
-    1. [rb_cont.py](/docs/GUIs/rb_cont.md): Simple interactive continuum fitter
-    2. [rb_spec.py](/docs/GUIs/rb_spec.md): Absorption line analysis pipeline
-       - Continuum fitting
-       - Equivalent width/column density measurements
-       - Simple Voigt profile fitting
-    3. [rb_interactive_vpfit_singlet.py](/docs/GUIs/rb_interactive_vpfit_singlet.md): Interactive Voigt profile     fitter
-    4. [rb_plot_spec.py](/docs/GUIs/rb_plot_spec.md): Spectrum plotting and analysis tool
-       - Pan and zoom spectrum
-       - Plot absorption lines at various redshifts
-       - Equivalent width and Gaussian fitting
-    5. [AbsTools](/docs/GUIs/AbsTools/README.md): Complex absorption line analysis GUI
-    6. [rb_specgui](/docs/GUIs/rb_specgui/rb_specgui.md): Advanced 1D spectrum viewer and line identifier
-    7. [zgui/main.py](/docs/GUIs/zgui.md): Redshift measurement GUI for galaxies
-       - Supports 1D and 2D spectra
-       - Optimized for JWST NIRCam/Grism spectroscopy
-    8 [LLSFitter_GUI.py](/docs/GUIs/LLSFitter/LLSFitter.md): A Simple GUI to fit Lyman Limit System column densities.
+1. [rb_cont.py](/docs/GUIs/rb_cont.md): Simple interactive continuum fitter
+2. [rb_spec.py](/docs/GUIs/rb_spec.md): Absorption line analysis pipeline
+   - Continuum fitting
+   - Equivalent width/column density measurements
+   - Simple Voigt profile fitting
+3. [rb_interactive_vpfit_singlet.py](/docs/GUIs/rb_interactive_vpfit_singlet.md): Interactive Voigt profile     fitter
+4. [rb_plot_spec.py](/docs/GUIs/rb_plot_spec.md): Spectrum plotting and analysis tool
+   - Pan and zoom spectrum
+   - Plot absorption lines at various redshifts
+   - Equivalent width and Gaussian fitting
+5. [AbsTools](/docs/GUIs/AbsTools/README.md): Complex absorption line analysis GUI
+6. [rb_specgui](/docs/GUIs/rb_specgui/rb_specgui.md): Advanced 1D spectrum viewer and line identifier
+7. [zgui/main.py](/docs/GUIs/zgui.md): Redshift measurement GUI for galaxies
+   - Supports 1D and 2D spectra
+   - Optimized for JWST NIRCam/Grism spectroscopy
+8 [LLSFitter_GUI.py](/docs/GUIs/LLSFitter/LLSFitter.md): A Simple GUI to fit Lyman Limit System column densities.
 
 ### Intergalactic Medium (IGM) Tools
 
