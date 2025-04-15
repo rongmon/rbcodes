@@ -32,8 +32,14 @@ lls.set_sigma_clip(3.0)  # 3-sigma clipping
 popt, pcov = lls.fit_curve_fit()
 print(f"Curve fit results: logNHI = {popt[2]:.2f} ± {np.sqrt(pcov[2,2]):.2f}")
 
-# Plot the fit
-fig, ax = lls.plot_fit(method='curve_fit', wmin=880, wmax=975)
+# Plot the fit with custom axis limits
+fig, ax = lls.plot_fit(
+    method='curve_fit', 
+    wmin=880,     # x-axis minimum (wavelength in Angstroms)
+    wmax=975,     # x-axis maximum
+    ymin=0.2,     # y-axis minimum (normalized flux)
+    ymax=1.8      # y-axis maximum
+)
 fig.savefig('lls_curvefit.png')
 ```
 
@@ -43,11 +49,13 @@ fig.savefig('lls_curvefit.png')
 # After running curve_fit (or directly)
 sampler, samples = lls.fit_emcee(nwalkers=50, nsteps=500, burnin_frac=0.2)
 
-# Plot the MCMC fit with model realizations
+# Plot the MCMC fit with model realizations and custom axis limits
 fig, ax = lls.plot_fit(
     method='mcmc', 
-    wmin=880, 
-    wmax=975, 
+    wmin=880,     # x-axis minimum (wavelength in Angstroms)
+    wmax=975,     # x-axis maximum
+    ymin=0,       # y-axis minimum (normalized flux)
+    ymax=2,       # y-axis maximum
     show_realizations=True, 
     n_realizations=100
 )
@@ -117,15 +125,25 @@ python LLSFitter_GUI.py
      - Set initial values for C0, C1, and log N(HI)
      - Set bounds for these parameters
      - Configure MCMC parameters (walkers, steps, burn-in fraction)
-     - Set plot options (wavelength range, visualization preferences)
+     - Set plot options (see below)
      - Adjust sigma-clipping threshold for outlier rejection
 
-4. **Running Fits**
+4. **Setting Plot Options**
+   - In the "Fit Parameters" tab, scroll down to find the "Plot Options" section
+   - Set the wavelength (x-axis) range with "Min Wavelength (Å)" and "Max Wavelength (Å)" spinboxes
+   - Control the y-axis limits:
+     - Check "Auto Y-Limits" for automatic scaling based on the data
+     - Uncheck this option to manually set "Min Y Value" and "Max Y Value"
+   - Toggle the display of continuum regions with "Show Continuum Regions"
+   - For MCMC plots, toggle "Show MCMC Realizations" and set the number of realizations to display
+   - Note: If the Plot Options section isn't visible, try resizing the application window to make it taller
+
+5. **Running Fits**
    - Click "Run Curve Fit" for a quick analysis using scipy's curve_fit
    - Click "Run MCMC Fit" for a more robust analysis using emcee
    - Results are displayed in the status bar and in the plot tabs
 
-5. **Viewing Results**
+6. **Viewing Results**
    - Use the tabs in the right panel to view:
      - Preview: The spectrum with continuum regions highlighted
      - Curve Fit: Results from the curve_fit method
@@ -134,7 +152,7 @@ python LLSFitter_GUI.py
    - Use "Analysis" → "View Detailed Results" for numerical details
    - Results can be saved with "File" → "Save Results"
 
-6. **Exporting**
+7. **Exporting**
    - Plots can be exported with "File" → "Export Current Plot"
    - Results can be saved to a text file with "File" → "Save Results"
    - Continuum regions can be saved/loaded as templates
@@ -159,12 +177,21 @@ python LLSFitter_GUI.py
    - For publication-quality results: 100+ walkers, 1000+ steps
    - Use a burn-in fraction of 0.2-0.3 to discard initial steps
 
-3. **Evaluate Fit Quality**:
+3. **Plot Display Optimization**:
+   - Adjust x-axis limits to focus on the Lyman limit region (around 880-975 Å)
+   - For clearer visualization of the flux decrement, set custom y-limits:
+     - For systems with strong absorption: try ymin=0, ymax=1.5
+     - For weak systems: try ymin=0.5, ymax=2.0
+   - Toggle the display of realizations based on your needs:
+     - Show them to visualize parameter uncertainty
+     - Hide them for cleaner plots in presentations or publications
+
+4. **Evaluate Fit Quality**:
    - Check if the model matches the flux decrement at 912 Å
    - Look for systematic residuals that might indicate problems
    - Compare curve_fit and MCMC results for consistency
 
-4. **Working with Noisy Data**:
+5. **Working with Noisy Data**:
    - Increase the sigma-clipping threshold (e.g., to 4-5σ)
    - Use more continuum regions to better constrain the fit
    - Run MCMC with more walkers and steps
@@ -190,3 +217,5 @@ Here are some examples of the visualizations produced by LLSFitter:
 - **Poor fits**: Try adjusting parameter bounds or initial values
 - **MCMC not converging**: Increase the number of steps and burn-in fraction
 - **Outliers affecting the fit**: Adjust the sigma-clipping threshold
+- **Plot Options not visible**: Resize the application window to make it taller, or look for scrollbars in the Fit Parameters tab
+- **Custom y-limits not applied**: Make sure the "Auto Y-Limits" checkbox is unchecked to enable manual y-limit controls

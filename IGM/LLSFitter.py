@@ -355,7 +355,8 @@ class LLSFitter:
         return sampler, self.samples
     
     def plot_fit(self, method='curve_fit', show_continuum_regions=True, 
-               wmin=None, wmax=None, figsize=(12, 6), show_realizations=False, n_realizations=100):
+               wmin=None, wmax=None, ymin=None, ymax=None, figsize=(12, 6), 
+               show_realizations=False, n_realizations=100):
         """
         Plot the spectrum and the fit.
         
@@ -368,6 +369,8 @@ class LLSFitter:
             and plot the points used in fitting
         wmin, wmax : float, optional
             Wavelength range to plot (if None, use domain_range)
+        ymin, ymax : float, optional
+            Flux range to plot (if None, auto-determine from data)
         figsize : tuple, optional
             Figure size
         show_realizations : bool, optional
@@ -407,12 +410,13 @@ class LLSFitter:
             continuum_mask = self.get_continuum_mask()
             
             # Plot each continuum region as a gray box
-            ymin, ymax = 0, 2  # Default range, will be adjusted later
+            y_box_min = 0
+            y_box_max = 2  # Default range, will be adjusted later
                 
             for rmin, rmax in self.continuum_regions:
                 # Only show regions within the plot range
                 if (rmin <= wmax and rmax >= wmin):
-                    rect = plt.Rectangle((rmin, ymin), rmax-rmin, ymax-ymin, 
+                    rect = plt.Rectangle((rmin, y_box_min), rmax-rmin, y_box_max-y_box_min, 
                                         color='gray', alpha=0.15, zorder=0)
                     ax.add_patch(rect)
         
@@ -443,12 +447,32 @@ class LLSFitter:
             ax.plot(self.rest_wave[continuum_mask], self.flux[continuum_mask], 'r.', 
                     alpha=0.7, markersize=3, label='Continuum Points Used', zorder=5)
         
-        # Set axes limits
+        # Set axes limits for x-axis
         ax.set_xlim(wmin, wmax)
-        ymin = np.percentile(self.flux[(self.rest_wave >= wmin) & (self.rest_wave <= wmax)], 1)
-        ymax = np.percentile(self.flux[(self.rest_wave >= wmin) & (self.rest_wave <= wmax)], 99)
-        margin = 0.2 * (ymax - ymin)
-        ax.set_ylim(max(0, ymin - margin), ymax + margin)
+        
+        # Set axes limits for y-axis - either use provided values or auto-calculate
+        if ymin is None or ymax is None:
+            # Auto-calculate y limits from visible data
+            visible_flux = self.flux[(self.rest_wave >= wmin) & (self.rest_wave <= wmax)]
+            auto_ymin = np.percentile(visible_flux, 1)
+            auto_ymax = np.percentile(visible_flux, 99)
+            margin = 0.2 * (auto_ymax - auto_ymin)
+            
+            # Use provided values if available, otherwise use auto-calculated ones
+            y_lower = ymin if ymin is not None else max(0, auto_ymin - margin)
+            y_upper = ymax if ymax is not None else auto_ymax + margin
+        else:
+            y_lower = ymin
+            y_upper = ymax
+        
+        # Update the rectangle heights for continuum regions
+        if show_continuum_regions:
+            for patch in ax.patches:
+                if isinstance(patch, plt.Rectangle):
+                    patch.set_height(y_upper - y_lower)
+                    patch.set_y(y_lower)
+        
+        ax.set_ylim(y_lower, y_upper)
         
         # Add labels and legend
         ax.set_xlabel('Rest Wavelength (Å)')
@@ -458,8 +482,7 @@ class LLSFitter:
         ax.grid(True, alpha=0.3)
         
         plt.tight_layout()
-        return fig, ax
-    
+        return fig, ax    
     def plot_corner(self, figsize=(10, 10)):
         """
         Plot corner plot of MCMC samples.

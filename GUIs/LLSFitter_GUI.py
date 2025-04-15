@@ -828,7 +828,8 @@ class LLSFitterGUI(QMainWindow):
         
         # Plot Options
         plot_group = QGroupBox("Plot Options")
-        plot_layout = QFormLayout(plot_group)
+        plot_layout = QFormLayout()  # Don't set the layout on the group box yet
+
         
         self.wmin_input = QDoubleSpinBox()
         self.wmin_input.setRange(800, 1000)
@@ -837,6 +838,25 @@ class LLSFitterGUI(QMainWindow):
         self.wmax_input = QDoubleSpinBox()
         self.wmax_input.setRange(800, 1000)
         self.wmax_input.setValue(975)
+        
+        # Add y-axis limit inputs
+        self.y_auto_checkbox = QCheckBox("Auto Y-Limits")
+        self.y_auto_checkbox.setChecked(True)
+        self.y_auto_checkbox.stateChanged.connect(self.toggle_y_limits)
+        
+        self.ymin_input = QDoubleSpinBox()
+        self.ymin_input.setRange(0, 5)
+        self.ymin_input.setValue(0)
+        self.ymin_input.setDecimals(2)
+        self.ymin_input.setSingleStep(0.1)
+        self.ymin_input.setEnabled(False)
+        
+        self.ymax_input = QDoubleSpinBox()
+        self.ymax_input.setRange(0, 5)
+        self.ymax_input.setValue(2)
+        self.ymax_input.setDecimals(2)
+        self.ymax_input.setSingleStep(0.1)
+        self.ymax_input.setEnabled(False)
         
         self.show_regions_check = QCheckBox()
         self.show_regions_check.setChecked(True)
@@ -855,14 +875,17 @@ class LLSFitterGUI(QMainWindow):
         self.sigma_input.setDecimals(1)
         self.sigma_input.setSingleStep(0.1)
         
-
+        #Form rows
         plot_layout.addRow("Sigma Clip Threshold:", self.sigma_input)
         plot_layout.addRow("Min Wavelength (Å):", self.wmin_input)
         plot_layout.addRow("Max Wavelength (Å):", self.wmax_input)
+        plot_layout.addRow("Auto Y-Limits:", self.y_auto_checkbox)
+        plot_layout.addRow("Min Y Value:", self.ymin_input)
+        plot_layout.addRow("Max Y Value:", self.ymax_input)
         plot_layout.addRow("Show Continuum Regions:", self.show_regions_check)
         plot_layout.addRow("Show MCMC Realizations:", self.show_realizations_check)
         plot_layout.addRow("Number of Realizations:", self.n_realizations_input)
-
+             
         
         # Add groups to fit_layout
         fit_layout.addRow(params_group)
@@ -945,7 +968,13 @@ class LLSFitterGUI(QMainWindow):
         
         # Set initial state
         self.continuum_table.set_default_regions()
-        
+
+    def toggle_y_limits(self, state):
+        """Enable or disable custom y-limit inputs based on checkbox state"""
+        enabled = not bool(state)  # Checkbox checked = auto limits = disable inputs
+        self.ymin_input.setEnabled(enabled)
+        self.ymax_input.setEnabled(enabled)
+            
     def browse_file(self):
         """Open a file dialog to select a spectrum file"""
         file_path, _ = QFileDialog.getOpenFileName(
@@ -1062,6 +1091,13 @@ class LLSFitterGUI(QMainWindow):
             wmin = self.wmin_input.value()
             wmax = self.wmax_input.value()
             
+            # Get y-limits if not using auto
+            ymin = None
+            ymax = None
+            if not self.y_auto_checkbox.isChecked():
+                ymin = self.ymin_input.value()
+                ymax = self.ymax_input.value()
+            
             # Get the continuum mask
             mask = self.lls_fitter.get_continuum_mask()
             
@@ -1078,22 +1114,43 @@ class LLSFitterGUI(QMainWindow):
             
             # Highlight continuum regions
             if self.show_regions_check.isChecked():
-                ymin, ymax = ax.get_ylim()
+                y_box_min = ymin if ymin is not None else 0
+                y_box_max = ymax if ymax is not None else 2  # Default, will be adjusted later
+                
                 for rmin, rmax in self.get_current_continuum_regions():
-                    rect = plt.Rectangle((rmin, ymin), rmax-rmin, ymax-ymin, 
+                    rect = plt.Rectangle((rmin, y_box_min), rmax-rmin, y_box_max-y_box_min, 
                                         color='gray', alpha=0.15, zorder=0)
                     ax.add_patch(rect)
             
-            # Set axes limits
+            # Set x-axis limits
             ax.set_xlim(wmin, wmax)
-            ymin = np.percentile(self.lls_fitter.flux[
-                (self.lls_fitter.rest_wave >= wmin) & (self.lls_fitter.rest_wave <= wmax)
-            ], 1)
-            ymax = np.percentile(self.lls_fitter.flux[
-                (self.lls_fitter.rest_wave >= wmin) & (self.lls_fitter.rest_wave <= wmax)
-            ], 99)
-            margin = 0.2 * (ymax - ymin)
-            ax.set_ylim(max(0, ymin - margin), ymax + margin)
+            
+            # Set y-axis limits (either custom or auto-calculated)
+            if ymin is not None and ymax is not None:
+                ax.set_ylim(ymin, ymax)
+                
+                # Adjust rectangle heights for continuum regions
+                if self.show_regions_check.isChecked():
+                    for patch in ax.patches:
+                        if isinstance(patch, plt.Rectangle):
+                            patch.set_height(ymax - ymin)
+                            patch.set_y(ymin)
+            else:
+                # Auto-calculate y limits
+                visible_flux = self.lls_fitter.flux[
+                    (self.lls_fitter.rest_wave >= wmin) & (self.lls_fitter.rest_wave <= wmax)
+                ]
+                auto_ymin = np.percentile(visible_flux, 1)
+                auto_ymax = np.percentile(visible_flux, 99)
+                margin = 0.2 * (auto_ymax - auto_ymin)
+                ax.set_ylim(max(0, auto_ymin - margin), auto_ymax + margin)
+                
+                # Adjust rectangle heights for continuum regions
+                if self.show_regions_check.isChecked():
+                    for patch in ax.patches:
+                        if isinstance(patch, plt.Rectangle):
+                            patch.set_height(ax.get_ylim()[1] - ax.get_ylim()[0])
+                            patch.set_y(ax.get_ylim()[0])
             
             # Add labels and legend
             ax.set_xlabel('Rest Wavelength (Å)')
@@ -1140,14 +1197,25 @@ class LLSFitterGUI(QMainWindow):
             # Update progress
             self.progress_bar.setValue(70)
             QApplication.processEvents()
+
+            # Get plot limits
+            wmin = self.wmin_input.value()
+            wmax = self.wmax_input.value()
+            ymin = None
+            ymax = None
+            if not self.y_auto_checkbox.isChecked():
+                ymin = self.ymin_input.value()
+                ymax = self.ymax_input.value()
             
             # Plot the results
             self.curve_fit_plot_widget.clear_figure()
             fig, ax = self.lls_fitter.plot_fit(
                 method='curve_fit',
                 show_continuum_regions=self.show_regions_check.isChecked(),
-                wmin=self.wmin_input.value(),
-                wmax=self.wmax_input.value(),
+                wmin=wmin,
+                wmax=wmax,
+                ymin=ymin,
+                ymax=ymax,
                 figsize=(8, 6)
             )
             
@@ -1260,14 +1328,27 @@ class LLSFitterGUI(QMainWindow):
             self.progress_bar.setValue(80)
             self.status_bar.showMessage("Generating plots...")
             QApplication.processEvents()
+
+
+            # Get plot limits
+            wmin = self.wmin_input.value()
+            wmax = self.wmax_input.value()
+            ymin = None
+            ymax = None
+            if not self.y_auto_checkbox.isChecked():
+                ymin = self.ymin_input.value()
+                ymax = self.ymax_input.value()
+
             
             # Plot the MCMC fit
             self.mcmc_plot_widget.clear_figure()
             fig, ax = self.lls_fitter.plot_fit(
                 method='mcmc',
                 show_continuum_regions=self.show_regions_check.isChecked(),
-                wmin=self.wmin_input.value(),
-                wmax=self.wmax_input.value(),
+                wmin=wmin,
+                wmax=wmax,
+                ymin=ymin,
+                ymax=ymax,
                 show_realizations=self.show_realizations_check.isChecked(),
                 n_realizations=self.n_realizations_input.value(),
                 figsize=(8, 6)
@@ -1355,9 +1436,13 @@ class LLSFitterGUI(QMainWindow):
         # Save plot options
         settings.setValue("wmin", self.wmin_input.value())
         settings.setValue("wmax", self.wmax_input.value())
+        settings.setValue("y_auto", self.y_auto_checkbox.isChecked())
+        settings.setValue("ymin", self.ymin_input.value())
+        settings.setValue("ymax", self.ymax_input.value())
         settings.setValue("show_regions", self.show_regions_check.isChecked())
         settings.setValue("show_realizations", self.show_realizations_check.isChecked())
         settings.setValue("n_realizations", self.n_realizations_input.value())
+    
         
         # Save window geometry
         settings.setValue("geometry", self.saveGeometry())
@@ -1384,7 +1469,7 @@ class LLSFitterGUI(QMainWindow):
         self.c1_min.setValue(float(settings.value("c1_min", -10.0)))
         self.c1_max.setValue(float(settings.value("c1_max", 10.0)))
         self.nhi_min.setValue(float(settings.value("nhi_min", 14.0)))
-        self.nhi_max.setValue(float(settings.value("nhi_max", 19.0)))
+        self.nhi_max.setValue(float(settings.value("nhi_max", 20.0)))
         
         # Load MCMC parameters
         self.walkers_input.setValue(int(settings.value("walkers", 50)))
@@ -1394,6 +1479,12 @@ class LLSFitterGUI(QMainWindow):
         # Load plot options
         self.wmin_input.setValue(float(settings.value("wmin", 880)))
         self.wmax_input.setValue(float(settings.value("wmax", 975)))
+        y_auto = settings.value("y_auto", "true") == "true"
+        self.y_auto_checkbox.setChecked(y_auto)
+        self.ymin_input.setValue(float(settings.value("ymin", 0.0)))
+        self.ymax_input.setValue(float(settings.value("ymax", 2.0)))
+        self.ymin_input.setEnabled(not y_auto)
+        self.ymax_input.setEnabled(not y_auto)
         self.show_regions_check.setChecked(settings.value("show_regions", "true") == "true")
         self.show_realizations_check.setChecked(settings.value("show_realizations", "true") == "true")
         self.n_realizations_input.setValue(int(settings.value("n_realizations", 100)))
