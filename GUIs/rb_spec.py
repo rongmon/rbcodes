@@ -8,6 +8,19 @@ import pdb
 
 import json
 
+#rbcodes imports 
+
+try:
+    from rbcodes.IGM import compute_EW as EW
+    from rbcodes.IGM import rb_setline as s
+
+
+except:
+    from IGM import compute_EW as EW
+    from IGM import rb_setline as s
+
+
+
 
 def load_rb_spec_object(filename, verbose=True):
     """
@@ -128,7 +141,7 @@ class rb_spec(object):
         import matplotlib
         matplotlib.use('Qt5Agg')
         import matplotlib.pyplot as plt
-        from GUIs.rb_spec import rb_spec as r 
+        from rbcodes.GUIs.rb_spec import rb_spec as r 
         #List of absorber redshifts
         zabs=[0.511020,1.026311,1.564481]
         transition= 2796.3
@@ -209,7 +222,7 @@ class rb_spec(object):
 
         ----------------------------------------------------------
         # Loading the rb_spec object back from the saved json file
-        from GUIs.rb_spec import load_rb_spec_object as r_load
+        from rbcodes.GUIs.rb_spec import load_rb_spec_object as r_load
         
         f='outfile.json'
 
@@ -240,102 +253,357 @@ class rb_spec(object):
         plt.xlim(xlim)
         plt.show()
     """
-    def __init__(self,wave,flux,error,filename=False):#,filetype=False, efil=None,**kwargs):
+    def __init__(self, wave, flux, error, filename=False):
         """
         Initializes a Spectrum object for absorption line analysis.
-
+    
         Parameters:
         wave (array-like): Wavelength values.
         flux (array-like): Flux values.
         error (array-like): Error values.
-        filename (str, optional): Filename if reading from a file. Default is None.
+        filename (str, optional): Filename if reading from a file. Default is False.
+        
+        Raises:
+        ValueError: If input arrays have mismatched lengths or contain invalid values.
         """
-        self.wave = wave
-        median_flux = np.nanmedian(flux)
-        self.flux = flux / median_flux
-        self.error = error / median_flux
+        # Verify input arrays have the same length
+        if len(wave) != len(flux):
+            raise ValueError("Wavelength and flux arrays must have the same length")
+        if len(wave) != len(error):
+            raise ValueError("Wavelength and error arrays must have the same length")
+        
+        # Check for NaN or infinity values
+        if np.any(np.isnan(wave)) or np.any(np.isinf(wave)):
+            raise ValueError("Wavelength array contains NaN or infinity values")
+        
+        # Check if arrays are empty
+        if len(wave) == 0:
+            raise ValueError("Input arrays cannot be empty")
+        
+        # Calculate median flux carefully to handle edge cases
+        try:
+            median_flux = np.nanmedian(flux)
+            if median_flux == 0 or np.isnan(median_flux):
+                # If median is zero or NaN, use 1.0 for scaling to avoid division by zero
+                median_flux = 1.0
+                print("Warning: Median flux is zero or NaN. Using unscaled flux values.")
+        except Exception as e:
+            print(f"Warning: Could not calculate median flux: {e}. Using unscaled values.")
+            median_flux = 1.0
+        
+        self.wave = np.array(wave)
+        self.flux = np.array(flux) / median_flux
+        self.error = np.array(error) / median_flux
         self.filename = filename
-
-
+    
     @classmethod
-    def from_file(cls,filename,filetype=False,efil=None,**kwargs):
+    def from_file(cls, filename, filetype=False, efil=None, **kwargs):
         """
         Creates a Spectrum object from a file.
-
+    
         Parameters:
         filename (str): Path to the file.
-        filetype (str, optional): Type of file (e.g., 'ascii', 'fits', 'HSLA', etc.). If None, it is inferred.
+        filetype (str, optional): Type of file (e.g., 'ascii', 'fits', 'HSLA', etc.). If False, it is inferred.
         efil (str, optional): Error file if separate.
         kwargs: Additional arguments for specific file readers.
-
+    
         Returns:
         Spectrum: An instance of the Spectrum class.
+    
+        Raises:
+        FileNotFoundError: If the file does not exist.
+        ImportError: If required modules cannot be imported.
+        ValueError: If file type is not supported or file content is invalid.
+        IOError: If there's an error reading the file.
         """
+        # Check if filename is provided
         if filename is None:
             if 'wave' in kwargs and 'flux' in kwargs and 'error' in kwargs:
                 return cls(kwargs['wave'], kwargs['flux'], kwargs['error'])
             raise IOError("Input wavelength, flux, and error arrays are required.")
-
-        if filetype is None:
+        
+        # Check if the file exists
+        if not os.path.exists(filename):
+            raise FileNotFoundError(f"File not found: {filename}")
+        
+        # Infer filetype if not specified
+        if filetype is False:
             ext = os.path.splitext(filename)[1].lower()
-            filetype = 'ascii' if ext in ['.txt', '.dat'] else ext[1:]
-
-        if filetype == 'ascii':
-            data = ascii.read(filename)
-            keys = data.keys()
-            wave, flux = np.array(data[keys[0]]), np.array(data[keys[1]])
-            error = np.array(data[keys[2]]) if len(keys) >= 3 else np.zeros_like(flux)
+            if ext in ['.txt', '.dat']:
+                filetype = 'ascii'
+            elif ext == '.fits':
+                filetype = 'fits'
+            elif ext == '.p' or ext == '.pkl':
+                filetype = 'p'
+            else:
+                filetype = ext[1:] if ext.startswith('.') else ext
+            print(f"Inferred file type: {filetype} based on extension")
         
-        elif filetype in ['fits', 'HSLA']:
-            with fits.open(filename) as file:
-                data = file[1].data
-                wave, flux = np.array(data['WAVE']), np.array(data['FLUX'])
-                error = np.array(data['ERROR']) if 'ERROR' in data.names else np.zeros_like(flux)
+        try:
+            if filetype == 'ascii':
+                try:
+                    from astropy.io import ascii
+                except ImportError:
+                    raise ImportError("astropy.io.ascii is required to read ASCII files")
+                
+                try:
+                    data = ascii.read(filename)
+                    if len(data) == 0:
+                        raise ValueError(f"Empty data file: {filename}")
+                    
+                    keys = data.keys()
+                    if len(keys) < 2:
+                        raise ValueError(f"Not enough columns in file: {filename}. Need at least wavelength and     flux.")
+                    
+                    wave = np.array(data[keys[0]])
+                    flux = np.array(data[keys[1]])
+                    
+                    # Handle error column or create error array
+                    if len(keys) >= 3:
+                        error = np.array(data[keys[2]])
+                    else:
+                        print("Warning: No error column found. Assuming 10% error.")
+                        error = 0.1 * np.abs(flux)
+                except Exception as e:
+                    raise IOError(f"Error reading ASCII file: {e}")
+            
+            elif filetype in ['fits', 'HSLA']:
+                try:
+                    from astropy.io import fits
+                except ImportError:
+                    raise ImportError("astropy.io.fits is required to read FITS files")
+                
+                try:
+                    with fits.open(filename) as file:
+                        if len(file) < 2:
+                            raise ValueError(f"FITS file does not have expected HDU structure: {filename}")
+                        
+                        data = file[1].data
+                        if data is None or len(data) == 0:
+                            raise ValueError(f"Empty data in FITS file: {filename}")
+                        
+                        # Check for required columns
+                        if 'WAVE' not in data.names and 'wave' not in data.names:
+                            raise ValueError(f"Wavelength column not found in FITS file: {filename}")
+                        if 'FLUX' not in data.names and 'flux' not in data.names:
+                            raise ValueError(f"Flux column not found in FITS file: {filename}")
+                        
+                        # Get column names with case insensitivity
+                        wave_col = 'WAVE' if 'WAVE' in data.names else 'wave'
+                        flux_col = 'FLUX' if 'FLUX' in data.names else 'flux'
+                        error_col = None
+                        for col in ['ERROR', 'error', 'ERR', 'err']:
+                            if col in data.names:
+                                error_col = col
+                                break
+                        
+                        wave = np.array(data[wave_col])
+                        flux = np.array(data[flux_col])
+                        
+                        if error_col:
+                            error = np.array(data[error_col])
+                        else:
+                            print("Warning: No error column found in FITS file. Assuming 10% error.")
+                            error = 0.1 * np.abs(flux)
+                except Exception as e:
+                    raise IOError(f"Error reading FITS file: {e}")
+            
+            elif filetype == 'xfits':
+                try:
+                    from linetools.spectra.xspectrum1d import XSpectrum1D
+                except ImportError:
+                    raise ImportError("linetools is required to read XFITS files")
+                
+                try:
+                    sp = XSpectrum1D.from_file(filename)
+                    wave = sp.wavelength.value
+                    flux = sp.flux.value
+                    
+                    if sp.sig_is_set:
+                        error = sp.sig.value
+                    else:
+                        print("Warning: No error information in XSpectrum. Assuming 10% error.")
+                        error = 0.1 * np.abs(flux)
+                    
+                    if sp.co_is_set:
+                        print("Normalizing by continuum from file")
+                        flux /= sp.co.value
+                        error /= sp.co.value
+                except Exception as e:
+                    raise IOError(f"Error reading XFITS file: {e}")
+            
+            elif filetype == 'p':
+                try:
+                    import pickle
+                except ImportError:
+                    raise ImportError("pickle module is required to read pickle files")
+                
+                try:
+                    with open(filename, "rb") as f:
+                        data = pickle.load(f)
+                    
+                    if not isinstance(data, dict):
+                        raise ValueError(f"Pickle file does not contain a dictionary: {filename}")
+                    
+                    if 'wave' not in data:
+                        raise ValueError(f"'wave' key not found in pickle file: {filename}")
+                    if 'flux' not in data:
+                        raise ValueError(f"'flux' key not found in pickle file: {filename}")
+                    
+                    wave = np.array(data['wave'])
+                    flux = np.array(data['flux'])
+                    
+                    if 'error' in data:
+                        error = np.array(data['error'])
+                    else:
+                        print("Warning: No 'error' key found in pickle file. Assuming 10% error.")
+                        error = 0.1 * np.abs(flux)
+                except Exception as e:
+                    raise IOError(f"Error reading pickle file: {e}")
+            
+            elif filetype == 'temp':
+                try:
+                    from astropy.io import fits
+                except ImportError:
+                    raise ImportError("astropy.io.fits is required to read TEMP files")
+                
+                try:
+                    with fits.open(filename) as file:
+                        if len(file) < 3:
+                            raise ValueError(f"TEMP FITS file does not have expected HDU structure: {filename}")
+                        
+                        wave = file[2].data
+                        flux = file[0].data
+                        error = file[1].data
+                        
+                        if wave is None or flux is None or error is None:
+                            raise ValueError(f"Missing data in TEMP FITS file: {filename}")
+                except Exception as e:
+                    raise IOError(f"Error reading TEMP FITS file: {e}")
+            
+            elif filetype == 'linetools':
+                try:
+                    from linetools.spectra import io as tio
+                except ImportError:
+                    raise ImportError("linetools is required to read files with linetools")
+                
+                try:
+                    sp = tio.readspec(filename, inflg=None, efil=efil, **kwargs)
+                    wave = sp.wavelength.value
+                    flux = sp.flux.value
+                    
+                    if sp.sig_is_set:
+                        error = sp.sig.value
+                    else:
+                        print("Warning: No error information. Assuming 10% error.")
+                        error = 0.1 * flux
+                except Exception as e:
+                    raise IOError(f"Error reading file with linetools: {e}")
+            
+            else:
+                raise ValueError(f"Unsupported file type: {filetype}")
+            
+            # Verify data integrity
+            if len(wave) == 0 or len(flux) == 0:
+                raise ValueError(f"Empty arrays read from file: {filename}")
+            
+            # Check for NaN or Inf values
+            if np.any(np.isnan(wave)) or np.any(np.isinf(wave)):
+                print("Warning: Wavelength array contains NaN or infinity values")
+            
+            if np.any(np.isnan(flux)) or np.any(np.isinf(flux)):
+                print("Warning: Flux array contains NaN or infinity values")
+                # Replace NaN/Inf with interpolated or zero values
+                bad_indices = np.isnan(flux) | np.isinf(flux)
+                if np.all(bad_indices):
+                    print("All flux values are NaN or Inf. Replacing with zeros.")
+                    flux = np.zeros_like(flux)
+                else:
+                    good_indices = ~bad_indices
+                    if np.any(good_indices):
+                        try:
+                            from scipy.interpolate import interp1d
+                            x_good = wave[good_indices]
+                            y_good = flux[good_indices]
+                            f = interp1d(x_good, y_good, bounds_error=False, fill_value=0)
+                            flux[bad_indices] = f(wave[bad_indices])
+                            print(f"Replaced {np.sum(bad_indices)} NaN/Inf flux values with interpolated values")
+                        except:
+                            flux[bad_indices] = 0
+                            print(f"Replaced {np.sum(bad_indices)} NaN/Inf flux values with zeros")
+            
+            if np.any(np.isnan(error)) or np.any(np.isinf(error)):
+                print("Warning: Error array contains NaN or infinity values")
+                # Replace NaN/Inf with median or percentage values
+                bad_indices = np.isnan(error) | np.isinf(error) | (error <= 0)
+                if np.all(bad_indices):
+                    print("All error values are invalid. Using 10% of flux as error.")
+                    error = 0.1 * np.abs(flux)
+                else:
+                    good_indices = ~bad_indices
+                    if np.any(good_indices):
+                        median_error = np.median(error[good_indices])
+                        error[bad_indices] = median_error if median_error > 0 else 0.1 * np.abs(flux[    bad_indices])
+                        print(f"Replaced {np.sum(bad_indices)} invalid error values with {median_error:.2e}")
+            
+            return cls(wave, flux, error, filename=filename)
         
-        elif filetype == 'xfits':
-            from linetools.spectra.xspectrum1d import XSpectrum1D  
-            sp = XSpectrum1D.from_file(filename)
-            wave, flux, error = sp.wavelength.value, sp.flux.value, sp.sig.value
-            if sp.co_is_set:
-                flux /= sp.co.value
-                error /= sp.co.value
-        
-        elif filetype == 'p':
-            with open(filename, "rb") as f:
-                data = pickle.load(f)
-            wave, flux = np.array(data['wave']), np.array(data['flux'])
-            error = np.array(data.get('error', np.zeros_like(flux)))
-        
-        elif filetype == 'temp':
-            with fits.open(filename) as file:
-                wave, flux, error = file[2].data, file[0].data, file[1].data
-        
-        elif filetype == 'linetools':
-            from linetools.spectra import io as tio
-            sp = tio.readspec(filename, inflg=None, efil=efil, **kwargs)
-            wave, flux = sp.wavelength.value, sp.flux.value
-            error = sp.sig.value if sp.sig_is_set else 0.1 * flux
-        
-        else:
-            raise ValueError("Unsupported file type: " + filetype)
-        
-        return cls(wave, flux, error, filename=filename)
-
+        except Exception as e:
+            # Re-raise the exception with additional context
+            raise type(e)(f"{str(e)} while processing file: {filename}").with_traceback(sys.exc_info()[2])
+    
     @classmethod
     def from_data(cls, wave, flux, error):
         """
         Creates a Spectrum object from given data arrays.
-
+    
         Parameters:
         wave (array-like): Wavelength values.
         flux (array-like): Flux values.
         error (array-like): Error values.
-
+    
         Returns:
         Spectrum: An instance of the Spectrum class.
+    
+        Raises:
+        ValueError: If input arrays have mismatched lengths or contain invalid values.
         """
-        return cls(wave, flux, error)
-
+        # Convert inputs to numpy arrays if they aren't already
+        wave = np.asarray(wave)
+        flux = np.asarray(flux)
+        error = np.asarray(error)
+        
+        # Verify shapes
+        if wave.shape != flux.shape:
+            raise ValueError(f"Wave and flux arrays must have the same shape: {wave.shape} vs {flux.shape}")
+        if wave.shape != error.shape:
+            raise ValueError(f"Wave and error arrays must have the same shape: {wave.shape} vs {error.shape}")
+        
+        # Check for empty arrays
+        if wave.size == 0:
+            raise ValueError("Input arrays cannot be empty")
+        
+        # Check for all-NaN arrays
+        if np.all(np.isnan(wave)):
+            raise ValueError("Wavelength array contains only NaN values")
+        if np.all(np.isnan(flux)):
+            raise ValueError("Flux array contains only NaN values")
+        
+        # Check for negative wavelengths
+        if np.any(wave <= 0):
+            print("Warning: Wavelength array contains zero or negative values")
+        
+        # Check for negative error values
+        if np.any(error < 0):
+            print("Warning: Error array contains negative values. Taking absolute values.")
+            error = np.abs(error)
+        
+        # If error array is all zeros, set to default
+        if np.all(error == 0):
+            print("Warning: Error array contains all zeros. Setting to 10% of flux.")
+            error = 0.1 * np.abs(flux)
+        
+        return cls(wave, flux, error)    
 
     def shift_spec(self,zabs):
         """ Shifts wavelength to absorber rest frame"""
@@ -360,7 +628,6 @@ class rb_spec(object):
 
 
         """
-        from IGM import rb_setline as s
 
         str=s.rb_setline(lam_rest,method,linelist=linelist)
 
@@ -417,7 +684,10 @@ class rb_spec(object):
             else:
                 if verbose:
                     print('Initializing interactive continuum fitter...')
-                from GUIs import rb_fit_interactive_continuum as f
+                try:
+                    from rbcodes.GUIs import rb_fit_interactive_continuum as f
+                except:
+                    from GUIs import rb_fit_interactive_continuum as f
                 s=f.rb_fit_interactive_continuum(self.wave_slice,self.flux_slice,self.error_slice)
                 cont=s.cont
 
@@ -523,8 +793,13 @@ class rb_spec(object):
         _n_bootstrap= number of bootstrap sampling to estimate fitting uncertainty [default = 100]
         """
         _n_bootstrap = kwargs.get('_n_bootstrap', 100)
- 
-        from IGM import cont_fit_poly_ransac as cf 
+        try:
+            from rbcodes.IGM import cont_fit_poly_ransac as cf 
+        except:
+            from IGM import cont_fit_poly_ransac as cf 
+
+
+        
         # Fit Legendre polynomial with RANSACdegree 
         # Fit polynomial using RANSAC
         self.cont, self.cont_err = cf.fit_polynomial_ransac(self.wave_slice, self.flux_slice, self.error_slice, degree,residual_threshold=residual_threshold,n_bootstrap=_n_bootstrap)
@@ -540,7 +815,13 @@ class rb_spec(object):
         """Alternate continuum fitting method. Does iterative ransac continumm fitting.
 
         """
-        from IGM import ransac_contfit as cf 
+        
+        try:
+            from rbcodes.IGM import ransac_contfit as cf 
+        except:
+            from IGM import ransac_contfit as cf 
+
+
         sp=cf.cont_fitter()
         sp=cf.cont_fitter.from_data(self.wave_slice,self.flux_slice,error=self.error_slice,mednorm=mednorm)
         sp.fit_continuum(window=window)        
@@ -562,10 +843,8 @@ class rb_spec(object):
         _binsize = kwargs.get('_binsize', 1)
 
 
-        from IGM import rb_setline as s
         str=s.rb_setline(lam_cen,method,linelist=self.linelist)
 
-        from IGM import compute_EW as EW
         out = EW.compute_EW(self.wave_slice,self.fnorm,str['wave'],[vmin,vmax],self.enorm,f0=str['fval'],zabs=0.,plot=plot, verbose=verbose,SNR=SNR,_binsize=_binsize)
 
 
@@ -598,7 +877,10 @@ class rb_spec(object):
         """
         #from GUIs import rb_plot_spec as sp
         #tt=sp.rb_plot_spec(self.wave,self.flux,self.error)
-        from GUIs import PlotSpec_Integrated as sp
+        try:
+            from GUIs import PlotSpec_Integrated as sp
+        except:
+            from GUIs import PlotSpec_Integrated as sp
         tt=sp.rb_plotspec(self.wave,self.flux,self.error)
 
     def plot_slice(self):
@@ -719,7 +1001,6 @@ class rb_spec(object):
         """Plot a given doublet defined by the lam1 and lam2 wavelength centers.
         """
 
-        from IGM import rb_setline as s
         str1=s.rb_setline(lam1,method,linelist=self.linelist)
         str2=s.rb_setline(lam2,method,linelist=self.linelist)
 
@@ -753,7 +1034,10 @@ class rb_spec(object):
     def vpfit_singlet(self,FWHM=6.5):
         """Test Wrapper to call vpfit GUI
         """
-        from GUIs import rb_interactive_vpfit_singlet as vf 
+        try:
+            from rbcodes.GUIs import rb_interactive_vpfit_singlet as vf 
+        except:
+            from GUIs import rb_interactive_vpfit_singlet as vf 
         vt=vf.rb_interactive_vpfit_singlet(self.wave_slice,self.fnorm,self.enorm,self.transition);    
 
 

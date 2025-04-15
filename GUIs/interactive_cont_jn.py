@@ -4,11 +4,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ipywidgets as widgets
 # Converting To velocities
-from IGM import rb_setline as line
 from scipy.interpolate import splrep,splev
 import sys
 import os
 from IPython.display import display
+
+try:
+    from rbcodes.IGM import rb_setline as line
+except:
+    from IGM import rb_setline as line
 
 
 class interactive_cont(object):
@@ -64,7 +68,7 @@ class interactive_cont(object):
             Added help feature and graceful exit option. - Now pressing q will exit the program at any stage
             ---------------------------------------------------------------------------
         """
-    def __init__(self,wave,flux,error=False,xlim=[-600.,600.],**kwargs):
+    def __init__(self,wave,flux,error=False,**kwargs):
         self.flux=flux
         self.error=error
         self.wave=wave

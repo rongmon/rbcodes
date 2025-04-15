@@ -1,8 +1,6 @@
 import numpy as np
 def bootstrap(data, bootnum=100, samples=None, bootfunc=None):
-    """
-
-    Performs bootstrap resampling on numpy arrays.
+    """Performs bootstrap resampling on numpy arrays.
 
     Bootstrap resampling is used to understand confidence intervals of sample
     estimates. This function returns versions of the dataset resampled with
