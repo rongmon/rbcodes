@@ -789,7 +789,7 @@ class LLSFitterGUI(QMainWindow):
         
         self.nhi_max = QDoubleSpinBox()
         self.nhi_max.setRange(13, 19)
-        self.nhi_max.setValue(19.0)
+        self.nhi_max.setValue(20.0)
         self.nhi_max.setDecimals(2)
         
         bounds_layout.addWidget(QLabel("Min"), 0, 1)
