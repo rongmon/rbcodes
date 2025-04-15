@@ -828,7 +828,7 @@ class LLSFitterGUI(QMainWindow):
         
         # Plot Options
         plot_group = QGroupBox("Plot Options")
-        plot_layout = QFormLayout()  # Don't set the layout on the group box yet
+        plot_layout = QFormLayout(plot_group)  # Don't set the layout on the group box yet
 
         
         self.wmin_input = QDoubleSpinBox()
