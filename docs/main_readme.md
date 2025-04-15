@@ -48,7 +48,8 @@ conda install -c conda-forge --file requirements_simple.txt
 7. [zgui/main.py](/docs/GUIs/zgui.md): Redshift measurement GUI for galaxies
    - Supports 1D and 2D spectra
    - Optimized for JWST NIRCam/Grism spectroscopy
-8 [LLSFitter_GUI.py](/docs/GUIs/LLSFitter/LLSFitter.md): A Simple GUI to fit Lyman Limit System column densities.
+
+8. [LLSFitter_GUI.py](/docs/GUIs/LLSFitter/LLSFitter.md): A Simple GUI to fit Lyman Limit System column densities.
 
 ### Intergalactic Medium (IGM) Tools
 

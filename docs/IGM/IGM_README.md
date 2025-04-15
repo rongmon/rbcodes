@@ -96,6 +96,11 @@ A continuum fitter class. This reads in a 1D spectrum and allows continuum fitti
 
     --------------------------------------------------------------------------------------------
 
+### LLSFitter (`LLSFitter`)
+
+Class for measuring the column density of Lyman Limit Systems (LLS)
+    using both curve_fit and MCMC methods.
+
 ## Functions
 
 ### compute_EW() (`compute_EW`)
@@ -274,6 +279,190 @@ Example code to plot to plot distances for differetn lens separations
     Returns
 
         Plot of physical separation vs redshift
+
+### __init__() (`LLSFitter`)
+
+Initialize the LLSFitter object.
+        
+        Parameters:
+        -----------
+        spectrum_file : str, optional
+            Path to the FITS file containing spectrum
+        zabs : float, optional
+            Absorption redshift
+
+### load_spectrum() (`LLSFitter`)
+
+Load spectrum from FITS file.
+        
+        Parameters:
+        -----------
+        spectrum_file : str
+            Path to the FITS file
+
+### set_redshift() (`LLSFitter`)
+
+Set the absorption redshift and compute rest-frame wavelengths.
+        
+        Parameters:
+        -----------
+        zabs : float
+            Absorption redshift
+
+### set_sigma_clip() (`LLSFitter`)
+
+Set the sigma threshold for outlier rejection when creating continuum mask.
+        
+        Parameters:
+        -----------
+        sigma : float
+            Sigma threshold for outlier rejection
+
+### set_domain_range() (`LLSFitter`)
+
+Set the wavelength domain range for analysis.
+        
+        Parameters:
+        -----------
+        wmin : float, optional
+            Minimum rest-frame wavelength in Angstroms
+        wmax : float, optional
+            Maximum rest-frame wavelength in Angstroms
+
+### set_continuum_regions() (`LLSFitter`)
+
+Set the regions used for continuum determination and fitting.
+        
+        Parameters:
+        -----------
+        regions : list of tuples, optional
+            List of (min, max) wavelength ranges to use for continuum fitting
+            If None, use default regions
+
+### get_continuum_mask() (`LLSFitter`)
+
+Create mask for continuum regions and apply sigma clipping to avoid absorption lines.
+        
+        Parameters:
+        -----------
+        sigma : float, optional
+            Sigma threshold for outlier rejection
+        
+        Returns:
+        --------
+        mask : numpy array
+            Boolean mask indicating continuum points after sigma clipping
+
+### model_flx() (`LLSFitter`)
+
+Physical model with a continuum and a Lyman limit absorption.
+        
+        Parameters:
+        -----------
+        theta : array-like
+            Model parameters [C0, C1, logNHI]
+        wave : array-like
+            Wavelength array in Angstroms
+            
+        Returns:
+        --------
+        model : array-like
+            Model flux
+
+### model_test() (`LLSFitter`)
+
+Wrapper for model_flx used in curve fitting (like scipy.optimize.curve_fit).
+
+### lnprior() (`LLSFitter`)
+
+Flat prior within given bounds.
+
+### lnlike() (`LLSFitter`)
+
+Log-likelihood function.
+
+### lnprob() (`LLSFitter`)
+
+Log-probability function.
+
+### fit_curve_fit() (`LLSFitter`)
+
+Fit the LLS model using scipy's curve_fit.
+        
+        Parameters:
+        -----------
+        theta_init : array-like, optional
+            Initial parameter guess [C0, C1, logNHI]
+            
+        Returns:
+        --------
+        popt : array-like
+            Best-fit parameters
+        pcov : array-like
+            Covariance matrix
+
+### fit_emcee() (`LLSFitter`)
+
+Fit the LLS model using MCMC with emcee.
+        
+        Parameters:
+        -----------
+        nwalkers : int, optional
+            Number of walkers
+        nsteps : int, optional
+            Number of steps per walker
+        burnin_frac : float, optional
+            Fraction of steps to discard as burn-in
+        theta_init : array-like, optional
+            Initial parameter guess [C0, C1, logNHI]
+            If None, use the results from curve_fit if available
+            
+        Returns:
+        --------
+        sampler : emcee.EnsembleSampler
+            MCMC sampler object
+        samples : array-like
+            Flattened chain of samples
+
+### plot_fit() (`LLSFitter`)
+
+Plot the spectrum and the fit.
+        
+        Parameters:
+        -----------
+        method : str, optional
+            'curve_fit' or 'mcmc'
+        show_continuum_regions : bool, optional
+            Whether to highlight the continuum regions with gray boxes
+            and plot the points used in fitting
+        wmin, wmax : float, optional
+            Wavelength range to plot (if None, use domain_range)
+        figsize : tuple, optional
+            Figure size
+        show_realizations : bool, optional
+            Whether to show random realizations (only for MCMC)
+        n_realizations : int, optional
+            Number of random realizations to show
+            
+        Returns:
+        --------
+        fig, ax : matplotlib figure and axis
+
+### plot_corner() (`LLSFitter`)
+
+Plot corner plot of MCMC samples.
+        
+        Returns:
+        --------
+        fig : matplotlib figure
+
+### get_results_summary() (`LLSFitter`)
+
+Get a summary of the fitting results.
+        
+        Returns:
+        --------
+        dict : Dictionary with fitting results
 
 ### compute_EW() (`compute_EW_old`)
 
