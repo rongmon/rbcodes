@@ -48,6 +48,7 @@ conda install -c conda-forge --file requirements_simple.txt
     7. [zgui/main.py](/docs/GUIs/zgui.md): Redshift measurement GUI for galaxies
        - Supports 1D and 2D spectra
        - Optimized for JWST NIRCam/Grism spectroscopy
+    8 [LLSFitter_GUI.py](/docs/GUIs/LLSFitter/LLSFitter.md): A Simple GUI to fit Lyman Limit System column densities.
 
 ### Intergalactic Medium (IGM) Tools
 
@@ -59,6 +60,7 @@ conda install -c conda-forge --file requirements_simple.txt
     4. rb_specbin.py: Spectrum rebinning
     5. ransac_contfit.py: Advanced continuum fitting
     6. lens_sep_to_kpc.py: Sightline separation calculation
+    7 [LLSFitter.py](/docs/GUIs/LLSFitter/LLSFitter.md): Lyman Limit System column density measurement. 
     
 ### Halo Analysis
        1) rb_nfw.py      : Compute NFW halo profile
