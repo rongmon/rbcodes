@@ -147,13 +147,17 @@ class LLSFitter:
         
         if sigma is None:
             sigma = self.sigma_clip
-
+    
         if self.continuum_regions is None:
             self.set_continuum_regions()
-
+    
         
         # Initialize final mask
         final_mask = np.zeros_like(self.rest_wave, dtype=bool)
+        
+        # Keep track of empty or invalid regions for warning
+        empty_regions = []
+        regions_with_zeros = []
         
         # Process each continuum region separately
         for rmin, rmax in self.continuum_regions:
@@ -162,11 +166,29 @@ class LLSFitter:
             
             # Skip if no points in this region
             if not np.any(region_mask):
+                empty_regions.append((rmin, rmax))
                 continue
+            
+            # Check for zero flux or zero error pixels
+            flux_in_region = self.flux[region_mask]
+            error_in_region = self.error[region_mask]
+            zero_pixels = (flux_in_region == 0) & (error_in_region == 0)
+            
+            if np.any(zero_pixels):
+                regions_with_zeros.append((rmin, rmax))
+                # Remove zero pixels from consideration
+                valid_pixels = ~zero_pixels
+                temp_mask = np.zeros_like(region_mask)
+                temp_mask[region_mask] = valid_pixels
+                region_mask = temp_mask
                 
+                # Skip if all pixels in the region were zeros
+                if not np.any(region_mask):
+                    continue
+            
             # Apply sigma clipping to this region only
             flux_in_region = self.flux[region_mask]
-            clipped_data = sigma_clip(flux_in_region, sigma=sigma, maxiters=5)
+            clipped_data = sigma_clip(flux_in_region, sigma=sigma, maxiters=5,cenfunc='median')
             
             # Create mask for non-clipped points in this region
             region_final_mask = np.zeros_like(region_mask)
@@ -175,8 +197,18 @@ class LLSFitter:
             # Add to the final mask
             final_mask = final_mask | region_final_mask
         
-        return final_mask
-    
+        # Print warnings for problematic regions
+        if empty_regions:
+            print(f"WARNING: The following continuum regions contain no data points and were skipped: {empty_regions}")
+        
+        if regions_with_zeros:
+            print(f"WARNING: Zero flux or error values found in regions {regions_with_zeros} - these pixels were excluded")
+        
+        # Check if final mask is empty
+        if not np.any(final_mask):
+            print("ERROR: No valid continuum points found in any region. Unable to perform fit.")
+        
+        return final_mask    
     # --- Models ---
     def model_flx(self, theta, wave):
         """

@@ -845,17 +845,17 @@ class LLSFitterGUI(QMainWindow):
         self.y_auto_checkbox.stateChanged.connect(self.toggle_y_limits)
         
         self.ymin_input = QDoubleSpinBox()
-        self.ymin_input.setRange(0, 5)
+        self.ymin_input.setRange(-100, 100)
         self.ymin_input.setValue(0)
-        self.ymin_input.setDecimals(2)
-        self.ymin_input.setSingleStep(0.1)
+        self.ymin_input.setDecimals(1)
+        self.ymin_input.setSingleStep(1)
         self.ymin_input.setEnabled(False)
         
         self.ymax_input = QDoubleSpinBox()
-        self.ymax_input.setRange(0, 5)
+        self.ymax_input.setRange(0, 100)
         self.ymax_input.setValue(2)
-        self.ymax_input.setDecimals(2)
-        self.ymax_input.setSingleStep(0.1)
+        self.ymax_input.setDecimals(1)
+        self.ymax_input.setSingleStep(1)
         self.ymax_input.setEnabled(False)
         
         self.show_regions_check = QCheckBox()
@@ -1080,6 +1080,29 @@ class LLSFitterGUI(QMainWindow):
             if not self.update_lls_fitter_params():
                 return
             
+            # Capture printed warnings by temporarily redirecting stdout
+            import io
+            import sys
+            original_stdout = sys.stdout
+            captured_output = io.StringIO()
+            sys.stdout = captured_output
+            
+            # Get the continuum mask
+            mask = self.lls_fitter.get_continuum_mask()
+            
+            # Restore stdout
+            sys.stdout = original_stdout
+            warnings = captured_output.getvalue()
+            
+            # Check for warnings and show in message box if present
+            if warnings:
+                QMessageBox.warning(self, "Continuum Region Warnings", warnings)
+            
+            # Check if mask is empty (no valid continuum points)
+            if not np.any(mask):
+                QMessageBox.critical(self, "Error", "No valid continuum points found. Cannot proceed with fitting.")
+                return
+            
             # Clear the figure
             self.preview_plot_widget.clear_figure()
             
@@ -1181,6 +1204,29 @@ class LLSFitterGUI(QMainWindow):
             if not self.update_lls_fitter_params():
                 return
             
+            # Capture printed warnings by temporarily redirecting stdout
+            import io
+            import sys
+            original_stdout = sys.stdout
+            captured_output = io.StringIO()
+            sys.stdout = captured_output
+            
+            # Get the continuum mask
+            mask = self.lls_fitter.get_continuum_mask()
+            
+            # Restore stdout
+            sys.stdout = original_stdout
+            warnings = captured_output.getvalue()
+            
+            # Check for warnings and show in message box if present
+            if warnings:
+                QMessageBox.warning(self, "Continuum Region Warnings", warnings)
+            
+            # Check if mask is empty (no valid continuum points)
+            if not np.any(mask):
+                QMessageBox.critical(self, "Error", "No valid continuum points found. Cannot proceed with fitting.")
+                return
+
             # Show progress in status bar
             self.status_bar.showMessage("Running curve_fit...")
             self.progress_bar.setVisible(True)
@@ -1271,6 +1317,30 @@ class LLSFitterGUI(QMainWindow):
             # Update the LLSFitter with current parameters
             if not self.update_lls_fitter_params():
                 return
+
+            # Capture printed warnings by temporarily redirecting stdout
+            import io
+            import sys
+            original_stdout = sys.stdout
+            captured_output = io.StringIO()
+            sys.stdout = captured_output
+            
+            # Get the continuum mask
+            mask = self.lls_fitter.get_continuum_mask()
+            
+            # Restore stdout
+            sys.stdout = original_stdout
+            warnings = captured_output.getvalue()
+            
+            # Check for warnings and show in message box if present
+            if warnings:
+                QMessageBox.warning(self, "Continuum Region Warnings", warnings)
+            
+            # Check if mask is empty (no valid continuum points)
+            if not np.any(mask):
+                QMessageBox.critical(self, "Error", "No valid continuum points found. Cannot proceed with fitting.")
+                return
+
             
             # Confirm for long runs
             nwalkers = self.walkers_input.value()

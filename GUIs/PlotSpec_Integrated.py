@@ -284,13 +284,61 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         #--------------------------end of layouts/widgets initialization------------#
         
         #configure canvas axes and viewing window
+        # RB Added error check to make sure some bad spectra doesn't seg fault.
         self.ax.set_xlabel('Wavelength')
         self.ax.set_ylabel('Flux')
-        xr=[min(self.wave),max(self.wave)]
-        yr=[0.,np.nanmedian(flux)*2.5]
-        self.ax.set_ylim(yr)
-        self.ax.set_xlim(xr)
+        
+        try:
+            xmin, xmax = min(self.wave), max(self.wave)
+            
+            # Check if min and max are the same or if NaN values exist
+            if xmin == xmax or np.isnan(xmin) or np.isnan(xmax):
+                self.message_window.setText("Warning: Invalid x-range detected. Using default range.")
+                print("Warning: Invalid x-range detected. Using default range.")
+                # Set a reasonable default range
+                if not np.isnan(xmin):
+                    xr = [xmin - 0.1 * abs(xmin), xmin + 0.1 * abs(xmin)]
+                else:
+                    xr = [0, 10]  # Completely arbitrary fallback if everything is NaN
+            else:
+                xr = [xmin, xmax]
+            
+            # Check and set y-range
+            if np.isnan(np.nanmedian(flux)) or np.nanmedian(flux) == 0:
+                self.message_window.setText("Warning: Invalid flux values detected. Using default y-range.")
+                print("Warning: Invalid flux values detected. Using default y-range.")
+                yr = [0, 1]  # Default if median is NaN or zero
+            else:
+                # Get a reasonable y-range with some padding
+                median = np.nanmedian(flux)
+                yr = [0, median * 2.5]
+                
+                # Check if min and max y are the same
+                if yr[0] == yr[1]:
+                    self.message_window.setText("Warning: Y-range min equals max. Adjusting range.")
+                    print("Warning: Y-range min equals max. Adjusting range.")
+                    yr = [yr[0] - 0.1 * abs(yr[0]) if yr[0] != 0 else -0.1, 
+                         yr[1] + 0.1 * abs(yr[1]) if yr[1] != 0 else 0.1]
+            
+            # Now set the axis limits with the validated ranges
+            self.ax.set_ylim(yr)
+            self.ax.set_xlim(xr)
+            
+        except Exception as e:
+            # Catch any other unexpected errors
+            self.message_window.setText(f"Error setting axis limits: {str(e)}. Using default ranges.")
+            print(f"Error setting axis limits: {str(e)}. Using default ranges.")
+            
+            # Set safe fallback values
+            xr = [0, 10]
+            yr = [0, 1]
+            self.ax.set_xlim(xr)
+            self.ax.set_ylim(yr)
+        
+        # Store the initial y-limits (either validated or fallback values)
         self.init_ylims = self.ax.get_ylim()
+        # Store the initial x-limits as well for consistency
+        self.init_xlims = self.ax.get_xlim()       
         #---------------------------------------------------
 
         self.vel=np.array([1.])
