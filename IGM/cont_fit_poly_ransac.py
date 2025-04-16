@@ -28,7 +28,14 @@ def fit_polynomial_ransac(wave, flux, error, degree, residual_threshold=0.5, n_b
     np.random.seed(42)
 
     # Apply RANSAC with a Linear Regression estimator
-    ransac = RANSACRegressor(base_estimator=LinearRegression(), residual_threshold=residual_threshold, random_state=42)
+    # Use estimator instead of base_estimator for compatibility with newer scikit-learn versions
+    try:
+        # Try newer scikit-learn parameter name first
+        ransac = RANSACRegressor(estimator=LinearRegression(), residual_threshold=residual_threshold, random_state=42)
+    except TypeError:
+        # Fall back to older parameter name if needed
+        ransac = RANSACRegressor(base_estimator=LinearRegression(), residual_threshold=residual_threshold, random_state=42)
+    
     ransac.fit(wave_poly, flux)
 
     # Extract inliers
