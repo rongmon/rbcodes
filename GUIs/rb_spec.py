@@ -5,6 +5,7 @@ from numpy.polynomial.legendre import Legendre
 import sys
 import os
 import pdb
+import warnings
 
 import json
 
@@ -286,9 +287,12 @@ class rb_spec(object):
             if median_flux == 0 or np.isnan(median_flux):
                 # If median is zero or NaN, use 1.0 for scaling to avoid division by zero
                 median_flux = 1.0
-                print("Warning: Median flux is zero or NaN. Using unscaled flux values.")
+                #print("Warning: Median flux is zero or NaN. Using unscaled flux values.")
+                warnings.warn("⚠️ Warning: Median flux is zero or NaN. Using unscaled flux values.", category=UserWarning)
         except Exception as e:
-            print(f"Warning: Could not calculate median flux: {e}. Using unscaled values.")
+            #print(f"Warning: Could not calculate median flux: {e}. Using unscaled values.")
+            warnings.warn(f"⚠️ Warning: Could not calculate median flux: {e}. Using unscaled values.", category=UserWarning)
+
             median_flux = 1.0
         
         self.wave = np.array(wave)
@@ -362,7 +366,9 @@ class rb_spec(object):
                     if len(keys) >= 3:
                         error = np.array(data[keys[2]])
                     else:
-                        print("Warning: No error column found. Assuming 10% error.")
+                        #print("Warning: No error column found. Assuming 10% error.")
+                        warnings.warn(f"⚠️ Warning: No error column found. Assuming 10% error.", category=UserWarning)
+
                         error = 0.1 * np.abs(flux)
                 except Exception as e:
                     raise IOError(f"Error reading ASCII file: {e}")
@@ -403,7 +409,9 @@ class rb_spec(object):
                         if error_col:
                             error = np.array(data[error_col])
                         else:
-                            print("Warning: No error column found in FITS file. Assuming 10% error.")
+                            #print("Warning: No error column found in FITS file. Assuming 10% error.")
+                            warnings.warn(f"⚠️ Warning: No error column found. Assuming 10% error.", category=UserWarning)
+
                             error = 0.1 * np.abs(flux)
                 except Exception as e:
                     raise IOError(f"Error reading FITS file: {e}")
@@ -422,7 +430,9 @@ class rb_spec(object):
                     if sp.sig_is_set:
                         error = sp.sig.value
                     else:
-                        print("Warning: No error information in XSpectrum. Assuming 10% error.")
+                        #print("Warning: No error information in XSpectrum. Assuming 10% error.")
+                        warnings.warn(f"⚠️ Warning: No error information in XSpectrum. Assuming 10% error.", category=UserWarning)
+
                         error = 0.1 * np.abs(flux)
                     
                     if sp.co_is_set:
@@ -456,7 +466,9 @@ class rb_spec(object):
                     if 'error' in data:
                         error = np.array(data['error'])
                     else:
-                        print("Warning: No 'error' key found in pickle file. Assuming 10% error.")
+                        #print("Warning: No 'error' key found in pickle file. Assuming 10% error.")
+                        warnings.warn(f"⚠️ Warning: No 'error' key found in pickle file. Assuming 10% error.", category=UserWarning)
+
                         error = 0.1 * np.abs(flux)
                 except Exception as e:
                     raise IOError(f"Error reading pickle file: {e}")
@@ -495,7 +507,8 @@ class rb_spec(object):
                     if sp.sig_is_set:
                         error = sp.sig.value
                     else:
-                        print("Warning: No error information. Assuming 10% error.")
+                        #print("Warning: No error information. Assuming 10% error.")
+                        warnings.warn(f"⚠️ Warning: No error information. Assuming 10% error.", category=UserWarning)
                         error = 0.1 * flux
                 except Exception as e:
                     raise IOError(f"Error reading file with linetools: {e}")
@@ -509,14 +522,18 @@ class rb_spec(object):
             
             # Check for NaN or Inf values
             if np.any(np.isnan(wave)) or np.any(np.isinf(wave)):
-                print("Warning: Wavelength array contains NaN or infinity values")
+                #print("Warning: Wavelength array contains NaN or infinity values")
+                warnings.warn(f"⚠️ Warning: Wavelength array contains NaN or infinity values", category=UserWarning)
             
             if np.any(np.isnan(flux)) or np.any(np.isinf(flux)):
-                print("Warning: Flux array contains NaN or infinity values")
+                #print("Warning: Flux array contains NaN or infinity values")
+                warnings.warn(f"⚠️ Warning: Flux array contains NaN or infinity values", category=UserWarning)
                 # Replace NaN/Inf with interpolated or zero values
                 bad_indices = np.isnan(flux) | np.isinf(flux)
                 if np.all(bad_indices):
-                    print("All flux values are NaN or Inf. Replacing with zeros.")
+                    #print("All flux values are NaN or Inf. Replacing with zeros.")
+                    warnings.warn(f"⚠️ Warning: Either Check original spectrum or proceed as stated below!", category=UserWarning)
+                    warnings.warn(f"⚠️ All flux values are NaN or Inf. Replacing with zeros.", category=UserWarning)
                     flux = np.zeros_like(flux)
                 else:
                     good_indices = ~bad_indices
@@ -533,19 +550,24 @@ class rb_spec(object):
                             print(f"Replaced {np.sum(bad_indices)} NaN/Inf flux values with zeros")
             
             if np.any(np.isnan(error)) or np.any(np.isinf(error)):
-                print("Warning: Error array contains NaN or infinity values")
+                warnings.warn(f"⚠️ Warning: Either Check original spectrum or proceed as stated below!", category=UserWarning)
+
+                #print("Warning: Error array contains NaN or infinity values")
+                warnings.warn(f"⚠️ Warning: Error array contains NaN or infinity values.", category=UserWarning)
                 # Replace NaN/Inf with median or percentage values
                 bad_indices = np.isnan(error) | np.isinf(error) | (error <= 0)
                 if np.all(bad_indices):
-                    print("All error values are invalid. Using 10% of flux as error.")
+                    #print("All error values are invalid. Using 10% of flux as error.")
+                    warnings.warn(f"⚠️ All error values are invalid. Using 10% of flux as error.", category=UserWarning)
                     error = 0.1 * np.abs(flux)
                 else:
                     good_indices = ~bad_indices
                     if np.any(good_indices):
                         median_error = np.median(error[good_indices])
                         error[bad_indices] = median_error if median_error > 0 else 0.1 * np.abs(flux[    bad_indices])
-                        print(f"Replaced {np.sum(bad_indices)} invalid error values with {median_error:.2e}")
-            
+                        #print(f"Replaced {np.sum(bad_indices)} invalid error values with {median_error:.2e}")
+                        warnings.warn(f"⚠️ Replaced {np.sum(bad_indices)} invalid error values with {median_error:.2e}", UserWarning)
+
             return cls(wave, flux, error, filename=filename)
         
         except Exception as e:
@@ -591,16 +613,21 @@ class rb_spec(object):
         
         # Check for negative wavelengths
         if np.any(wave <= 0):
-            print("Warning: Wavelength array contains zero or negative values")
+            warnstr = "Wavelength array contains zero or negative values"
+            warnings.warn(f"⚠️ {warnstr}", category=UserWarning)
         
         # Check for negative error values
         if np.any(error < 0):
-            print("Warning: Error array contains negative values. Taking absolute values.")
+            warnstr="Warning: Error array contains negative values. Taking absolute values."
+            warnings.warn(f"⚠️ {warnstr}", category=UserWarning)
+        
             error = np.abs(error)
         
         # If error array is all zeros, set to default
         if np.all(error == 0):
-            print("Warning: Error array contains all zeros. Setting to 10% of flux.")
+            warnstr="Warning: Error array contains all zeros. Setting to 10% of flux."
+            warnings.warn(f"⚠️ {warnstr}", category=UserWarning)
+        
             error = 0.1 * np.abs(flux)
         
         return cls(wave, flux, error)    
