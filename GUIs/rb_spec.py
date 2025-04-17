@@ -168,8 +168,8 @@ class rb_spec(object):
         #Slice Spectrum within that window
         s.slice_spec(transition,xlim[0],xlim[1],use_vel=True);
         
-        #Fit continuum Mask the regions defined by velocity
-        s.fit_continuum(mask=[-200,300,500,1100],domain=xlim,Legendre=3)
+        #Fit continuum Mask the regions defined by velocity/ use_weight= True/False toggles if error is used for weighting the fit
+        s.fit_continuum(mask=[-200,300,500,1100],domain=xlim,Legendre=3, use_weights=False)
         
         #-------------------------------------------------------------------------------
         # DETOUR 1--->
@@ -721,6 +721,89 @@ class rb_spec(object):
 
 
         else:
+
+            #Moving onto using my iterative continuum fitting module. More versatile.
+            try:
+                from rbcodes.IGM.rb_iter_contfit import rb_iter_contfit
+            except:
+                from IGM.rb_iter_contfit import rb_iter_contfit
+            
+            order=Legendre
+            # Setup parameters
+            if domain == False:
+                domain = [-600., 600.]
+            
+            # Handle masks
+            if mask == False:
+                # No Mask
+                q = 0. * self.wave_slice + 1. 
+            else:
+                # Process the mask regions
+                nmsk = int(len(mask)/2)
+                vmin = np.zeros(nmsk,)
+                vmax = np.zeros(nmsk,)
+                for i in range(0, nmsk):
+                    vmin[i] = mask[2*i]
+                    vmax[i] = mask[2*i+1]
+                q = 0. * self.wave_slice + 1. 
+                for i in range(0, nmsk):
+                    sq = np.where((self.velo >= vmin[i]) & (self.velo <= vmax[i]))
+                    q[sq] = 0.
+            
+            # Get unmasked indices
+            unmasked_indices = np.where(q == 1)
+            
+            # Extract only unmasked data points
+            velo_unmasked = self.velo[unmasked_indices]  # Use velocity for fitting
+            wave_unmasked=self.wave_slice[unmasked_indices]
+            flux_unmasked = self.flux_slice[unmasked_indices]
+            error_unmasked = self.error_slice[unmasked_indices]
+            
+            # Set up fitting parameters
+            use_weights = kwargs.get('use_weights', False)
+            use_sigma_clip = 'sigma_clip' in kwargs
+            sigma_level = kwargs.get('n_sigma', 3.0) if use_sigma_clip else 3.0
+            
+            # Call rb_iter_contfit with only unmasked points
+            _, _, fit_error, fit_model,fitter = rb_iter_contfit(
+                velo_unmasked,
+                flux_unmasked,
+                error_unmasked,
+                order=order,
+                sigma=sigma_level,
+                use_weights=use_weights,
+                return_model=True,
+                maxiter=kwargs.get('maxiter', 25)
+            )
+            
+            # Generate continuum over the full range
+            cont = fit_model(self.velo)
+            
+            # Calculate uncertainties from the fit
+            if use_weights:
+
+                if hasattr(fitter, 'fit_info') and 'param_cov' in fitter.fit_info:
+                    cov_matrix = fitter.fit_info['param_cov']
+                    if cov_matrix is not None:
+                        param_uncertainties = np.sqrt(np.diag(cov_matrix))
+                        print("Both statistical and continuum fitting error included.")
+                        # Calculate the 1-sigma confidence bounds
+                        self.cont_err = calculate_confidence_bounds(self.velo, fit_model, cov_matrix)
+                        self.error_slice = np.sqrt((self.error_slice**2) + (self.cont_err**2))
+                    else:
+                        print("Covariance matrix is not available. The fit might be poorly constrained.")
+                        print("Using fit-error as proxy.")
+                        self.cont_err= np.ones(len(self.velo),)*fit_error
+                        self.error_slice = np.sqrt((self.error_slice**2) + (self.cont_err**2))                        
+                else:
+                    self.cont_err=fit_error
+                    print("Using only statistical error.")
+            else:
+                self.cont_err=fit_error
+                print("Unweighted fit performed - using only statistical error.")
+            
+            """
+            #This is the older implementation. Now a cleaner implementation is used.
             from astropy.modeling import models, fitting
 
             order=Legendre
@@ -793,13 +876,9 @@ class rb_spec(object):
                 print("Covariance matrix is not available. The fit might be poorly constrained.")
                 print("Using only statistical error.")
 
+            """
 
 
-
-
-            # Now mask the part of spectrum that we don't want to fit. 
-            # Mask is created to have multiple low vel, high vel ranges.
-            # e.g. mask = [-300.,-250.,100.,120.] will exclude -300,-250 and 100,120 km/s parts of the spectrum in the fit
 
 
         self.cont=cont
