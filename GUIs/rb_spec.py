@@ -768,7 +768,7 @@ class rb_spec(object):
             _, _, fit_error, fit_model,fitter = rb_iter_contfit(
                 velo_unmasked,
                 flux_unmasked,
-                error_unmasked,
+                error=error_unmasked,
                 order=order,
                 sigma=sigma_level,
                 use_weights=use_weights,

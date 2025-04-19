@@ -22,3 +22,5 @@ IGM/__pycache__/rb_setline.cpython-37.pyc
 GUIs/zgui/__pycache__/gui_io.cpython-39.pyc
 *.pyc
 *.pyc
+GUIs/zgui/__pycache__/gui_io_xspec.cpython-39.pyc
+GUIs/zgui/__pycache__/gui_io_xspec.cpython-39.pyc
