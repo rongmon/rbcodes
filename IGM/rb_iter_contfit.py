@@ -5,7 +5,8 @@ from astropy.modeling import models, fitting
 import warnings
 import os
 from matplotlib.gridspec import GridSpec
-
+# Read in the 1D spectrum to be analyzed
+from pkg_resources import resource_filename
 # Check if linetools is available, if not provide installation instructions
 try:
     from linetools.spectra.xspectrum1d import XSpectrum1D
@@ -14,11 +15,16 @@ except ImportError:
     LINETOOLS_AVAILABLE = False
     print("linetools package not found. To install, run:")
     print("pip install linetools")
-    print("For full installation instructions, visit: https://github.com/linetools/linetools")
+    print("We only use linetools to read a fits file in the example.")
 
 # The cleaned version of the function
 def rb_iter_contfit(wave, flux, error=None, **kwargs):
-    """Iterative continuum fitter using Legendre polynomials
+    """Iterative continuum fitter using Legendre polynomials with sigma clipping
+    
+    This function fits a continuum to spectral data using an iterative process with 
+    Legendre polynomials and sigma clipping to exclude outliers (such as absorption 
+    or emission features). It uses the astropy FittingWithOutlierRemoval and 
+    sigma_clip tools for robust fitting.
     
     Parameters
     ----------
@@ -27,38 +33,80 @@ def rb_iter_contfit(wave, flux, error=None, **kwargs):
     flux : ndarray
         Flux array 
     error : ndarray, optional
-        Error array. If None, constant error is estimated from flux.
+        Error array. If None, constant error is estimated from flux using robust
+        statistical methods (median absolute deviation).
     
     Optional Parameters
     ------------------
     maxiter : int
-        Maximum iteration (default: 25)
+        Maximum number of fitting iterations (default: 25)
     order : int
-        Polynomial order of fit (default: 4)
+        Polynomial order of Legendre fit (default: 4)
     sigma : float
-        Sigma clipping threshold (default: 3.0)
+        Sigma clipping threshold for outlier rejection (default: 3.0)
     use_weights : bool
-        Whether to use error spectrum as weights (default: True)
+        Whether to use error spectrum as weights (1/σ²) in the fitting process (default: True)
     return_model : bool
-        Whether to return the astropy model (default: False)
+        Whether to return the astropy model and fitter objects (default: False)
     
     Returns
     ---------
     fit_final : ndarray
-        Final fitted continuum array
+        Final fitted continuum array evaluated at input wavelength points
     resid_final : ndarray
-        Residual error array (flux/continuum)
+        Residual array (flux/continuum) - useful for normalization
     fit_error : float
-        Standard deviation of the residual
-    fit_model : astropy.modeling.Model (optional)
-        The fitted model object (returned if return_model=True)        
-    fitter : astropy.modeling.fitting.LevMarLSQFitter (optional)
+        Standard deviation of the residuals (measure of fit quality)
+    fit_model : astropy.modeling.Model, optional
+        The fitted Legendre polynomial model object (returned if return_model=True)        
+    fitter : astropy.modeling.fitting.LevMarLSQFitter, optional
         The fitter object with fit information including covariance matrix
         (returned if return_model=True)
+    
+    Notes
+    -----
+    The function automatically handles:
+    - Chip gaps (where flux and error are both zero)
+    - Negative or zero error values (replaced with median error)
+    - Negative or zero flux values (replaced with corresponding error values)
+    - Potential emission or absorption features during initial fitting
+    
+    If `use_weights=True`, the fitting uses inverse variance weighting (1/σ²)
+    to give more weight to points with smaller errors.
+    
+    Examples
+    --------
+    Basic usage with error array:
+    
+    >>> cont, resid, error = rb_iter_contfit(wavelength, flux, error)
+    >>> normalized_flux = flux / cont
+    
+    With model return and custom parameters:
+    
+    >>> cont, resid, error, model, fitter = rb_iter_contfit(
+    ...     wavelength, flux, error, 
+    ...     order=5, 
+    ...     sigma=2.5, 
+    ...     return_model=True
+    ... )
+    
+    Without error array (will be estimated):
+    
+    >>> cont, resid, error = rb_iter_contfit(wavelength, flux)
+    
+    Notes
+    -----
+    This function uses Legendre polynomials which are more numerically stable
+    than simple polynomials for fitting across wide wavelength ranges.
+    
+    The sigma clipping approach progressively removes outliers that don't fit
+    the polynomial model, which is particularly useful for spectra with
+    absorption or emission features.
+   
     ------------------------------
     Written by:  Rongmon Bordoloi
     Tested on Python 3.7  Sep 4 2019
-    Highly modified for optimization April 16, 2025. 
+    Highly modified for optimization April, 2025. 
     --------------------------
    
     """
@@ -180,408 +228,476 @@ def rb_iter_contfit(wave, flux, error=None, **kwargs):
     else:
         return fit_final, resid_final, fit_error
 
-
-# Function to extract spectral chunks
-def extract_spectral_chunks(wave, flux, error, window_size=50, n_chunks=4, method='uniform'):
+def calculate_bic(residuals, n_params, n_points, error=None):
     """
-    Extract small chunks from a spectrum for testing continuum fitting
+    Calculate the Bayesian Information Criterion (BIC) for a model fit.
+    
+    The BIC is defined as:
+    
+    BIC = k * ln(n) + n * ln(RSS/n)
+    
+    where:
+    - k is the number of parameters in the model
+    - n is the number of data points
+    - RSS is the residual sum of squares (Σ(y_i - f_i)²)
+    
+    If error weights are provided, the weighted BIC is calculated as:
+    
+    BIC = k * ln(n) + n * ln(WRSS/n)
+    
+    where:
+    - WRSS is the weighted residual sum of squares (Σ((y_i - f_i)/σ_i)²)
+    - σ_i are the error values
+    
+    BIC penalizes models with more parameters to prevent overfitting.
+    A lower BIC indicates a better fit, balancing goodness-of-fit with model complexity.
     
     Parameters
     ----------
-    wave : array
-        Wavelength array
-    flux : array
-        Flux array
-    error : array
-        Error array
-    window_size : float
-        Size of each chunk in Angstroms
-    n_chunks : int
-        Number of chunks to extract
-    method : str
-        Method for selecting chunks
-        'uniform' - Uniformly spaced chunks across the spectrum
-        'random' - Randomly selected chunks
-        'features' - Chunks with significant features
-        
+    residuals : array
+        Residuals from the model fit (observed - predicted)
+    n_params : int
+        Number of parameters in the model (polynomial order + 1)
+    n_points : int
+        Number of data points
+    error : array, optional
+        Error array for weighted BIC calculation. If provided, the residuals
+        are weighted by 1/error² in the calculation.
+    
     Returns
     -------
-    chunks : list of tuples
-        List of (wave_chunk, flux_chunk, error_chunk, start_idx, end_idx) for each chunk
+    float
+        BIC value (lower is better)
     """
-    # Get wavelength range
-    wave_min = np.min(wave)
-    wave_max = np.max(wave)
-    full_range = wave_max - wave_min
-    
-    # Check if we have enough data for the requested window size and number of chunks
-    if full_range < window_size * n_chunks:
-        print(f"Warning: Spectrum range ({full_range:.1f} Å) is smaller than requested chunks ({window_size*n_chunks:.1f} Å)")
-        print(f"Reducing window size to {full_range/n_chunks:.1f} Å")
-        window_size = full_range / n_chunks
-    
-    chunks = []
-    
-    if method == 'uniform':
-        # Select uniformly spaced chunks
-        chunk_centers = np.linspace(wave_min + window_size/2, wave_max - window_size/2, n_chunks)
-        
-        for center in chunk_centers:
-            start_wave = center - window_size/2
-            end_wave = center + window_size/2
-            
-            # Find indices corresponding to this wavelength range
-            start_idx = np.argmin(np.abs(wave - start_wave))
-            end_idx = np.argmin(np.abs(wave - end_wave))
-            
-            # Ensure we have enough points
-            if end_idx - start_idx < 10:
-                print(f"Warning: Chunk at {center:.1f} has too few points, expanding window")
-                # Expand window until we have at least 10 points
-                while end_idx - start_idx < 10 and (start_idx > 0 or end_idx < len(wave)-1):
-                    if start_idx > 0:
-                        start_idx -= 1
-                    if end_idx < len(wave)-1:
-                        end_idx += 1
-            
-            # Extract the chunk
-            wave_chunk = wave[start_idx:end_idx+1]
-            flux_chunk = flux[start_idx:end_idx+1]
-            error_chunk = error[start_idx:end_idx+1]
-            
-            chunks.append((wave_chunk, flux_chunk, error_chunk, start_idx, end_idx))
-    
-    elif method == 'random':
-        # Select random chunks
-        np.random.seed(42)  # For reproducibility
-        
-        for _ in range(n_chunks):
-            # Select a random center point
-            center_idx = np.random.randint(0, len(wave))
-            center = wave[center_idx]
-            
-            # Define chunk boundaries
-            start_wave = center - window_size/2
-            end_wave = center + window_size/2
-            
-            # Find indices
-            start_idx = np.argmin(np.abs(wave - start_wave))
-            end_idx = np.argmin(np.abs(wave - end_wave))
-            
-            # Ensure boundaries are within range
-            start_idx = max(0, start_idx)
-            end_idx = min(len(wave)-1, end_idx)
-            
-            # Extract the chunk
-            wave_chunk = wave[start_idx:end_idx+1]
-            flux_chunk = flux[start_idx:end_idx+1]
-            error_chunk = error[start_idx:end_idx+1]
-            
-            chunks.append((wave_chunk, flux_chunk, error_chunk, start_idx, end_idx))
-    
-    elif method == 'features':
-        # Find regions with significant features
-        
-        # Calculate running standard deviation to find variable regions
-        window = max(21, int(len(wave)/50))  # Use an odd-sized window
-        window = window + 1 if window % 2 == 0 else window  # Ensure it's odd
-        
-        # Pad flux array for edge handling
-        padded_flux = np.pad(flux, (window//2, window//2), mode='edge')
-        
-        # Calculate rolling standard deviation
-        std_array = np.zeros_like(flux)
-        for i in range(len(flux)):
-            std_array[i] = np.std(padded_flux[i:i+window])
-        
-        # Find the regions with highest variance
-        sorted_indices = np.argsort(std_array)[::-1]  # Sort in descending order
-        
-        # Select top regions, but ensure they don't overlap
-        selected_centers = []
-        min_separation = int(len(wave) / (n_chunks * 2))  # Minimum separation between chunks
-        
-        for idx in sorted_indices:
-            # Check if this index is far enough from already selected centers
-            if all(abs(idx - center) > min_separation for center in selected_centers):
-                selected_centers.append(idx)
-                
-                # Break if we've found enough chunks
-                if len(selected_centers) >= n_chunks:
-                    break
-        
-        # Extract chunks around these centers
-        for center_idx in selected_centers:
-            center = wave[center_idx]
-            
-            # Define chunk boundaries
-            start_wave = center - window_size/2
-            end_wave = center + window_size/2
-            
-            # Find indices
-            start_idx = np.argmin(np.abs(wave - start_wave))
-            end_idx = np.argmin(np.abs(wave - end_wave))
-            
-            # Ensure boundaries are within range
-            start_idx = max(0, start_idx)
-            end_idx = min(len(wave)-1, end_idx)
-            
-            # Extract the chunk
-            wave_chunk = wave[start_idx:end_idx+1]
-            flux_chunk = flux[start_idx:end_idx+1]
-            error_chunk = error[start_idx:end_idx+1]
-            
-            chunks.append((wave_chunk, flux_chunk, error_chunk, start_idx, end_idx))
-    
+    if error is None:
+        # Calculate the residual sum of squares
+        rss = np.sum(residuals**2)
     else:
-        raise ValueError(f"Unknown chunk selection method: {method}")
-    
-    return chunks
+        rss = np.sum((residuals/error)**2)
 
+    
+    # Calculate BIC
+    # BIC = k * ln(n) + n * ln(RSS/n)
+    bic = n_params * np.log(n_points) + n_points * np.log(rss/n_points)
+    
+    return bic
 
-# Test chunks with different polynomial orders
-def test_chunks_with_orders(chunks, orders=[3, 4, 5]):
-    """Test continuum fitting on each chunk with different polynomial orders"""
+def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6, 
+                           maxiter=20, sigma=3.0, use_weights=True, return_model=True, 
+                           plot=True, **kwargs):
+    """
+    Fit a spectral region with the optimal polynomial order determined by Bayesian Information Criterion.
     
-    all_results = []
+    This function tests multiple polynomial orders and selects the optimal one based on the
+    Bayesian Information Criterion (BIC), which balances goodness-of-fit with model complexity.
+    For each polynomial order, it uses the rb_iter_contfit function to perform the actual fitting
+    with sigma clipping.
     
-    for i, (wave_chunk, flux_chunk, error_chunk, start_idx, end_idx) in enumerate(chunks):
-        chunk_results = []
-        
-        # Try different polynomial orders
-        for order in orders:
-            # Run the continuum fitting
-            fit_result, resid_final, fit_error = rb_iter_contfit(
-                wave_chunk, 
-                flux_chunk, 
-                error=error_chunk, 
-                order=order,
-                use_weights=False
-            )
-            
-            chunk_results.append((order, fit_result, resid_final, fit_error))
-        
-        all_results.append(chunk_results)
+    Parameters
+    ----------
+    wave : ndarray
+        Wavelength array
+    flux : ndarray
+        Flux array
+    error : ndarray, optional
+        Error array. If None, a constant error is estimated (10% of median flux).
+    min_order : int, optional
+        Minimum polynomial order to test (default: 1)
+    max_order : int, optional
+        Maximum polynomial order to test (default: 6)
+    maxiter : int, optional
+        Maximum iterations for sigma-clipping in rb_iter_contfit (default: 20)
+    sigma : float, optional
+        Sigma clipping threshold for outlier rejection (default: 3.0)
+    use_weights : bool, optional
+        Whether to use error spectrum as weights (default: True)
+    return_model : bool, optional
+        Whether to return the model objects in the result dictionary (default: True)
+        Note: During testing of polynomial orders, return_model is always set to True internally.
+    plot : bool, optional
+        Whether to plot the results, including all tested polynomial fits and BIC values (default: True)
+    **kwargs : 
+        Additional parameters passed directly to rb_iter_contfit
     
-    return all_results
-
-
-# Function to plot chunk results
-def plot_chunk_results(chunks, all_results, chunk_info=None):
-    """Plot the results of chunk testing with different polynomial orders"""
+    Returns
+    -------
+    dict
+        A dictionary containing the following keys:
+        - 'wave': Input wavelength array
+        - 'flux': Input flux array
+        - 'error': Error array (input or estimated)
+        - 'continuum': Best-fit continuum based on optimal polynomial order
+        - 'normalized_flux': Flux divided by continuum
+        - 'best_order': Optimal polynomial order determined by BIC
+        - 'fit_error': Standard deviation of residuals for best fit
+        - 'bic_results': List of (order, BIC) tuples for all tested orders
+        - 'fit_model': The astropy model for the best fit (if return_model=True)
+        - 'fitter': The astropy fitter object (if return_model=True)
     
-    n_chunks = len(chunks)
-    n_orders = len(all_results[0])
+    Notes
+    -----
+    The Bayesian Information Criterion (BIC) is calculated as:
+        BIC = k * ln(n) + n * ln(RSS/n)
+    where k is the number of parameters, n is the number of data points,
+    and RSS is the residual sum of squares.
     
-    # Create figure with subplots
-    fig = plt.figure(figsize=(15, 4*n_chunks))
-    gs = GridSpec(n_chunks, 2, figure=fig, width_ratios=[3, 1])
+    If weights are used, the weighted residuals are used in the BIC calculation.
     
-    for i, (chunk, chunk_results) in enumerate(zip(chunks, all_results)):
-        wave_chunk, flux_chunk, error_chunk, start_idx, end_idx = chunk
+    The function automatically adjusts max_order if there are too few data points
+    for the requested polynomial order.
+    
+    Examples
+    --------
+    Basic usage:
+    
+    >>> result = fit_optimal_polynomial(wavelength, flux, error)
+    >>> normalized_flux = result['normalized_flux']
+    >>> best_order = result['best_order']
+    
+    Fitting without plotting:
+    
+    >>> result = fit_optimal_polynomial(wavelength, flux, error, plot=False)
+    
+    Testing higher-order polynomials:
+    
+    >>> result = fit_optimal_polynomial(wavelength, flux, error, 
+    ...                                min_order=3, max_order=10)
+    
+    Accessing the model (for predicting at new wavelengths):
+    
+    >>> result = fit_optimal_polynomial(wavelength, flux, error, return_model=True)
+    >>> new_wave = np.linspace(wavelength.min(), wavelength.max(), 1000)
+    >>> new_cont = result['fit_model'](new_wave)
+    """
+    # Check input arrays
+    if wave is None or flux is None:
+        raise ValueError("Wavelength and flux arrays must be provided")
+    
+    if len(wave) != len(flux):
+        raise ValueError("Wavelength and flux arrays must have the same length")
+    
+    # Ensure we have an error array
+    if error is None:
+        # Create a constant error array (10% of median flux)
+        error = np.ones_like(flux) * 0.1 * np.median(flux)
+        print("No error array provided. Using constant error (10% of median flux).")
+    
+    # Ensure the number of points is sufficient for fitting
+    n_points = len(wave)
+    if n_points < max_order + 2:
+        print(f"Too few points ({n_points}) for requested max_order ({max_order})")
+        max_order = n_points - 2
+        print(f"Reduced max_order to {max_order}")
+    
+    # Define the range of polynomial orders to test
+    test_orders = range(min_order, max_order + 1)
+    
+    # Track results for each order
+    all_fits = []
+    bic_values = []
+    
+    print(f"Testing polynomial orders from {min_order} to {max_order}...")
+    
+    # Test different polynomial orders
+    for order in test_orders:
+        # Call rb_iter_contfit for each order
+        fit_result, residuals, std_error,fit_model,fitter = rb_iter_contfit(
+            wave, 
+            flux, 
+            error=error, 
+            order=order,
+            maxiter=maxiter,
+            sigma=sigma,
+            use_weights=use_weights,
+            return_model=True,
+            **kwargs 
+        )
         
-        # Plot data and fits
-        ax1 = fig.add_subplot(gs[i, 0])
-        ax1.plot(wave_chunk, flux_chunk, 'k-', alpha=0.7, label='Observed flux')
+        # Calculate raw residuals (observed - predicted)
+        raw_residuals = flux - fit_result
         
-        best_error = float('inf')
-        best_order = None
-        
-        for j, (order, fit_result, resid_final, fit_error) in enumerate(chunk_results):
-            ax1.plot(wave_chunk, fit_result, '-', label=f'Order {order} (std={fit_error:.4f})')
-            
-            if fit_error < best_error:
-                best_error = fit_error
-                best_order = order
-        
-        # Add title with chunk info if provided
-        if chunk_info is not None and i < len(chunk_info):
-            ax1.set_title(f"Chunk {i+1}: {chunk_info[i]} - Best Order: {best_order}")
+        if use_weights:
+            # Calculate BIC (n_params = order + 1)
+            bic_value = calculate_bic(raw_residuals, order + 1, n_points,error=error)
         else:
-            ax1.set_title(f"Chunk {i+1}: {wave_chunk[0]:.1f} - {wave_chunk[-1]:.1f} Å - Best Order: {best_order}")
+            bic_value = calculate_bic(raw_residuals, order + 1, n_points)
+
         
-        ax1.set_xlabel('Wavelength (Å)')
-        ax1.set_ylabel('Flux')
-        ax1.legend()
+        # Store results
+        all_fits.append((order, fit_result, residuals, std_error, bic_value,fit_model,fitter))
+        bic_values.append((order, bic_value))
         
-        # Plot residuals
-        ax2 = fig.add_subplot(gs[i, 1])
-        
-        for j, (order, fit_result, resid_final, fit_error) in enumerate(chunk_results):
-            # Offset residuals for clarity
-            offset = j * 0.5
-            ax2.plot(wave_chunk, resid_final + offset, '-', label=f'Order {order}')
-            ax2.axhline(y=1.0 + offset, color='r', linestyle='--', alpha=0.5)
-        
-        ax2.set_title('Residuals')
-        ax2.set_xlabel('Wavelength (Å)')
-        ax2.set_ylabel('Flux / Continuum + offset')
-        ax2.legend()
+        print(f"Order {order}: BIC = {bic_value:.2f}, StdDev = {std_error:.4f}")
     
-    plt.tight_layout()
+    # Find the best order (minimum BIC)
+    best_idx = np.argmin([bic for _, bic in bic_values])
+    best_order, best_fit, best_residuals, best_std, best_bic,best_fit_model,best_fitter = all_fits[best_idx]
+    
+    print(f"\nOptimal polynomial order: {best_order}")
+    print(f"BIC value: {best_bic:.2f}")
+    print(f"Standard deviation of residuals: {best_std:.4f}")
+    
+    # Calculate normalized flux
+    normalized_flux = flux / best_fit
+    
+ 
+                
+    # Prepare the result dictionary
+    result_dict = {
+        'wave': wave,
+        'flux': flux,
+        'error': error,
+        'continuum': best_fit,
+        'normalized_flux': normalized_flux,
+        'best_order': best_order,
+        'fit_error': best_std,
+        'bic_results': bic_values,
+        'all_fits': all_fits  # Include all fits for plotting
+    }
+    
+    # Only include model objects if requested
+    if return_model:
+        result_dict.update({
+            'fit_model': best_fit_model,
+            'fitter': best_fitter
+        })
+ 
+    # Plot the results if requested
+    if plot:
+        fig = plot_polynomial_fit_results(result_dict)
+        plt.show()
+    
+    # Remove 'all_fits' from the result dictionary if not needed for return
+    # This avoids cluttering the return value with large data
+    if 'all_fits' in result_dict and not plot:
+        del result_dict['all_fits']
+
+    return result_dict
+
+def plot_polynomial_fit_results(result_dict, figure_size=(10, 8)):
+    """
+    Plot the results of polynomial fitting with BIC comparison.
+    
+    Creates a three-panel figure showing:
+    1. Original spectrum with all polynomial fits
+    2. Normalized flux (flux/continuum)
+    3. BIC values for different polynomial orders
+    
+    Parameters
+    ----------
+    result_dict : dict
+        Dictionary containing fitting results with the following keys:
+        - 'wave': Wavelength array
+        - 'flux': Flux array
+        - 'continuum': Best-fit continuum
+        - 'normalized_flux': Flux divided by continuum
+        - 'best_order': Optimal polynomial order
+        - 'bic_results': List of (order, BIC) tuples for all tested orders
+        - 'all_fits': List of (order, fit, residuals, std_error, bic) for all orders
+    figure_size : tuple, optional
+        Size of the figure in inches (width, height) (default: (10, 8))
+    
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The created figure object, which can be further customized or saved
+    
+    Notes
+    -----
+    This function requires matplotlib to be installed.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.gridspec import GridSpec
+    
+    # Extract data from result dictionary
+    wave = result_dict['wave']
+    flux = result_dict['flux']
+    best_fit = result_dict['continuum']
+    normalized_flux = result_dict['normalized_flux']
+    best_order = result_dict['best_order']
+    all_fits = result_dict['all_fits']
+    bic_values = result_dict['bic_results']
+    
+    # Create figure with GridSpec for multiple panels
+    fig = plt.figure(figsize=figure_size)
+    gs = fig.add_gridspec(3, 1, height_ratios=[2, 1, 1], hspace=0.3)
+    
+    # Main plot - spectrum and fits
+    ax1 = fig.add_subplot(gs[0])
+    ax1.plot(wave, flux, 'k-', label='Observed flux')
+    
+    # Get best fit BIC value
+    best_bic = next(bic for order, bic in bic_values if order == best_order)
+    
+    # Plot best fit with emphasis
+    ax1.plot(wave, best_fit, 'r-', linewidth=2, 
+             label=f'Order {best_order} fit (BIC: {best_bic:.2f})')
+    
+    # Plot other fits for comparison
+    colors = plt.cm.viridis(np.linspace(0, 1, len(all_fits)))
+    for i, (order, fit, _, _, bic, _, _) in enumerate(all_fits):
+        if order != best_order:  # Skip the best fit (already plotted)
+            ax1.plot(wave, fit, '-', color=colors[i], alpha=0.5,
+                    label=f'Order {order} (BIC: {bic:.2f})')
+    
+    ax1.set_ylabel('Flux')
+    
+    # Adjust the figure to make room for the legend
+    plt.subplots_adjust(right=0.75)
+    
+    # Add the legend outside the plot
+    legend = ax1.legend(loc='center left', bbox_to_anchor=(1.05, 0.5), 
+                        title="Polynomial Fits", frameon=True, fancybox=True, shadow=True)
+    
+    # Second panel - normalized flux
+    ax2 = fig.add_subplot(gs[1], sharex=ax1)
+    ax2.plot(wave, normalized_flux, 'k-')
+    ax2.axhline(y=1.0, color='r', linestyle='--')
+    ax2.set_ylabel('Normalized Flux')
+    
+    # Third panel - BIC values
+    ax3 = fig.add_subplot(gs[2])
+    bic_values_array = np.array(bic_values)
+    orders = bic_values_array[:, 0]
+    bics = bic_values_array[:, 1]
+    
+    # Normalize BIC values for clearer visualization
+    min_bic = np.min(bics)
+    bics_normalized = bics - min_bic
+    
+    ax3.plot(orders, bics_normalized, 'o-', color='blue')
+    ax3.scatter([best_order], [0], color='red', s=80, zorder=5)  # Best order is at 0 after normalization
+    
+    ax3.set_xlabel('Polynomial Order')
+    ax3.set_ylabel('ΔBIC')
+    ax3.set_title('BIC Values (lower is better)')
+    ax3.grid(True, linestyle='--', alpha=0.5)
+    
+    # Only mark best order
+    for i, (order, bic_norm) in enumerate(zip(orders, bics_normalized)):
+        if order == best_order:
+            ax3.annotate(f'Best Order: {int(order)}', 
+                         xy=(order, bic_norm),
+                         xytext=(10, +20),
+                         textcoords='offset points',
+                         arrowprops=dict(arrowstyle='->'))
+    
+    # Adjust x limits for first two subplots
+    for ax in [ax1, ax2]:
+        ax.set_xlim(wave.min(), wave.max())
+    
+    # Only show x-axis labels on the bottom plots
+    plt.setp(ax1.get_xticklabels(), visible=False)
+    
+    # Add a common title at the top of all subplots
+    fig.suptitle('Polynomial Continuum Fitting Results', fontsize=14)
+    
+    # Ensure the layout adjusts properly
+    plt.tight_layout(rect=[0, 0, 0.75, 0.95])  # Adjust for the legend
+    
     return fig
 
-
-# Main function to test with spectral chunks
-def test_spectral_chunks(filename, window_size=50, n_chunks=4, method='uniform', orders=[3, 4, 5, 6]):
+def fit_spectral_region(filename, lam_min, lam_max, min_order=2, max_order=6, 
+                        maxiter=20, sigma=3.0, use_weights=True, plot=True,
+                        save_output=False, output_filename=None):
     """
-    Test continuum fitting on chunks of a spectrum with different polynomial orders
+    Load a spectrum and fit a specific wavelength region with optimal polynomial order.
     
     Parameters
     ----------
     filename : str
-        Path to the FITS file
-    window_size : float
-        Size of each chunk in Angstroms
-    n_chunks : int
-        Number of chunks to extract
-    method : str
-        Method for selecting chunks: 'uniform', 'random', or 'features'
-    orders : list
-        List of polynomial orders to test
+        Path to the FITS file containing the spectrum
+    lam_min : float
+        Minimum wavelength of the region to fit
+    lam_max : float
+        Maximum wavelength of the region to fit
+    min_order, max_order, maxiter, sigma, use_weights, plot :
+        Parameters passed to fit_optimal_polynomial
+    save_output : bool, optional
+        Whether to save the normalized spectrum region (default: False)
+    output_filename : str, optional
+        Filename for the output normalized spectrum region
+    
+    Returns
+    -------
+    dict
+        Results from fit_optimal_polynomial
     """
-    if not LINETOOLS_AVAILABLE:
-        print("Cannot run test: linetools package not available")
-        return
-    
-    # Check if the file exists
     if not os.path.exists(filename):
-        print(f"File not found: {filename}")
-        print("Please ensure the file exists or provide the correct path.")
-        return
+        raise FileNotFoundError(f"File not found: {filename}")
     
-    try:
-        # Load the spectrum
-        print(f"Loading spectrum from {filename}...")
-        sp = XSpectrum1D.from_file(filename)
-        
-        # Extract wavelength, flux, and error arrays
-        wave = sp.wavelength.value  # Convert from Quantity to numpy array
-        flux = sp.flux.value
-        error = sp.sig.value if sp.sig is not None else np.ones_like(flux) * 0.1 * np.median(flux)
-        
-        print(f"Loaded spectrum with {len(wave)} data points")
-        print(f"Wavelength range: {wave.min():.2f} - {wave.max():.2f} Å")
-        
-        # Extract chunks
-        print(f"Extracting {n_chunks} chunks of {window_size} Å using method '{method}'...")
-        chunks = extract_spectral_chunks(wave, flux, error, window_size, n_chunks, method)
-        
-        # Test chunks with different polynomial orders
-        print(f"Testing polynomial orders {orders} on each chunk...")
-        all_results = test_chunks_with_orders(chunks, orders)
-        
-        # Generate chunk info for plots
-        chunk_info = []
-        for i, (wave_chunk, _, _, _, _) in enumerate(chunks):
-            chunk_info.append(f"{wave_chunk[0]:.1f} - {wave_chunk[-1]:.1f} Å")
-        
-        # Plot results
-        fig = plot_chunk_results(chunks, all_results, chunk_info)
-        
-        # Save and show the figure
-        #plt.savefig(f'chunk_test_results_{method}_w{window_size}.png')
-        plt.show()
-        
-        # Print summary of best orders for each chunk
-        print("\nSummary of best polynomial orders for each chunk:")
-        for i, (chunk_results, info) in enumerate(zip(all_results, chunk_info)):
-            best_result = min(chunk_results, key=lambda x: x[3])  # Find lowest fit_error
-            best_order, _, _, best_error = best_result
-            print(f"Chunk {i+1} ({info}): Best order = {best_order} (std = {best_error:.4f})")
-        
-        return chunks, all_results
+    print(f"Loading spectrum from {filename}...")
+    sp = XSpectrum1D.from_file(filename)
     
-    except Exception as e:
-        print(f"Error processing the spectrum: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return None, None
+    # Extract wavelength, flux, and error arrays
+    wave = sp.wavelength.value
+    flux = sp.flux.value
+    error = sp.sig.value if sp.sig_is_set else None
+    
+    # Select the wavelength region
+    region_mask = (wave >= lam_min) & (wave <= lam_max)
+    
+    if not np.any(region_mask):
+        raise ValueError(f"No data points found in wavelength range {lam_min}-{lam_max}")
+    
+    region_wave = wave[region_mask]
+    region_flux = flux[region_mask]
+    region_error = error[region_mask] if error is not None else None
+    
+    print(f"Selected region: {region_wave[0]:.2f} - {region_wave[-1]:.2f} Å")
+    print(f"Number of data points: {len(region_wave)}")
+    
+    # Fit the region with optimal polynomial order
+    result = fit_optimal_polynomial(
+        region_wave, 
+        region_flux, 
+        error=region_error,
+        min_order=min_order,
+        max_order=max_order,
+        maxiter=maxiter,
+        sigma=sigma,
+        use_weights=use_weights,
+        plot=plot
+    )
+    
+    # Save the normalized region if requested
+    if save_output and output_filename is not None:
+        # Create a new XSpectrum1D object with the continuum
+        normalized_spec = XSpectrum1D.from_tuple(
+            (region_wave, region_flux, region_error, result['continuum'])
+        )
+        normalized_spec.write_to_fits(output_filename)
+        print(f"Saved normalized spectrum region to {output_filename}")
+        result['output_file'] = output_filename
+    
+    return result
 
-
-# Plot full spectrum with chunk locations
-def plot_full_spectrum_with_chunks(wave, flux, chunks):
-    """Plot the full spectrum and highlight the extracted chunks"""
-    
-    plt.figure(figsize=(12, 6))
-    plt.plot(wave,  flux, 'k-', alpha=0.5)
-    
-    colors = ['r', 'g', 'b', 'c', 'm', 'y']
-    
-    for i, (wave_chunk, flux_chunk, _, start_idx, end_idx) in enumerate(chunks):
-        color = colors[i % len(colors)]
-        plt.axvspan(wave_chunk[0], wave_chunk[-1], alpha=0.2, color=color)
-        plt.plot(wave_chunk, flux_chunk, color=color, linewidth=2, label=f'Chunk {i+1}')
-    
-    plt.xlabel('Wavelength (Å)')
-    plt.ylabel('Flux')
-    plt.title('Full spectrum with extracted chunks')
-    plt.legend()
-    plt.tight_layout()
-    #plt.savefig('full_spectrum_with_chunks.png')
-    plt.show()
-
-
+# Example usage
 if __name__ == "__main__":
-    # Default parameters
-    default_filename = '/Users/bordoloi/WORK/python/rbcodes/example-data/test.fits'
-    default_window_size = 50  # Angstroms
-    default_n_chunks = 4
-    default_method = 'uniform'  # 'uniform', 'random', or 'features'
-    default_orders = [3, 4, 5, 6]
+    # Path to the example FITS file
+    filename = resource_filename('rbcodes', 'example-data/test.fits')
+
     
-    # Check if the default file exists
-    if not os.path.exists(default_filename):
-        filename = input(f"Default file '{default_filename}' not found. Enter path to a FITS spectrum file: ")
-    else:
-        filename = default_filename
+    # Define wavelength region to fit
+    lam_min = 1360  # Ångstroms
+    lam_max = 1390  # Ångstroms
     
-    # Get user input for parameters
-    print("\nParameters for spectral chunk testing:")
-    print(f"1. Window size (default: {default_window_size} Å)")
-    print(f"2. Number of chunks (default: {default_n_chunks})")
-    print(f"3. Selection method (default: '{default_method}')")
-    print("   Options: 'uniform', 'random', 'features'")
-    print(f"4. Polynomial orders to test (default: {default_orders})")
-    print("\nPress Enter to use defaults or enter new values.")
+    # Parameters for fitting
+    min_order = 1
+    max_order = 10
     
-    # Get window size
-    window_size_input = input("Window size in Angstroms: ")
-    window_size = float(window_size_input) if window_size_input.strip() else default_window_size
+    # Fit the spectral region
+    result = fit_spectral_region(
+        filename,
+        lam_min, 
+        lam_max,
+        min_order=min_order,
+        max_order=max_order,
+        use_weights=False,
+        plot=True,
+        save_output=False,
+        output_filename='normalized_region.fits'
+    )
     
-    # Get number of chunks
-    n_chunks_input = input("Number of chunks: ")
-    n_chunks = int(n_chunks_input) if n_chunks_input.strip() else default_n_chunks
-    
-    # Get selection method
-    method_input = input("Selection method ('uniform', 'random', 'features'): ")
-    method = method_input if method_input.strip() in ['uniform', 'random', 'features'] else default_method
-    
-    # Get polynomial orders
-    orders_input = input("Polynomial orders (comma-separated integers, e.g., '3,4,5,6'): ")
-    if orders_input.strip():
-        try:
-            orders = [int(x.strip()) for x in orders_input.split(',')]
-        except ValueError:
-            print("Invalid input for polynomial orders. Using default.")
-            orders = default_orders
-    else:
-        orders = default_orders
-    
-    print(f"\nRunning test with: window_size={window_size}, n_chunks={n_chunks}, method='{method}', orders={orders}")
-    
-    # Load the spectrum to get wave and flux arrays for the full spectrum plot
-    try:
-        sp = XSpectrum1D.from_file(filename)
-        wave = sp.wavelength.value
-        flux = sp.flux.value
-        
-        # Run the test
-        chunks, all_results = test_spectral_chunks(filename, window_size, n_chunks, method, orders)
-        
-        # Plot full spectrum with chunk locations
-        if chunks is not None:
-            plot_full_spectrum_with_chunks(wave, flux, chunks)
-            
-    except Exception as e:
-        print(f"Error: {str(e)}")
+    print(f"\nContinuum fitting complete for region {lam_min}-{lam_max} Å")
+    print(f"Best polynomial order: {result['best_order']}")

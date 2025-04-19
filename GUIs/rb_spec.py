@@ -691,6 +691,7 @@ class rb_spec(object):
         """
 
         verbose = kwargs.get('verbose', False)  # Default is False if not provided
+        optimize_cont = kwargs.get('optimize_cont', False)  # Default is False if not provided
 
         n_sigma=kwargs.get('n_sigma',3) # sigma clipping level 
 
@@ -724,9 +725,9 @@ class rb_spec(object):
 
             #Moving onto using my iterative continuum fitting module. More versatile.
             try:
-                from rbcodes.IGM.rb_iter_contfit import rb_iter_contfit
+                from rbcodes.IGM.rb_iter_contfit import rb_iter_contfit,fit_optimal_polynomial
             except:
-                from IGM.rb_iter_contfit import rb_iter_contfit
+                from IGM.rb_iter_contfit import rb_iter_contfit,fit_optimal_polynomial
             
             order=Legendre
             # Setup parameters
@@ -761,20 +762,43 @@ class rb_spec(object):
             
             # Set up fitting parameters
             use_weights = kwargs.get('use_weights', False)
-            use_sigma_clip = 'sigma_clip' in kwargs
-            sigma_level = kwargs.get('n_sigma', 3.0) if use_sigma_clip else 3.0
+            n_sigma = kwargs.get('n_sigma', 3.0) 
             
-            # Call rb_iter_contfit with only unmasked points
-            _, _, fit_error, fit_model,fitter = rb_iter_contfit(
-                velo_unmasked,
-                flux_unmasked,
-                error=error_unmasked,
-                order=order,
-                sigma=sigma_level,
-                use_weights=use_weights,
-                return_model=True,
-                maxiter=kwargs.get('maxiter', 25)
-            )
+                
+            #New option if we want to use a fixed Legendre polynomial or use Bayesian Information Criterion (BIC) to find the best continuum model.
+            if optimize_cont==True:
+                min_order = kwargs.get('min_order', 1)           
+                max_order = kwargs.get('max_order', 10)
+                # Fit the region with optimal polynomial order
+                result = fit_optimal_polynomial(
+                        velo_unmasked, 
+                        flux_unmasked, 
+                        error=error_unmasked,
+                        min_order=min_order,
+                        max_order=max_order,
+                        maxiter=kwargs.get('maxiter', 25),
+                        sigma=n_sigma,
+                        use_weights=use_weights,
+                        plot=False
+                    )
+                # Now unpack each output
+                fit_error=result['fit_error']
+                fit_model=result['fit_model']
+                fitter=result['fitter']
+
+
+            else: 
+                # Call rb_iter_contfit with only unmasked points
+                _, _, fit_error, fit_model,fitter = rb_iter_contfit(
+                    velo_unmasked,
+                    flux_unmasked,
+                    error=error_unmasked,
+                    order=order,
+                    sigma=n_sigma,
+                    use_weights=use_weights,
+                    return_model=True,
+                    maxiter=kwargs.get('maxiter', 25)
+                )
             
             # Generate continuum over the full range
             cont = fit_model(self.velo)
