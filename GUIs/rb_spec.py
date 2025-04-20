@@ -789,7 +789,8 @@ class rb_spec(object):
 
             else: 
                 # Call rb_iter_contfit with only unmasked points
-                _, _, fit_error, fit_model,fitter = rb_iter_contfit(
+                #_, _, fit_error, fit_model,fitter 
+                result = = rb_iter_contfit(
                     velo_unmasked,
                     flux_unmasked,
                     error=error_unmasked,
@@ -799,6 +800,11 @@ class rb_spec(object):
                     return_model=True,
                     maxiter=kwargs.get('maxiter', 25)
                 )
+                # Now unpack required output
+                fit_error=result['fit_error']
+                fit_model=result['fit_model']
+                fitter=result['fitter']
+
             
             # Generate continuum over the full range
             cont = fit_model(self.velo)

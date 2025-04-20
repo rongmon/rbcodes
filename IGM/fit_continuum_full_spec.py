@@ -20,13 +20,12 @@ import warnings
 
 # Try to import required modules from different possible locations
 try:
-    from rbcodes.IGM.rb_iter_contfit import rb_iter_contfit, fit_optimal_polynomial, calculate_bic
+    from rbcodes.IGM.rb_iter_contfit import fit_optimal_polynomial
 except ImportError:
     try:
-        from IGM.rb_iter_contfit import rb_iter_contfit, fit_optimal_polynomial, calculate_bic
+        from IGM.rb_iter_contfit import fit_optimal_polynomial
     except ImportError:
         print("Error: rb_iter_contfit module not found. Please ensure it's in your Python path.")
-        print("You can install it with: pip install rbcodes")
         raise
 
 # Check if linetools is available
@@ -36,8 +35,6 @@ try:
 except ImportError:
     LINETOOLS_AVAILABLE = False
     print("linetools package not found. To install, run:")
-    print("pip install linetools")
-    print("For full installation instructions, visit: https://github.com/linetools/linetools")
 
 
 def generate_full_coverage_chunks(wave, flux, error, window_size=100, overlap=30, 

@@ -17,7 +17,6 @@ except ImportError:
     print("pip install linetools")
     print("We only use linetools to read a fits file in the example.")
 
-# The cleaned version of the function
 def rb_iter_contfit(wave, flux, error=None, **kwargs):
     """Iterative continuum fitter using Legendre polynomials with sigma clipping
     
@@ -46,22 +45,23 @@ def rb_iter_contfit(wave, flux, error=None, **kwargs):
         Sigma clipping threshold for outlier rejection (default: 3.0)
     use_weights : bool
         Whether to use error spectrum as weights (1/σ²) in the fitting process (default: True)
-    return_model : bool
-        Whether to return the astropy model and fitter objects (default: False)
+    include_model : bool
+        Whether to include the astropy model and fitter objects in the return dictionary (default: False)
+        This replaces the previous return_model parameter for consistency.
     
     Returns
     ---------
-    fit_final : ndarray
-        Final fitted continuum array evaluated at input wavelength points
-    resid_final : ndarray
-        Residual array (flux/continuum) - useful for normalization
-    fit_error : float
-        Standard deviation of the residuals (measure of fit quality)
-    fit_model : astropy.modeling.Model, optional
-        The fitted Legendre polynomial model object (returned if return_model=True)        
-    fitter : astropy.modeling.fitting.LevMarLSQFitter, optional
-        The fitter object with fit information including covariance matrix
-        (returned if return_model=True)
+    dict
+        A dictionary containing the following keys:
+        - 'continuum': Final fitted continuum array evaluated at input wavelength points
+        - 'residuals': Residual array (flux/continuum) - useful for normalization
+        - 'fit_error': Standard deviation of the residuals (measure of fit quality)
+        - 'model': The fitted Legendre polynomial model object (included if include_model=True)
+        - 'fitter': The fitter object with fit information including covariance matrix
+                   (included if include_model=True)
+        - 'wave': Input wavelength array
+        - 'flux': Input flux array
+        - 'error': Error array (input or estimated)
     
     Notes
     -----
@@ -78,21 +78,26 @@ def rb_iter_contfit(wave, flux, error=None, **kwargs):
     --------
     Basic usage with error array:
     
-    >>> cont, resid, error = rb_iter_contfit(wavelength, flux, error)
+    >>> result = rb_iter_contfit(wavelength, flux, error)
+    >>> cont = result['continuum']
     >>> normalized_flux = flux / cont
     
     With model return and custom parameters:
     
-    >>> cont, resid, error, model, fitter = rb_iter_contfit(
+    >>> result = rb_iter_contfit(
     ...     wavelength, flux, error, 
     ...     order=5, 
     ...     sigma=2.5, 
-    ...     return_model=True
+    ...     include_model=True
     ... )
+    >>> model = result['model']
+    >>> new_wave = np.linspace(min(wavelength), max(wavelength), 1000)
+    >>> new_cont = model(new_wave)
     
     Without error array (will be estimated):
     
-    >>> cont, resid, error = rb_iter_contfit(wavelength, flux)
+    >>> result = rb_iter_contfit(wavelength, flux)
+    >>> cont = result['continuum']
     
     Notes
     -----
@@ -106,16 +111,17 @@ def rb_iter_contfit(wave, flux, error=None, **kwargs):
     ------------------------------
     Written by:  Rongmon Bordoloi
     Tested on Python 3.7  Sep 4 2019
-    Highly modified for optimization April, 2025. 
+    Modified April 2025 - Standardized return format to use dictionary
     --------------------------
-   
     """
     # Get optional parameters
     maxiter = kwargs.get('maxiter', 25)
     order = kwargs.get('order', 4)
     sigma_level = kwargs.get('sigma', 3.0)
     use_weights = kwargs.get('use_weights', True)
-    return_model = kwargs.get('return_model', False)
+    
+    # For backward compatibility, check for both include_model and return_model
+    include_model = kwargs.get('include_model', False) or kwargs.get('return_model', False)
     
     # Check if error array is provided, if not, estimate it
     if error is None:
@@ -215,18 +221,35 @@ def rb_iter_contfit(wave, flux, error=None, **kwargs):
     fit_error = np.std(resid_final[qq])
     
     # Get parameter errors from covariance matrix if using weights
+    param_errors = None
     if use_weights and hasattr(fit, 'fit_info') and 'param_cov' in fit.fit_info:
         param_cov = fit.fit_info['param_cov']
         if param_cov is not None:
             # Extract the parameter errors from the diagonal of the covariance matrix
             param_errors = np.sqrt(np.diag(param_cov))
-            # Could store or return these if needed
     
-    # Return results
-    if return_model:
-        return fit_final, resid_final, fit_error, filtered_fit, fit
-    else:
-        return fit_final, resid_final, fit_error
+    # Prepare the result dictionary
+    result = {
+        'continuum': fit_final,
+        'residuals': resid_final,
+        'fit_error': fit_error,
+        'wave': wave,
+        'flux': flux,
+        'error': error
+    }
+    
+    # Include model objects if requested
+    if include_model:
+        result.update({
+            'model': filtered_fit,
+            'fitter': fit
+        })
+        
+        # Include parameter errors if available
+        if param_errors is not None:
+            result['param_errors'] = param_errors
+    
+    return result
 
 def calculate_bic(residuals, n_params, n_points, error=None):
     """
@@ -283,7 +306,7 @@ def calculate_bic(residuals, n_params, n_points, error=None):
     return bic
 
 def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6, 
-                           maxiter=20, sigma=3.0, use_weights=True, return_model=True, 
+                           maxiter=20, sigma=3.0, use_weights=True, include_model=True, 
                            plot=True, **kwargs):
     """
     Fit a spectral region with the optimal polynomial order determined by Bayesian Information Criterion.
@@ -311,9 +334,9 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
         Sigma clipping threshold for outlier rejection (default: 3.0)
     use_weights : bool, optional
         Whether to use error spectrum as weights (default: True)
-    return_model : bool, optional
-        Whether to return the model objects in the result dictionary (default: True)
-        Note: During testing of polynomial orders, return_model is always set to True internally.
+    include_model : bool, optional
+        Whether to include the model objects in the result dictionary (default: True)
+        Note: During testing of polynomial orders, include_model is always set to True internally.
     plot : bool, optional
         Whether to plot the results, including all tested polynomial fits and BIC values (default: True)
     **kwargs : 
@@ -328,11 +351,13 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
         - 'error': Error array (input or estimated)
         - 'continuum': Best-fit continuum based on optimal polynomial order
         - 'normalized_flux': Flux divided by continuum
+        - 'residuals': Residual array (flux/continuum)
         - 'best_order': Optimal polynomial order determined by BIC
         - 'fit_error': Standard deviation of residuals for best fit
         - 'bic_results': List of (order, BIC) tuples for all tested orders
-        - 'fit_model': The astropy model for the best fit (if return_model=True)
-        - 'fitter': The astropy fitter object (if return_model=True)
+        - 'model': The astropy model for the best fit (if include_model=True)
+        - 'fitter': The astropy fitter object (if include_model=True)
+        - 'param_errors': Parameter errors if available (if include_model=True)
     
     Notes
     -----
@@ -365,9 +390,9 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
     
     Accessing the model (for predicting at new wavelengths):
     
-    >>> result = fit_optimal_polynomial(wavelength, flux, error, return_model=True)
+    >>> result = fit_optimal_polynomial(wavelength, flux, error, include_model=True)
     >>> new_wave = np.linspace(wavelength.min(), wavelength.max(), 1000)
-    >>> new_cont = result['fit_model'](new_wave)
+    >>> new_cont = result['model'](new_wave)
     """
     # Check input arrays
     if wave is None or flux is None:
@@ -400,8 +425,8 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
     
     # Test different polynomial orders
     for order in test_orders:
-        # Call rb_iter_contfit for each order
-        fit_result, residuals, std_error,fit_model,fitter = rb_iter_contfit(
+        # Call rb_iter_contfit for each order with dictionary return format
+        result = rb_iter_contfit(
             wave, 
             flux, 
             error=error, 
@@ -409,29 +434,35 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
             maxiter=maxiter,
             sigma=sigma,
             use_weights=use_weights,
-            return_model=True,
+            include_model=True,  # Always include model for BIC calculations
             **kwargs 
         )
+        
+        # Extract results from dictionary
+        fit_result = result['continuum']
+        residuals = result['residuals']
+        std_error = result['fit_error']
+        fit_model = result['model']
+        fitter = result['fitter']
         
         # Calculate raw residuals (observed - predicted)
         raw_residuals = flux - fit_result
         
+        # Calculate BIC (n_params = order + 1)
         if use_weights:
-            # Calculate BIC (n_params = order + 1)
-            bic_value = calculate_bic(raw_residuals, order + 1, n_points,error=error)
+            bic_value = calculate_bic(raw_residuals, order + 1, n_points, error=error)
         else:
             bic_value = calculate_bic(raw_residuals, order + 1, n_points)
-
         
         # Store results
-        all_fits.append((order, fit_result, residuals, std_error, bic_value,fit_model,fitter))
+        all_fits.append((order, fit_result, residuals, std_error, bic_value, fit_model, fitter))
         bic_values.append((order, bic_value))
         
         print(f"Order {order}: BIC = {bic_value:.2f}, StdDev = {std_error:.4f}")
     
     # Find the best order (minimum BIC)
     best_idx = np.argmin([bic for _, bic in bic_values])
-    best_order, best_fit, best_residuals, best_std, best_bic,best_fit_model,best_fitter = all_fits[best_idx]
+    best_order, best_fit, best_residuals, best_std, best_bic, best_fit_model, best_fitter = all_fits[best_idx]
     
     print(f"\nOptimal polynomial order: {best_order}")
     print(f"BIC value: {best_bic:.2f}")
@@ -440,8 +471,6 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
     # Calculate normalized flux
     normalized_flux = flux / best_fit
     
- 
-                
     # Prepare the result dictionary
     result_dict = {
         'wave': wave,
@@ -449,6 +478,7 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
         'error': error,
         'continuum': best_fit,
         'normalized_flux': normalized_flux,
+        'residuals': best_residuals,
         'best_order': best_order,
         'fit_error': best_std,
         'bic_results': bic_values,
@@ -456,11 +486,23 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
     }
     
     # Only include model objects if requested
-    if return_model:
-        result_dict.update({
-            'fit_model': best_fit_model,
+    if include_model:
+        # Get parameter errors if available
+        param_errors = None
+        if hasattr(best_fitter, 'fit_info') and 'param_cov' in best_fitter.fit_info:
+            param_cov = best_fitter.fit_info['param_cov']
+            if param_cov is not None:
+                param_errors = np.sqrt(np.diag(param_cov))
+        
+        model_info = {
+            'model': best_fit_model,
             'fitter': best_fitter
-        })
+        }
+        
+        if param_errors is not None:
+            model_info['param_errors'] = param_errors
+            
+        result_dict.update(model_info)
  
     # Plot the results if requested
     if plot:
