@@ -790,7 +790,7 @@ class rb_spec(object):
             else: 
                 # Call rb_iter_contfit with only unmasked points
                 #_, _, fit_error, fit_model,fitter 
-                result = = rb_iter_contfit(
+                result  = rb_iter_contfit(
                     velo_unmasked,
                     flux_unmasked,
                     error=error_unmasked,
