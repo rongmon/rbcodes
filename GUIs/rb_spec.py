@@ -767,8 +767,8 @@ class rb_spec(object):
                 
             #New option if we want to use a fixed Legendre polynomial or use Bayesian Information Criterion (BIC) to find the best continuum model.
             if optimize_cont==True:
-                min_order = kwargs.get('min_order', 1)           
-                max_order = kwargs.get('max_order', 10)
+                min_order = kwargs.get('min_order', 0)           
+                max_order = kwargs.get('max_order', 7)
                 # Fit the region with optimal polynomial order
                 result = fit_optimal_polynomial(
                         velo_unmasked, 
@@ -783,7 +783,7 @@ class rb_spec(object):
                     )
                 # Now unpack each output
                 fit_error=result['fit_error']
-                fit_model=result['fit_model']
+                fit_model=result['model']
                 fitter=result['fitter']
 
 
@@ -802,7 +802,7 @@ class rb_spec(object):
                 )
                 # Now unpack required output
                 fit_error=result['fit_error']
-                fit_model=result['fit_model']
+                fit_model=result['model']
                 fitter=result['fitter']
 
             
