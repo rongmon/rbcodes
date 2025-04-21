@@ -355,6 +355,11 @@ def plot_continuum_results(wave, flux, error, continuum, chunks, chunk_results, 
         Minimum wavelength to display
     wmax : float, optional
         Maximum wavelength to display
+    
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The created figure object
     """
     # Set default wavelength range if not specified
     if wmin is None:
@@ -393,18 +398,32 @@ def plot_continuum_results(wave, flux, error, continuum, chunks, chunk_results, 
             
             # Add text label with polynomial order
             result = chunk_results[i]
-            ypos = np.max(plot_flux) * (0.9 - 0.05 * (i % 5))  # Stagger labels
+            
+            # Use relative coordinates for positioning
+            relative_y_pos = 0.9 - 0.05 * (i % 5)  # Stagger labels from top (0.9) to bottom
+            
+            # Use transform to place text in axes coordinates (0-1 range)
             ax1.text((chunk_min + chunk_max)/2, 
-                     ypos,
+                     relative_y_pos,
                      f"Order {result['best_order']}", 
-                     color=color, ha='center', fontsize=9)
+                     color=color, 
+                     ha='center', 
+                     fontsize=9,
+                     transform=ax1.get_xaxis_transform())  # Use axis transform for relative positioning
     
     ax1.set_xlabel('Wavelength (Å)')
     ax1.set_ylabel('Flux')
     ax1.set_xlim(wmin, wmax)
+    
+    # Adjust y-axis limits based on the data
+    flux_median = np.nanmedian(plot_flux)
+    flux_std = np.nanstd(plot_flux)
+    ax1.set_ylim(min(plot_flux) - 0.02 * flux_std, 
+                 flux_median + 0.5 * (flux_std))
+    
     ax1.set_title('Spectrum with Fitted Continuum')
     ax1.legend()
-    
+
     # Plot individual chunk fits
     ax2 = fig.add_subplot(gs[1], sharex=ax1)
     
@@ -460,11 +479,12 @@ def plot_continuum_results(wave, flux, error, continuum, chunks, chunk_results, 
     ax4.legend(loc='upper right', fontsize=8, ncol=3)
     
     plt.tight_layout()
-    plt.show()
+    return fig  # Return the figure object
 
 
 def fit_quasar_continuum(data, chunk_params=None, fitting_params=None, 
-                        save_output=True, output_filename=None, plot=True):
+                        save_output=True, output_filename=None, 
+                        plot=True, save_plot=False, plot_filename=None):
     """
     Fit the continuum of a quasar or galaxy spectrum by dividing it into chunks,
     fitting each with an optimal polynomial order, and blending the results.
@@ -505,6 +525,13 @@ def fit_quasar_continuum(data, chunk_params=None, fitting_params=None,
     
     plot : bool, optional
         Whether to plot the results (default: True)
+
+    save_plot : bool, optional
+        Whether to save the plot to a file (default: False)
+    
+    plot_filename : str, optional
+        Filename for the plot (default: input filename with _continuum_fit.png suffix)
+
     
     Returns
     -------
@@ -517,6 +544,9 @@ def fit_quasar_continuum(data, chunk_params=None, fitting_params=None,
         - 'normalized_flux': flux/continuum
         - 'chunk_results': list of results for each chunk
         - 'output_file': path to saved output file (if save_output=True)
+        - 'figure': matplotlib figure object (if plot=True)
+        - 'plot_file': path to saved plot file (if save_plot=True)
+
     
     Examples
     --------
@@ -781,27 +811,78 @@ def fit_quasar_continuum(data, chunk_params=None, fitting_params=None,
             normalized_spec.write_to_fits(output_file)
             print(f"Saved normalized spectrum to {output_file}")
         
+        # Initialize variables for figure handling
+        fig = None
+        plot_file = None
+        
+        # Extract wavelength range from chunk_params
+        wmin = chunk_params.get('wmin', None) if chunk_params else None
+        wmax = chunk_params.get('wmax', None) if chunk_params else None
+        
         # Plot the results if requested
         if plot:
-            plot_continuum_results(wave, flux, error, full_continuum, chunks, chunk_results, wmin=wmin, wmax=wmax)
+            fig = plot_continuum_results(wave, flux, error, full_continuum, chunks, chunk_results, wmin=wmin, wmax=wmax)
+            
+            # Save the plot if requested
+            if save_plot:
+                if plot_filename is None:
+                    # Create default plot filename
+                    if isinstance(data, str):
+                        base, _ = os.path.splitext(data)
+                        plot_filename = f"{base}_continuum_fit.png"
+                    else:
+                        plot_filename = "continuum_fit.png"
+                
+                fig.savefig(plot_filename, dpi=300, bbox_inches='tight')
+                print(f"Saved plot to {plot_filename}")
+                plot_file = plot_filename
+            
+            plt.show()
+        
+        else:
+            # If not showing plot but saving, still create figure
+            if save_plot:
+                fig = plot_continuum_results(wave, flux, error, full_continuum, chunks, chunk_results, wmin=wmin, wmax=wmax)
+                
+                if plot_filename is None:
+                    if isinstance(data, str):
+                        base, _ = os.path.splitext(data)
+                        plot_filename = f"{base}_continuum_fit.png"
+                    else:
+                        plot_filename = "continuum_fit.png"
+                
+                fig.savefig(plot_filename, dpi=300, bbox_inches='tight')
+                print(f"Saved plot to {plot_filename}")
+                plot_file = plot_filename
+                plt.close(fig)
         
         # Return the results
-        return {
+        return_dict = {
             'wave': wave,
             'flux': flux,
             'error': error,
             'continuum': full_continuum,
             'normalized_flux': normalized_flux,
-            'chunk_results': chunk_results,
-            'output_file': output_file
+            'chunk_results': chunk_results
         }
         
+        # Add optional outputs to the dictionary
+        if output_file:
+            return_dict['output_file'] = output_file
+        
+        if fig and plot:
+            return_dict['figure'] = fig
+        
+        if plot_file:
+            return_dict['plot_file'] = plot_file
+        
+        return return_dict
+
     except Exception as e:
         print(f"Error processing the spectrum: {str(e)}")
         import traceback
         traceback.print_exc()
         return None
-
 
 # Example usage
 if __name__ == "__main__":
@@ -823,6 +904,8 @@ if __name__ == "__main__":
     parser.add_argument("--output", help="Output filename")
     parser.add_argument("--wmin", type=float, help="Minimum wavelength to include")
     parser.add_argument("--wmax", type=float, help="Maximum wavelength to include")
+    parser.add_argument("--save-plot", action="store_true", help="Save the plot to file")
+    parser.add_argument("--plot-filename", help="Filename for the saved plot")
     
     args = parser.parse_args()
     
@@ -850,7 +933,9 @@ if __name__ == "__main__":
         fitting_params=fitting_params,
         save_output=not args.no_save,
         output_filename=args.output,
-        plot=not args.no_plot
+        plot=not args.no_plot,
+        save_plot=args.save_plot,
+        plot_filename=args.plot_filename
     )
     
     if results is not None:
@@ -861,8 +946,11 @@ if __name__ == "__main__":
                   f"Best Order: {chunk['best_order']}, "
                   f"Std Error: {chunk['std_error']:.4f}")
         
-        if not args.no_save:
+        if not args.no_save and 'output_file' in results:
             print(f"\nFull continuum fitting complete. "
                   f"Normalized spectrum saved to {results['output_file']}")
         else:
             print("\nFull continuum fitting complete. Output not saved (--no-save option used).")
+        
+        if args.save_plot and 'plot_file' in results:
+            print(f"Plot saved to {results['plot_file']}")

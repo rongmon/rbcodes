@@ -55,13 +55,14 @@ conda install -c conda-forge --file requirements_simple.txt
 
 [Full Documentation](/docs/IGM/IGM_README.md)
 
-    1. compute_EW.py: Equivalent width and column density calculations
-    2. rb_setline.py: Atomic transition and f-value finder
-    3. rb_iter_contfit.py: Iterative continuum fitting
-    4. rb_specbin.py: Spectrum rebinning
-    5. ransac_contfit.py: Advanced continuum fitting
-    6. lens_sep_to_kpc.py: Sightline separation calculation
-    7 [LLSFitter.py](/docs/GUIs/LLSFitter/LLSFitter.md): Lyman Limit System column density measurement. 
+1. compute_EW.py: Equivalent width and column density calculations
+2. rb_setline.py: Atomic transition and f-value finder
+3. [rb_iter_contfit.py]/docs/IGM/rb_iter_contfit.md): Advanced Iterative polynomial continuum fitting with sigma clipping. Has options to select polynomial order using Bayesian Information Criterion (BIC),
+4. [fit_continuum_full_spec.py]/docs/IGM/rb_iter_contfit.md): Use the previous code to fit continuum to a full QSO spectrum. Look at documentation for examples.
+5. rb_specbin.py: Spectrum rebinning
+6. ransac_contfit.py: Advanced continuum fitting
+7. lens_sep_to_kpc.py: Sightline separation calculation
+8 [LLSFitter.py](/docs/GUIs/LLSFitter/LLSFitter.md): Lyman Limit System column density measurement. 
     
 ### Halo Analysis
        1) rb_nfw.py      : Compute NFW halo profile

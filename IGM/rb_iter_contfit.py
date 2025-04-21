@@ -118,7 +118,7 @@ def rb_iter_contfit(wave, flux, error=None, **kwargs):
     maxiter = kwargs.get('maxiter', 25)
     order = kwargs.get('order', 4)
     sigma_level = kwargs.get('sigma', 3.0)
-    use_weights = kwargs.get('use_weights', True)
+    use_weights = kwargs.get('use_weights', False)
     
     # For backward compatibility, check for both include_model and return_model
     include_model = kwargs.get('include_model', False) or kwargs.get('return_model', False)
@@ -306,8 +306,8 @@ def calculate_bic(residuals, n_params, n_points, error=None):
     return bic
 
 def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6, 
-                           maxiter=20, sigma=3.0, use_weights=True, include_model=True, 
-                           plot=True, **kwargs):
+                           maxiter=20, sigma=3.0, use_weights=False, include_model=True, 
+                           plot=True,save_plot=False, plot_filename=None, **kwargs):
     """
     Fit a spectral region with the optimal polynomial order determined by Bayesian Information Criterion.
     
@@ -333,12 +333,16 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
     sigma : float, optional
         Sigma clipping threshold for outlier rejection (default: 3.0)
     use_weights : bool, optional
-        Whether to use error spectrum as weights (default: True)
+        Whether to use error spectrum as weights (default: False)
     include_model : bool, optional
         Whether to include the model objects in the result dictionary (default: True)
         Note: During testing of polynomial orders, include_model is always set to True internally.
     plot : bool, optional
         Whether to plot the results, including all tested polynomial fits and BIC values (default: True)
+    save_plot : bool, optional
+        Whether to save the plot to a file (default: False)
+    plot_filename : str, optional
+        Filename for the saved plot (default: "polynomial_fit.png")
     **kwargs : 
         Additional parameters passed directly to rb_iter_contfit
     
@@ -358,6 +362,8 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
         - 'model': The astropy model for the best fit (if include_model=True)
         - 'fitter': The astropy fitter object (if include_model=True)
         - 'param_errors': Parameter errors if available (if include_model=True)
+        - 'plot_file': path to saved plot file (if save_plot=True)
+
     
     Notes
     -----
@@ -487,28 +493,52 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
     
     # Only include model objects if requested
     if include_model:
-        # Get parameter errors if available
-        param_errors = None
-        if hasattr(best_fitter, 'fit_info') and 'param_cov' in best_fitter.fit_info:
-            param_cov = best_fitter.fit_info['param_cov']
-            if param_cov is not None:
-                param_errors = np.sqrt(np.diag(param_cov))
-        
         model_info = {
             'model': best_fit_model,
             'fitter': best_fitter
         }
         
-        if param_errors is not None:
-            model_info['param_errors'] = param_errors
+        # Get parameter errors if available and weights were used
+        if use_weights:
+            param_errors = None
+            if hasattr(best_fitter, 'fit_info') and 'param_cov' in best_fitter.fit_info:
+                param_cov = best_fitter.fit_info['param_cov']
+                if param_cov is not None:
+                    param_errors = np.sqrt(np.diag(param_cov))
             
+            if param_errors is not None:
+                model_info['param_errors'] = param_errors
+        
+        # Update the result dictionary with model information
         result_dict.update(model_info)
  
     # Plot the results if requested
     if plot:
         fig = plot_polynomial_fit_results(result_dict)
+        
+        # Save the plot if requested
+        if save_plot:
+            if plot_filename is None:
+                # Create default plot filename
+                plot_filename = "polynomial_fit.png"
+            
+            fig.savefig(plot_filename, dpi=300, bbox_inches='tight')
+            print(f"Saved plot to {plot_filename}")
+            result_dict['plot_file'] = plot_filename
+        
         plt.show()
-    
+    else:
+        # If not showing plot but saving, still create figure
+        if save_plot:
+            fig = plot_polynomial_fit_results(result_dict)
+            
+            if plot_filename is None:
+                plot_filename = "polynomial_fit.png"
+            
+            fig.savefig(plot_filename, dpi=300, bbox_inches='tight')
+            print(f"Saved plot to {plot_filename}")
+            result_dict['plot_file'] = plot_filename
+            plt.close(fig)    
     # Remove 'all_fits' from the result dictionary if not needed for return
     # This avoids cluttering the return value with large data
     if 'all_fits' in result_dict and not plot:
@@ -641,7 +671,8 @@ def plot_polynomial_fit_results(result_dict, figure_size=(10, 8)):
 
 def fit_spectral_region(filename, lam_min, lam_max, min_order=2, max_order=6, 
                         maxiter=20, sigma=3.0, use_weights=True, plot=True,
-                        save_output=False, output_filename=None):
+                        save_output=False, output_filename=None,
+                        save_plot=False, plot_filename=None):
     """
     Load a spectrum and fit a specific wavelength region with optimal polynomial order.
     
@@ -699,8 +730,10 @@ def fit_spectral_region(filename, lam_min, lam_max, min_order=2, max_order=6,
         maxiter=maxiter,
         sigma=sigma,
         use_weights=use_weights,
-        plot=plot
-    )
+        plot=plot,
+        save_plot=save_plot,
+        plot_filename=plot_filename
+        )
     
     # Save the normalized region if requested
     if save_output and output_filename is not None:
@@ -721,12 +754,12 @@ if __name__ == "__main__":
 
     
     # Define wavelength region to fit
-    lam_min = 1360  # Ångstroms
-    lam_max = 1390  # Ångstroms
+    lam_min = 1390  # Ångstroms
+    lam_max = 1530  # Ångstroms
     
     # Parameters for fitting
-    min_order = 1
-    max_order = 10
+    min_order = 0
+    max_order = 8
     
     # Fit the spectral region
     result = fit_spectral_region(
