@@ -214,7 +214,7 @@ The `fit_quasar_continuum` function generates a visualization showing:
 3. Normalized spectrum
 4. BIC values for each chunk
 
-![Full Spectrum Fitting](/images/full_spectrum_fitting_example.png)
+![Full Spectrum Fitting](images/full_spectrum_fitting_example.png)
 
 ## Advanced Usage: Real Data Examples
 
