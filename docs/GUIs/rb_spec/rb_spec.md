@@ -69,7 +69,7 @@ spec.compute_EW(transition, vmin=-80, vmax=55, plot=True)
 spec.save_slice('analysis_results.json', file_format='json')
 ```
 
-![Continuum Fitting Example](figures/continuum_fitting_example.png)
+![Continuum Fitting Example](images/continuum_fitting_example.png)
 
 ### Creating from Numpy Arrays
 
