@@ -307,7 +307,7 @@ The `rb_spec` pipeline integrates with other `rbcodes` modules:
 If you use `rb_spec.py` in your research, please cite:
 
 ```
-Bordoloi, R. 2024, rbcodes: Absorption Line Analysis Pipeline, GitHub repository
+rbcodes, GitHub repository
 ```
 
 ---
