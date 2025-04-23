@@ -1,5 +1,7 @@
 # MultispecViewer
 
+[Back to Main Page](../../main_readme.md)
+
 A tool for visualizing and analyzing multiple spectroscopic datasets simultaneously.
 
 ⚠️ **WARNING: UNDER ACTIVE DEVELOPMENT** ⚠️

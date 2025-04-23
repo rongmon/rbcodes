@@ -1,6 +1,8 @@
 # Interactive Continuum Fitting Tools
 
-This README provides documentation for the interactive continuum fitting tools in the `rbcodes.GUIs` package:
+[Back to Main Page](../main_readme.md)
+
+This provides documentation for the interactive continuum fitting tools in the `rbcodes.GUIs` package:
 - `rb_cont.py` - A command-line script for launching the interactive fitter
 - `rb_fit_interactive_continuum.py` - The core class for interactive continuum fitting
 
