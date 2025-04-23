@@ -60,7 +60,7 @@ pip install -e .  # This requires a setup.py file in the package #COMING SOON.
 3. [multispecviewer](/docs/GUIs/multispec/multispec.md): 🛠️: Improved rb_specgui to handle multiple 1D spectra simultaneously. **WARNING: This tool is under active development and may undergo significant changes. Use with caution in production environments. Features and interfaces may change without prior notice. Consider backing up your data and analysis before using this tool.**
 
 4. [AbsTools](/docs/GUIs/AbsTools/README.md): Complex absorption line analysis GUI
-5. [zgui/main.py](docs/GUIs/zgui/Tutorial_for_Emission_Line_Redshift_Estimator_GUI.pdf): Redshift measurement GUI for galaxies
+5. [Tutorial for zgui/main.py (PDF)](/docs/GUIs/zgui/Tutorial_for_Emission_Line_Redshift_Estimator_GUI.pdf): Redshift measurement GUI for galaxies
    - Supports 1D and 2D spectra
    - Optimized for JWST NIRCam/Grism spectroscopy
 
