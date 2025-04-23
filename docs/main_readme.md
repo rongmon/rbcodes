@@ -28,12 +28,7 @@ conda install -c conda-forge --file requirements_simple.txt
 
 ### Dependencies
 - Core Dependencies: 
-  - astropy
-  - lmfit
-  - scipy
-  - numpy
-  - matplotlib
-  - linetools
+  astropy, lmfit, scipy, numpy, matplotlib, linetools, emcee, corner, PyQt5, pandas, scikit-learn 
 
 ## Contents
 
