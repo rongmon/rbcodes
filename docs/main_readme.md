@@ -24,6 +24,26 @@ conda activate myenv
 
 # Install packages (use conda to ensure compatibility)
 conda install -c conda-forge --file requirements_simple.txt
+
+# Add rbcodes package to your PYTHONPATH
+# Option 1: Temporarily add to PYTHONPATH for current session
+export PYTHONPATH=$PYTHONPATH:/path/to/rbcodes  # For Linux/Mac
+# OR
+set PYTHONPATH=%PYTHONPATH%;C:\path\to\rbcodes  # For Windows
+
+# Option 2: Permanently add to PYTHONPATH in your environment
+# For Linux/Mac, add this to your ~/.bashrc, ~/.zshrc, or similar:
+echo 'export PYTHONPATH=$PYTHONPATH:/path/to/rbcodes' >> ~/.bashrc
+source ~/.bashrc
+
+# For Windows, set through System Properties > Environment Variables
+# Or use this command:
+setx PYTHONPATH "%PYTHONPATH%;C:\path\to\rbcodes"
+
+#****This is not yet implemented***
+# Option 3: Install the package in development mode
+cd /path/to/rbcodes
+pip install -e .  # This requires a setup.py file in the package #COMING SOON. 
 ```
 
 ### Dependencies
