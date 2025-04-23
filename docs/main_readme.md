@@ -14,7 +14,6 @@ This package is constantly under development and will be periodically updated.
 
 ## Installation
 
-### Create Conda Environment
 ```bash
 # Create the environment with Python 3.9.6
 conda create -n myenv python=3.9.6
@@ -65,7 +64,7 @@ pip install -e .  # This requires a setup.py file in the package #COMING SOON.
    - Equivalent width and Gaussian fitting
 5. [AbsTools](/docs/GUIs/AbsTools/README.md): Complex absorption line analysis GUI
 6. [rb_specgui](/docs/GUIs/rb_specgui/rb_specgui.md): Advanced 1D spectrum viewer and line identifier
-7. [zgui/main.py](/docs/GUIs/zgui.md): Redshift measurement GUI for galaxies
+7. [zgui/main.py](docs/GUIs/zgui/Tutorial_for_Emission_Line_Redshift_Estimator_GUI.pdf): Redshift measurement GUI for galaxies
    - Supports 1D and 2D spectra
    - Optimized for JWST NIRCam/Grism spectroscopy
 
@@ -82,7 +81,7 @@ pip install -e .  # This requires a setup.py file in the package #COMING SOON.
 5. rb_specbin.py: Spectrum rebinning
 6. ransac_contfit.py: Advanced continuum fitting
 7. lens_sep_to_kpc.py: Sightline separation calculation
-8 [LLSFitter.py](/docs/GUIs/LLSFitter/LLSFitter.md): Lyman Limit System column density measurement. 
+8. [LLSFitter.py](/docs/GUIs/LLSFitter/LLSFitter.md): Lyman Limit System column density measurement. 
     
 ### Halo Analysis
        1) rb_nfw.py      : Compute NFW halo profile
