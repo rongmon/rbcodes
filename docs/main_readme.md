@@ -2,7 +2,12 @@
 
 A public release of Python codes for astrophysical research by Rongmon Bordoloi. 
 
-[![DOI](https://zenodo.org/badge/192408573.svg)](https://zenodo.org/badge/latestdoi/192408573)
+### 📖 Citation
+
+If you use this package, please cite it using the following DOI:
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6079263.svg)](https://doi.org/10.5281/zenodo.6079263)
+
 
 ## Overview
 This package is constantly under development and will be periodically updated.
@@ -105,7 +110,5 @@ conda install -c conda-forge --file requirements_simple.txt
 - Contributions and improvements are welcome
 
 ## License
-[Insert license details]
 
-## Contact
-[Insert contact information]
+This project is licensed under the [MIT License](LICENSE).
