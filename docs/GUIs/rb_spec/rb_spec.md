@@ -302,13 +302,6 @@ The `rb_spec` pipeline integrates with other `rbcodes` modules:
 - `rb_setline.py`: Atomic line database management
 - Interactive GUIs for visual analysis
 
-## 📖 Citation
-
-If you use `rb_spec.py` in your research, please cite:
-
-```
-rbcodes, GitHub repository
-```
 
 ---
 **Note**: This tool is part of the `rbcodes` package maintained by Rongmon Bordoloi. For the latest version and updates, visit the official GitHub repository.

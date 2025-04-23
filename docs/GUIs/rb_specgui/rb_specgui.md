@@ -12,22 +12,6 @@ This tool is particularly useful for:
 - Measuring equivalent widths and column densities of absorption lines
 - Creating catalogs of absorption systems at various redshifts
 
-## Installation
-
-### Prerequisites
-
-1. Install rbcodes requirements using conda:
-
-```bash
-# Create a new conda environment (optional but recommended)
-conda create -n rbcodes python=3.9.6
-conda activate rbcodes
-
-# Install requirements from requirements_simple.txt
-conda install -c conda-forge --file /path/to/rbcodes/requirements_simple.txt
-```
-
-Refer to the `requirements_simple.txt` file in the rbcodes repository for specific package details.
 
 ### Setup
 
