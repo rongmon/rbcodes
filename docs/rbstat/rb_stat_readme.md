@@ -1,5 +1,7 @@
 # Project Documentation
 
+[Back to Main Page](../README.md)
+
 *Auto-generated documentation from docstrings*
 
 ## Functions
