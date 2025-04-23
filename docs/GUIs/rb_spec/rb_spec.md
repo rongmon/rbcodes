@@ -1,5 +1,7 @@
 # rb_spec.py - Comprehensive Absorption Line Analysis Pipeline
 
+[Back to Main Page](../../main_readme.md)
+
 `rb_spec.py` is a comprehensive absorption line analysis pipeline that is part of the `rbcodes` package. It lives in `rbcodes.GUIs` and provides a full suite of tools for analyzing absorption line spectra, particularly designed for studying the Circumgalactic Medium (CGM) and Intergalactic Medium (IGM).
 
 ## 🌟 Overview

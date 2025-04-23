@@ -1,5 +1,8 @@
 # rb_specgui
 
+[Back to Main Page](../../main_readme.md)
+
+
 A comprehensive tool for visualizing and analyzing astronomical spectra, with a focus on absorption line identification.
 
 ## Overview
