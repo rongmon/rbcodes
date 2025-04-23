@@ -2,6 +2,30 @@
 
 [Back to Main Page](../../main_readme.md)
 
+## Table of Contents
+- [Overview](#-overview)
+- [Key Features](#-key-features)
+  - [Multiple Continuum Fitting Methods](#1-multiple-continuum-fitting-methods)
+  - [Comprehensive Analysis Tools](#2-comprehensive-analysis-tools)
+  - [Advanced Features](#3-advanced-features)
+- [Quick Start Guide](#-quick-start-guide)
+  - [Basic Workflow](#basic-workflow)
+  - [Creating from Numpy Arrays](#creating-from-numpy-arrays)
+- [Analysis Methods](#-analysis-methods)
+  - [Continuum Fitting Methods](#continuum-fitting-methods)
+  - [Equivalent Width and Column Density](#equivalent-width-and-column-density)
+  - [Signal-to-Noise Estimation](#signal-to-noise-estimation)
+  - [Saturation Detection](#saturation-detection)
+  - [Data Persistence](#data-persistence)
+- [Output Data Structure](#-output-data-structure)
+- [Viewing and Inspection](#-viewing-and-inspection)
+- [Example Applications](#-example-applications)
+  - [CGM Analysis in Galaxy Spectra](#1-cgm-analysis-in-galaxy-spectra)
+  - [IGM Lyman Series Analysis](#2-igm-lyman-series-analysis)
+  - [Automated Batch Processing](#3-automated-batch-processing)
+- [Important Notes](#️-important-notes)
+- [Related Tools](#-related-tools)
+
 `rb_spec.py` is a comprehensive absorption line analysis pipeline that is part of the `rbcodes` package. It lives in `rbcodes.GUIs` and provides a full suite of tools for analyzing absorption line spectra, particularly designed for studying the Circumgalactic Medium (CGM) and Intergalactic Medium (IGM).
 
 ## 🌟 Overview
