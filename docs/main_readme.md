@@ -34,7 +34,7 @@ conda install -c conda-forge --file requirements_simple.txt
 
 ### Graphical User Interfaces (GUIs)
 1. [rb_cont.py](/docs/GUIs/rb_cont.md): Simple interactive continuum fitter
-2. [rb_spec.py](/docs/GUIs/rb_spec.md): Absorption line analysis pipeline
+2. [rb_spec.py](/docs/GUIs/rb_spec/rb_spec.md): Absorption line analysis pipeline
    - Continuum fitting
    - Equivalent width/column density measurements
    - Simple Voigt profile fitting
