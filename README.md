@@ -11,6 +11,10 @@ If you use this package, please cite it using the following DOI:
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6079263.svg)](https://doi.org/10.5281/zenodo.6079263)
 
 
+### 📚 Documentation
+
+Full documentation is available in [`rbcodes/docs/main_readme.md`](docs/main_readme.md).
+
 Installation:
 -------------
 Add this folder to your pythonpath and you are good to go.
