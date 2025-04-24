@@ -618,10 +618,15 @@ class SpectralPlot(FigureCanvas):
         if self.message_box:
             self.message_box.on_sent_message(msg, "#008000")
             
-        # Convert relative positions back to data coordinates
-        y_pos = y_min + rel_pos * y_range
+        ## Convert relative positions back to data coordinates
+        #y_pos = y_min + rel_pos * y_range
+        #y_line_top = y_pos + line_height * y_range
+        #y_text_pos = y_pos + text_height * y_range
+        #set y-values based on where it was clicked
+        y_pos = yval + yval*0.15
         y_line_top = y_pos + line_height * y_range
         y_text_pos = y_pos + text_height * y_range
+
         
         # Draw the line pattern with relative positioning
         line, = ax.plot([wave0, wave0, wave1, wave1], [y_pos, y_line_top, y_line_top, y_pos], color='r')
