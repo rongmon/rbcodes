@@ -2,14 +2,18 @@
 
 A public release of Python codes for astrophysical research by Rongmon Bordoloi. 
 
-[![DOI](https://zenodo.org/badge/192408573.svg)](https://zenodo.org/badge/latestdoi/192408573)
+### 📖 Citation
+
+If you use this package, please cite it using the following DOI:
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6079263.svg)](https://doi.org/10.5281/zenodo.6079263)
+
 
 ## Overview
 This package is constantly under development and will be periodically updated.
 
 ## Installation
 
-### Create Conda Environment
 ```bash
 # Create the environment with Python 3.9.6
 conda create -n myenv python=3.9.6
@@ -19,37 +23,52 @@ conda activate myenv
 
 # Install packages (use conda to ensure compatibility)
 conda install -c conda-forge --file requirements_simple.txt
+
+# Add rbcodes package to your PYTHONPATH
+# Option 1: Temporarily add to PYTHONPATH for current session
+export PYTHONPATH=$PYTHONPATH:/path/to/rbcodes  # For Linux/Mac
+# OR
+set PYTHONPATH=%PYTHONPATH%;C:\path\to\rbcodes  # For Windows
+
+# Option 2: Permanently add to PYTHONPATH in your environment
+# For Linux/Mac, add this to your ~/.bashrc, ~/.zshrc, or similar:
+echo 'export PYTHONPATH=$PYTHONPATH:/path/to/rbcodes' >> ~/.bashrc
+source ~/.bashrc
+
+# For Windows, set through System Properties > Environment Variables
+# Or use this command:
+setx PYTHONPATH "%PYTHONPATH%;C:\path\to\rbcodes"
+
+#****This is not yet implemented***
+# Option 3: Install the package in development mode
+cd /path/to/rbcodes
+pip install -e .  # This requires a setup.py file in the package #COMING SOON. 
 ```
 
 ### Dependencies
 - Core Dependencies: 
-  - astropy
-  - lmfit
-  - scipy
-  - numpy
-  - matplotlib
-  - linetools
+  astropy, lmfit, scipy, numpy, matplotlib, linetools, emcee, corner, PyQt5, pandas, scikit-learn 
 
 ## Contents
 
 ### Graphical User Interfaces (GUIs)
-1. [rb_cont.py](/docs/GUIs/rb_cont.md): Simple interactive continuum fitter
-2. [rb_spec.py](/docs/GUIs/rb_spec.md): Absorption line analysis pipeline
+1. [rb_spec.py](/docs/GUIs/rb_spec/rb_spec.md): Complrehensive absorption line analysis pipeline
    - Continuum fitting
    - Equivalent width/column density measurements
    - Simple Voigt profile fitting
-3. [rb_interactive_vpfit_singlet.py](/docs/GUIs/rb_interactive_vpfit_singlet.md): Interactive Voigt profile     fitter
-4. [rb_plot_spec.py](/docs/GUIs/rb_plot_spec.md): Spectrum plotting and analysis tool
-   - Pan and zoom spectrum
-   - Plot absorption lines at various redshifts
-   - Equivalent width and Gaussian fitting
-5. [AbsTools](/docs/GUIs/AbsTools/README.md): Complex absorption line analysis GUI
-6. [rb_specgui](/docs/GUIs/rb_specgui/rb_specgui.md): Advanced 1D spectrum viewer and line identifier
-7. [zgui/main.py](/docs/GUIs/zgui.md): Redshift measurement GUI for galaxies
+2. [rb_specgui](/docs/GUIs/rb_specgui/rb_specgui.md): Advanced 1D spectrum viewer and line identifier
+3. [multispecviewer](/docs/GUIs/multispec/multispec.md): 🛠️: Improved rb_specgui to handle multiple 1D spectra simultaneously. **WARNING: This tool is under active development and may undergo significant changes. Use with caution in production environments. Features and interfaces may change without prior notice. Consider backing up your data and analysis before using this tool.**
+
+4. [AbsTools](/docs/GUIs/AbsTools/README.md): Complex absorption line analysis GUI
+5. [Tutorial for zgui/main.py (PDF)](/docs/GUIs/zgui/Tutorial_for_Emission_Line_Redshift_Estimator_GUI.pdf): Redshift measurement GUI for galaxies
    - Supports 1D and 2D spectra
    - Optimized for JWST NIRCam/Grism spectroscopy
 
-8. [LLSFitter_GUI.py](/docs/GUIs/LLSFitter/LLSFitter.md): A Simple GUI to fit Lyman Limit System column densities.
+6. [LLSFitter_GUI.py](/docs/GUIs/LLSFitter/LLSFitter.md): A Simple GUI to fit Lyman Limit System column densities.
+7. [rb_cont.py](/docs/GUIs/rb_cont.md): Simple interactive continuum fitter
+8. [rb_interactive_vpfit_singlet.py](/docs/GUIs/rb_interactive_vpfit_singlet.md): Interactive Voigt profile     fitter
+9. [rb_plot_spec.py](/docs/GUIs/rb_plot_spec.md): Spectrum plotting and analysis tool ⚠️ **DEPRECATED**
+
 
 ### Intergalactic Medium (IGM) Tools
 
@@ -62,7 +81,7 @@ conda install -c conda-forge --file requirements_simple.txt
 5. rb_specbin.py: Spectrum rebinning
 6. ransac_contfit.py: Advanced continuum fitting
 7. lens_sep_to_kpc.py: Sightline separation calculation
-8 [LLSFitter.py](/docs/GUIs/LLSFitter/LLSFitter.md): Lyman Limit System column density measurement. 
+8. [LLSFitter.py](/docs/GUIs/LLSFitter/LLSFitter.md): Lyman Limit System column density measurement. 
     
 ### Halo Analysis
        1) rb_nfw.py      : Compute NFW halo profile
@@ -105,7 +124,5 @@ conda install -c conda-forge --file requirements_simple.txt
 - Contributions and improvements are welcome
 
 ## License
-[Insert license details]
 
-## Contact
-[Insert contact information]
+This project is licensed under the [MIT License](LICENSE).

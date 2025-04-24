@@ -1,5 +1,7 @@
 # Polynomial Continuum Fitting Tools for Spectral Analysis
 
+[Back to Main Page](../main_readme.md)
+
 This repository contains a set of Python tools for robust continuum fitting of astronomical spectra. These modules are part of the `rbcodes.IGM` package, providing flexible and powerful methods for normalizing spectra.
 
 ## Main Features

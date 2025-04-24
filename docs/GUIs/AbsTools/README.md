@@ -1,5 +1,7 @@
 # AbsTools: Absorption Line Analysis Toolbox
 
+[Back to Main Page](../../main_readme.md)
+
 AbsTools is an interactive toolkit for analyzing absorption lines in astronomical spectra. It provides a user-friendly graphical interface for continuum fitting, equivalent width measurements, and column density determinations of absorption features in spectra of the Circumgalactic Medium (CGM), Intergalactic Medium (IGM), and Interstellar Medium (ISM).
 
 ## Overview

@@ -1,354 +1,564 @@
+#!/usr/bin/env python
+"""
+Interactive continuum fitter for 1D spectra.
+
+This script loads a spectrum from a file and launches an interactive
+continuum fitting interface. The user can select points by clicking on
+the plot, and fit a cubic spline through these points to create a continuum.
+The normalized spectrum and fitted continuum can be saved to a file.
+
+Example usage:
+    python rb_cont.py filename [filetype]
+
+Where:
+    filename : Path to the file containing the spectrum
+    filetype : (Optional) Type of file - 'fits', 'ascii', 'p' (pickle), or 'xfits'
+               If not provided, it will be inferred from the file extension.
+
+Controls:
+    Mouse:
+        Left Click  : Select the median flux value within +/- 2.5 units from 
+                      the x-coordinate for continuum fitting.
+        Right Click : Delete the nearest continuum point.
+    
+    Keyboard:
+        b     : Select a point for continuum fit at the exact (x,y) coordinate 
+                of the cursor.
+        enter : Perform a spline fit to create a continuum.
+        n     : Show the normalized spectrum.
+        w     : After pressing 'n', this will save the continuum.
+        h     : Display the help screen.
+        r     : Reset fit.
+        q     : Quit the interactive session.
+"""
+
+import sys
+import os
+import argparse
+import warnings
+import numpy as np
 import matplotlib
 matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
-import numpy as np
-from scipy.interpolate import splrep,splev
-import pdb
-import sys
-import os
 
-def onclick(event):
-    """
-     when none of the toolbar buttons is activated and the user clicks in the
-     plot somewhere, compute the median value of the spectrum in a 10angstrom
-     window around the x-coordinate of the clicked point. The y coordinate
-     of the clicked point is not important. Make sure the continuum points
-     `feel` it when it gets clicked, set the `feel-radius` (picker) to 5 points
-     """
-    toolbar = plt.get_current_fig_manager().toolbar
-    if event.button==1 and toolbar.mode=='':
-        window = ((event.xdata-5)<=wave) & (wave<=(event.xdata+5))
-        y = np.median(flux[window])
-        plt.plot(event.xdata,y,'ro',ms=5,picker=5,label='cont_pnt',markeredgecolor='k',picker=True)
-    plt.draw()
+# Import the interactive continuum fitter class
+try:
+    from rbcodes.GUIs.rb_fit_interactive_continuum import rb_fit_interactive_continuum
+except ImportError:
+    # If not available in rbcodes, try to import from local directory
+    try:
+        from rb_fit_interactive_continuum import rb_fit_interactive_continuum
+    except ImportError:
+        print("Error: rb_fit_interactive_continuum module not found.")
+        print("Please make sure it's either in the current directory or in rbcodes.GUIs.")
+        sys.exit(1)
 
-def onpick(event):
-    """ when the user clicks right on a continuum point, remove it"""
-    if event.mouseevent.button==3:
-        if hasattr(event.artist,'get_label') and event.artist.get_label()=='cont_pnt':
-            event.artist.remove()
-
-def ontype(event):
-    """
-    #---------------------------------------------------------------------------
-    # When the user hits enter:
-    # 1. Cycle through the artists in the current axes. If it is a continuum
-    #    point, remember its coordinates. If it is the fitted continuum from the
-    #    previous step, remove it
-    # 2. sort the continuum-point-array according to the x-values
-    # 3. fit a spline and evaluate it in the wavelength points
-    # 4. plot the continuum
-    #
-    # Original Code taken from : http://www.ster.kuleuven.be/~pieterd/python/html/plotting/specnorm.html
-    # Modified by Rongmon Bordoloi July 13 2017.
-    # Modified to add custom points and changed the look of the plots.
-    # Also added custom input options to read different formats. 
-    # Input file could be ascii, fits or pickle format
-    # Output will be in the same format as the input file. 
-    # Added help feature and graceful exit option. - Now pressing q will exit the program at any stage
-    #---------------------------------------------------------------------------
-    """
-    if event.key=='enter':
-        cont_pnt_coord = []
-        for artist in plt.gca().get_children():
-            if hasattr(artist,'get_label') and artist.get_label()=='cont_pnt':
-                cont_pnt_coord.append(artist.get_data())
-            elif hasattr(artist,'get_label') and artist.get_label()=='continuum':
-                artist.remove()
-        cont_pnt_coord = np.array(cont_pnt_coord)[...,0]
-        sort_array = np.argsort(cont_pnt_coord[:,0])
-        x,y = cont_pnt_coord[sort_array].T
-        spline = splrep(x,y,k=3)
-        continuum = splev(wave,spline)
-        plt.plot(wave,continuum,'r-',lw=2,label='continuum')
-
-    # when the user hits 'n' and a spline-continuum is fitted, normalise the
-    # spectrum
-    elif event.key=='n':
-        continuum = None
-        for artist in plt.gca().get_children():
-            if hasattr(artist,'get_label') and artist.get_label()=='continuum':
-                continuum = artist.get_data()[1]
-                break
-        if continuum is not None:
-            plt.cla()
-            plt.step(wave,flux/continuum,'b-',label='normalised',linewidth=1)
-            plt.step(wave,continuum,'r-',label='unnorm_cont',linewidth=0)            
-            plt.plot([np.min(wave),np.max(wave)],[1,1],'k--')
-            plt.xlim([np.min(wave),np.max(wave)])
-            plt.title(filename)
-            plt.xlabel('Wavelength')
-            plt.ylabel('Relative Flux')
-
-
-    # when the user hits 'r': clear the axes and plot the original spectrum
-    elif event.key=='r':
-        plt.cla()
-        plt.step(wave,flux,'b-')
-
-    # when the user hits 'b': selects a handpicked x,y value
-    elif event.key=='b':
-        plt.plot(event.xdata,event.ydata,'ro',ms=5,picker=5,label='cont_pnt',markeredgecolor='k',picker=True)
-        plt.draw()
-
-    #If the user presses 'h': The help is printed on the screen
-    elif event.key=='h':
-        print(
-        '''    
-        ---------------------------------------------------------------------------
-        This is an interactive continuum fitter for 1D spectrum.
-        The purpose of this code is to create a spline continuum fit from selected points.
-        The help scene activates by pressing h on the plot.
-
-        The program only works properly if none of the toolbar buttons in the figure is activated. 
-
-
-        Useful Keystrokes:
-
-            Mouse Clicks:
-            
-                Left Click  : Select the median flux value within +/- 5 pixel from the x-coordinate.
-                              These points are used for the continuum fit.
-                Right Click : Delete the nearest continuum point.
-
-            Keystrokes:
-              
-              b     :    Select a point for continuum fit at that exact (x,y) coordinate.
-              enter :    Perform a spline fit to data to create a continuum.
-              n     :    Show the normalized spectrum.
-              w     :    Only after pressing n, write fitted continuum to file. 
-                         [Output file saves wave, flux, error [if available], continuum]
-                         [output file is in same format as input file with *_norm.* appended to the name.]
-              h     :    This Help screen.
-              r     :    Reset fit.
-              q     :    Quit Program.
-         ---------------------------------------------------------------------------
-        Written By:  Rongmon Bordoloi                                   July 13 2017.
-
-
-        ----------------------------------------------------------------------------
+def print_help():
+    """Print help information about the interactive continuum fitter."""
+    print("""
+    ---------------------------------------------------------------------------
+    Interactive Continuum Fitter for 1D Spectrum
+    ---------------------------------------------------------------------------
+    
+    This program loads a spectrum from a file and allows interactive fitting
+    of a continuum using cubic splines. The normalized spectrum and fitted
+    continuum can be saved to a file.
+    
+    The program only works properly if none of the toolbar buttons in the figure
+    is activated.
+    
+    Controls:
+    
+        Mouse Clicks:
         
-        Basic code is taken from : http://www.ster.kuleuven.be/~pieterd/python/html/plotting/specnorm.html
-        Heavily modified by Rongmon Bordoloi July 13/14 2017.
-        Modified to add custom points and changed the look of the plots.
-        Also added custom input options to read different formats. 
-        Input file could be ascii, fits or pickle format
-        Output will be in the same format as the input file. 
-        Added help feature and graceful exit option. - Now pressing q will exit the program at any stage
-        ---------------------------------------------------------------------------
-        '''
-        )
+            Left Click  : Select the median flux value within +/- 2.5 units from
+                         the x-coordinate for continuum fitting.
+            Right Click : Delete the nearest continuum point.
+        
+        Keyboard:
+        
+            b     : Select a point for continuum fit at the exact (x,y) coordinate
+                   of the cursor.
+            enter : Perform a spline fit to create a continuum.
+            n     : Show the normalized spectrum.
+            w     : After pressing 'n', this will save the continuum.
+            h     : Display this help screen.
+            r     : Reset fit.
+            q     : Quit the interactive session.
+    
+    ---------------------------------------------------------------------------
+    """)
 
+def load_spectrum(filename, filetype=None):
+    """
+    Load a spectrum from a file.
+    
+    Parameters
+    ----------
+    filename : str
+        Path to the file containing the spectrum.
+    filetype : str, optional
+        Type of file - 'fits', 'ascii', 'p' (pickle), or 'xfits'.
+        If None, it will be inferred from the file extension.
+    
+    Returns
+    -------
+    tuple
+        (wave, flux, error, metadata) where:
+        - wave is the wavelength array
+        - flux is the flux array
+        - error is the error array
+        - metadata is a dictionary with additional information
+    
+    Raises
+    ------
+    FileNotFoundError
+        If the file doesn't exist.
+    ValueError
+        If the file type is not supported or the file doesn't contain valid data.
+    ImportError
+        If required modules are not available.
+    """
+    # Check if file exists
+    if not os.path.exists(filename):
+        raise FileNotFoundError(f"File not found: {filename}")
+    
+    # Infer file type if not provided
+    if filetype is None:
+        ext = os.path.splitext(filename)[1].lower()
+        if ext in ['.txt', '.dat']:
+            filetype = 'ascii'
+        elif ext == '.fits':
+            filetype = 'fits'
+        elif ext in ['.p', '.pkl']:
+            filetype = 'p'
+        else:
+            filetype = ext[1:] if ext.startswith('.') else ext
+        print(f"Inferred file type: {filetype}")
+    
+    metadata = {'filename': filename, 'filetype': filetype}
+    
+    # Read the file based on its type
+    try:
+        if filetype == 'ascii':
+            from astropy.io import ascii
+            try:
+                data = ascii.read(filename)
+                if len(data) == 0:
+                    raise ValueError(f"Empty data file: {filename}")
+                
+                keys = data.keys()
+                if len(keys) < 2:
+                    raise ValueError(f"Not enough columns in file: {filename}. Need at least wavelength and flux.")
+                
+                wave = np.array(data[keys[0]])
+                flux = np.array(data[keys[1]])
+                
+                if len(keys) >= 3:
+                    error = np.array(data[keys[2]])
+                else:
+                    print("Warning: No error column found. Assuming 10% error.")
+                    error = 0.1 * np.abs(flux)
+                
+                metadata['format'] = 'ascii'
+                metadata['columns'] = keys
+            except Exception as e:
+                raise ValueError(f"Error reading ASCII file: {str(e)}")
+        
+        elif filetype in ['fits', 'FITS']:
+            # Try to use linetools if available
+            try:
+                from linetools.spectra.xspectrum1d import XSpectrum1D
+                
+                print(f"Loading {filename} with linetools.spectra.xspectrum1d...")
+                sp = XSpectrum1D.from_file(filename)
+                wave = sp.wavelength.value
+                flux = sp.flux.value
+                
+                if sp.sig_is_set:
+                    error = sp.sig.value
+                else:
+                    print("Warning: No error information in XSpectrum. Assuming 10% error.")
+                    error = 0.1 * np.abs(flux)
+                
+                if sp.co_is_set:
+                    print("Continuum found in file. Using it for normalization.")
+                    continuum = sp.co.value
+                    metadata['original_continuum'] = continuum
+                
+                metadata['format'] = 'linetools'
+                
+            except ImportError:
+                # Fall back to astropy.io.fits if linetools is not available
+                print("linetools not available. Using astropy.io.fits instead.")
+                from astropy.io import fits
+                
+                try:
+                    with fits.open(filename) as file:
+                        if len(file) < 2:
+                            raise ValueError(f"FITS file does not have expected HDU structure: {filename}")
+                        
+                        data = file[1].data
+                        if data is None or len(data) == 0:
+                            raise ValueError(f"Empty data in FITS file: {filename}")
+                        
+                        if 'WAVE' in data.names:
+                            wave = np.array(data['WAVE'])
+                        elif 'wave' in data.names:
+                            wave = np.array(data['wave'])
+                        else:
+                            raise ValueError(f"Wavelength column not found in FITS file: {filename}")
+                        
+                        if 'FLUX' in data.names:
+                            flux = np.array(data['FLUX'])
+                        elif 'flux' in data.names:
+                            flux = np.array(data['flux'])
+                        else:
+                            raise ValueError(f"Flux column not found in FITS file: {filename}")
+                        
+                        if 'ERROR' in data.names:
+                            error = np.array(data['ERROR'])
+                        elif 'error' in data.names:
+                            error = np.array(data['error'])
+                        elif 'ERR' in data.names:
+                            error = np.array(data['ERR'])
+                        elif 'err' in data.names:
+                            error = np.array(data['err'])
+                        else:
+                            print("Warning: No error column found in FITS file. Assuming 10% error.")
+                            error = 0.1 * np.abs(flux)
+                        
+                        metadata['format'] = 'fits'
+                        metadata['columns'] = data.names
+                except Exception as e:
+                    raise ValueError(f"Error reading FITS file: {str(e)}")
+        
+        elif filetype == 'xfits':
+            try:
+                from linetools.spectra.xspectrum1d import XSpectrum1D
+                
+                print(f"Loading {filename} as XSpectrum1D...")
+                sp = XSpectrum1D.from_file(filename)
+                wave = sp.wavelength.value
+                flux = sp.flux.value
+                
+                if sp.sig_is_set:
+                    error = sp.sig.value
+                else:
+                    print("Warning: No error information in XSpectrum. Assuming 10% error.")
+                    error = 0.1 * np.abs(flux)
+                
+                if sp.co_is_set:
+                    print("Continuum found in file. Using it for normalization.")
+                    continuum = sp.co.value
+                    metadata['original_continuum'] = continuum
+                
+                metadata['format'] = 'xfits'
+            except ImportError:
+                raise ImportError("linetools is required to read xfits files. Please install linetools.")
+            except Exception as e:
+                raise ValueError(f"Error reading XFITS file: {str(e)}")
+        
+        elif filetype in ['p', 'pkl', 'pickle']:
+            try:
+                import pickle
+                
+                with open(filename, 'rb') as f:
+                    data = pickle.load(f)
+                
+                if not isinstance(data, dict):
+                    raise ValueError(f"Pickle file does not contain a dictionary: {filename}")
+                
+                if 'wave' not in data:
+                    raise ValueError(f"'wave' key not found in pickle file: {filename}")
+                if 'flux' not in data:
+                    raise ValueError(f"'flux' key not found in pickle file: {filename}")
+                
+                wave = np.array(data['wave'])
+                flux = np.array(data['flux'])
+                
+                if 'error' in data:
+                    error = np.array(data['error'])
+                else:
+                    print("Warning: No 'error' key found in pickle file. Assuming 10% error.")
+                    error = 0.1 * np.abs(flux)
+                
+                # Add any additional keys from the pickle file to metadata
+                for key, value in data.items():
+                    if key not in ['wave', 'flux', 'error']:
+                        metadata[key] = value
+                
+                metadata['format'] = 'pickle'
+            except Exception as e:
+                raise ValueError(f"Error reading pickle file: {str(e)}")
+        
+        else:
+            raise ValueError(f"Unsupported file type: {filetype}")
+        
+        # Validate the loaded arrays
+        if len(wave) == 0 or len(flux) == 0:
+            raise ValueError(f"Empty arrays loaded from file: {filename}")
+        
+        if len(wave) != len(flux) or len(wave) != len(error):
+            raise ValueError(f"Mismatched array lengths: wave={len(wave)}, flux={len(flux)}, error={len(error)}")
+        
+        # Check for NaN or infinity values
+        if np.any(np.isnan(wave)) or np.any(np.isinf(wave)):
+            warnings.warn(f"Wavelength array contains {np.sum(np.isnan(wave))} NaN and {np.sum(np.isinf(wave))} infinite values")
+        
+        if np.any(np.isnan(flux)) or np.any(np.isinf(flux)):
+            warnings.warn(f"Flux array contains {np.sum(np.isnan(flux))} NaN and {np.sum(np.isinf(flux))} infinite values")
+            
+            # Replace NaN/Inf values in flux with interpolated or median values
+            bad_indices = np.isnan(flux) | np.isinf(flux)
+            if np.any(bad_indices):
+                good_indices = ~bad_indices
+                if np.any(good_indices):
+                    try:
+                        from scipy.interpolate import interp1d
+                        x_good = wave[good_indices]
+                        y_good = flux[good_indices]
+                        f = interp1d(x_good, y_good, bounds_error=False, fill_value=np.median(y_good))
+                        flux[bad_indices] = f(wave[bad_indices])
+                        print(f"Replaced {np.sum(bad_indices)} NaN/Inf flux values with interpolated values")
+                    except ImportError:
+                        # Fall back to using median if scipy is not available
+                        flux[bad_indices] = np.median(flux[good_indices])
+                        print(f"Replaced {np.sum(bad_indices)} NaN/Inf flux values with median value")
+                else:
+                    # All values are bad, use zeros
+                    flux[:] = 0.0
+                    print("All flux values are NaN/Inf. Replaced with zeros.")
+        
+        if np.any(np.isnan(error)) or np.any(np.isinf(error)) or np.any(error <= 0):
+            warnings.warn(f"Error array contains {np.sum(np.isnan(error))} NaN and {np.sum(np.isinf(error))} infinite values")
+            
+            # Replace NaN/Inf/negative values in error with 10% of flux or median error
+            bad_indices = np.isnan(error) | np.isinf(error) | (error <= 0)
+            if np.any(bad_indices):
+                good_indices = ~bad_indices
+                if np.any(good_indices):
+                    median_error = np.median(error[good_indices])
+                    error[bad_indices] = median_error
+                    print(f"Replaced {np.sum(bad_indices)} invalid error values with median error")
+                else:
+                    # All values are bad, use 10% of flux
+                    error[:] = 0.1 * np.abs(flux)
+                    print("All error values are invalid. Using 10% of flux as error.")
+        
+        return wave, flux, error, metadata
+        
+    except Exception as e:
+        print(f"Error loading spectrum: {str(e)}")
+        raise
 
-    # At any time pressing q means graceful exit
-    elif event.key=='q':
-        quit_index=0;
-        for artist in plt.gca().get_children():
-            if hasattr(artist,'get_label') and artist.get_label()=='normalised':
-                quit_index=1
-            if quit_index==1:
-                plt.close()
-                print('Interactive Contunuum Normalization Done.')
-                print('Hope you remembered to save the fit by pressing w!')
-                print('Good Bye!')
-                break
+def save_spectrum(wave, flux, error, continuum, filename, filetype, metadata=None):
+    """
+    Save a spectrum with its fitted continuum to a file.
+    
+    Parameters
+    ----------
+    wave : array-like
+        Wavelength array.
+    flux : array-like
+        Flux array.
+    error : array-like
+        Error array.
+    continuum : array-like
+        Fitted continuum array.
+    filename : str
+        Path to the original input file.
+    filetype : str
+        Type of file to save - 'fits', 'ascii', or 'p' (pickle).
+    metadata : dict, optional
+        Additional metadata to include in the file.
+    
+    Returns
+    -------
+    str
+        Path to the saved file.
+    
+    Raises
+    ------
+    ValueError
+        If the file type is not supported or if there's an error saving the file.
+    ImportError
+        If required modules are not available.
+    
+    Notes
+    -----
+    The output file will be saved with the same name as the input file but with
+    '_norm' appended before the extension. For example, if the input file is
+    'spectrum.fits', the output file will be 'spectrum_norm.fits'.
+    """
+    if metadata is None:
+        metadata = {}
+    
+    # Create output filename
+    outfilename = os.path.splitext(filename)[0] + '_norm'
+    if filetype == 'ascii':
+        outfilename += '.txt'
+    elif filetype in ['fits', 'FITS', 'xfits']:
+        outfilename += '.fits'
+    elif filetype in ['p', 'pkl', 'pickle']:
+        outfilename += '.p'
+    else:
+        outfilename += '.' + filetype
+    
+    try:
+        if filetype == 'ascii':
+            from astropy.table import Table
+            
+            # Create table with wavelength, flux, error, and continuum
+            table = Table([wave, flux, error, continuum, flux/continuum], 
+                          names=['wave', 'flux', 'error', 'continuum', 'normalized_flux'])
+            
+            # Add metadata as table metadata
+            for key, value in metadata.items():
+                if isinstance(value, (str, int, float, bool)):
+                    table.meta[key] = value
+            
+            # Save table to file
+            from astropy.io import ascii as asc
+            asc.write(table, outfilename, overwrite=True)
+            
+        elif filetype in ['fits', 'FITS', 'xfits']:
+            # Try to use linetools if available
+            try:
+                from linetools.spectra.xspectrum1d import XSpectrum1D
+                
+                # Create XSpectrum1D object
+                sp = XSpectrum1D.from_tuple((wave, flux, error, continuum))
+                
+                # Add metadata as header
+                for key, value in metadata.items():
+                    if isinstance(value, (str, int, float, bool)):
+                        sp.meta[key] = value
+                
+                # Save to file
+                sp.write_to_fits(outfilename)
+                
+            except ImportError:
+                # Fall back to astropy.io.fits if linetools is not available
+                from astropy.table import Table
+                from astropy.io import fits
+                
+                # Create table with wavelength, flux, error, and continuum
+                table = Table([wave, flux, error, continuum, flux/continuum], 
+                              names=['wave', 'flux', 'error', 'continuum', 'normalized_flux'])
+                
+                # Add metadata as table metadata
+                for key, value in metadata.items():
+                    if isinstance(value, (str, int, float, bool)):
+                        table.meta[key] = value
+                
+                # Save table to file
+                table.write(outfilename, format='fits', overwrite=True)
+                
+        elif filetype in ['p', 'pkl', 'pickle']:
+            import pickle
+            
+            # Create dictionary with data
+            data = {
+                'wave': wave,
+                'flux': flux,
+                'error': error,
+                'continuum': continuum,
+                'normalized_flux': flux/continuum
+            }
+            
+            # Add metadata
+            for key, value in metadata.items():
+                data[key] = value
+            
+            # Save to file
+            with open(outfilename, 'wb') as f:
+                pickle.dump(data, f, protocol=2)
+                
+        else:
+            raise ValueError(f"Unsupported file type for saving: {filetype}")
+        
+        print(f"Saved normalized spectrum to {outfilename}")
+        return outfilename
+        
+    except Exception as e:
+        print(f"Error saving spectrum: {str(e)}")
+        return None
+
+def main():
+    """
+    Main function to run the interactive continuum fitting script.
+    
+    This function parses command-line arguments, loads the spectrum,
+    launches the interactive fitter, and saves the results.
+    """
+    # Set up argument parser
+    parser = argparse.ArgumentParser(
+        description="Interactive continuum fitter for 1D spectra",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+        Controls:
+            Mouse:
+                Left Click  : Select median flux in window
+                Right Click : Delete point
+            
+            Keyboard:
+                b     : Select exact point
+                enter : Fit continuum
+                n     : Show normalized spectrum
+                w     : Save continuum
+                h     : Help screen
+                r     : Reset fit
+                q     : Quit
+        """
+    )
+    
+    parser.add_argument("filename", help="Path to the spectrum file")
+    parser.add_argument("filetype", nargs="?", default=None,
+                        help="Type of file (fits, ascii, p). If not provided, inferred from extension.")
+    parser.add_argument("--help-controls", action="store_true",
+                        help="Show detailed help about the controls")
+    
+    args = parser.parse_args()
+    
+    # Show help about controls if requested
+    if args.help_controls:
+        print_help()
+        return
+    
+    try:
+        # Load the spectrum
+        print(f"Loading spectrum from {args.filename}...")
+        wave, flux, error, metadata = load_spectrum(args.filename, args.filetype)
+        
+        print(f"Loaded spectrum with {len(wave)} points")
+        print(f"Wavelength range: {wave.min():.2f} - {wave.max():.2f}")
+        
+        # Launch the interactive fitter
+        print("\nLaunching interactive continuum fitter...")
+        print("Press 'h' in the plot window for help on controls.")
+        
+        fitter = rb_fit_interactive_continuum(wave, flux, error)
+        
+        # Check if a continuum was fitted and saved
+        if fitter.cont is not None:
+            print("\nContinuum fitting successful!")
+            
+            # Save the result
+            filetype = metadata.get('filetype', None)
+            if filetype:
+                save_spectrum(wave, flux, error, fitter.cont, args.filename, filetype, metadata)
             else:
-                plt.close()
-                print('Quitting without normalizing. Moving along.....')
-                break
-
-
-
-
-    # when the user hits 'w': if the normalised spectrum exists, write it to a
-    # file.
-    elif event.key=='w':
-        for artist in plt.gca().get_children():
-            if hasattr(artist,'get_label') and artist.get_label()=='unnorm_cont':#'normalised':
-                data = np.array(artist.get_data())
-                cont=(data.T[:,1])
-                outfilename=os.path.splitext(filename)[0]+'_norm.'+filetype
-                if filetype=='ascii':
-                    from astropy.table import Table, Column, MaskedColumn
-                    if (len(tab)>=3):
-                        table=Table([wave,flux,error,cont],names=['wave','flux','error','cont'])
-                    else:
-                        table=Table([wave,flux,cont],names=['wave','flux','cont'])
-                    ascii.write(table,outfilename)
-                if (filetype=='fits') | (filetype=='xfits'):
-                    from astropy.table import Table, Column, MaskedColumn
-                    if (len(tab)>=3):
-                        table=Table([wave,flux,error,cont],names=['wave','flux','error','cont'])
-                    else:
-                        table=Table([wave,flux,cont],names=['wave','flux','cont'])
-                    table.write(outfilename,format='fits')
-                if filetype=='p':
-                    table={}
-                    table['wave']=wave
-                    table['flux']=flux
-                    table['cont']=cont
-                    if (len(tab)>=3):
-                        table['error']=error
-                    pickle.dump(table, open( outfilename, "wb"), protocol=2 )
-                print('Saved to file')
-                break
-    plt.draw()
-
-
+                print("Warning: Could not determine file type for saving. Please specify.")
+        else:
+            print("\nNo continuum was fitted or saved.")
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return 1
+    
+    return 0
 
 
 if __name__ == "__main__":
-    """ Interactive continuum fitter for 1D spectrum.
-
-    parameters
-    ----------
-        
-        [str] Filename 
-
-    Returns
-    -------
-    [array] Fitted continuum
-        ---------------------------------------------------------------------------
-        This is an interactive continuum fitter for 1D spectrum.
-        The purpose of this code is to create a spline continuum fit from selected points.
-        The help scene activates by pressing h on the plot.
-
-        The program only works properly if none of the toolbar buttons in the figure is activated. 
-
-
-        Useful Keystrokes:
-
-            Mouse Clicks:
-            
-                Left Click  : Select the median flux value within +/- 5 pixel from the x-coordinate.
-                              These points are used for the continuum fit.
-                Right Click : Delete the nearest continuum point.
-
-            Keystrokes:
-              
-              b     :    Select a point for continuum fit at that exact (x,y) coordinate.
-              enter :    Perform a spline fit to data to create a continuum.
-              n     :    Show the normalized spectrum.
-              w     :    Only after pressing n, write fitted continuum to file. 
-                         [Output file saves wave, flux, error [if available], continuum]
-                         [output file is in same format as input file with *_norm.* appended to the name.]
-              h     :    This Help screen.
-              r     :    Reset fit.
-              q     :    Quit Program.
-        ---------------------------------------------------------------------------
-        Example:   Type in Terminal 
-
-                        Case I:
-                            > ipython rb_cont.py filename
-
-                            Where filename could be file.fits, file.txt, file.dat, or file.p 
-                            Fits and Pickle files should have dictionaries with keys = wave, flux and error [optional].
-                            ascii files should have tab seperated columns with wave,flux and error [optional]
-                            If it is none of these extentions then please specify as described below.
-
-
-                        Case II:
-                            > ipython rb_cont.py filename filetype
-
-                            Where filename could be file.fits, file.txt, file.dat, or file.p 
-                            Fits and Pickle files should have dictionaries with keys = wave, flux and error [optional].
-                            ascii files should have tab seperated columns with wave,flux and error [optional]
-
-                            filetype =  Type of file.
-                                filetype could be written as : fits [for fits files.]
-                                                             : ascii [for ascii files.]
-                                                             : p for [pickle files.]
-
-                        Case III: 
-
-                        Add this path to your .cshrc file 
-                            alias rb_cont   'ipython PATH_TO_THIS_FILE/rb_cont.py'
-
-                            then this file can be run as 
-                            > rb_cont filename
-                                Or
-                            > rb_cont filename filetype
-
-
-        ---------------------------------------------------------------------------
-        Written By:  Rongmon Bordoloi                                   July 13 2017.
-
-
-        ----------------------------------------------------------------------------
-        
-        Basic code is taken from : http://www.ster.kuleuven.be/~pieterd/python/html/plotting/specnorm.html
-        Heavily modified by Rongmon Bordoloi July 13/14 2017.
-        Modified to add custom points and changed the look of the plots.
-        Also added custom input options to read different formats. 
-        Input file could be ascii, fits or pickle format
-        Output will be in the same format as the input file. 
-        Added help feature and graceful exit option. - Now pressing q will exit the program at any stage
-        Added keyword xfits to read in xspecplot formatted files [RB 9.10.2017]
-        Did minor syntax change to fix saving file issue [RB 06.17.2019]
-        ---------------------------------------------------------------------------
-    """
-
-
-    # Get the filename of the spectrum from the command line, and plot it
-    filename = sys.argv[1]
-
-    #Check if filetype is specified if not try to take what is given as extention to the file
-
-
-    if (len(sys.argv) >2):
-        filetype=sys.argv[2]
-    else:
-        #Take File Extention and try to match it
-        tt=os.path.splitext(filename)[1]
-        if (tt=='txt')| (tt=='dat'):
-            filetype='ascii'
-        else:
-            filetype=tt[1:len(tt)]
-    cwd=os.getcwd()
-    print(cwd+'/'+filename)
-
-    # Read in Files in differet formats
-    if filetype=='ascii':
-        from astropy.io import ascii
-        dat=ascii.read(cwd+'/'+filename)
-        tab=dat.keys()
-        wave=np.array(dat[tab[0]])
-        flux=np.array(dat[tab[1]])
-        if (len(dat.keys())>=3):
-            error=dat[tab[2]]
-    elif filetype=='fits':
-        from astropy.io import fits
-        file=fits.open(cwd+'/'+filename)
-        dat=file[1].data
-        tab=dat.names
-        wave=np.array(dat['wave'][0])
-        flux=np.array(dat['flux'][0])
-        if (len(tab)>=3):
-            error=np.array(dat['error'][0])
-    if filetype=='xfits':
-        from astropy.io import fits
-        hdu = fits.open(filename)
-        wave = hdu['wavelength'].data
-        flux = hdu['flux'].data
-        error=hdu['error'].data
-        hdu.close()
-    elif filetype=='p':
-        import pickle
-        dat=pickle.load( open(cwd+'/'+filename, "rb" ))
-        tab=dat.keys()
-        wave=np.array(dat['wave'])
-        flux=np.array(dat['flux'])
-        if (len(tab)>=3):
-            error=np.array(dat['error'])
-
-    spectrum, = plt.step(wave,flux,'b-',label='spectrum',linewidth=1)
-    plt.title(filename)
-    plt.xlabel('Wavelength')
-    plt.ylabel('Flux')
-
-
-    # Connect the different functions to the different events
-    plt.gcf().canvas.mpl_connect('key_press_event',ontype)
-    plt.gcf().canvas.mpl_connect('button_press_event',onclick)
-    plt.gcf().canvas.mpl_connect('pick_event',onpick)
-    plt.show() # show the window
+    sys.exit(main())
