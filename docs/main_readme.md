@@ -2,6 +2,22 @@
 
 A public release of Python codes for astrophysical research by Rongmon Bordoloi. 
 
+## Table of Contents
+- [Citation](#-citation)
+- [Overview](#overview)
+- [Installation](#installation)
+- [Dependencies](#dependencies)
+- [Contents](#contents)
+  - [Graphical User Interfaces (GUIs)](#graphical-user-interfaces-guis)
+  - [Intergalactic Medium (IGM) Tools](#intergalactic-medium-igm-tools)
+  - [Halo Analysis](#halo-analysis)
+  - [Statistical Tools](#statistical-tools)
+  - [Lensing](#lensing)
+  - [Utility Modules](#utility-modules)
+  - [Catalog Tools](#catalog-tools)
+- [Contributing](#contributing)
+- [License](#license)
+
 ### 📖 Citation
 
 If you use this package, please cite it using the following DOI:
@@ -52,7 +68,7 @@ pip install -e .  # This requires a setup.py file in the package #COMING SOON.
 ## Contents
 
 ### Graphical User Interfaces (GUIs)
-1. [rb_spec.py](/docs/GUIs/rb_spec/rb_spec.md): Complrehensive absorption line analysis pipeline
+1. [rb_spec.py](/docs/GUIs/rb_spec/rb_spec.md): Comprehensive absorption line analysis pipeline
    - Continuum fitting
    - Equivalent width/column density measurements
    - Simple Voigt profile fitting
@@ -120,9 +136,13 @@ pip install -e .  # This requires a setup.py file in the package #COMING SOON.
                                           to transform the co-ordinates to J2000 epoch.
 
 ## Contributing
-- Package is under active development
-- Contributions and improvements are welcome
 
-## License
+Contributions are welcome! Please follow these steps:
+1. Fork the repository.
+2. Create a new branch for your feature or bug fix.
+3. Submit a pull request with a clear description of your changes.
+
+For major changes, please open an issue first to discuss what you would like to change.
+## ![License](https://img.shields.io/badge/license-MIT-green)
 
 This project is licensed under the [MIT License](LICENSE).
