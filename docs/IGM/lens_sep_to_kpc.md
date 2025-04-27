@@ -138,7 +138,7 @@ plt.tight_layout()
 plt.show()
 ```
 
-![Lens Separation vs Redshift](/images/lens_separation_vs_redshift.png)
+![Lens Separation vs Redshift](images/lens_separation_vs_redshift.png)
 
 ## Function Parameters
 
@@ -188,7 +188,7 @@ The physical separation between lensed quasar sightlines changes with absorber r
 
 This behavior allows for unique studies of gas properties on various physical scales within the same system.
 
-![Lens Geometry Diagram](/images/lens_geometry_diagram_final.png)
+![Lens Geometry Diagram](images/lens_geometry_diagram_final.png)
 
 ## Technical Implementation Details
 

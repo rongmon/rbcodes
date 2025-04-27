@@ -1,4 +1,4 @@
-# RBCodes
+# rbcodes
 
 A public release of Python codes for astrophysical research by Rongmon Bordoloi. 
 
