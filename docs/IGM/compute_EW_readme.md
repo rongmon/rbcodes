@@ -93,7 +93,7 @@ When `plot=True`, the function generates a visualization showing:
    - Column density as a function of velocity (if f0 provided)
    - Cumulative equivalent width with 16%, 50%, and 84% percentiles (if f0 not provided)
 
-![EW Analysis Example](/images/compute_EW_example.png)
+![EW Analysis Example](images/compute_EW_example.png)
 
 ## Best Practices
 
