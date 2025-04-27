@@ -1,46 +1,82 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from typing import Dict, List, Union, Optional, Any, Tuple
 
-def compute_EW(lam, flx, wrest, lmts, flx_err, plot=False, **kwargs):
+def compute_EW(
+    lam: np.ndarray,
+    flx: np.ndarray,
+    wrest: float,
+    lmts: List[float],
+    flx_err: np.ndarray,
+    plot: bool = False,
+    zabs: float = 0.0,
+    f0: Optional[float] = None,
+    sat_limit: Union[float, str, None] = 'auto',
+    normalization: str = 'none',
+    verbose: bool = False,
+    SNR: bool = False,
+    _binsize: int = 1,
+    **kwargs
+) -> Dict[str, Any]:
     """
     Function to compute the equivalent width (EW) within a given velocity window.
 
     Enhanced version with improved error handling, robustness, and dynamic saturation detection.
 
     Parameters:
-        lam (array): Observed wavelength vector (in Angstroms).
-        flx (array): Flux vector (same length as lam, preferably continuum normalized).
+        lam (np.ndarray): Observed wavelength vector (in Angstroms). Must be monotonically increasing.
+        flx (np.ndarray): Flux vector (same length as lam, preferably continuum normalized).
         wrest (float): Rest frame wavelength of the absorption line (in Angstroms).
-        lmts (list): Velocity limits [vmin, vmax] in km/s.
-        flx_err (array): Error spectrum (same length as flx).
+        lmts (List[float]): Velocity limits [vmin, vmax] in km/s. Must have vmin < vmax.
+        flx_err (np.ndarray): Error spectrum (same length as flx).
         plot (bool): If True, will plot the spectrum and equivalent width. Default is False.
-
-    Optional Parameters:
         zabs (float): Absorber redshift. Default is 0.
-        f0 (float): Oscillator strength of the transition.
-        sat_limit (float or str): Limit for saturation. Default is 'auto' which uses median error.
-                                  Can also be a float value or None to disable saturation handling.
+        f0 (Optional[float]): Oscillator strength of the transition. Required for column density calculation.
+        sat_limit (Union[float, str, None]): Limit for saturation detection:
+                                             - 'auto': Uses median error within integration window (default)
+                                             - float value: Custom threshold
+                                             - None: Disables saturation handling
+        normalization (str): Method of flux normalization:
+                             - 'none': No normalization (default)
+                             - 'median': Normalize by median flux
+                             - 'mean': Normalize by mean flux
         verbose (bool): If True, will print detailed output. Default is False.
         SNR (bool): If True, computes the Signal-to-Noise Ratio. Default is False.
-        normalization (str): Method of flux normalization. Options: 'median', 'mean', 'none'. Default is 'none'.
         _binsize (int): Binning size for SNR calculation. Default is 1.
 
     Returns:
-        dict: A dictionary containing equivalent width measurements and related information.
+        Dict[str, Any]: A dictionary containing equivalent width measurements and related information.
             - 'ew_tot': Total rest frame equivalent width (in Angstroms).
             - 'err_ew_tot': Error on the total equivalent width.
             - 'vel_disp': 1-sigma velocity dispersion.
             - 'vel50_err': Error on the velocity centroid.
             - 'line_saturation': Boolean flag indicating if line is saturated.
             - 'saturation_fraction': Fraction of integration window that is saturated.
-            - 'col': AOD column density.
-            - 'colerr': Error on the AOD column density.
-            - 'Tau_a': Apparent optical depth.
-            - 'med_vel': Velocity centroid (EW-weighted velocity within velocity limits).
+            - 'col': AOD column density (only if f0 provided).
+            - 'colerr': Error on the AOD column density (only if f0 provided).
+            - 'Tau_a': Apparent optical depth (only if f0 provided).
+            - 'med_vel': Velocity centroid (only if f0 provided).
+            - 'SNR': Signal-to-noise ratio (only if SNR=True).
+    
+    Examples:
+        # Basic usage with minimal parameters
+        from rbcodes.IGM.compute_EW import compute_EW
+        result = compute_EW(wavelength, flux, 1215.67, [-100, 100], flux_error)
+        
+        # Full analysis with column density calculation and plotting
+        result = compute_EW(
+            wavelength, flux, 1215.67, [-150, 150], flux_error, 
+            plot=True, zabs=0.1, f0=0.4164, verbose=True
+        )
+        
+        # Check for saturation with custom threshold
+        result = compute_EW(
+            wavelength, flux, 1215.67, [-100, 100], flux_error,
+            sat_limit=0.1, normalization='median'
+        )
     
     Written:
         - Rongmon Bordoloi, 2nd November 2016
-        - Translated from Matlab code `compute_EW.m`, which in turn is based on Chris Thom's `eqwrange.pro`.
         - Tested with COS-Halos/Dwarfs data.
         
     Edits:
@@ -50,6 +86,7 @@ def compute_EW(lam, flx, wrest, lmts, flx_err, plot=False, **kwargs):
         - RB, February 21, 2025: rewritten for clarity, added SNR keyword to compute signal-to-noise of the spectrum.
         - RB, April 8, 2025: Major improvements.
         - RB, April 9, 2025: Added dynamic saturation detection based on median error.
+        - RB, April 26, 2025: plotting updates+type annotations added 
 
     Improvements:
     - Dynamic saturation detection based on median error in the integration window
@@ -63,6 +100,10 @@ def compute_EW(lam, flx, wrest, lmts, flx_err, plot=False, **kwargs):
     # Input Validation
     if not (len(lam) == len(flx) == len(flx_err)):
         raise ValueError("Input arrays (lam, flx, flx_err) must have equal lengths")
+
+    if len(lam) == 0:
+        raise ValueError("Input arrays cannot be empty")
+
     
     # Validate wavelength array is monotonically increasing
     if not np.all(np.diff(lam) > 0):
@@ -71,6 +112,7 @@ def compute_EW(lam, flx, wrest, lmts, flx_err, plot=False, **kwargs):
     # Validate velocity limits
     if len(lmts) != 2 or lmts[0] >= lmts[1]:
         raise ValueError("Invalid velocity limits. Must be [vmin, vmax] with vmin < vmax")
+
 
     # Extract optional parameters with default values
     verbose = kwargs.get('verbose', False)
@@ -257,12 +299,23 @@ def compute_EW(lam, flx, wrest, lmts, flx_err, plot=False, **kwargs):
 
     # Optional plotting
     if plot:
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6))
+        if f0 is not None:
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
+        else:
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6))
+
 
         # Plot normalized flux and error
-        ax1.step(vel, norm_flx, color='k', label="Normalized Flux")
-        ax1.step(vel, norm_flx_err, color='r', label="Flux Error")
+        ax1.step(vel, norm_flx, color='k', label="Normalized Flux",lw=0.5,where='mid')
+        ax1.step(vel, norm_flx_err, color='r', label="Flux Error",lw=0.5,alpha=0.5,where='mid')
+
+        # Add velocity centroid marker if available
+        if not np.isnan(vel50):
+            ax1.axvline(x=vel50, color='green', linestyle='-', alpha=0.7,
+                      label=f'Velocity Centroid ({vel50:.1f} km/s)')
         
+        
+
         # Highlight saturated regions
         if is_saturated:
             sat_indices = np.where((vel >= lmts[0]) & (vel <= lmts[1]) & (norm_flx <= sat_threshold))
@@ -270,10 +323,21 @@ def compute_EW(lam, flx, wrest, lmts, flx_err, plot=False, **kwargs):
                 ax1.scatter(vel[sat_indices], norm_flx[sat_indices], color='orange', 
                          marker='x', s=50, label='Saturated Pixels')
         
-        ax1.set_xlim([-600, 600])
-        ax1.set_ylim([-0.02, 1.8])
-        ax1.plot([-2500, 2500], [0, 0], 'k:')
-        ax1.plot([-2500, 2500], [1, 1], 'k:')
+        # Calculate appropriate y limits based on data
+        y_max = min(2.0, np.nanpercentile(norm_flx[pix], 95) * 1.5)
+        y_min = -0.01
+        ax1.set_ylim([y_min, y_max])
+        
+        # Set x limits to show context around the integration window
+        ax1.set_xlim([min(vel),max(vel)])
+        
+        # Add reference lines
+        ax1.axhline(y=0, color='k', linestyle=':', alpha=0.5,lw=0.5)
+        ax1.axhline(y=1, color='k', linestyle=':', alpha=0.5,lw=0.5)
+        
+        # Add vertical lines at integration limits
+        ax1.axvline(x=lmts[0], color='blue', linestyle='--', alpha=0.5)
+        ax1.axvline(x=lmts[1], color='blue', linestyle='--', alpha=0.5)
         ax1.plot([lmts[0], lmts[0]], [1.5, 1.5], 'r+', markersize=15)
         ax1.plot([lmts[1], lmts[1]], [1.5, 1.5], 'r+', markersize=15)
         
@@ -286,7 +350,7 @@ def compute_EW(lam, flx, wrest, lmts, flx_err, plot=False, **kwargs):
             title_text = f'$W_{{rest}} = {ew_tot:.3f} \pm {err_ew_tot:.3f}$ Å'
         
         if SNR:
-            ax1.text(-600, 0.2, f'Median SNR: {output.get("SNR", "N/A"):.1f}')
+            ax1.text(min(vel)+200, 0.2, f'Median SNR: {output.get("SNR", "N/A"):.1f}')
         
         ax1.set_title(title_text)
         ax1.set_xlabel('Velocity [km/s]')
@@ -294,8 +358,14 @@ def compute_EW(lam, flx, wrest, lmts, flx_err, plot=False, **kwargs):
 
         # Plot column density as a function of velocity
         if f0 is not None:
-            ax2.step(vel[pix], n[pix], color='b', label="Column Density")
-            ax2.step(vel, n, color='k', lw=0.5, alpha=0.5)
+            ax2.step(vel[pix], n[pix], color='b', label="Column Density",where='mid')
+            ax2.step(vel, n, color='k', lw=0.5, alpha=0.5,where='mid')
+
+            # Highlight velocity centroid
+            if not np.isnan(vel50):
+                idx_v50 = np.argmin(np.abs(vel[pix] - vel50))
+                if idx_v50 < len(pix[0]):
+                    ax2.axvline(x=vel50, color='green', linestyle='-', alpha=0.7)
             
             # Highlight saturated regions in column density plot
             if is_saturated:
@@ -303,11 +373,47 @@ def compute_EW(lam, flx, wrest, lmts, flx_err, plot=False, **kwargs):
                 if len(sat_indices[0]) > 0:
                     ax2.scatter(vel[sat_indices], n[sat_indices], color='orange', 
                              marker='x', s=50, label='Saturated Pixels')
+            # Add total column density annotation
+            if not np.isnan(col):
+                ax2.annotate(f'log N = {np.log10(col):.3f} ± {np.log10(col + colerr) - np.log10(col):.3f}', 
+                           xy=(0.02, 0.85), xycoords='axes fraction',
+                           bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.8))
+            ax2.set_ylabel(' AOD Column Density (cm$^{-2}$ km$^{-1}$ s)')
+        # Plot cumulative EW
+        else:
+            # Plot cumulative equivalent width if f0 not provided
+            vel_pix = vel[pix]
+            sort_idx = np.argsort(vel_pix)
+            cumulative_ew = np.cumsum(ew[sort_idx]) / np.sum(ew)
+            ax2.plot(vel_pix[sort_idx], cumulative_ew, 'b-', label="Cumulative EW")
             
-            ax2.set_xlim([-600, 600])
-            ax2.set_xlabel('Velocity [km/s]')
-            ax2.plot([-2500, 2500], [0, 0], 'k:')
-            ax2.legend(loc='upper right')
+            # Mark 16, 50, and 84 percentiles
+            try:
+                v16 = np.interp(0.16, cumulative_ew, vel_pix[sort_idx])
+                v50 = np.interp(0.50, cumulative_ew, vel_pix[sort_idx])
+                v84 = np.interp(0.84, cumulative_ew, vel_pix[sort_idx])
+                
+                ax2.axvline(x=v16, color='green', linestyle='--', alpha=0.7, label=f'16% ({v16:.1f} km/s)')
+                ax2.axvline(x=v50, color='green', linestyle='-', alpha=0.7, label=f'50% ({v50:.1f} km/s)')
+                ax2.axvline(x=v84, color='green', linestyle='--', alpha=0.7, label=f'84% ({v84:.1f} km/s)')
+                
+                # Add dispersion annotation
+                disp = (v84 - v16) / 2
+                ax2.annotate(f'σ = {disp:.1f} km/s', 
+                           xy=(0.02, 0.85), xycoords='axes fraction',
+                           bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.8))
+            except:
+                pass
+                
+            ax2.set_ylabel('Cumulative EW')
+            ax2.set_ylim([0, 1.05])     
+        
+
+
+        ax2.set_xlabel('Velocity [km/s]')
+        ax2.axhline(y=0, color='k', linestyle=':', alpha=0.5)
+        ax2.legend(loc='upper right')
+        
 
         plt.tight_layout()
         plt.show()

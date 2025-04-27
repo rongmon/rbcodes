@@ -90,13 +90,13 @@ pip install -e .  # This requires a setup.py file in the package #COMING SOON.
 
 [Full Documentation](/docs/IGM/IGM_README.md)
 
-1. compute_EW.py: Equivalent width and column density calculations
-2. rb_setline.py: Atomic transition and f-value finder
+1. [compute_EW.py](/docs/IGM/compute_EW_readme.md): Equivalent width and column density calculations
+2. [rb_setline.py](/docs/rb_setline.md): Atomic transition and f-value finder
 3. [rb_iter_contfit.py](/docs/IGM/rb_iter_contfit.md): Advanced Iterative polynomial continuum fitting with sigma clipping. Has options to select polynomial order using Bayesian Information Criterion (BIC),
 4. [fit_continuum_full_spec.py](/docs/IGM/rb_iter_contfit.md): Use the previous code to fit continuum to a full QSO spectrum. Look at documentation for examples.
-5. rb_specbin.py: Spectrum rebinning
+5. [rb_specbin.py](/docs/rb_specbin.md): Spectrum rebinning
 6. ransac_contfit.py: Advanced continuum fitting
-7. lens_sep_to_kpc.py: Sightline separation calculation
+7. [lens_sep_to_kpc.py](/docs/lens_sep_to_kpc.md): Sightline separation calculation
 8. [LLSFitter.py](/docs/GUIs/LLSFitter/LLSFitter.md): Lyman Limit System column density measurement. 
     
 ### Halo Analysis
