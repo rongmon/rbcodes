@@ -93,7 +93,7 @@ print(f"Expected length: {len(flux) // 7 + 1}")
 
 Rebinning can significantly improve signal-to-noise ratio at the cost of spectral resolution. The diagram below illustrates this trade-off:
 
-![Spectral Rebinning Example](/images/spectral_rebinning_example.png)
+![Spectral Rebinning Example](images/spectral_rebinning_example.png)
 
 ## Function Parameters
 
@@ -164,4 +164,4 @@ Unlike interpolation or convolution-based methods, `rb_specbin` performs simple 
 
 This makes it particularly suitable for astronomical spectroscopy where flux conservation and proper error propagation are essential.
 
-![Comparison of Rebinning Methods](/images/rebinning_methods_comparison.png)
+![Comparison of Rebinning Methods](images/rebinning_methods_comparison.png)
