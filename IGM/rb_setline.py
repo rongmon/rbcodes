@@ -69,7 +69,7 @@ def rb_setline(lambda_rest: float,
     
     Match a line by name:
     
-    >>> result = rb_setline(0, 'Name', target_name='H I 1215')
+    >>> result = rb_setline(0, 'Name', target_name='HI 1215')
 
     Raises
     ------

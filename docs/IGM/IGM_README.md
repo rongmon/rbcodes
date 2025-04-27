@@ -1,14 +1,16 @@
 # Project Documentation
 
-[Back to Main Page](../main_readme.md)
-
 *Auto-generated documentation from docstrings*
 
 ## Modules
 
 ### rb_setline
 
-Read in atomic line information for a given or approximate rest frame  wavelength.
+Read in atomic line information for a given or approximate rest frame wavelength.
+
+This module provides functionality to find atomic line information based on different
+matching methods including exact wavelength matching, closest wavelength matching,
+or matching by species name.
 
 ### ransac_contfit
 
@@ -21,6 +23,19 @@ Rebin 1D spectrum to new pixel scale.
 ### lens_sep
 
 Example code to plot to plot distances for differetn lens separations
+
+### fit_continuum_full_spec
+
+Full spectrum continuum fitting module that divides the spectrum into chunks, 
+applies optimal polynomial fitting to each chunk, and then blends the results.
+
+This module implements an advanced continuum fitting approach for quasar or galaxy spectra
+by breaking the spectrum into overlapping chunks, finding the optimal polynomial order
+for each chunk using BIC, and then blending the chunks together to create a smooth continuum.
+
+Author: Rongmon Bordoloi
+Contributors: Various
+Last updated: April 2025
 
 ## Classes
 
@@ -166,74 +181,141 @@ Function to compute the equivalent width (EW) within a given velocity window.
 
 ### lens_sep_to_kpc() (`lens_sep_to_kpc`)
 
-------------------------------------------------------------------------------------------
-       Function to compute physical separation between sightlines in a lensed quasar system.
-       Input:- 
-               delta_arcsec      :- Angular separation between two quasars in arcsecond
-               zabs_list         :- List of absorber redshifts for which we want to compute physical separation
-               z_lens            :- Lens galaxy redshift
-               z_source          :- background Quasar redshift
+Compute physical separation between sightlines in a lensed quasar system.
     
+    Parameters
+    ----------
+    delta_arcsec : float
+        Angular separation between two quasars in arcsecond
+    zabs_list : array-like
+        List or array of absorber redshifts for which to compute physical separation
+    z_lens : float
+        Lens galaxy redshift
+    z_source : float
+        Background Quasar redshift
+    custom_cosmo : astropy.cosmology object, optional
+        Custom cosmology to use. Default is Planck18.
+    return_with_units : bool, optional
+        If True, returns result with astropy units attached. Default is False.
     
-       Output:- 
-               distlist          :- numpy array with physical Separation for each absorber redshift in kpc
+    Returns
+    -------
+    distlist : numpy.ndarray or astropy.units.Quantity
+        Physical Separation for each absorber redshift in kpc
     
-       Example:- 
-                    >from IGM import lens_sep_to_kpc as l
-                    > delta_arcsec=1. # 1 arcsecond separation
-                    > zabs_list =[.2, .5,1.2,2.]
-                    >z_lens =0.55
-                    >z_source =3.5
-                    > out = l.lens_sep_to_kpc(delta_arcsec,zabs_list,z_lens,z_source)
+    Notes
+    -----
+    Equation used is equation (5) from Cooke et al. 2010.
+    [Cooke, R., Pettini, M., Steidel, C. C., et al. 2010, MNRAS, 409, 679]
+    Uses Planck 2018 LambdaCDM cosmology by default.
     
-       Written :- Rongmon Bordoloi                           March 2 2021
-    
-       Equation used is the equation (5) from Cooke et al 2010.
-       [Cooke, R., Pettini, M., Steidel, C. C., et al. 2010, MNRAS, 409, 679]
-       Uses Planck 2018 \LambdaCDM cosmology
-    
-    
-    ------------------------------------------------------------------------------------------
+    Examples
+    --------
+    >>> from rbcodes.IGM import lens_sep_to_kpc as l
+    >>> delta_arcsec = 1.  # 1 arcsecond separation
+    >>> zabs_list = [.2, .5, 1.2, 2.]
+    >>> z_lens = 0.55
+    >>> z_source = 3.5
+    >>> out = l.lens_sep_to_kpc(delta_arcsec, zabs_list, z_lens, z_source)
+    ------------
+    Written :- 
+        Rongmon Bordoloi                               March 2 2021
+        Updated for better error handling and units    April 2025
 
 ### rb_setline() (`rb_setline`)
 
-Function to read in atomic line information for a given rest frame  wavelength.
-                           Or 
-    For the line matching the closest wavelength. 
+Function to read in atomic line information for a given rest frame wavelength,
+    for the line matching the closest wavelength, or by name.
 
     Parameters
     ----------
-    lambda_rest :-  Rest Frame wavelength (in \AA) of the line to match
-    method     :-   'closest' ->  If set will match the closest line.
-                    'Exact'  ->  If set will match the exact wavelength.
-                    'Name'   -> Match by name, USE WITH CARE. MUST INPUT OPTIONAL NAMELIST
- 
+    lambda_rest : float
+        Rest Frame wavelength (in Å) of the line to match
+    method : str
+        'closest' -> If set will match the closest line.
+        'Exact'   -> If set will match the exact wavelength.
+        'Name'    -> Match by name, USE WITH CARE. MUST INPUT OPTIONAL target_name
+    linelist : str, optional
+        The line list to use. Default is 'atom'.
+        Available options: 'atom', 'LLS', 'LLS Small', 'DLA', 'LBG', 'Gal',
+        'Eiger_Strong', 'Gal_Em', 'Gal_Abs', 'Gal_long', 'AGN', 'HI_recomb',
+        'HI_recomb_light'
+    target_name : str, optional
+        Required when method='Name'. The name of the target species to match.
+
     Returns
-    ----------
-    
-    dic :- Dictionary with fval,lambda and species name.
-
-    Example
     -------
+    dict
+        Dictionary with the following keys:
+        - 'wave': Rest frame wavelength(s) of the matched line(s)
+        - 'fval': Oscillator strength value(s)
+        - 'name': Species name(s)
+        - 'gamma': Radiation damping constant (if available in the line list)
 
-       str=rb_setline(2796.3,'closest')
+    Examples
+    --------
+    Match the closest line to a given wavelength:
+    
+    >>> result = rb_setline(2796.3, 'closest')
+    >>> print(f"Found: {result['name']} at {result['wave']} Å")
+    
+    Match a line by exact wavelength:
+    
+    >>> result = rb_setline(1215.67, 'Exact')
+    
+    Match a line by name:
+    
+    >>> result = rb_setline(0, 'Name', target_name='HI 1215')
 
+    Raises
+    ------
+    ValueError
+        If method is not one of 'closest', 'Exact', or 'Name'
+        If method='Name' but target_name is not provided
+        If method='Exact' but no lines match the wavelength
+    FileNotFoundError
+        If the requested line list file cannot be found
 
+    Notes
+    -----
+    - For 'Exact' method, a match is considered if the wavelength is within 0.001 Å
+    - The 'Name' method requires the target_name parameter to be set
+    - The full list of available line lists can be found in the read_line_list function
+    - Line lists are cached to improve performance when called multiple times
+
+    History
+    -------
     Written By: Rongmon Bordoloi                Jan 2018, Python 2.7
-    Edit:       Rongmon Bordoloi                            Sep 2018, Depreciated kwargs to be compatible with python 3
+    Edit:       Rongmon Bordoloi                Sep 2018, Depreciated kwargs to be compatible with python 3
+    Edit:       Improved version                Apr 2025, Various improvements while maintaining compatibility
 
 ### read_line_list() (`rb_setline`)
 
-Module to read a linelist defined by the label
+Read a line list defined by the label.
 
     Parameters
     ----------
-    lable : Label string [e.g. atom, LLS, LLS Small, LBG, Gal, Eiger_Strong]
-      Must include redshift
+    label : str
+        Label string identifying which line list to read
+        Available options: 'atom', 'LLS', 'LLS Small', 'DLA', 'LBG', 'Gal',
+        'Eiger_Strong', 'Gal_Em', 'Gal_Abs', 'Gal_long', 'AGN', 'HI_recomb',
+        'HI_recomb_light'
 
     Returns
-    ----------
-    a dictionary with wrest, ion name and fvalues
+    -------
+    list of dict
+        A list of dictionaries containing line data with keys:
+        - 'wrest': Rest wavelength
+        - 'ion': Ion name
+        - 'fval': f-value (oscillator strength)
+        - 'gamma': Radiation damping constant (for 'atom' line list only)
+
+    Raises
+    ------
+    FileNotFoundError
+        If the line list file cannot be found
+    ValueError
+        If an invalid line list label is provided
 
 ### from_file() (`ransac_contfit`)
 
@@ -251,24 +333,27 @@ This function bins up 1D spectra in integer pixels. The routine returns a
     Parameters
     -----------
      
-        fx       - Flux
-        nbin     - Number of pixels to bin on
-        VAR=  -- Input variance array [Optional]
-        WAV=  -- Input wavelength array [Optional]
+        flux      - Input flux array
+        nbin      - Number of pixels to bin on
+        var=      - Input variance array [Optional]
+        wave=     - Input wavelength array [Optional]
     
     Returns
     --------
-        bin       - Structure of data
+        output    - Dictionary containing rebinned data with the following keys:
+                    'flux': Rebinned flux array
+                    'error': Rebinned error array (if var was provided)
+                    'wave': Rebinned wavelength array (if wave was provided)
       
     Example
     --------
-        bin = rb_specbin(fx, 3)
+        output = rb_specbin(fx, 3)
+        output = rb_specbin(fx, 3, var=var_array, wave=wave_array)
      
      
-      REVISION HISTORY:
+    REVISION HISTORY:
        Written by RB. June 2015
-     -
-     ------------------------------------------------------------------------------
+       Updated by RB. April 2025 - Improved error handling, documentation, and efficiency
 
 ### lens_sep() (`lens_sep`)
 
@@ -510,6 +595,180 @@ Function to compute the equivalent width (EW) within a given velocity window.
         - RB, April 28, 2021: Modified `med_vel` to be weighted by `EW` and `vel_disp`.
         - RB, February 21, 2025: rewritten for clarity, added SNR keyword to compute signal-to-noise of the spectrum
 
+### generate_full_coverage_chunks() (`fit_continuum_full_spec`)
+
+Generate chunks that ensure full coverage of the spectrum within the specified wavelength range.
+    
+    Parameters
+    ----------
+    wave : array
+        Wavelength array
+    flux : array
+        Flux array
+    error : array
+        Error array
+    window_size : float
+        Size of each chunk in Angstroms
+    overlap : float
+        Overlap between chunks in Angstroms
+    method : str
+        Method for selecting chunks: 'uniform' or 'features'
+    wmin : float, optional
+        Minimum wavelength to include (default: min of wave array)
+    wmax : float, optional
+        Maximum wavelength to include (default: max of wave array)
+    
+    Returns
+    -------
+    chunks : list of tuples
+        List of (wave_chunk, flux_chunk, error_chunk, start_idx, end_idx) for each chunk
+
+### create_cosine_taper_weights() (`fit_continuum_full_spec`)
+
+Create a weight array with a cosine taper at both ends.
+    
+    Parameters
+    ----------
+    length : int
+        Length of the array
+    
+    Returns
+    -------
+    array
+        Weight array with values between 0 and 1
+
+### plot_continuum_results() (`fit_continuum_full_spec`)
+
+Plot the results of continuum fitting, showing how chunks contribute to the full continuum.
+    
+    Parameters
+    ----------
+    wave : array
+        Wavelength array
+    flux : array
+        Flux array
+    error : array
+        Error array
+    continuum : array
+        Fitted continuum array
+    chunks : list of tuples
+        List of chunks used for fitting
+    chunk_results : list of dict
+        Results for each chunk
+    wmin : float, optional
+        Minimum wavelength to display
+    wmax : float, optional
+        Maximum wavelength to display
+    
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The created figure object
+
+### fit_quasar_continuum() (`fit_continuum_full_spec`)
+
+Fit the continuum of a quasar or galaxy spectrum by dividing it into chunks,
+    fitting each with an optimal polynomial order, and blending the results.
+    
+    This function implements a powerful approach to continuum fitting that works well
+    for complex spectra with a mix of emission and absorption features. It breaks the
+    spectrum into overlapping segments, finds the optimal polynomial order for each
+    using the Bayesian Information Criterion (BIC), and then blends them together
+    to create a smooth, continuous fit.
+    
+    Parameters
+    ----------
+    data : str or tuple
+        Either a path to a FITS file or a tuple of (wave, flux, error) arrays.
+        If tuple, error can be None and will be estimated from flux.
+    
+    chunk_params : dict, optional
+        Parameters for dividing the spectrum:
+        - window_size : float, size of each chunk in Angstroms (default: 100)
+        - overlap_fraction : float, fraction of chunk size to overlap (default: 0.3)
+        - method : str, method for selecting chunks: 'uniform' or 'features' (default: 'uniform')
+        - wmin : float, minimum wavelength to include (default: min of wave array)
+        - wmax : float, maximum wavelength to include (default: max of wave array)
+    
+    fitting_params : dict, optional
+        Parameters for continuum fitting:
+        - min_order : int, minimum polynomial order to test (default: 2)
+        - max_order : int, maximum polynomial order to test (default: 6)
+        - maxiter : int, maximum iterations for fitting (default: 25)
+        - sigma : float, sigma clipping threshold (default: 3.0)
+        - use_weights : bool, whether to use error spectrum as weights (default: True)
+    
+    save_output : bool, optional
+        Whether to save the continuum-normalized spectrum (default: True)
+    
+    output_filename : str, optional
+        Filename for the output normalized spectrum (default: input filename with _normalized suffix)
+    
+    plot : bool, optional
+        Whether to plot the results (default: True)
+
+    save_plot : bool, optional
+        Whether to save the plot to a file (default: False)
+    
+    plot_filename : str, optional
+        Filename for the plot (default: input filename with _continuum_fit.png suffix)
+
+    
+    Returns
+    -------
+    dict
+        A dictionary containing:
+        - 'wave': wavelength array
+        - 'flux': original flux array
+        - 'error': error array
+        - 'continuum': fitted continuum array
+        - 'normalized_flux': flux/continuum
+        - 'chunk_results': list of results for each chunk
+        - 'output_file': path to saved output file (if save_output=True)
+        - 'figure': matplotlib figure object (if plot=True)
+        - 'plot_file': path to saved plot file (if save_plot=True)
+
+    
+    Examples
+    --------
+    Example 1: Basic usage with a FITS file
+    
+    >>> from rbcodes.IGM import fit_continuum_full_spec as fc
+    >>> results = fc.fit_quasar_continuum('quasar.fits')
+    
+    Example 2: Specify wavelength range and customized fitting parameters
+    
+    >>> results = fc.fit_quasar_continuum(
+    ...     'quasar.fits',
+    ...     chunk_params={
+    ...         'window_size': 150,         # 150 Angstroms per chunk
+    ...         'overlap_fraction': 0.4,    # 40% overlap between chunks
+    ...         'method': 'uniform',        # Uniform chunk spacing
+    ...         'wmin': 1200,               # Start at 1200 Angstroms
+    ...         'wmax': 1800                # End at 1800 Angstroms
+    ...     },
+    ...     fitting_params={
+    ...         'min_order': 2,             # Test polynomials starting at order 2
+    ...         'max_order': 8,             # Maximum polynomial order to test
+    ...         'maxiter': 20,              # Maximum fitting iterations
+    ...         'sigma': 2.5,               # Sigma-clipping threshold
+    ...         'use_weights': True         # Use error spectrum for weighting
+    ...     },
+    ...     save_output=True,
+    ...     output_filename='normalized_quasar.fits'
+    ... )
+    
+    Example 3: Provide wavelength, flux, and error arrays directly
+    
+    >>> import numpy as np
+    >>> wave = np.linspace(1000, 2000, 1000)
+    >>> flux = np.random.normal(1.0, 0.1, 1000)
+    >>> error = np.ones_like(flux) * 0.1
+    >>> results = fc.fit_quasar_continuum(
+    ...     (wave, flux, error),
+    ...     chunk_params={'wmin': 1200, 'wmax': 1800}
+    ... )
+
 ### rb_iter_contfit() (`rb_iter_contfit`)
 
 Iterative continuum fitter using Legendre polynomials with sigma clipping
@@ -539,22 +798,23 @@ Iterative continuum fitter using Legendre polynomials with sigma clipping
         Sigma clipping threshold for outlier rejection (default: 3.0)
     use_weights : bool
         Whether to use error spectrum as weights (1/σ²) in the fitting process (default: True)
-    return_model : bool
-        Whether to return the astropy model and fitter objects (default: False)
+    include_model : bool
+        Whether to include the astropy model and fitter objects in the return dictionary (default: False)
+        This replaces the previous return_model parameter for consistency.
     
     Returns
     ---------
-    fit_final : ndarray
-        Final fitted continuum array evaluated at input wavelength points
-    resid_final : ndarray
-        Residual array (flux/continuum) - useful for normalization
-    fit_error : float
-        Standard deviation of the residuals (measure of fit quality)
-    fit_model : astropy.modeling.Model, optional
-        The fitted Legendre polynomial model object (returned if return_model=True)        
-    fitter : astropy.modeling.fitting.LevMarLSQFitter, optional
-        The fitter object with fit information including covariance matrix
-        (returned if return_model=True)
+    dict
+        A dictionary containing the following keys:
+        - 'continuum': Final fitted continuum array evaluated at input wavelength points
+        - 'residuals': Residual array (flux/continuum) - useful for normalization
+        - 'fit_error': Standard deviation of the residuals (measure of fit quality)
+        - 'model': The fitted Legendre polynomial model object (included if include_model=True)
+        - 'fitter': The fitter object with fit information including covariance matrix
+                   (included if include_model=True)
+        - 'wave': Input wavelength array
+        - 'flux': Input flux array
+        - 'error': Error array (input or estimated)
     
     Notes
     -----
@@ -571,21 +831,26 @@ Iterative continuum fitter using Legendre polynomials with sigma clipping
     --------
     Basic usage with error array:
     
-    >>> cont, resid, error = rb_iter_contfit(wavelength, flux, error)
+    >>> result = rb_iter_contfit(wavelength, flux, error)
+    >>> cont = result['continuum']
     >>> normalized_flux = flux / cont
     
     With model return and custom parameters:
     
-    >>> cont, resid, error, model, fitter = rb_iter_contfit(
+    >>> result = rb_iter_contfit(
     ...     wavelength, flux, error, 
     ...     order=5, 
     ...     sigma=2.5, 
-    ...     return_model=True
+    ...     include_model=True
     ... )
+    >>> model = result['model']
+    >>> new_wave = np.linspace(min(wavelength), max(wavelength), 1000)
+    >>> new_cont = model(new_wave)
     
     Without error array (will be estimated):
     
-    >>> cont, resid, error = rb_iter_contfit(wavelength, flux)
+    >>> result = rb_iter_contfit(wavelength, flux)
+    >>> cont = result['continuum']
     
     Notes
     -----
@@ -599,7 +864,7 @@ Iterative continuum fitter using Legendre polynomials with sigma clipping
     ------------------------------
     Written by:  Rongmon Bordoloi
     Tested on Python 3.7  Sep 4 2019
-    Highly modified for optimization April, 2025. 
+    Modified April 2025 - Standardized return format to use dictionary
     --------------------------
 
 ### calculate_bic() (`rb_iter_contfit`)
@@ -669,12 +934,16 @@ Fit a spectral region with the optimal polynomial order determined by Bayesian I
     sigma : float, optional
         Sigma clipping threshold for outlier rejection (default: 3.0)
     use_weights : bool, optional
-        Whether to use error spectrum as weights (default: True)
-    return_model : bool, optional
-        Whether to return the model objects in the result dictionary (default: True)
-        Note: During testing of polynomial orders, return_model is always set to True internally.
+        Whether to use error spectrum as weights (default: False)
+    include_model : bool, optional
+        Whether to include the model objects in the result dictionary (default: True)
+        Note: During testing of polynomial orders, include_model is always set to True internally.
     plot : bool, optional
         Whether to plot the results, including all tested polynomial fits and BIC values (default: True)
+    save_plot : bool, optional
+        Whether to save the plot to a file (default: False)
+    plot_filename : str, optional
+        Filename for the saved plot (default: "polynomial_fit.png")
     **kwargs : 
         Additional parameters passed directly to rb_iter_contfit
     
@@ -687,11 +956,15 @@ Fit a spectral region with the optimal polynomial order determined by Bayesian I
         - 'error': Error array (input or estimated)
         - 'continuum': Best-fit continuum based on optimal polynomial order
         - 'normalized_flux': Flux divided by continuum
+        - 'residuals': Residual array (flux/continuum)
         - 'best_order': Optimal polynomial order determined by BIC
         - 'fit_error': Standard deviation of residuals for best fit
         - 'bic_results': List of (order, BIC) tuples for all tested orders
-        - 'fit_model': The astropy model for the best fit (if return_model=True)
-        - 'fitter': The astropy fitter object (if return_model=True)
+        - 'model': The astropy model for the best fit (if include_model=True)
+        - 'fitter': The astropy fitter object (if include_model=True)
+        - 'param_errors': Parameter errors if available (if include_model=True)
+        - 'plot_file': path to saved plot file (if save_plot=True)
+
     
     Notes
     -----
@@ -724,9 +997,9 @@ Fit a spectral region with the optimal polynomial order determined by Bayesian I
     
     Accessing the model (for predicting at new wavelengths):
     
-    >>> result = fit_optimal_polynomial(wavelength, flux, error, return_model=True)
+    >>> result = fit_optimal_polynomial(wavelength, flux, error, include_model=True)
     >>> new_wave = np.linspace(wavelength.min(), wavelength.max(), 1000)
-    >>> new_cont = result['fit_model'](new_wave)
+    >>> new_cont = result['model'](new_wave)
 
 ### plot_polynomial_fit_results() (`rb_iter_contfit`)
 
