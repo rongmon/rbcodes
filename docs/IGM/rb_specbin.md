@@ -1,5 +1,7 @@
 # Spectral Rebinning Tool
 
+[Back to Main Page](../main_readme.md)
+
 The `rb_specbin` function is a specialized tool for rebinning one-dimensional spectral data to a new integer pixel scale. It handles flux, error, and wavelength arrays, providing a clean and efficient implementation for spectroscopic data processing.
 
 ## Main Features

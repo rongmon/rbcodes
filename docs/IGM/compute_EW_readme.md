@@ -1,5 +1,7 @@
 # Equivalent Width Calculator for Spectroscopic Analysis
 
+[Back to Main Page](../main_readme.md)
+
 The `compute_EW` function is a comprehensive tool for calculating equivalent widths (EW) of absorption lines in spectroscopic data. It offers advanced functionality including dynamic saturation detection, apparent optical depth (AOD) calculations, and visualization.
 
 ## Main Features

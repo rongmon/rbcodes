@@ -1,5 +1,8 @@
 # Atomic Line Information Retrieval Tool
 
+[Back to Main Page](../main_readme.md)
+
+
 The `rb_setline` module provides functionality for retrieving atomic line information from various spectral line lists. It allows users to find spectral line data based on wavelength matching (exact or closest) or by species name.
 
 ## Main Features
