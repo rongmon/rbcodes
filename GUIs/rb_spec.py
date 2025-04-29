@@ -832,85 +832,6 @@ class rb_spec(object):
                 self.cont_err=fit_error
                 print("Unweighted fit performed - using only statistical error.")
             
-            """
-            #This is the older implementation. Now a cleaner implementation is used.
-            from astropy.modeling import models, fitting
-
-            order=Legendre
-            weight= 1./(self.error_slice**2.)
-            
-            if domain==False:
-                domain=[-600.,600.]
-
-            if mask==False:
-                #No Mask
-                q=0.*self.wave_slice +1. 
-
-            else:
-                #mask=kwargs['mask']            
-                #Number of Masks 
-                nmsk=int(len(mask)/2)
-                vmin=np.zeros(nmsk,)
-                vmax=np.zeros(nmsk,)
-
-                for i in range(0,nmsk):
-                    vmin[i]=mask[2*i]
-                    vmax[i]=mask[2*i+1]
-
-                q=0.*self.wave_slice +1. 
-
-                for i in range(0,nmsk):
-                    sq=np.where((self.velo >= vmin[i]) & (self.velo <= vmax[i]))
-                    q[sq]=0.
-            #Select Unmasked part of the spectrum
-            qtq=np.where((q ==1))
-
-            # Fitting the masked Data
-            #e=Legendre.fit(self.velo[qtq],self.flux_slice[qtq],order,w=weight[qtq],domain=domain);
-            #cont=e(self.velo)
-
-            legendre_init = models.Legendre1D(degree=order)
-            # Fit the model using Levenberg-Marquardt minimization
-            fitter = fitting.LevMarLSQFitter()
-            #fitter=fitting.LinearLSQFitter()
-            # Sigma clip the date for a better continuum fit. [Optional]
-            if 'sigma_clip' in kwargs:
-                from astropy.stats import sigma_clip
-                # Apply sigma clipping on the flux array
-                sel_flux=self.flux_slice[qtq]
-                sel_weight=weight[qtq]
-                sel_velo=self.velo[qtq]
-                clipped_flux = sigma_clip(sel_flux, sigma=n_sigma, maxiters=5,cenfunc=np.nanmedian)
-                # Mask for unclipped (valid) values
-                unclipped_mask = ~clipped_flux.mask
-                # Select unclipped flux values and corresponding wave values
-                unclipped_flux = sel_flux[unclipped_mask]
-                unclipped_vel = sel_velo[unclipped_mask]
-                unclipped_weigths=sel_weight[unclipped_mask]
-                legendre_fit = fitter(legendre_init, unclipped_vel,unclipped_flux,weights=unclipped_weigths)
-
-            else:
-                legendre_fit = fitter(legendre_init, self.velo[qtq],self.flux_slice[qtq],weights=weight[qtq])
-
-            cont=legendre_fit(self.velo)
-            # Calculate uncertainties (standard deviations) of the fitted parameters
-            cov_matrix = fitter.fit_info['param_cov']
-            if cov_matrix is not None:
-                param_uncertainties = np.sqrt(np.diag(cov_matrix))
-                print("Both statistical and continuum fitting error included.")
-                # Calculate the 1-sigma confidence bounds
-                self.cont_err = calculate_confidence_bounds(self.velo, legendre_fit, cov_matrix)
-                self.error_slice=np.sqrt((self.error_slice**2)+(self.cont_err**2))
-
-            else:
-                print("Covariance matrix is not available. The fit might be poorly constrained.")
-                print("Using only statistical error.")
-
-            """
-
-
-
-
         self.cont=cont
         self.fnorm=self.flux_slice/self.cont
         self.enorm=self.error_slice/self.cont
@@ -1005,16 +926,13 @@ class rb_spec(object):
         else:
             self.SNR=-99
 
-        #return self.trans,self.fval,self.vmin,self.vmax,self.trans_wave,self.W,self.W_e,self.logN,self.logN_e,self.Tau
 
 
     def plot_spec(self):
         """Quick wrapper to call an interactive plotter for the full spectrum as given in input file.
         """
-        #from GUIs import rb_plot_spec as sp
-        #tt=sp.rb_plot_spec(self.wave,self.flux,self.error)
         try:
-            from GUIs import PlotSpec_Integrated as sp
+            from rbcodes.GUIs import PlotSpec_Integrated as sp
         except:
             from GUIs import PlotSpec_Integrated as sp
         tt=sp.rb_plotspec(self.wave,self.flux,self.error)
