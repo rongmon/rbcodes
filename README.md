@@ -20,7 +20,7 @@ Full documentation is available in [`rbcodes/docs/main_readme.md`](docs/main_rea
 - This package is constantly under development and will be periodically updated.
 - Contributions and improvements are welcome
 
-## License
+## ![License](https://img.shields.io/badge/license-MIT-green)
 
 This project is licensed under the [MIT License](LICENSE).
 
