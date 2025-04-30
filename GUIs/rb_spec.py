@@ -889,7 +889,7 @@ class rb_spec(object):
         self.fnorm=self.flux_slice/self.cont
         self.enorm=self.error_slice/self.cont
 
-    def plot_continuum_fit(self, outfilename=None, xlim=None, mask_alpha=0.2):
+    def plot_continuum_fit(self, outfilename=None, xlim=None, mask_alpha=0.2,verbose=False):
         """Plot the fitted continuum and mark out masked regions if available.
         
         This function creates a two-panel plot showing:
@@ -963,14 +963,15 @@ class rb_spec(object):
         if xlim is None:
             xlim = [self.velo.min(), self.velo.max()]
             # Add a hint about the xlim
-            print("Hint: No xlim provided, using full velocity range. "
-                  "You can set custom limits with xlim=[-500, 500]")
+            print("No xlim provided, using full velocity range. "
+                  "\nHint: You can set custom limits with xlim=[-500, 500]")
         
         # Create figure
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
         
-        # Add a hint about how to show the plot
-        print("\nHint: To display the plot, call plt.show() after this function.")
+        if verbose:
+            # Add a hint about how to show the plot
+            print("\nHint: To display the plot, call plt.show() after this function.")
         
         # Top panel: Original flux and continuum
         ax1.step(self.velo, self.flux_slice, 'k-', where='mid', label='Original flux')
@@ -987,7 +988,7 @@ class rb_spec(object):
                 if len(mask) > 0:
                     if isinstance(mask[0], (bool, np.bool_)):
                         # Boolean mask array - not implemented yet
-                        print("Hint: Boolean masks are not yet visualized in plots.")
+                        print("Boolean masks are not yet visualized in plots.")
                     else:
                         # List of velocity pairs [v1, v2, v3, v4, ...] -> [(v1,v2), (v3,v4), ...]
                         mask_ranges = []
@@ -1001,8 +1002,9 @@ class rb_spec(object):
                             ax1.axvspan(start, end, alpha=mask_alpha, color='blue', 
                                        label='Masked' if i == 0 else "")
                         
-                        # Add hint about masking
-                        print(f"Hint: Displaying {len(mask_ranges)} masked regions in blue shading.")
+                        if verbose:
+                            # Add text about masking
+                            print(f"Displaying {len(mask_ranges)} masked regions in blue shading.")
         else:
             print("No masks were found. To use masks in continuum fitting, "
                   "provide a mask parameter to fit_continuum(), e.g., "
@@ -1041,21 +1043,24 @@ class rb_spec(object):
             if hasattr(self, 'W') and hasattr(self, 'W_e'):
                 ax2.text(0.02, 0.05, f'W = {self.W:.3f} ± {self.W_e:.3f} Å', 
                         transform=ax2.transAxes, bbox=dict(facecolor='white', alpha=0.7))
-                print(f"Hint: Equivalent width measurement displayed: W = {self.W:.3f} ± {self.W_e:.3f} Å")
+                if verbose:
+                    print(f"Equivalent width measurement displayed: W = {self.W:.3f} ± {self.W_e:.3f} Å")
             
             # Add hint about column density if available
             if hasattr(self, 'logN') and hasattr(self, 'logN_e'):
                 log_N = np.log10(self.logN)
                 log_N_err = 0.434 * self.logN_e/self.logN if self.logN > 0 else 0
-                print(f"Hint: Column density: log N = {log_N:.2f} ± {log_N_err:.2f}")
+                if verbose:
+                    print(f"Hint: Column density: log N = {log_N:.2f} ± {log_N_err:.2f}")
                 
                 # Add annotation about column density
                 col_density_text = f'log N = {log_N:.2f} ± {log_N_err:.2f}'
                 ax2.text(0.02, 0.12, col_density_text, 
                          transform=ax2.transAxes, bbox=dict(facecolor='white', alpha=0.7))
         else:
-            print("No EW measurement regions found. "
-                  "Call compute_EW() after fitting the continuum to measure absorption lines.")
+            if verbose:
+                print("No EW measurement regions found. "
+                      "Call compute_EW() after fitting the continuum to measure absorption lines.")
         
         ax2.set_xlabel('Velocity (km/s)')
         ax2.set_ylabel('Normalized Flux')
@@ -1069,17 +1074,24 @@ class rb_spec(object):
         if outfilename:
             plt.savefig(outfilename, bbox_inches='tight', dpi=300)
             print(f"Plot saved to {outfilename}")
-            print("Hint: You can customize the filename and format, e.g., "
-                  "'myplot.png', 'myplot.pdf', 'myplot.svg'")
+            if verbose:
+                print('--------------------------------------------------')
+                print("\nHint: You can customize the filename and format, e.g., "
+                      "'myplot.png', 'myplot.pdf', 'myplot.svg'")
         else:
-            print("Hint: To save this plot, provide outfilename parameter, e.g., "
-                  "plot_continuum_fit(outfilename='continuum_fit.png')")
+            if verbose:
+                print('--------------------------------------------------')
+                print("\nHint: To save this plot, provide outfilename parameter, e.g., "
+                      "plot_continuum_fit(outfilename='continuum_fit.png')")
+        
         
         # Add hint about further customization
-        print("Hint: You can further customize this plot using matplotlib commands, e.g.:")
-        print("  fig.suptitle('My Custom Title')")
-        print("  ax1 = fig.axes[0]  # Get the top subplot")
-        print("  ax1.set_ylim([0, 2])  # Customize y-axis limits")
+        if verbose:
+            print('--------------------------------------------------')
+            print("\nHint: You can further customize this plot using matplotlib commands, e.g.:")
+            print("   fig.suptitle('My Custom Title')")
+            print("   ax1 = fig.axes[0]  # Get the top subplot")
+            print("   ax1.set_ylim([0, 2])  # Customize y-axis limits")
         
         return fig
 

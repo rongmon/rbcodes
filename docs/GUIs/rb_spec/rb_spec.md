@@ -88,6 +88,12 @@ spec.fit_continuum(
     use_weights=False
 )
 
+# 4.1 [Optional] Visualize the continuum fit
+# This allows you to inspect the quality of the fit before proceeding
+# You can save the plot by providing an outfilename parameter
+fig = spec.plot_continuum_fit(outfilename='continuum_fit.png',verbose=True)  # Save plot (optional)
+plt.show()  # Display plot in interactive window
+
 # 5. Compute equivalent width
 spec.compute_EW(transition, vmin=-80, vmax=55, plot=True)
 
@@ -250,6 +256,11 @@ After analysis, the `rb_spec` object contains:
 ## 🔍 Viewing and Inspection
 
 ```python
+# View full spectrum
+
+fig=spec.plot_continuum_fit(verbose=True)
+plt.show()
+
 # View full spectrum
 spec.plot_spec()
 
