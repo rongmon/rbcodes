@@ -114,16 +114,8 @@ def compute_EW(
         raise ValueError("Invalid velocity limits. Must be [vmin, vmax] with vmin < vmax")
 
 
-    # Extract optional parameters with default values
-    verbose = kwargs.get('verbose', False)
-    SNR = kwargs.get('SNR', False)
-    zabs = kwargs.get('zabs', 0.0)
-    sat_limit = kwargs.get('sat_limit', 'auto')
-    f0 = kwargs.get('f0', None)
-    _binsize = kwargs.get('_binsize', 1)
     
     # Normalization handling
-    normalization = kwargs.get('normalization', 'none')
     if normalization == 'median':
         norm_factor = np.nanmedian(flx)
     elif normalization == 'mean':

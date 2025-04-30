@@ -835,6 +835,7 @@ class rb_spec(object):
         self.cont=cont
         self.fnorm=self.flux_slice/self.cont
         self.enorm=self.error_slice/self.cont
+        self.cont_mask=mask
 
 
 
@@ -888,7 +889,199 @@ class rb_spec(object):
         self.fnorm=self.flux_slice/self.cont
         self.enorm=self.error_slice/self.cont
 
-
+    def plot_continuum_fit(self, outfilename=None, xlim=None, mask_alpha=0.2):
+        """Plot the fitted continuum and mark out masked regions if available.
+        
+        This function creates a two-panel plot showing:
+        1. Original flux with fitted continuum and error
+        2. Normalized spectrum with error
+        
+        Parameters
+        ----------
+        outfilename : str, optional
+            If provided, the plot will be saved to this filename
+        xlim : list, optional
+            Velocity limits for x-axis [vmin, vmax]. If None, uses full range.
+        mask_alpha : float, optional
+            Transparency level for masked regions (default: 0.2)
+            
+        Returns
+        -------
+        matplotlib.figure.Figure
+            The created figure object for further customization if needed
+            
+        Notes
+        -----
+        This method should be called after `fit_continuum` has been executed.
+        
+        Examples
+        --------
+        >>> spec.fit_continuum(mask=[-200, 300, 500, 1100], domain=[-1500, 1500], Legendre=3)
+        >>> spec.plot_continuum_fit()
+        >>> plt.show()  # Display the plot
+        
+        # Save the plot to a file
+        >>> spec.plot_continuum_fit(outfilename='continuum_fit.png')
+        
+        # Customize the plot further
+        >>> fig = spec.plot_continuum_fit()
+        >>> fig.suptitle('My Custom Title')
+        >>> plt.show()
+        """
+        # Import matplotlib and set style
+        import matplotlib.pyplot as plt
+        try:
+            plt.style.use('seaborn-darkgrid')
+        except (OSError, ValueError):
+            try:
+                plt.style.use('seaborn')
+            except (OSError, ValueError):
+                # Use default matplotlib style with customization
+                plt.style.use('default')
+        
+        # Custom settings for better appearance
+        plt.rcParams.update({
+            'figure.dpi': 150,
+            'savefig.dpi': 300,
+            'font.size': 12,
+            'axes.grid': True,
+            'grid.alpha': 0.3,
+            'axes.facecolor': '#f8f8f8',
+            'figure.facecolor': 'white',
+            'axes.labelsize': 12,
+            'axes.titlesize': 14,
+            'lines.linewidth': 1.5,
+            'xtick.labelsize': 10,
+            'ytick.labelsize': 10
+        })
+    
+        # Check if continuum has been fitted
+        if not hasattr(self, 'cont') or self.cont is None:
+            raise ValueError("Continuum has not been fitted. Call fit_continuum() first.")
+        
+        # Set xlim if not provided
+        if xlim is None:
+            xlim = [self.velo.min(), self.velo.max()]
+            # Add a hint about the xlim
+            print("Hint: No xlim provided, using full velocity range. "
+                  "You can set custom limits with xlim=[-500, 500]")
+        
+        # Create figure
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+        
+        # Add a hint about how to show the plot
+        print("\nHint: To display the plot, call plt.show() after this function.")
+        
+        # Top panel: Original flux and continuum
+        ax1.step(self.velo, self.flux_slice, 'k-', where='mid', label='Original flux')
+        ax1.step(self.velo, self.cont, 'r-', lw=2, where='mid', label='Fitted continuum')
+        ax1.step(self.velo, self.error_slice, 'gray', alpha=0.5, where='mid', label='Error')
+        
+        # Highlight masked regions if available
+        if hasattr(self, 'cont_mask') and self.cont_mask is not None:
+            mask = self.cont_mask
+            
+            # Process mask depending on its format
+            if isinstance(mask, (list, tuple, np.ndarray)):
+                # Determine if mask is a list of velocity ranges or a boolean array
+                if len(mask) > 0:
+                    if isinstance(mask[0], (bool, np.bool_)):
+                        # Boolean mask array - not implemented yet
+                        print("Hint: Boolean masks are not yet visualized in plots.")
+                    else:
+                        # List of velocity pairs [v1, v2, v3, v4, ...] -> [(v1,v2), (v3,v4), ...]
+                        mask_ranges = []
+                        if len(mask) % 2 == 0:  # Even number of elements
+                            for i in range(0, len(mask), 2):
+                                if i+1 < len(mask):
+                                    mask_ranges.append((mask[i], mask[i+1]))
+                        
+                        # Apply shading to masked regions
+                        for i, (start, end) in enumerate(mask_ranges):
+                            ax1.axvspan(start, end, alpha=mask_alpha, color='blue', 
+                                       label='Masked' if i == 0 else "")
+                        
+                        # Add hint about masking
+                        print(f"Hint: Displaying {len(mask_ranges)} masked regions in blue shading.")
+        else:
+            print("No masks were found. To use masks in continuum fitting, "
+                  "provide a mask parameter to fit_continuum(), e.g., "
+                  "mask=[-200, 300, 500, 800]")
+        
+        ax1.set_ylabel('Flux (arbitrary units)')
+        ax1.set_title('Continuum Fitting Results')
+        if hasattr(self, 'line_sel_flag') and hasattr(self, 'transition_name'):
+            title = f"Continuum Fit: {self.transition_name} ({self.line_sel_flag})"
+            ax1.set_title(title)
+        ax1.legend(loc='upper right')
+        
+        # Add annotation about the continuum fitting method used
+        method_info = ""
+        if hasattr(self, 'cont_fit_method'):
+            method_info = f" using {self.cont_fit_method}"
+        else:
+            # Try to infer method from attributes
+            if hasattr(self, 'cont_err'):
+                method_info = " using Legendre polynomial"
+        
+        ax1.text(0.02, 0.05, f"Continuum fitted{method_info}", 
+                transform=ax1.transAxes, bbox=dict(facecolor='white', alpha=0.7))
+        
+        # Bottom panel: Normalized spectrum
+        ax2.step(self.velo, self.fnorm, 'k-', where='mid', label='Normalized flux')
+        ax2.step(self.velo, self.enorm, 'gray', alpha=0.5, where='mid', label='Normalized error')
+        ax2.axhline(1.0, color='r', ls='--', alpha=0.7)
+        ax2.axhline(0.0, color='r', ls=':', alpha=0.3)
+        
+        # Add EW integration region if available
+        if hasattr(self, 'vmin') and hasattr(self, 'vmax'):
+            # Add vertical markers for EW integration region
+            ax2.axvspan(self.vmin, self.vmax, alpha=0.1, color='green', label='EW region')
+            # Add EW information if available
+            if hasattr(self, 'W') and hasattr(self, 'W_e'):
+                ax2.text(0.02, 0.05, f'W = {self.W:.3f} ± {self.W_e:.3f} Å', 
+                        transform=ax2.transAxes, bbox=dict(facecolor='white', alpha=0.7))
+                print(f"Hint: Equivalent width measurement displayed: W = {self.W:.3f} ± {self.W_e:.3f} Å")
+            
+            # Add hint about column density if available
+            if hasattr(self, 'logN') and hasattr(self, 'logN_e'):
+                log_N = np.log10(self.logN)
+                log_N_err = 0.434 * self.logN_e/self.logN if self.logN > 0 else 0
+                print(f"Hint: Column density: log N = {log_N:.2f} ± {log_N_err:.2f}")
+                
+                # Add annotation about column density
+                col_density_text = f'log N = {log_N:.2f} ± {log_N_err:.2f}'
+                ax2.text(0.02, 0.12, col_density_text, 
+                         transform=ax2.transAxes, bbox=dict(facecolor='white', alpha=0.7))
+        else:
+            print("No EW measurement regions found. "
+                  "Call compute_EW() after fitting the continuum to measure absorption lines.")
+        
+        ax2.set_xlabel('Velocity (km/s)')
+        ax2.set_ylabel('Normalized Flux')
+        ax2.set_xlim(xlim)
+        ax2.set_ylim(-0.1, 1.5)
+        ax2.legend(loc='upper right')
+        
+        plt.tight_layout()
+        
+        # Save if outfilename is provided
+        if outfilename:
+            plt.savefig(outfilename, bbox_inches='tight', dpi=300)
+            print(f"Plot saved to {outfilename}")
+            print("Hint: You can customize the filename and format, e.g., "
+                  "'myplot.png', 'myplot.pdf', 'myplot.svg'")
+        else:
+            print("Hint: To save this plot, provide outfilename parameter, e.g., "
+                  "plot_continuum_fit(outfilename='continuum_fit.png')")
+        
+        # Add hint about further customization
+        print("Hint: You can further customize this plot using matplotlib commands, e.g.:")
+        print("  fig.suptitle('My Custom Title')")
+        print("  ax1 = fig.axes[0]  # Get the top subplot")
+        print("  ax1.set_ylim([0, 2])  # Customize y-axis limits")
+        
+        return fig
 
     def compute_EW(self, lam_cen, vmin=-50., vmax=50., method='closest', plot=False, **kwargs):
         """Computes rest frame equivalent width and column density for a desired atomic line.
@@ -900,14 +1093,15 @@ class rb_spec(object):
         _binsize = kwargs.get('_binsize', 1)
 
 
-        str=s.rb_setline(lam_cen,method,linelist=self.linelist)
+        linestr=s.rb_setline(lam_cen,method,linelist=self.linelist)
+        out = EW.compute_EW(self.wave_slice,self.fnorm,linestr['wave'],[vmin,vmax],
+            self.enorm,f0=linestr['fval'],zabs=0.,plot=plot, verbose=verbose,
+            SNR=SNR,_binsize=_binsize)
+        
 
-        out = EW.compute_EW(self.wave_slice,self.fnorm,str['wave'],[vmin,vmax],self.enorm,f0=str['fval'],zabs=0.,plot=plot, verbose=verbose,SNR=SNR,_binsize=_binsize)
-
-
-        self.trans=str['name']
-        self.fval=str['fval']
-        self.trans_wave=str['wave']
+        self.trans=linestr['name']
+        self.fval=linestr['fval']
+        self.trans_wave=linestr['wave']
         self.vmin=vmin
         self.vmax=vmax
 
