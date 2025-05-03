@@ -8,16 +8,53 @@ from astropy.constants import G
 import astropy.units as u
 from numpy import log10
 
-######################################################
+"""NB: Stellar-mass to halo-mass relations from Behroozi et al 
+Universe Machine. It is possible to calculate scatter in the
+Stellar to halo mass relation but shoulf assume that in the
+mass range of interest, the scatter in this correlation is
+about 0.1 dex (in reality, 0.04-0.13 dex)
 
-# NB: Stellar-mass to halo-mass relations from Behroozi et al
-# Universe Machine. It is possible to calculate scatter in the
-# Stellar to halo mass relation but shoulf assume that in the
-# mass range of interest, the scatter in this correlation is
-# about 0.1 dex (in reality, 0.04-0.13 dex)
+example
+from rbcode.halo import halos as h
+import numpy as np
+import matplotlib.pyplot as plt
 
-#####################################################3
+#define stellar mass in log
+sm=np.arange(8,10,.2)
 
+
+
+hm1=np.zeros(len(sm),)
+hm2=np.zeros(len(sm),)
+hm3=np.zeros(len(sm),)
+hm4=np.zeros(len(sm),)
+
+z1=np.ones(len(sm),)*5.3
+z2=np.ones(len(sm),)*5.6
+z3=np.ones(len(sm),)*6
+z4=np.ones(len(sm),)*6.5
+
+for i in range(0,len(sm)):
+    hm1[i]=h.stellarToHaloMass(z1[i],sm[i])    
+    hm2[i]=h.stellarToHaloMass(z2[i],sm[i])
+    hm3[i]=h.stellarToHaloMass(z3[i],sm[i])
+    hm4[i]=h.stellarToHaloMass(z4[i],sm[i])
+
+
+
+
+plt.plot(sm,hm1,'.',label='z=5.3')
+plt.plot(sm,hm2,'.',label='z=5.6')
+plt.plot(sm,hm3,'.',label='z=6')
+plt.plot(sm,hm4,'.',label='z=6.5')
+
+plt.xlabel('log Stellar Mass')
+plt.ylabel('log halo Mass')
+
+plt.show()
+
+
+"""
 def stellarToHaloMass(z,stellar_mass):
     
     #Load params
