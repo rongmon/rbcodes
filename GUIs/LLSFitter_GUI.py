@@ -98,16 +98,18 @@ class ContinuumRegionsTable(QTableWidget):
                 value = float(item.text())
                 
                 # Check if min < max for the row
-                if column == 0 and self.item(row, 1) is not None:
+                if column == 0 and self.item(row, 1) is not None and self.item(row, 1) != 0:
                     wmax = float(self.item(row, 1).text())
-                    if value >= wmax:
+                    # Modified to ignore when max is 0 (unset value)
+                    if value >= wmax and wmax != 0.0:
                         QMessageBox.warning(self, "Invalid Value", 
                                           "Minimum wavelength must be less than maximum wavelength")
                         item.setText("0.0")
                 
-                if column == 1 and self.item(row, 0) is not None:
+                if column == 1 and self.item(row, 0) is not None and self.item(row, 0) != 0:
                     wmin = float(self.item(row, 0).text())
-                    if value <= wmin:
+                    # Modified to ignore when min is 0 (unset value)
+                    if value <= wmin and wmin != 0.0:
                         QMessageBox.warning(self, "Invalid Value", 
                                           "Maximum wavelength must be greater than minimum wavelength")
                         item.setText("0.0")
@@ -115,6 +117,7 @@ class ContinuumRegionsTable(QTableWidget):
         except ValueError:
             QMessageBox.warning(self, "Invalid Value", "Please enter a valid number")
             item.setText("0.0")
+
     
     def add_row(self):
         """Add a new empty row to the table"""
@@ -665,6 +668,20 @@ class LLSFitterGUI(QMainWindow):
         msg.setText(help_text)
         msg.exec_()
     
+
+    def update_redshift(self):
+        """Update the redshift when the value changes"""
+        if self.lls_fitter is not None:
+            try:
+                zabs_text = self.redshift_edit.text()
+                if zabs_text:
+                    zabs = float(zabs_text)
+                    self.lls_fitter.set_redshift(zabs)
+                    self.preview_continuum_regions()
+            except ValueError:
+                # Ignore invalid redshift values during typing
+                pass
+
     def init_ui(self):
         # Create central widget
         central_widget = QWidget()
@@ -687,10 +704,11 @@ class LLSFitterGUI(QMainWindow):
         file_layout.addWidget(self.file_path_edit)
         file_layout.addWidget(browse_button)
         
-        # Redshift input
+        ## Redshift input
         redshift_group = QGroupBox("Absorption Redshift")
         redshift_layout = QHBoxLayout(redshift_group)
         self.redshift_edit = QLineEdit()
+        self.redshift_edit.textChanged.connect(self.update_redshift)  # Add this line
         redshift_layout.addWidget(self.redshift_edit)
         
         # Add to top layout
