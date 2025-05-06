@@ -54,10 +54,13 @@ class RedshiftInputWidget(QWidget):
         self.redshift_input.setText(f"{self.default_redshift:.6f}")
         self.redshift_input.setStyleSheet("""
             QLineEdit {
-                background-color: #353535;
+                background-color: #3C3C3C;
                 color: white;
-                border: 1px solid #2A82DA;
-                padding: 3px;
+                border: 1px solid #555555;
+                border-radius: 6px;
+                padding: 6px;
+                selection-background-color: #2A82DA;
+                selection-color: white;
             }
         """)
         redshift_layout.addWidget(redshift_label)
@@ -70,16 +73,30 @@ class RedshiftInputWidget(QWidget):
         self.linelist_combo = QComboBox()
         self.linelist_combo.addItems(["None", "LLS", "LLS Small", "DLA", "LBG", "Gal", "Eiger_Strong"])
         self.linelist_combo.setCurrentText(self.default_linelist)
+
         self.linelist_combo.setStyleSheet("""
             QComboBox { 
-                background-color: #353535; 
-                color: white; 
-                border: 1px solid #2A82DA;
+                background-color: #3A3A3C;
+                color: #F2F2F7;
+                border: 1px solid #636366;
+                border-radius: 6px;
+                padding: 6px;
+                font-size: 14px;
             }
             QComboBox::drop-down {
-                background-color: #2A82DA;
+                background-color: #48484A;
+                border-left: 1px solid #636366;
+                width: 30px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #3A3A3C;
+                color: #F2F2F7;
+                border: 1px solid #636366;
+                selection-background-color: #0A84FF;
+                selection-color: white;
             }
         """)
+
         linelist_layout.addWidget(linelist_label)
         linelist_layout.addWidget(self.linelist_combo)
         main_layout.addLayout(linelist_layout)
@@ -92,12 +109,24 @@ class RedshiftInputWidget(QWidget):
         self.color_combo.setCurrentText(self.default_color)
         self.color_combo.setStyleSheet("""
             QComboBox { 
-                background-color: #353535; 
-                color: white; 
-                border: 1px solid #2A82DA;
+                background-color: #3A3A3C;
+                color: #F2F2F7;
+                border: 1px solid #636366;
+                border-radius: 6px;
+                padding: 6px;
+                font-size: 14px;
             }
             QComboBox::drop-down {
-                background-color: #2A82DA;
+                background-color: #48484A;
+                border-left: 1px solid #636366;
+                width: 30px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #3A3A3C;
+                color: #F2F2F7;
+                border: 1px solid #636366;
+                selection-background-color: #0A84FF;
+                selection-color: white;
             }
         """)
         color_layout.addWidget(color_label)
@@ -111,13 +140,18 @@ class RedshiftInputWidget(QWidget):
         self.submit_button = QPushButton("Submit")
         self.submit_button.setStyleSheet("""
             QPushButton {
-                background-color: #2A82DA; 
-                color: white; 
+                background-color: #0A84FF;  /* macOS accent blue */
+                color: white;
                 border: none;
-                padding: 5px;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 14px;
             }
             QPushButton:hover {
-                background-color: #4A9FEA;
+                background-color: #409CFF;  /* lighter blue on hover */
+            }
+            QPushButton:pressed {
+                background-color: #0060DF;  /* darker blue when pressed */
             }
         """)
         self.submit_button.clicked.connect(self.validate_and_submit)
@@ -127,15 +161,21 @@ class RedshiftInputWidget(QWidget):
         self.catalog_button = QPushButton("Catalog")
         self.catalog_button.setStyleSheet("""
             QPushButton {
-                background-color: #008000; 
-                color: white; 
+                background-color: #30D158;  /* macOS green accent */
+                color: white;
                 border: none;
-                padding: 5px;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 14px;
             }
             QPushButton:hover {
-                background-color: #00A000;
+                background-color: #4CD964;  /* lighter green on hover */
+            }
+            QPushButton:pressed {
+                background-color: #248A3D;  /* darker green when pressed */
             }
         """)
+
         self.catalog_button.clicked.connect(self.on_catalog_clicked)
         buttons_layout.addWidget(self.catalog_button)
         

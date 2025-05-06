@@ -882,7 +882,7 @@ class MainWindow(QMainWindow):
         self.main_splitter.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
         # Create the absorber manager
-        clr = rt.rb_set_color()
+        #clr = rt.rb_set_color()
         self.absorber_manager = AbsorberManager(self)#, colors=list(clr.keys())[1:])
         self.absorber_manager.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
         self.absorber_manager.setMinimumWidth(200)
@@ -917,7 +917,7 @@ class MainWindow(QMainWindow):
         
         # Create redshift input widget with updated features
         self.redshift_widget = RedshiftInputWidget()
-        self.redshift_widget.setMaximumWidth(600)  # Limit the width of the redshift widget
+        self.redshift_widget.setMaximumWidth(300)  # Limit the width of the redshift widget
         
         # Connect to signals from updated RedshiftInputWidget
         self.redshift_widget.submitted.connect(self.handle_redshift_submission)
