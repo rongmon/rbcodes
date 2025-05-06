@@ -6,7 +6,10 @@ from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QColor
 
 # Import color utility from rb_utility
-from utils import rb_utility as rt
+try:
+    from rbcodes.utils import rb_utility as rt
+except:
+    from utils import rb_utility as rt
 
 class RedshiftInputWidget(QWidget):
     """

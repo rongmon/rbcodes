@@ -50,7 +50,7 @@ plt.plot(sm,hm4,'.',label='z=6.5')
 
 plt.xlabel('log Stellar Mass')
 plt.ylabel('log halo Mass')
-
+plt.legend()
 plt.show()
 
 
