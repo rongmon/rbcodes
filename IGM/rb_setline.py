@@ -212,19 +212,19 @@ def read_line_list(label: str) -> List[Dict[str, Any]]:
 
     # Define the mapping from label to filename
     filename_mapping = {
-        'atom': resource_filename('IGM', 'lines/atom_full.dat'),
-        'LLS': resource_filename('IGM', 'lines/lls.lst'),
-        'LLS Small': resource_filename('IGM', 'lines/lls_sub.lst'),
-        'DLA': resource_filename('IGM', 'lines/dla.lst'),
-        'LBG': resource_filename('IGM', 'lines/lbg.lst'),
-        'Gal': resource_filename('IGM', 'lines/gal_vac.lst'),
-        'Eiger_Strong': resource_filename('IGM', 'lines/Eiger_Strong.lst'),
-        'Gal_Em': resource_filename('IGM', 'lines/Galaxy_emission_Lines.lst'),
-        'Gal_Abs': resource_filename('IGM', 'lines/Galaxy_absorption_Lines.lst'),
-        'Gal_long': resource_filename('IGM', 'lines/Galaxy_Long_E_n_A.lst'),
-        'AGN': resource_filename('IGM', 'lines/AGN.lst'),
-        'HI_recomb': resource_filename('IGM', 'lines/HI_recombination.lst'),
-        'HI_recomb_light': resource_filename('IGM', 'lines/HI_recombination_light.lst')
+        'atom': resource_filename('rbcodes.IGM', 'lines/atom_full.dat'),
+        'LLS': resource_filename('rbcodes.IGM', 'lines/lls.lst'),
+        'LLS Small': resource_filename('rbcodes.IGM', 'lines/lls_sub.lst'),
+        'DLA': resource_filename('rbcodes.IGM', 'lines/dla.lst'),
+        'LBG': resource_filename('rbcodes.IGM', 'lines/lbg.lst'),
+        'Gal': resource_filename('rbcodes.IGM', 'lines/gal_vac.lst'),
+        'Eiger_Strong': resource_filename('rbcodes.IGM', 'lines/Eiger_Strong.lst'),
+        'Gal_Em': resource_filename('rbcodes.IGM', 'lines/Galaxy_emission_Lines.lst'),
+        'Gal_Abs': resource_filename('rbcodes.IGM', 'lines/Galaxy_absorption_Lines.lst'),
+        'Gal_long': resource_filename('rbcodes.IGM', 'lines/Galaxy_Long_E_n_A.lst'),
+        'AGN': resource_filename('rbcodes.IGM', 'lines/AGN.lst'),
+        'HI_recomb': resource_filename('rbcodes.IGM', 'lines/HI_recombination.lst'),
+        'HI_recomb_light': resource_filename('rbcodes.IGM', 'lines/HI_recombination_light.lst')
     }
 
     # Check if the label is valid
