@@ -30,6 +30,9 @@ class LineSelectionDialog(QDialog):
                 parent.y() + parent.height() // 4,
                 400, 300
             )
+            
+        # Apply dark theme styling
+        self.apply_theme()
     
     def initUI(self):
         """Initialize the user interface"""
@@ -46,7 +49,7 @@ class LineSelectionDialog(QDialog):
         
         # Create list widget
         self.list_widget = QListWidget()
-        self.list_widget.setAlternatingRowColors(True)
+        self.list_widget.setAlternatingRowColors(False) # Change this from True to False
         
         # Populate the list if we have data
         if self.line_list and self.observed_wavelength is not None:
@@ -84,6 +87,67 @@ class LineSelectionDialog(QDialog):
         
         # Connect double-click on list item to selection
         self.list_widget.itemDoubleClicked.connect(self.on_item_double_clicked)
+    
+    def apply_theme(self):
+        """Apply the dark theme styling consistent with other widgets"""
+        # Dialog background
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #353535;
+                color: #F2F2F7;
+            }
+            
+            QLabel {
+                color: #F2F2F7;
+                font-size: 14px;
+            }
+            
+            QListWidget {
+                background-color: #252525;
+                alternate-background-color: #3A3A3C;
+                color: #F2F2F7;
+                border: 1px solid #636366;
+                border-radius: 6px;
+                padding: 4px;
+                font-size: 14px;
+            }
+            
+            QListWidget::item {
+                padding: 6px;
+            }
+            
+            QListWidget::item:selected {
+                background-color: #0A84FF;
+                color: white;
+            }
+            
+            QPushButton {
+                background-color: #3A3A3C;
+                color: #F2F2F7;
+                border: 1px solid #636366;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 14px;
+            }
+            
+            QPushButton:hover {
+                background-color: #48484A;
+            }
+            
+            /* Style the Select button specifically */
+            QPushButton#select_button {
+                background-color: #0A84FF;
+                color: white;
+                border: none;
+            }
+            
+            QPushButton#select_button:hover {
+                background-color: #409CFF;
+            }
+        """)
+        
+        # Set object names to allow specific styling
+        self.select_button.setObjectName("select_button")
     
     def on_select_clicked(self):
         """Handle select button click"""
