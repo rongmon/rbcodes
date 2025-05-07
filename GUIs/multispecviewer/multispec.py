@@ -861,8 +861,16 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         
 
-        # Layout of a file selection Button
-        button_layout = QHBoxLayout()
+        
+        # Create a container widget for the button layout
+        button_container = QWidget()
+        button_container.setFixedWidth(300)  # Set your desired width here
+        button_layout = QHBoxLayout(button_container)
+        
+        # Add a stretch to push everything to the right
+        button_layout.addStretch(1)
+        
+        # Now add the button and label
         self.select_button = QPushButton("Select FITS Files")
         self.select_button.clicked.connect(self.select_fits_files)
         self.file_label = QLabel("No files selected")
@@ -870,7 +878,9 @@ class MainWindow(QMainWindow):
         
         button_layout.addWidget(self.select_button)
         button_layout.addWidget(self.file_label)
-        main_layout.addLayout(button_layout)
+        
+        # Add the container widget to the main layout
+        main_layout.addWidget(button_container, 0, Qt.AlignRight)  # Align right in the main layout
         
         # Create message box first so we can pass it to the SpectralPlot
         self.message_box = MessageBox()

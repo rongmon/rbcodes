@@ -74,7 +74,8 @@ class RedshiftInputWidget(QWidget):
         linelist_label = QLabel("Line List:")
         linelist_label.setStyleSheet("color: white;")  
         self.linelist_combo = QComboBox()
-        self.linelist_combo.addItems(["None", "LLS", "LLS Small", "DLA", "LBG", "Gal", "Eiger_Strong"])
+        self.linelist_combo.addItems(["None", "LLS", "LLS Small", "DLA", "LBG", "Gal", "Eiger_Strong","AGN"])
+        # AGN, DLA, Eiger_Strong, Gal, Gal_Abs, Gal_Em, Gal_long, HI_recomb, HI_recomb_light, LBG, LLS, LLS Small, atom
         self.linelist_combo.setCurrentText(self.default_linelist)
 
         self.linelist_combo.setStyleSheet("""
@@ -186,8 +187,9 @@ class RedshiftInputWidget(QWidget):
         main_layout.addLayout(buttons_layout)
         
         # Connect signals for changes
-        self.linelist_combo.currentIndexChanged.connect(self.on_linelist_changed)
-        self.color_combo.currentIndexChanged.connect(self.on_color_changed)
+        #This plots changes on the fly
+        #self.linelist_combo.currentIndexChanged.connect(self.on_linelist_changed)
+        #self.color_combo.currentIndexChanged.connect(self.on_color_changed)
         
     def on_catalog_clicked(self):
         """Handle catalog button click"""
@@ -239,7 +241,7 @@ class RedshiftInputWidget(QWidget):
             return
             
         # Validate line list selection
-        if not linelist:
+        if not linelist or linelist == "None":
             QMessageBox.warning(self, "Missing Selection", "Please select a line list.")
             return
         
