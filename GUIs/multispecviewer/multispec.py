@@ -866,6 +866,8 @@ class MainWindow(QMainWindow):
         self.select_button = QPushButton("Select FITS Files")
         self.select_button.clicked.connect(self.select_fits_files)
         self.file_label = QLabel("No files selected")
+        self.file_label.setStyleSheet("color: white;")
+        
         button_layout.addWidget(self.select_button)
         button_layout.addWidget(self.file_label)
         main_layout.addLayout(button_layout)

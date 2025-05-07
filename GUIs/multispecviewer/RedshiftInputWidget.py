@@ -50,6 +50,8 @@ class RedshiftInputWidget(QWidget):
         # Redshift input layout
         redshift_layout = QHBoxLayout()
         redshift_label = QLabel("Redshift:")
+        redshift_label.setStyleSheet("color: white;")  
+
         self.redshift_input = QLineEdit()
         self.redshift_input.setText(f"{self.default_redshift:.6f}")
         self.redshift_input.setStyleSheet("""
@@ -70,6 +72,7 @@ class RedshiftInputWidget(QWidget):
         # Line list layout
         linelist_layout = QHBoxLayout()
         linelist_label = QLabel("Line List:")
+        linelist_label.setStyleSheet("color: white;")  
         self.linelist_combo = QComboBox()
         self.linelist_combo.addItems(["None", "LLS", "LLS Small", "DLA", "LBG", "Gal", "Eiger_Strong"])
         self.linelist_combo.setCurrentText(self.default_linelist)
@@ -104,6 +107,7 @@ class RedshiftInputWidget(QWidget):
         # Color layout
         color_layout = QHBoxLayout()
         color_label = QLabel("Color:")
+        color_label.setStyleSheet("color: white;")  
         self.color_combo = QComboBox()
         self.color_combo.addItems(self.color_options)
         self.color_combo.setCurrentText(self.default_color)
