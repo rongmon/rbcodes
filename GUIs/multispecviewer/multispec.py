@@ -237,25 +237,25 @@ class SpectralPlot(FigureCanvas):
             current_xlim = self.axes[0].get_xlim()
             self.axes[0].set_xlim(x, current_xlim[1])
             if self.message_box:
-                self.message_box.on_sent_message(f"Set minimum x-limit to {x:.2f}", "#0000FF")
+                self.message_box.on_sent_message(f"Set minimum x-limit to {x:.2f}", "#8AB4F8")
             self.draw()
         elif event.key == 'X':
             current_xlim = self.axes[0].get_xlim()
             self.axes[0].set_xlim(current_xlim[0], x)
             if self.message_box:
-                self.message_box.on_sent_message(f"Set maximum x-limit to {x:.2f}", "#0000FF")
+                self.message_box.on_sent_message(f"Set maximum x-limit to {x:.2f}", "#8AB4F8")
             self.draw()
         elif event.key == 't':
             current_ylim = self.axes[ax_index].get_ylim()
             self.axes[ax_index].set_ylim(current_ylim[0], y)
             if self.message_box:
-                self.message_box.on_sent_message(f"Set maximum y-limit to {y:.2f} on panel {ax_index+1}", "#0000FF")
+                self.message_box.on_sent_message(f"Set maximum y-limit to {y:.2f} on panel {ax_index+1}", "#8AB4F8")
             self.draw()
         elif event.key == 'b':
             current_ylim = self.axes[ax_index].get_ylim()
             self.axes[ax_index].set_ylim(y, current_ylim[1])
             if self.message_box:
-                self.message_box.on_sent_message(f"Set minimum y-limit to {y:.2f} on panel {ax_index+1}", "#0000FF")
+                self.message_box.on_sent_message(f"Set minimum y-limit to {y:.2f} on panel {ax_index+1}", "#8AB4F8")
             self.draw()
         elif event.key=='S':
             self.scale += 2
@@ -290,14 +290,14 @@ class SpectralPlot(FigureCanvas):
             delx = (xlim[-1] - xlim[0])
             self.axes[ax_index].set_xlim([xlim[0] - delx, xlim[0]])
             if self.message_box:
-                self.message_box.on_sent_message(f"Shifted view left on panel {ax_index+1}", "#0000FF")
+                self.message_box.on_sent_message(f"Shifted view left on panel {ax_index+1}", "#8AB4F8")
             self.draw()
         elif event.key==']':
             xlim = self.axes[ax_index].get_xlim()
             delx = (xlim[-1] - xlim[0])
             self.axes[ax_index].set_xlim([xlim[1], xlim[1] + delx])
             if self.message_box:
-                self.message_box.on_sent_message(f"Shifted view right on panel {ax_index+1}", "#0000FF")
+                self.message_box.on_sent_message(f"Shifted view right on panel {ax_index+1}", "#8AB4F8")
             self.draw()
         elif event.key == 'Y':
             Windowname='Manual y-Limits'
@@ -448,13 +448,13 @@ class SpectralPlot(FigureCanvas):
             self.clear_redshift_lines()
             self.fig.canvas.draw_idle()  # Ensure the figure updates
             if self.message_box:
-                self.message_box.on_sent_message(f"{linelist} line list. Clearing lines...", "#0000FF")
+                self.message_box.on_sent_message(f"{linelist} line list. Clearing lines...", "#8AB4F8")
         
         # If spectra are already loaded, update the plot with the new redshift lines
         elif self.spectra and len(self.spectra) > 0:
             # Add debug message
             if self.message_box:
-                self.message_box.on_sent_message(f"Setting redshift z={redshift} with {linelist} line list in {color}", "#0000FF")
+                self.message_box.on_sent_message(f"Setting redshift z={redshift} with {linelist} line list in {color}", "#8AB4F8")
             # Call plot_redshift_lines directly here to plot the lines immediately
             self.plot_redshift_lines()
             # Explicitly update the canvas
@@ -1075,7 +1075,7 @@ class MainWindow(QMainWindow):
         
         if file_paths:
             self.statusBar().showMessage(f"Loading {len(file_paths)} files...")
-            self.message_box.on_sent_message(f"Loading {len(file_paths)} files...", "#0000FF")
+            self.message_box.on_sent_message(f"Loading {len(file_paths)} files...", "#8AB4F8")
             self.load_fits_files(file_paths)
             self.file_label.setText(f"{len(file_paths)} files selected")
             self.statusBar().showMessage(f"Loaded {len(file_paths)} files - Use keyboard shortcuts for adjustments")
