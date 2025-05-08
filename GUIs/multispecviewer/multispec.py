@@ -257,34 +257,49 @@ class SpectralPlot(FigureCanvas):
             if self.message_box:
                 self.message_box.on_sent_message(f"Set minimum y-limit to {y:.2f} on panel {ax_index+1}", "#8AB4F8")
             self.draw()
-        elif event.key=='S':
+        elif event.key == 'S':
             self.scale += 2
-            # First grab the corresponding spectra 
+            if self.scale % 2 == 0:  # ensure odd
+                self.scale += 1
+        
+            self.scale = max(1, self.scale)  # ensure at least 1
+        
+            # Grab spectrum
             spec = self.spectra[ax_index]
             filename = os.path.basename(spec.filename)
             wave = spec.wavelength.value
             flux = spec.flux.value
             error = spec.sig.value if hasattr(spec, 'sig') else None
+        
             new_flux = convolve(flux, Box1DKernel(self.scale))
-            new_err = convolve(error, Box1DKernel(self.scale))
+            new_err = convolve(error, Box1DKernel(self.scale)) if error is not None else None
+        
             self.replot(wave, new_flux, new_err, ax_index, filename)
             self.draw()
-
-            self.message_box.on_sent_message(f'Convolutional kernel size = {int(self.scale)}.')
-        elif event.key=='U':
+        
+            self.message_box.on_sent_message(f'Convolutional kernel size = {int(self.scale)}.', "#8AB4F8")
+        
+        elif event.key == 'U':
             self.scale -= 2
-            # First grab the corresponding spectra 
+            if self.scale % 2 == 0:  # ensure odd
+                self.scale -= 1
+        
+            self.scale = max(1, self.scale)  # ensure at least 1
+        
+            # Grab spectrum
             spec = self.spectra[ax_index]
             filename = os.path.basename(spec.filename)
             wave = spec.wavelength.value
             flux = spec.flux.value
             error = spec.sig.value if hasattr(spec, 'sig') else None
+        
             new_flux = convolve(flux, Box1DKernel(self.scale))
-            new_err = convolve(error, Box1DKernel(self.scale))
+            new_err = convolve(error, Box1DKernel(self.scale)) if error is not None else None
+        
             self.replot(wave, new_flux, new_err, ax_index, filename)
             self.draw()
-
-            self.message_box.on_sent_message(f'Convolutional kernel size = {int(self.scale)}.')
+        
+            self.message_box.on_sent_message(f'Convolutional kernel size = {int(self.scale)}.', "#8AB4F8")
         elif event.key=='[':
             xlim = self.axes[ax_index].get_xlim()
             delx = (xlim[-1] - xlim[0])
