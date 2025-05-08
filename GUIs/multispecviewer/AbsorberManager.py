@@ -1,167 +1,265 @@
 import pandas as pd
 from PyQt5.QtWidgets import (QWidget, QTableWidget, QTableWidgetItem, 
                              QHBoxLayout, QVBoxLayout, QComboBox, QPushButton,
-                             QHeaderView, QSizePolicy, QApplication, QCheckBox)
+                             QHeaderView, QSizePolicy, QApplication)
 from PyQt5.QtGui import QColor
 from PyQt5 import QtCore, QtGui, QtWidgets
+from rbcodes.utils import rb_utility as rt
+clr = rt.rb_set_color()
 
 class AbsorberManager(QWidget):
     """
     A widget for managing multiple absorber systems with their redshifts, line lists, and colors.
-    Allows adding, removing, plotting, and hiding absorbers using a unified checkbox approach.
+    Allows adding, removing, plotting, and hiding absorbers.
     
     Note: To fully support this widget, the parent should implement:
     - plot_absorber_lines(row, z_abs, line_list, color) - Plot lines for this absorber
     - remove_absorber_lines(row) - Remove lines for this absorber
-    - toggle_absorber_visibility(row, visible) - Toggle or set visibility of absorber lines
+    - toggle_absorber_visibility(row) - Toggle visibility of absorber lines
     - update_absorber_redshift(row, z_abs) - Update when redshift is changed manually
+    - renumber_absorber_lines(old_row, new_row) - Handle row renumbering after deletion
     """
         
     def __init__(self, parent=None, colors=None):
         super().__init__(parent)
+        # Set up the dark theme after creating the widgets
+        self.setup_dark_theme()
         self.parent = parent
         
-        # Define theme colors
-        self.theme = {
-            'bg': '#252525',
-            'widget_bg': '#353535',
-            'header_bg': '#3A3A3C',
-            'input_bg': '#3A3A3C',
-            'border': '#636366',
-            'text': '#F2F2F7',
-            'accent': '#0A84FF',
-            'danger': '#FF453A',
-            'hover': '#48484A'
-        }
-        
-        # Use provided colors or default list
-        try:
-            # Try to import color utility if available
-            from rbcodes.utils import rb_utility as rt
-            clr = rt.rb_set_color()
-            self.colors = colors or list(clr.keys())[1:]  # Skip first color (background)
-        except ImportError:
-            # Fallback colors if utility not available
-            self.colors = colors or ['white', 'red', 'blue', 'green', 'yellow', 'cyan', 'magenta']
+        # Import color utility and use those colors if not provided
+        self.colors = colors or list(clr.keys())[1:]  # Skip the first color (usually background)        
 
         # Define available line lists
-        self.line_options = ['LLS', 'LLS Small', 'DLA', 'LBG', 'Gal', 'Eiger_Strong', 'AGN', 'None']
-        
+        self.line_options = ['LLS', 'LLS Small', 'DLA', 'LBG', 'Gal', 'Eiger_Strong','AGN', 'None']
         # Initialize data storage for absorbers
-        self.absorbers_df = pd.DataFrame(columns=['Zabs', 'LineList', 'Color', 'IsPlotted'])
+        self.absorbers_df = pd.DataFrame(columns=['Zabs', 'LineList', 'Color'])
         
         # Initialize UI components
         self.initUI()
-    
+        
     def initUI(self):
-        """Initialize the user interface with optimized layout"""
+        """Initialize the user interface components"""
         self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(5, 5, 5, 5)
         
         # Create table for displaying absorbers
-        self.table = QTableWidget(1, 5)
-        self.table.setHorizontalHeaderLabels(['LineList', 'z', 'Color', 'Show', 'Remove'])
+        self.table = QTableWidget(1, 6)  # Start with 1 row, will expand as needed
+        self.table.setHorizontalHeaderLabels(['LineList', 'z', 'Color', 'Plot', 'Remove', 'Hide'])
         
-        # Set column properties
+        # Configure table properties
         header = self.table.horizontalHeader()
-        column_widths = [80, 70, 70, 30, 30]
         
-        for i, width in enumerate(column_widths):
-            header.setSectionResizeMode(i, QHeaderView.Interactive)
-            self.table.setColumnWidth(i, width)
+        # Customize column widths to prevent overlap
+        #header.setSectionResizeMode(0, QHeaderView.Stretch)  # Line Lists column stretches
+        header.setSectionResizeMode(0, QHeaderView.Interactive)
+        self.table.setColumnWidth(0, 80)  # Initial width
+        header.setMinimumSectionSize(50)  # Prevents column from getting too small
+
+        header.setSectionResizeMode(1, QHeaderView.Interactive)  # Redshift column
+        header.setSectionResizeMode(2, QHeaderView.Interactive)  # Color column
+
         
-        header.setMinimumSectionSize(30)
+        # Fixed width for action buttons
+        for col in range(3, 6):
+            header.setSectionResizeMode(col, QHeaderView.Interactive)
+            self.table.setColumnWidth(col, 30)  # Adjust width as needed
+        
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.table.setAlternatingRowColors(True)
         
-        # Add initial rows with widgets
-        self._add_row(0)
-        self._add_row(1)
+        # Set default widgets for initial rows
+        self._add_row_widgets(0)
+        #self._add_row_widgets(1)
         
         # Add table to layout
         self.layout.addWidget(self.table)
         
-        # Connect signals
+        # Connect cell changed signal
         self.table.cellChanged.connect(self.on_cell_changed)
         
-        # Apply theme
-        self.apply_theme()
-    
-    def _add_row(self, row_index):
-        """Add a new row with all necessary widgets"""
-        # Create widgets
-        line_combo = self._create_combo_box(self.line_options)
-        color_combo = self._create_combo_box(self.colors)
-        show_check = self._create_checkbox()
-        remove_btn = self._create_button("✕")
-        
-        # Connect signals with lambdas to capture row context
-        show_check.stateChanged.connect(
-            lambda state, row=row_index: self.toggle_absorber_visibility_from_checkbox(row, state)
-        )
-        remove_btn.clicked.connect(
-            lambda _, row=row_index: self.remove_absorber(row)
-        )
-        
-        # Add widgets to table
+    def _add_row_widgets(self, row_index):
+        """Add widgets to a specific row in the table"""
+        # Line list combo box
+        line_combo = QComboBox()
+        for item in self.line_options:
+            line_combo.addItem(item)
+        line_combo.setStyleSheet("""
+            QComboBox { 
+                background-color: #353535; 
+                color: white; 
+                border: 1px solid #2A82DA;
+            }
+            QComboBox::drop-down {
+                background-color: #2A82DA;
+            }
+        """)
         self.table.setCellWidget(row_index, 0, line_combo)
+        
+        # Color combo box
+        color_combo = QComboBox()
+        for color in self.colors:
+            color_combo.addItem(color)
+        color_combo.setStyleSheet("""
+            QComboBox { 
+                background-color: #353535; 
+                color: white; 
+                border: 1px solid #2A82DA;
+            }
+            QComboBox::drop-down {
+                background-color: #2A82DA;
+            }
+        """)
         self.table.setCellWidget(row_index, 2, color_combo)
-        self.table.setCellWidget(row_index, 3, show_check)
+        
+        # Plot button with direct row reference
+        plot_btn = QPushButton("Plot", self)
+        plot_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2A82DA; 
+                color: white; 
+                border: none;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: #4A9FEA;
+            }
+        """)
+        # Store the row index directly on the button
+        plot_btn.row_index = row_index
+        plot_btn.clicked.connect(self.plot_absorber_from_button)
+        self.table.setCellWidget(row_index, 3, plot_btn)
+        
+        # Remove button with direct row reference
+        remove_btn = QPushButton("Remove", self)
+        remove_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FF6B6B; 
+                color: white; 
+                border: none;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: #FF8A8A;
+            }
+        """)
+        # Store the row index directly on the button
+        remove_btn.row_index = row_index
+        remove_btn.clicked.connect(self.remove_absorber_from_button)
         self.table.setCellWidget(row_index, 4, remove_btn)
-    
-    def _create_combo_box(self, items):
-        """Factory method for creating styled combo boxes"""
-        combo = QComboBox()
-        for item in items:
-            combo.addItem(item)
-        return combo
-    
-    def _create_checkbox(self):
-        """Factory method for creating styled checkboxes"""
-        return QCheckBox()
-    
-    def _create_button(self, text):
-        """Factory method for creating styled buttons"""
-        btn = QPushButton(text, self)
-        # Make remove button's text color stand out for clarity
-        if text == "✕":
-            btn.setProperty("type", "danger")
-        return btn
-    
-    def toggle_absorber_visibility_from_checkbox(self, row, state):
-        """Handle checkbox state change to plot or hide absorber"""
-        # Determine if checked
-        is_checked = (state == QtCore.Qt.Checked)
         
-        # Get the absorber data
-        z_abs = float(self.table.item(row, 1).text()) if self.table.item(row, 1) else None
-        if not z_abs:
-            return
+        # Hide button with direct row reference
+        hide_btn = QPushButton("Hide", self)
+        hide_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FFA500; 
+                color: white; 
+                border: none;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: #FFB740;
+            }
+        """)
+        # Store the row index directly on the button
+        hide_btn.row_index = row_index
+        hide_btn.clicked.connect(self.toggle_hide_absorber_from_button)
+        self.table.setCellWidget(row_index, 5, hide_btn)
+    
+    def get_index(self):
+        """
+        Gets the row and column of the clicked button.
+        This is a comprehensive approach based on PlotSpec_Integrated.
+        """
+        # Get the button that was clicked
+        button = QtWidgets.QApplication.focusWidget()
+        if not button:
+            return None, None
             
-        line_list = self.table.cellWidget(row, 0).currentText()
-        color = self.table.cellWidget(row, 2).currentText()
+        # Try direct approach - check if the widget is in our table
+        for row in range(self.table.rowCount()):
+            for col in range(3, 6):  # Columns with buttons
+                if self.table.cellWidget(row, col) == button:
+                    print(f"Direct check - Button at row {row}, col {col}")
+                    return row, col
         
-        # Check if this absorber has been plotted before
-        is_plotted = False
-        if row < len(self.absorbers_df):
-            is_plotted = self.absorbers_df.at[row, 'IsPlotted'] if 'IsPlotted' in self.absorbers_df.columns else False
+        # Try indexAt with button position (might not work reliably)
+        index = self.table.indexAt(button.pos())
+        if index.isValid():
+            row = index.row()
+            col = index.column()
+            print(f"IndexAt check - Button at row {row}, col {col}")
+            return row, col
         
-        if is_checked:
-            # Show/plot the absorber
-            if not is_plotted:
-                # If not previously plotted, plot it now
-                if hasattr(self.parent, 'plot_absorber_lines'):
-                    success = self.parent.plot_absorber_lines(row, z_abs, line_list, color)
-                    if success and row < len(self.absorbers_df):
-                        self.absorbers_df.at[row, 'IsPlotted'] = True
-            else:
-                # If already plotted but hidden, show it
-                if hasattr(self.parent, 'toggle_absorber_visibility'):
-                    self.parent.toggle_absorber_visibility(row)
+        print("Could not determine button position")
+        return None, None
+    
+    def plot_absorber_from_button(self):
+        """Plot absorber using row index stored on the button"""
+        button = self.sender()
+        if hasattr(button, 'row_index'):
+            row = button.row_index
+            print(f"Plotting absorber at row {row}")
+            self.plot_absorber(row)
         else:
-            # Hide the absorber
-            if is_plotted and hasattr(self.parent, 'toggle_absorber_visibility'):
-                self.parent.toggle_absorber_visibility(row)
+            print("Button does not have a row_index property")
+    
+    def remove_absorber_from_button(self):
+        """Remove absorber using row index stored on the button"""
+        button = self.sender()
+        if hasattr(button, 'row_index'):
+            row = button.row_index
+            print(f"Removing absorber at row {row}")
+            self.remove_absorber(row)
+        else:
+            print("Button does not have a row_index property")
+    
+    def toggle_hide_absorber_from_button(self):
+        """Toggle hide absorber using row index stored on the button"""
+        button = self.sender()
+        if hasattr(button, 'row_index'):
+            row = button.row_index
+            print(f"Toggling visibility of absorber at row {row}")
+            self.toggle_hide_absorber(row)
+        else:
+            print("Button does not have a row_index property")
+        
+    def get_button_row_index(self):
+        """
+        Gets the row index of the button that triggered the event.
+        This technique is adapted from PlotSpec_Integrated.
+        """
+        button = self.sender()
+        if not button:
+            return -1
+            
+        # First try to find the button directly in the table
+        for row in range(self.table.rowCount()):
+            for col in range(3, 6):  # Columns 3, 4, 5 contain our buttons
+                if self.table.cellWidget(row, col) == button:
+                    return row
+                    
+        # Fallback: try using position
+        index = self.table.indexAt(button.pos())
+        if index.isValid():
+            return index.row()
+            
+        return -1
+    
+    def plot_clicked(self):
+        """Handle Plot button click"""
+        row = self.get_button_row_index()
+        if row >= 0:
+            self.plot_absorber(row)
+            
+    def remove_clicked(self):
+        """Handle Remove button click"""
+        row = self.get_button_row_index()
+        if row >= 0:
+            self.remove_absorber(row)
+            
+    def hide_clicked(self):
+        """Handle Hide button click"""
+        row = self.get_button_row_index()
+        if row >= 0:
+            self.toggle_hide_absorber(row)
     
     def add_absorber(self, z_abs, line_list=None, color=None):
         """Add a new absorber to the manager"""
@@ -169,11 +267,9 @@ class AbsorberManager(QWidget):
         line_list = line_list or 'LLS'
         color = color or 'white'
         
-        # Add to dataframe with IsPlotted = True
-        new_row = pd.Series({'Zabs': z_abs, 'LineList': line_list, 
-                            'Color': color, 'IsPlotted': True})
-        self.absorbers_df = pd.concat([self.absorbers_df, new_row.to_frame().T], 
-                                      ignore_index=True)
+        # Add to dataframe
+        new_row = pd.Series({'Zabs': z_abs, 'LineList': line_list, 'Color': color})
+        self.absorbers_df = self.absorbers_df.append(new_row, ignore_index=True)
         
         # Find the first empty row or add a new one
         row_found = False
@@ -189,18 +285,18 @@ class AbsorberManager(QWidget):
             new_row_idx = self.table.rowCount()
             self.table.setRowCount(new_row_idx + 1)
             
-            # Add widgets before populating to ensure connections exist
-            self._add_row(new_row_idx)
+            # Important: Add widgets BEFORE populating to ensure button connections exist
+            self._add_row_widgets(new_row_idx)
             self._populate_row(new_row_idx, z_abs, line_list, color)
-        
-        # Ensure there's at least one empty row at the end
+            
+        # Always ensure there's at least one empty row at the end for future entries
         last_row = self.table.rowCount() - 1
-        if self.table.item(last_row, 1) is not None:  # Last row not empty
+        if self.table.item(last_row, 1) is not None:  # If the last row is not empty
             empty_row_idx = self.table.rowCount()
             self.table.setRowCount(empty_row_idx + 1)
-            self._add_row(empty_row_idx)
-            
-        # Return success
+            self._add_row_widgets(empty_row_idx)
+        
+        # Return success status
         return True
     
     def _populate_row(self, row, z_abs, line_list, color):
@@ -220,6 +316,30 @@ class AbsorberManager(QWidget):
         if color_index >= 0:
             color_combo.setCurrentIndex(color_index)
     
+    def plot_absorber(self, row):
+        """Plot the absorber at the specified row"""
+        # Check if row exists and has data
+        if row >= self.table.rowCount() or self.table.item(row, 1) is None:
+            print(f"Error: No absorber data at row {row}")
+            return False
+        
+        try:
+            # Get absorber data
+            z_abs = float(self.table.item(row, 1).text())
+            line_list = self.table.cellWidget(row, 0).currentText()
+            color = self.table.cellWidget(row, 2).currentText()
+            
+            # Call the parent's plotting method if available
+            if hasattr(self.parent, 'plot_absorber_lines'):
+                success = self.parent.plot_absorber_lines(row, z_abs, line_list, color)
+                return success
+            else:
+                print("Error: Parent does not have plot_absorber_lines method")
+                return False
+        except Exception as e:
+            print(f"Error plotting absorber: {e}")
+            return False
+    
     def remove_absorber(self, row):
         """Remove the absorber at the specified row"""
         try:
@@ -227,25 +347,51 @@ class AbsorberManager(QWidget):
             if hasattr(self.parent, 'remove_absorber_lines'):
                 self.parent.remove_absorber_lines(row)
             
-            # Remove from dataframe if row exists
+            # Need to get data before removing the row
             if row < len(self.absorbers_df):
+                # Remove from dataframe
                 self.absorbers_df = self.absorbers_df.drop(row).reset_index(drop=True)
             
             # Remove the row from the table
             self.table.removeRow(row)
             
-            # Add a new empty row at the end if needed
-            if self.table.rowCount() == 0 or (
-                self.table.rowCount() > 0 and
-                self.table.item(self.table.rowCount()-1, 1) is not None
-            ):
-                new_row_idx = self.table.rowCount()
-                self.table.insertRow(new_row_idx)
-                self._add_row(new_row_idx)
+            # Update row_index for all buttons after the removed row
+            for r in range(row, self.table.rowCount()):
+                for c in range(3, 6):  # Button columns
+                    btn = self.table.cellWidget(r, c)
+                    if btn and hasattr(btn, 'row_index'):
+                        # Update the row index to match the new position
+                        btn.row_index = r
+            
+            # Add a new empty row at the end to maintain minimum rows
+            new_row_idx = self.table.rowCount()
+            self.table.insertRow(new_row_idx)
+            self._add_row_widgets(new_row_idx)
                 
             return True
         except Exception as e:
             print(f"Error removing absorber: {e}")
+            return False
+    
+    def toggle_hide_absorber(self, row):
+        """Toggle visibility of the absorber at the specified row"""
+        try:
+            # Call parent's method to toggle visibility if available
+            if hasattr(self.parent, 'toggle_absorber_visibility'):
+                success = self.parent.toggle_absorber_visibility(row)
+                
+                # Update the Hide button text if successful
+                if success:
+                    hide_btn = self.table.cellWidget(row, 5)
+                    current_text = hide_btn.text()
+                    hide_btn.setText("Show" if current_text == "Hide" else "Hide")
+                
+                return success
+            else:
+                print("Error: Parent does not have toggle_absorber_visibility method")
+                return False
+        except Exception as e:
+            print(f"Error toggling absorber visibility: {e}")
             return False
     
     def on_cell_changed(self, row, column):
@@ -279,130 +425,92 @@ class AbsorberManager(QWidget):
         if row < len(self.absorbers_df):
             return self.absorbers_df.iloc[row].to_dict()
         return None
-    
-    def apply_theme(self):
-        """Apply centralized theme to all components"""
-        t = self.theme  # Short alias for theme colors
-        
-        # Base widget style
-        widget_style = f"""
-            QWidget {{
-                background-color: {t['widget_bg']};
-                color: {t['text']};
-            }}
+
+    def setup_dark_theme(self):
         """
-        
-        # Table style
-        table_style = f"""
-            QTableWidget {{
-                background-color: {t['bg']};
-                alternate-background-color: {t['widget_bg']};
-                color: {t['text']};
-                selection-background-color: {t['accent']};
-                gridline-color: {t['border']};
-                border-radius: 6px;
-            }}
-            
-            QTableWidget::item {{
-                background-color: {t['bg']};
-                color: {t['text']};
-                padding: 4px;
-            }}
-            
-            QTableWidget::item:selected {{
-                background-color: {t['accent']};
-                color: white;
-            }}
-            
-            QHeaderView::section {{
-                background-color: {t['header_bg']};
-                color: {t['text']};
-                padding: 6px;
-                border: 1px solid {t['border']};
-                font-size: 10px;
-            }}
+        Apply a dark theme similar to the main application's color scheme
         """
+        # Dark background colors
+        dark_background = QColor(53, 53, 53)
+        darker_background = QColor(25, 25, 25)
         
-        # Combobox style
-        combobox_style = f"""
-            QComboBox {{ 
-                background-color: {t['input_bg']};
-                color: {t['text']};
-                border: 1px solid {t['border']};
-                border-radius: 6px;
-                padding: 6px;
-                font-size: 10px;
-            }}
-            QComboBox::drop-down {{
-                background-color: {t['hover']};
-                border-left: 1px solid {t['border']};
-                width: 30px;
-            }}
-            QComboBox QAbstractItemView {{
-                background-color: {t['input_bg']};
-                color: {t['text']};
-                border: 1px solid {t['border']};
-                selection-background-color: {t['accent']};
-                selection-color: white;
-            }}
-        """
+        # Text and accent colors
+        white_text = QColor(255, 255, 255)
+        highlight_color = QColor(42, 130, 218)
         
-        # Button style
-        button_style = f"""
-            QPushButton {{
-                background-color: {t['input_bg']};
-                color: {t['text']};
-                border: 1px solid {t['border']};
-                border-radius: 6px;
-                padding: 2px;
-                font-size: 10px;
-            }}
-            QPushButton:hover {{
-                background-color: {t['hover']};
-                color: white;
-            }}
-            QPushButton[type="danger"]:hover {{
-                background-color: {t['danger']};
-                color: white;
-            }}
-        """
+        dark_stylesheet = """
+        QWidget {
+            background-color: %s;
+            color: %s;
+            selection-background-color: %s;
+        }
         
-        # Checkbox style
-        checkbox_style = f"""
-            QCheckBox {{
-                color: {t['text']};
-                spacing: 5px;
-            }}
-            QCheckBox::indicator {{
-                width: 18px;
-                height: 18px;
-                border-radius: 4px;
-            }}
-            QCheckBox::indicator:unchecked {{
-                background-color: {t['input_bg']};
-                border: 1px solid {t['border']};
-            }}
-            QCheckBox::indicator:checked {{
-                background-color: {t['accent']};
-                border: 1px solid {t['border']};
-            }}
-        """
+        QTableWidget {
+            background-color: %s;
+            alternate-background-color: %s;
+            color: %s;
+            selection-background-color: %s;
+        }
         
-        # Combine all styles
-        combined_style = "\n".join([
-            widget_style, 
-            table_style, 
-            combobox_style, 
-            button_style, 
-            checkbox_style
-        ])
+        QTableWidget::item {
+            background-color: %s;
+            color: %s;
+        }
         
-        # Apply combined style to the widget
-        self.setStyleSheet(combined_style)
+        QTableWidget::item:selected {
+            background-color: %s;
+            color: %s;
+        }
         
-        # Apply styles to comboboxes
-        for row in range(self.table.rowCount()):
-            for col in [0, 2]:  # LineList and Color combo columns
-                widget = self.table.cellWidget(row, col)
-                if isinstance(widget, QComboBox):
-                    widget.setStyleSheet(combobox_style)
+        QHeaderView::section {
+            background-color: %s;
+            color: %s;
+            padding: 5px;
+            border: 1px solid %s;
+        }
+        
+        QPushButton {
+            background-color: %s;
+            color: %s;
+            border: 1px solid %s;
+            padding: 5px;
+        }
+        
+        QPushButton:hover {
+            background-color: %s;
+            color: %s;
+        }
+        
+        QComboBox {
+            background-color: %s;
+            color: %s;
+            selection-background-color: %s;
+        }
+        
+        QComboBox::drop-down {
+            background-color: %s;
+        }
+        """ % (
+            dark_background.name(), white_text.name(), highlight_color.name(),
+            darker_background.name(), dark_background.name(), white_text.name(), highlight_color.name(),
+            darker_background.name(), white_text.name(),
+            highlight_color.name(), white_text.name(),
+            dark_background.name(), white_text.name(), darker_background.name(),
+            dark_background.name(), white_text.name(), highlight_color.name(),
+            highlight_color.name(), white_text.name(),
+            darker_background.name(), white_text.name(), highlight_color.name(),
+            dark_background.name()
+        )
+        
+        # Apply stylesheet
+        self.setStyleSheet(dark_stylesheet)
+        
+        # Try to set alternating row colors for all table widgets
+        for child in self.findChildren(QTableWidget):
+            child.setAlternatingRowColors(True)
+            child.setStyleSheet("""
+                QTableWidget { 
+                    alternate-background-color: #353535; 
+                    background-color: #191919; 
+                }
+            """)
