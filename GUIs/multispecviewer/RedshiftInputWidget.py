@@ -59,8 +59,8 @@ class RedshiftInputWidget(QWidget):
                 background-color: #3C3C3C;
                 color: white;
                 border: 1px solid #555555;
-                border-radius: 6px;
-                padding: 6px;
+                border-radius: 1px;
+                padding: 1px;
                 selection-background-color: #2A82DA;
                 selection-color: white;
             }
@@ -83,9 +83,9 @@ class RedshiftInputWidget(QWidget):
                 background-color: #3A3A3C;
                 color: #F2F2F7;
                 border: 1px solid #636366;
-                border-radius: 6px;
-                padding: 6px;
-                font-size: 14px;
+                border-radius: 1px;
+                padding: 1px;
+                font-size: 12px;
             }
             QComboBox::drop-down {
                 background-color: #48484A;
@@ -117,8 +117,8 @@ class RedshiftInputWidget(QWidget):
                 background-color: #3A3A3C;
                 color: #F2F2F7;
                 border: 1px solid #636366;
-                border-radius: 6px;
-                padding: 6px;
+                border-radius: 1px;
+                padding: 1px;
                 font-size: 14px;
             }
             QComboBox::drop-down {

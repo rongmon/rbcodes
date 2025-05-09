@@ -43,7 +43,7 @@ class AbsorberManager(QWidget):
         
         # Create table for displaying absorbers
         self.table = QTableWidget(1, 6)  # Start with 1 row, will expand as needed
-        self.table.setHorizontalHeaderLabels(['LineList', 'z', 'Color', 'Plot', 'Remove', 'Hide'])
+        self.table.setHorizontalHeaderLabels(['LineList', 'z', 'Color', 'Plot', 'Hide','Remove'])
         
         # Configure table properties
         header = self.table.horizontalHeader()
@@ -67,7 +67,7 @@ class AbsorberManager(QWidget):
         
         # Set default widgets for initial rows
         self._add_row_widgets(0)
-        self._add_row_widgets(1)
+        #self._add_row_widgets(1)
         
         # Add table to layout
         self.layout.addWidget(self.table)
@@ -143,7 +143,7 @@ class AbsorberManager(QWidget):
         # Store the row index directly on the button
         remove_btn.row_index = row_index
         remove_btn.clicked.connect(self.remove_absorber_from_button)
-        self.table.setCellWidget(row_index, 4, remove_btn)
+        self.table.setCellWidget(row_index, 5, remove_btn)
         
         # Hide button with direct row reference
         hide_btn = QPushButton("Hide", self)
@@ -161,7 +161,7 @@ class AbsorberManager(QWidget):
         # Store the row index directly on the button
         hide_btn.row_index = row_index
         hide_btn.clicked.connect(self.toggle_hide_absorber_from_button)
-        self.table.setCellWidget(row_index, 5, hide_btn)
+        self.table.setCellWidget(row_index, 4, hide_btn)
     
     def get_index(self):
         """
@@ -331,7 +331,7 @@ class AbsorberManager(QWidget):
             
             # Call the parent's plotting method if available
             if hasattr(self.parent, 'plot_absorber_lines'):
-                success = self.parent.plot_absorber_lines(row, z_abs, line_list, color)
+                success = self.parent.plot_absorber_lines(row, z_abs, line_list, color,alpha=0.35,linewidth=0.5)
                 return success
             else:
                 print("Error: Parent does not have plot_absorber_lines method")
@@ -426,91 +426,63 @@ class AbsorberManager(QWidget):
             return self.absorbers_df.iloc[row].to_dict()
         return None
 
+
     def setup_dark_theme(self):
         """
-        Apply a dark theme similar to the main application's color scheme
+        Apply a dark theme matching the main application's color scheme
         """
-        # Dark background colors
-        dark_background = QColor(53, 53, 53)
-        darker_background = QColor(25, 25, 25)
-        
-        # Text and accent colors
-        white_text = QColor(255, 255, 255)
-        highlight_color = QColor(42, 130, 218)
-        
-        dark_stylesheet = """
+        self.setStyleSheet("""
         QWidget {
-            background-color: %s;
-            color: %s;
-            selection-background-color: %s;
+            background-color: #353535;
+            color: #F2F2F7;
         }
         
         QTableWidget {
-            background-color: %s;
-            alternate-background-color: %s;
-            color: %s;
-            selection-background-color: %s;
+            background-color: #252525;
+            alternate-background-color: #353535;
+            color: #F2F2F7;
+            selection-background-color: #0A84FF;
+            gridline-color: #636366;
+            border-radius: 6px;
         }
         
         QTableWidget::item {
-            background-color: %s;
-            color: %s;
+            background-color: #252525;
+            color: #F2F2F7;
+            padding: 4px;
         }
         
         QTableWidget::item:selected {
-            background-color: %s;
-            color: %s;
+            background-color: #0A84FF;
+            color: white;
         }
         
         QHeaderView::section {
-            background-color: %s;
-            color: %s;
-            padding: 5px;
-            border: 1px solid %s;
+            background-color: #3A3A3C;
+            color: #F2F2F7;
+            padding: 6px;
+            border: 1px solid #636366;
+            font-size: 14px;
         }
         
         QPushButton {
-            background-color: %s;
-            color: %s;
-            border: 1px solid %s;
-            padding: 5px;
+            background-color: #3A3A3C;
+            color: #F2F2F7;
+            border: 1px solid #636366;
+            border-radius: 6px;
+            padding: 6px;
+            font-size: 14px;
         }
         
         QPushButton:hover {
-            background-color: %s;
-            color: %s;
+            background-color: #48484A;
+            color: white;
         }
         
-        QComboBox {
-            background-color: %s;
-            color: %s;
-            selection-background-color: %s;
+        QCheckBox {
+            color: #F2F2F7;
+            spacing: 5px;
         }
+        """)
         
-        QComboBox::drop-down {
-            background-color: %s;
-        }
-        """ % (
-            dark_background.name(), white_text.name(), highlight_color.name(),
-            darker_background.name(), dark_background.name(), white_text.name(), highlight_color.name(),
-            darker_background.name(), white_text.name(),
-            highlight_color.name(), white_text.name(),
-            dark_background.name(), white_text.name(), darker_background.name(),
-            dark_background.name(), white_text.name(), highlight_color.name(),
-            highlight_color.name(), white_text.name(),
-            darker_background.name(), white_text.name(), highlight_color.name(),
-            dark_background.name()
-        )
         
-        # Apply stylesheet
-        self.setStyleSheet(dark_stylesheet)
-        
-        # Try to set alternating row colors for all table widgets
-        for child in self.findChildren(QTableWidget):
-            child.setAlternatingRowColors(True)
-            child.setStyleSheet("""
-                QTableWidget { 
-                    alternate-background-color: #353535; 
-                    background-color: #191919; 
-                }
-            """)

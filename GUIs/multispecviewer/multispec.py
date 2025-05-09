@@ -665,7 +665,7 @@ class SpectralPlot(FigureCanvas):
         #    self.parent_window.redshift_widget.set_redshift(z)
 
 
-    def plot_absorber_lines(self, absorber_id, z_abs, line_list, color):
+    def plot_absorber_lines(self, absorber_id, z_abs, line_list, color,**kwargs):
         """
         Plot spectral lines for a specific absorber system.
         
@@ -675,6 +675,8 @@ class SpectralPlot(FigureCanvas):
         :param color: Color name to use for the lines
         :return: Success status
         """
+        alpha = kwargs.get('alpha', 0.7) 
+        linewidth=kwargs.get('linewidth',1)
         if not self.spectra or self.axes is None or len(self.axes) == 0:
             if self.message_box:
                 self.message_box.on_sent_message("No spectra loaded - cannot plot absorber lines", "#FF0000")
@@ -746,7 +748,7 @@ class SpectralPlot(FigureCanvas):
                     ylim = current_ylims[i]
                     
                     # Draw the line with color from the clr dictionary
-                    line_obj = ax.axvline(x=observed_wavelength, color=color_value, linestyle='--', alpha=0.7)
+                    line_obj = ax.axvline(x=observed_wavelength, color=color_value, linestyle='--', alpha=alpha,lw=linewidth)
                     self.absorber_lines[absorber_id].append(line_obj)
                     
                     # Only add text labels in the top panel (index 0)
@@ -957,6 +959,81 @@ class MainWindow(QMainWindow):
         
         # Add the bottom widget to the main layout
         main_layout.addWidget(bottom_widget)
+
+        # Create a container for the action buttons (Load, Save, Show)
+        button_container = QWidget()
+        button_layout = QVBoxLayout(button_container)
+        button_layout.setSpacing(5)
+        button_container.setMaximumWidth(100)  # Set fixed width for the buttons
+        
+        # Create the "Load" button
+        self.load_button = QPushButton("Load")
+        self.load_button.setStyleSheet("""
+            QPushButton {
+                background-color: #0A84FF;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #409CFF;
+            }
+            QPushButton:pressed {
+                background-color: #0060DF;
+            }
+        """)
+        self.load_button.clicked.connect(self.handle_load_clicked)
+        
+        # Create the "Save" button
+        self.save_button = QPushButton("Save")
+        self.save_button.setStyleSheet("""
+            QPushButton {
+                background-color: #30D158;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #4CD964;
+            }
+            QPushButton:pressed {
+                background-color: #248A3D;
+            }
+        """)
+        self.save_button.clicked.connect(self.handle_save_clicked)
+        
+        # Create the "Show" button
+        self.show_button = QPushButton("Show")
+        self.show_button.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9F0A;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #FFBC53;
+            }
+            QPushButton:pressed {
+                background-color: #D97F07;
+            }
+        """)
+        #connect the show button to the function we want to use
+        self.show_button.clicked.connect(self.handle_show_clicked)
+        
+        # Add buttons to the container layout
+        button_layout.addWidget(self.load_button)
+        button_layout.addWidget(self.save_button)
+        button_layout.addWidget(self.show_button)
+        
+        # Add the button container to the bottom layout
+        bottom_layout.addWidget(button_container)
         
         self.spectra = []  # Stores loaded spectra
         
@@ -1050,9 +1127,9 @@ class MainWindow(QMainWindow):
         
     # Add these methods to MainWindow:
     
-    def plot_absorber_lines(self, row, z_abs, line_list, color):
+    def plot_absorber_lines(self, row, z_abs, line_list, color, **kwargs):
         """Wrapper to call the canvas's plot_absorber_lines method"""
-        return self.canvas.plot_absorber_lines(row, z_abs, line_list, color)
+        return self.canvas.plot_absorber_lines(row, z_abs, line_list, color, **kwargs)
     
     def remove_absorber_lines(self, row):
         """Wrapper to call the canvas's remove_absorber_lines method"""
@@ -1150,6 +1227,55 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(error_message)
             self.message_box.on_sent_message(error_message, "#FF0000")        
     
+    def handle_load_clicked(self):
+        """
+        Handle the Load button click event.
+        Loads absorber systems from a saved file.
+        """
+        self.message_box.on_sent_message("⚠️ Load functionality is not fully implemented yet.", "#FFA500")
+
+        try:
+            options = QFileDialog.Options()
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "Load Absorber Catalog", "", 
+                "CSV Files (*.csv);;All Files (*)", options=options
+            )
+            
+            if file_path:
+                self.message_box.on_sent_message(f"Loading data from: {file_path}", "#FF0000")
+                # Future implementation will go here
+                self.message_box.on_sent_message("Load functionality is not fully implemented yet.", "#FFA500")
+        except Exception as e:
+            self.message_box.on_sent_message(f"Error loading data: {str(e)}", "#FF0000")
+
+    def handle_save_clicked(self):
+        """
+        Handle the Save button click event.
+        Saves identified lines from AbsorberManager to a file.
+        """
+        self.message_box.on_sent_message("⚠️ Save functionality is not fully implemented yet.", "#FFA500")
+
+        try:
+            options = QFileDialog.Options()
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "Save Absorber Catalog", "", 
+                "CSV Files (*.csv);;All Files (*)", options=options
+            )
+            
+            if file_path:
+                self.message_box.on_sent_message(f"Saving data to: {file_path}", "#8AB4F8")
+                # Future implementation will go here
+                self.message_box.on_sent_message("Save functionality is not fully implemented yet.", "#FFA500")
+        except Exception as e:
+            self.message_box.on_sent_message(f"Error saving data: {str(e)}", "#FF0000")
+
+    def handle_show_clicked(self):
+        """
+        Handle the Show button click event.
+        plot all loaded identified lines from AbsorberManager to a file.
+        """
+        self.message_box.on_sent_message("⚠️ Show functionality is not fully implemented yet.", "#FFA500")
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
