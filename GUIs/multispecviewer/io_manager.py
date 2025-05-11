@@ -430,15 +430,39 @@ class IOManager:
             
             elif ext == '.csv':
                 try:
+                    # First, read the headers to check column names
+                    with open(file_path, 'r') as f:
+                        header_line = f.readline().strip()
+                    
+                    # Load the CSV
                     absorbers_df = pd.read_csv(file_path)
-                    # Verify required columns
+                    
+                    # Handle different column naming conventions for backward compatibility
+                    column_mapping = {}
+                    
+                    # Map 'list' to 'LineList' if needed
+                    if 'list' in absorbers_df.columns and 'LineList' not in absorbers_df.columns:
+                        column_mapping['list'] = 'LineList'
+                    
+                    # Map 'color' to 'Color' if needed
+                    if 'color' in absorbers_df.columns and 'Color' not in absorbers_df.columns:
+                        column_mapping['color'] = 'Color'
+                    
+                    # Apply the mappings if needed
+                    if column_mapping:
+                        absorbers_df = absorbers_df.rename(columns=column_mapping)
+                        self.show_message("Mapped legacy column names to current format", "#FFA500")
+                    
+                    # Verify required columns (after mapping)
                     required_cols = ['Zabs', 'LineList', 'Color']
-                    if not all(col in absorbers_df.columns for col in required_cols):
-                        missing = [col for col in required_cols if col not in absorbers_df.columns]
+                    missing = [col for col in required_cols if col not in absorbers_df.columns]
+                    
+                    if missing:
                         return None, f"CSV file missing required columns: {', '.join(missing)}"
                     
                     self.show_message(f"Loaded {len(absorbers_df)} absorber systems from CSV", "#008000")
                     return absorbers_df, None
+                    
                 except Exception as e:
                     return None, f"Error loading CSV: {str(e)}"
             
@@ -448,8 +472,7 @@ class IOManager:
         except Exception as e:
             error_message = f"Error loading absorber data: {str(e)}"
             self.show_message(error_message, "#FF0000")
-            return None, error_message
-    
+            return None, error_message    
     # ===== Combined JSON Operations =====
     
     def save_combined_data(self, line_list, absorbers_df, spectrum_files=None, file_path=None, user_comment=None, metadata=None):
