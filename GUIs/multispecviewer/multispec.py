@@ -1234,8 +1234,7 @@ class MainWindow(QMainWindow):
         Adds error spectrum as 5% of flux if none exists.
         """
         try:
-            import numpy as np
-            
+                    
             self.spectra = []
             for file_path in file_paths:                
                 # First, load the spectrum to get wavelength and flux
