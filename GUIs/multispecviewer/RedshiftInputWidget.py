@@ -98,7 +98,7 @@ class RedshiftInputWidget(QWidget):
                 border: 1px solid #636366;
                 selection-background-color: #0A84FF;
                 selection-color: white;
-            }
+            }                
         """)
 
         linelist_layout.addWidget(linelist_label)
@@ -145,18 +145,18 @@ class RedshiftInputWidget(QWidget):
         self.submit_button = QPushButton("Submit")
         self.submit_button.setStyleSheet("""
             QPushButton {
-                background-color: #0A84FF;  /* macOS accent blue */
-                color: white;
+                background-color: #474747;  
+                color: #F2F2F2;             
                 border: none;
                 border-radius: 6px;
                 padding: 6px 12px;
-                font-size: 14px;
+                font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #409CFF;  /* lighter blue on hover */
+                background-color: #505050; 
             }
             QPushButton:pressed {
-                background-color: #0060DF;  /* darker blue when pressed */
+                background-color: #2A2A2A;  
             }
         """)
         self.submit_button.clicked.connect(self.validate_and_submit)
@@ -166,18 +166,18 @@ class RedshiftInputWidget(QWidget):
         self.catalog_button = QPushButton("Catalog")
         self.catalog_button.setStyleSheet("""
             QPushButton {
-                background-color: #30D158;  /* macOS green accent */
-                color: white;
+                background-color: #474747;  
+                color: #F2F2F2;             
                 border: none;
                 border-radius: 6px;
                 padding: 6px 12px;
-                font-size: 14px;
+                font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #4CD964;  /* lighter green on hover */
+                background-color: #505050; 
             }
             QPushButton:pressed {
-                background-color: #248A3D;  /* darker green when pressed */
+                background-color: #2A2A2A;  
             }
         """)
 

@@ -1006,18 +1006,18 @@ class MainWindow(QMainWindow):
         self.load_button = QPushButton("Load")
         self.load_button.setStyleSheet("""
             QPushButton {
-                background-color: #0A84FF;
-                color: white;
+                background-color: #474747;  
+                color: #F2F2F2;             
                 border: none;
                 border-radius: 6px;
                 padding: 6px 12px;
-                font-size: 14px;
+                font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #409CFF;
+                background-color: #505050; 
             }
             QPushButton:pressed {
-                background-color: #0060DF;
+                background-color: #2A2A2A;  
             }
         """)
         self.load_button.clicked.connect(self.handle_load_clicked)
@@ -1026,18 +1026,18 @@ class MainWindow(QMainWindow):
         self.save_button = QPushButton("Save")
         self.save_button.setStyleSheet("""
             QPushButton {
-                background-color: #30D158;
-                color: white;
+                background-color: #474747;  
+                color: #F2F2F2;             
                 border: none;
                 border-radius: 6px;
                 padding: 6px 12px;
-                font-size: 14px;
+                font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #4CD964;
+                background-color: #505050; 
             }
             QPushButton:pressed {
-                background-color: #248A3D;
+                background-color: #2A2A2A;  
             }
         """)
         self.save_button.clicked.connect(self.handle_save_clicked)
@@ -1046,18 +1046,18 @@ class MainWindow(QMainWindow):
         self.show_button = QPushButton("Show")
         self.show_button.setStyleSheet("""
             QPushButton {
-                background-color: #FF9F0A;
-                color: white;
+                background-color: #474747;  
+                color: #F2F2F2;             
                 border: none;
                 border-radius: 6px;
                 padding: 6px 12px;
-                font-size: 14px;
+                font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #FFBC53;
+                background-color: #505050; 
             }
             QPushButton:pressed {
-                background-color: #D97F07;
+                background-color: #2A2A2A;  
             }
         """)
         #connect the show button to the function we want to use
@@ -1067,18 +1067,18 @@ class MainWindow(QMainWindow):
         self.list_button = QPushButton("List")
         self.list_button.setStyleSheet("""
             QPushButton {
-                background-color: #BF5AF2;
-                color: white;
+                background-color: #474747;  
+                color: #F2F2F2;             
                 border: none;
                 border-radius: 6px;
                 padding: 6px 12px;
-                font-size: 14px;
+                font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #DA8FFF;
+                background-color: #505050; 
             }
             QPushButton:pressed {
-                background-color: #9841C9;
+                background-color: #2A2A2A;  
             }
         """)
         self.list_button.clicked.connect(self.display_line_list)
