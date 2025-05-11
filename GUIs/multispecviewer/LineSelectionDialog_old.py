@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QListWidget, QListWidgetItem,
-                             QLabel, QPushButton, QHBoxLayout, QWidget, QCheckBox)
+                             QLabel, QPushButton, QHBoxLayout, QWidget)
 from PyQt5.QtCore import Qt, pyqtSignal
 
 class LineSelectionDialog(QDialog):
@@ -18,7 +18,6 @@ class LineSelectionDialog(QDialog):
         
         self.observed_wavelength = observed_wavelength
         self.line_list = line_list
-        self.parent_window = parent
         
         # Setup UI
         self.initUI()
@@ -72,11 +71,6 @@ class LineSelectionDialog(QDialog):
         
         layout.addWidget(self.list_widget)
         
-        # Add checkbox for immediate plotting
-        self.plot_checkbox = QCheckBox("Plot lines immediately when selecting")
-        self.plot_checkbox.setChecked(False)  # Default to off
-        layout.addWidget(self.plot_checkbox)
-        
         # Buttons layout
         button_layout = QHBoxLayout()
         
@@ -93,120 +87,67 @@ class LineSelectionDialog(QDialog):
         
         # Connect double-click on list item to selection
         self.list_widget.itemDoubleClicked.connect(self.on_item_double_clicked)
-        
-        # Connect selection changed to handle immediate plotting
-        self.list_widget.itemSelectionChanged.connect(self.on_selection_changed)
     
     def apply_theme(self):
         """Apply the dark theme styling consistent with other widgets"""
+        # Dialog background
         self.setStyleSheet("""
-        QDialog {
-            background-color: #353535;
-            color: #F2F2F7;
-        }
-        
-        QLabel {
-            color: #F2F2F7;
-            font-size: 14px;
-        }
-        
-        QListWidget {
-            background-color: #252525;
-            alternate-background-color: #3A3A3C;
-            color: #F2F2F7;
-            border: 1px solid #636366;
-            border-radius: 6px;
-            padding: 4px;
-            font-size: 14px;
-        }
-        
-        QListWidget::item {
-            padding: 6px;
-        }
-        
-        QListWidget::item:selected {
-            background-color: #0A84FF;
-            color: white;
-        }
-        
-        QPushButton {
-            background-color: #3A3A3C;
-            color: #F2F2F7;
-            border: 1px solid #636366;
-            border-radius: 6px;
-            padding: 6px 12px;
-            font-size: 14px;
-        }
-        
-        QPushButton:hover {
-            background-color: #48484A;
-            color: white;
-        }
-        
-        /* Style the Select button specifically */
-        QPushButton#select_button {
-            background-color: #0A84FF;
-            color: white;
-            border: none;
-        }
-        
-        QPushButton#select_button:hover {
-            background-color: #409CFF;
-        }
-        
-        QCheckBox {
-            color: #F2F2F7;
-            spacing: 5px;
-        }
-        
-        QCheckBox::indicator:checked {
-            background-color: #0A84FF;
-            border: 1px solid #0A84FF;
-            border-radius: 3px;
-        }
-        
-        QCheckBox::indicator:unchecked {
-            background-color: #3A3A3C;
-            border: 1px solid #636366;
-            border-radius: 3px;
-        }
+            QDialog {
+                background-color: #353535;
+                color: #F2F2F7;
+            }
+            
+            QLabel {
+                color: #F2F2F7;
+                font-size: 14px;
+            }
+            
+            QListWidget {
+                background-color: #252525;
+                alternate-background-color: #3A3A3C;
+                color: #F2F2F7;
+                border: 1px solid #636366;
+                border-radius: 6px;
+                padding: 4px;
+                font-size: 14px;
+            }
+            
+            QListWidget::item {
+                padding: 6px;
+            }
+            
+            QListWidget::item:selected {
+                background-color: #0A84FF;
+                color: white;
+            }
+            
+            QPushButton {
+                background-color: #3A3A3C;
+                color: #F2F2F7;
+                border: 1px solid #636366;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 14px;
+            }
+            
+            QPushButton:hover {
+                background-color: #48484A;
+            }
+            
+            /* Style the Select button specifically */
+            QPushButton#select_button {
+                background-color: #0A84FF;
+                color: white;
+                border: none;
+            }
+            
+            QPushButton#select_button:hover {
+                background-color: #409CFF;
+            }
         """)
         
         # Set object names to allow specific styling
         self.select_button.setObjectName("select_button")
-    
-    def on_selection_changed(self):
-        """Handle item selection changes for immediate plotting"""
-        if not self.plot_checkbox.isChecked():
-            return  # Only proceed if immediate plotting is enabled
-            
-        current_item = self.list_widget.currentItem()
-        if current_item:
-            data = current_item.data(Qt.UserRole)
-            if data and self.parent_window:
-                # Update redshift input but don't emit lineSelected signal
-                # This way we plot the lines but don't close the dialog
-                if hasattr(self.parent_window, 'redshift_widget'):
-                    # Get the current color and linelist
-                    current_color = self.parent_window.redshift_widget.color_combo.currentText()
-                    current_linelist = self.parent_window.redshift_widget.linelist_combo.currentText()
-                    
-                    # Update redshift input
-                    self.parent_window.redshift_widget.set_redshift(data['implied_redshift'])
-                    
-                    # Trigger a manual update to the canvas
-                    if hasattr(self.parent_window, 'canvas'):
-                        # Update the canvas's redshift data and plot
-                        self.parent_window.canvas.redshift = data['implied_redshift']
-                        self.parent_window.canvas.linelist = current_linelist
-                        self.parent_window.canvas.line_color = current_color
-                        self.parent_window.canvas.plot_redshift_lines()
-                    
-                    # Show message in message box if available
-                    if hasattr(self.parent_window, 'message_box'):
-                        self.parent_window.message_box.on_sent_message(
-                            f"Plotting lines for {data['transition_name']}, λrest = {data['rest_wavelength']:.2f} Å, "
-                            f"implied z = {data['implied_redshift']:.6f}", "#008000")
     
     def on_select_clicked(self):
         """Handle select button click"""
