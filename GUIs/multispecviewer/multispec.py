@@ -30,6 +30,8 @@ import astropy.units as u
 # Convolution and data processing
 from astropy.convolution import convolve, Box1DKernel
 
+import pandas as pd
+
 # Custom local imports
 from rbcodes.GUIs.multispecviewer.RedshiftInputWidget import RedshiftInputWidget
 from rbcodes.GUIs.multispecviewer.MessageBox import MessageBox
@@ -70,6 +72,8 @@ class SpectralPlot(FigureCanvas):
         self.scale = 1. # 1D spec convolution kernel size
         self.redshift_lines = []  # Store references to plotted lines
         self.quickid_lines = []  # New list to store quick line ID markers
+        self.line_list = pd.DataFrame(columns=['Name', 'Wave_obs', 'Zabs'])
+
         
         # Store reference to the message box
         self.message_box = message_box
@@ -349,6 +353,73 @@ class SpectralPlot(FigureCanvas):
             self.check_lineid(event.xdata, 'Lyb', event.ydata, ax_index)
         elif (event.key == '1'):
             self.check_lineid(event.xdata, 'Lya', event.ydata, ax_index)
+        
+
+        # Intialize vstack
+        elif event.key == 'v' or event.key == 'V':
+            # Check if redshift is set
+            if hasattr(self, 'redshift') and hasattr(self, 'linelist'):
+                # Initialize line_list if it doesn't exist
+                if not hasattr(self, 'line_list'):
+                    self.line_list = pd.DataFrame(columns=['Name', 'Wave_obs', 'Zabs'])
+                
+                # Get velocity limits
+                if event.key == 'V':
+                    # Show dialog to get custom velocity limits
+                    Windowname = 'Manual velocity-Limits'
+                    instruction = 'Input range (e.g. -1500,1500)'
+                    vlim_input, ok = QInputDialog.getText(self, Windowname, instruction)
+                    
+                    if not ok:
+                        return  # User cancelled
+                        
+                    try:
+                        # Parse velocity limits
+                        vlim = vlim_input.split(',')
+                        vlim = np.array(vlim).astype('float32')
+                    except Exception as e:
+                        if self.message_box:
+                            self.message_box.on_sent_message(f"Error parsing velocity limits: {str(e)}", "#FF0000")
+                        return
+                else:
+                    # Default velocity limits
+                    vlim = [-1000, 1000]
+                
+                # Determine which spectrum to use based on where the user clicked
+                spec_index = 0  # Default to first spectrum
+                
+                if event.inaxes is not None:
+                    # Find which axes was clicked
+                    for i, ax in enumerate(self.axes):
+                        if event.inaxes == ax:
+                            spec_index = i
+                            break
+                    
+                    if spec_index >= len(self.spectra):
+                        spec_index = 0  # Fallback to first spectrum
+                        
+                # Get the selected spectrum data
+                spec = self.spectra[spec_index]
+                wave = spec.wavelength.value
+                flux = spec.flux.value
+                error = spec.sig.value if hasattr(spec, 'sig') else None
+                
+                # Launch vStack with the selected spectrum
+                try:
+                    from rbcodes.GUIs.multispecviewer.vStack import vStack
+                    self.ion_selection = vStack(self, wave, flux, error, 
+                                                self.linelist, zabs=self.redshift, vlim=vlim)
+                    
+                    if self.message_box:
+                        filename = os.path.basename(spec.filename) if hasattr(spec, 'filename') else f"Spectrum {spec_index+1}"
+                        self.message_box.on_sent_message(
+                            f"Launched vStack for {filename} at z={self.redshift:.6f}", "#008000")
+                except Exception as e:
+                    if self.message_box:
+                        self.message_box.on_sent_message(f"Error launching vStack: {str(e)}", "#FF0000")
+            else:
+                if self.message_box:
+                    self.message_box.on_sent_message("Set a redshift and line list first before using vStack", "#FF0000")
 
     def reset_view(self):
         """
@@ -660,10 +731,7 @@ class SpectralPlot(FigureCanvas):
         self.quickid_lines.append(text)
         self.draw()
         
-        # Update the redshift widget with the calculated redshift
-        #if hasattr(self.parent_window, 'redshift_widget'):
-        #    self.parent_window.redshift_widget.set_redshift(z)
-
+        
 
     def plot_absorber_lines(self, absorber_id, z_abs, line_list, color,**kwargs):
         """
@@ -812,38 +880,6 @@ class SpectralPlot(FigureCanvas):
             return True
 
 
-        
-    def toggle_absorber_visibility(self, absorber_id):
-        """
-        Toggle visibility of lines for a specific absorber system.
-        
-        :param absorber_id: Identifier for the absorber system to toggle
-        :return: Success status
-        """
-        if not hasattr(self, 'absorber_lines') or absorber_id not in self.absorber_lines:
-            return False
-        
-        # Check if we have any lines for this absorber
-        if not self.absorber_lines[absorber_id]:
-            return False
-        
-        # Sample the first line to determine current visibility
-        first_line = self.absorber_lines[absorber_id][0]
-        is_visible = first_line.get_visible()
-        
-        # Toggle visibility for all lines in this absorber
-        for line_obj in self.absorber_lines[absorber_id]:
-            line_obj.set_visible(not is_visible)
-        
-        # Update the plot
-        self.fig.canvas.draw_idle()
-        
-        if self.message_box:
-            status = "Hidden" if is_visible else "Shown"
-            self.message_box.on_sent_message(f"{status} absorber system {absorber_id}", "#008000")
-        
-        return True
-    
     
     
 class MainWindow(QMainWindow):
@@ -1026,11 +1062,33 @@ class MainWindow(QMainWindow):
         """)
         #connect the show button to the function we want to use
         self.show_button.clicked.connect(self.handle_show_clicked)
+
+        # Create the "List" button
+        self.list_button = QPushButton("List")
+        self.list_button.setStyleSheet("""
+            QPushButton {
+                background-color: #BF5AF2;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #DA8FFF;
+            }
+            QPushButton:pressed {
+                background-color: #9841C9;
+            }
+        """)
+        self.list_button.clicked.connect(self.display_line_list)
+        
         
         # Add buttons to the container layout
         button_layout.addWidget(self.load_button)
         button_layout.addWidget(self.save_button)
         button_layout.addWidget(self.show_button)
+        button_layout.addWidget(self.list_button)
         
         # Add the button container to the bottom layout
         bottom_layout.addWidget(button_container)
@@ -1135,10 +1193,6 @@ class MainWindow(QMainWindow):
         """Wrapper to call the canvas's remove_absorber_lines method"""
         return self.canvas.remove_absorber_lines(row)
     
-    def toggle_absorber_visibility(self, row):
-        """Wrapper to call the canvas's toggle_absorber_visibility method"""
-        return self.canvas.toggle_absorber_visibility(row)
-    
     def update_absorber_redshift(self, row, z_abs):
         """
         Update the redshift value for an absorber and replot its lines.
@@ -1230,51 +1284,320 @@ class MainWindow(QMainWindow):
     def handle_load_clicked(self):
         """
         Handle the Load button click event.
-        Loads absorber systems from a saved file.
+        Loads line_list from .txt and absorbers_df from .csv file.
         """
-        self.message_box.on_sent_message("⚠️ Load functionality is not fully implemented yet.", "#FFA500")
-
         try:
             options = QFileDialog.Options()
             file_path, _ = QFileDialog.getOpenFileName(
-                self, "Load Absorber Catalog", "", 
-                "CSV Files (*.csv);;All Files (*)", options=options
+                self, "Load Data", "", 
+                "Text Files (*.txt);;All Files (*)", options=options
             )
             
-            if file_path:
-                self.message_box.on_sent_message(f"Loading data from: {file_path}", "#FF0000")
-                # Future implementation will go here
-                self.message_box.on_sent_message("Load functionality is not fully implemented yet.", "#FFA500")
+            if not file_path:
+                return  # User cancelled
+                
+            self.message_box.on_sent_message(f"Loading data from: {file_path}", "#8AB4F8")
+            
+            # Base path for all files (without extension)
+            base_path = os.path.splitext(file_path)[0]
+            
+            # Load line_list from .txt file
+            line_list_path = file_path  # This is the .txt file
+            if os.path.exists(line_list_path):
+                try:
+                    # Initialize line_list if it doesn't exist
+                    if not hasattr(self.canvas, 'line_list'):
+                        self.canvas.line_list = pd.DataFrame(columns=['Name', 'Wave_obs', 'Zabs'])
+                    
+                    # Parse the text file
+                    with open(line_list_path, 'r') as f:
+                        lines = f.readlines()
+                    
+                    # Skip header (first two lines)
+                    data_lines = lines[2:]
+                    
+                    # Parse each line
+                    for line in data_lines:
+                        if line.strip():  # Skip empty lines
+                            parts = line.strip().split()
+                            if len(parts) >= 3:
+                                # Extract values
+                                # Name might contain spaces, so we need to be careful
+                                wave_index = -2  # Assume Wave_obs is second to last
+                                zabs_index = -1  # Assume Zabs is last
+                                
+                                # Extract the last two values as Wave_obs and Zabs
+                                try:
+                                    wave_obs = float(parts[wave_index])
+                                    zabs = float(parts[zabs_index])
+                                    
+                                    # Everything before these two values is the Name
+                                    name = ' '.join(parts[:wave_index])
+                                    
+                                    # Add to line_list
+                                    new_row = pd.Series({'Name': name, 'Wave_obs': wave_obs, 'Zabs': zabs})
+                                    self.canvas.line_list = self.canvas.line_list.append(new_row, ignore_index=True)
+                                except ValueError:
+                                    # If we can't convert to float, try another approach
+                                    # This is a simple fallback that assumes tab or multiple space delimiters
+                                    try:
+                                        import re
+                                        columns = re.split(r'\s{2,}', line.strip())
+                                        if len(columns) >= 3:
+                                            name = columns[0].strip()
+                                            wave_obs = float(columns[1].strip())
+                                            zabs = float(columns[2].strip())
+                                            
+                                            # Add to line_list
+                                            new_row = pd.Series({'Name': name, 'Wave_obs': wave_obs, 'Zabs': zabs})
+                                            self.canvas.line_list = self.canvas.line_list.append(new_row, ignore_index=True)
+                                    except Exception as e:
+                                        print(f"Could not parse line: {line} - {str(e)}")
+                    
+                    self.message_box.on_sent_message(f"Loaded {len(self.canvas.line_list)} line identifications", "#008000")
+                except Exception as e:
+                    self.message_box.on_sent_message(f"Error parsing line list: {str(e)}", "#FF0000")
+            
+            # Load absorbers_df from .csv file
+            absorbers_path = f"{base_path}_absorbers.csv"
+            if os.path.exists(absorbers_path):
+                try:
+                    absorbers_df = pd.read_csv(absorbers_path)
+                    
+                    # Check that required columns exist
+                    required_columns = ['Zabs', 'LineList', 'Color']
+                    if set(required_columns).issubset(absorbers_df.columns):
+                        # Update AbsorberManager with loaded data
+                        for _, row in absorbers_df.iterrows():
+                            self.absorber_manager.add_absorber(
+                                row['Zabs'], row['LineList'], row['Color'], 
+                                visible=row.get('Visible', False)  # Use get to handle missing column
+                            )
+                        
+                        self.message_box.on_sent_message(f"Loaded {len(absorbers_df)} absorber systems", "#008000")
+                    else:
+                        missing = [col for col in required_columns if col not in absorbers_df.columns]
+                        self.message_box.on_sent_message(f"Absorbers file missing columns: {', '.join(missing)}", "#FF0000")
+                except Exception as e:
+                    self.message_box.on_sent_message(f"Error loading absorbers: {str(e)}", "#FF0000")
+            
         except Exception as e:
             self.message_box.on_sent_message(f"Error loading data: {str(e)}", "#FF0000")
 
+    
+    # In MainWindow.handle_save_clicked method
     def handle_save_clicked(self):
         """
         Handle the Save button click event.
-        Saves identified lines from AbsorberManager to a file.
+        Saves line_list as .txt and absorbers_df as .csv file.
         """
-        self.message_box.on_sent_message("⚠️ Save functionality is not fully implemented yet.", "#FFA500")
-
         try:
             options = QFileDialog.Options()
             file_path, _ = QFileDialog.getSaveFileName(
-                self, "Save Absorber Catalog", "", 
-                "CSV Files (*.csv);;All Files (*)", options=options
+                self, "Save Data", "", 
+                "Text Files (*.txt);;All Files (*)", options=options
             )
             
-            if file_path:
-                self.message_box.on_sent_message(f"Saving data to: {file_path}", "#8AB4F8")
-                # Future implementation will go here
-                self.message_box.on_sent_message("Save functionality is not fully implemented yet.", "#FFA500")
+            if not file_path:
+                return  # User cancelled
+                
+            self.message_box.on_sent_message(f"Saving data to: {file_path}", "#8AB4F8")
+            
+            # Make sure file path has .txt extension for line_list
+            if not file_path.lower().endswith('.txt'):
+                file_path += '.txt'
+                
+            # Base path for all files (without extension)
+            base_path = os.path.splitext(file_path)[0]
+            
+            # Save line_list as .txt file
+            line_list_path = file_path  # This will be the .txt file
+            if hasattr(self.canvas, 'line_list') and not self.canvas.line_list.empty:
+                # Format the line_list as a nicely formatted text table
+                with open(line_list_path, 'w') as f:
+                    # Write header
+                    f.write(f"{'Name':<30} {'Wave_obs':<15} {'Zabs':<10}\n")
+                    f.write("-" * 55 + "\n")
+                    
+                    # Write each line
+                    for _, row in self.canvas.line_list.iterrows():
+                        name = str(row['Name'])
+                        wave_obs = f"{row['Wave_obs']:.4f}"
+                        zabs = f"{row['Zabs']:.6f}"
+                        f.write(f"{name:<30} {wave_obs:<15} {zabs:<10}\n")
+                
+                self.message_box.on_sent_message(f"Saved line list to: {line_list_path}", "#008000")
+            
+            # Save absorbers_df as .csv file
+            absorbers_path = f"{base_path}_absorbers.csv"
+            absorbers_df = self.absorber_manager.get_all_absorber_data()
+            if not absorbers_df.empty:
+                # Select only the columns we want
+                if set(['Zabs', 'LineList', 'Color']).issubset(absorbers_df.columns):
+                    absorbers_df = absorbers_df[['Zabs', 'LineList', 'Color']]
+                
+                # Save to CSV
+                absorbers_df.to_csv(absorbers_path, index=False)
+                self.message_box.on_sent_message(f"Saved absorbers to: {absorbers_path}", "#008000")
+            
         except Exception as e:
             self.message_box.on_sent_message(f"Error saving data: {str(e)}", "#FF0000")
+
 
     def handle_show_clicked(self):
         """
         Handle the Show button click event.
-        plot all loaded identified lines from AbsorberManager to a file.
+        Displays/hides all identified lines from line_list on the plot.
+        Toggle behavior: first click shows lines, second click hides them.
         """
-        self.message_box.on_sent_message("⚠️ Show functionality is not fully implemented yet.", "#FFA500")
+        try:
+            # Initialize storage for line objects if not already present
+            if not hasattr(self.canvas, 'line_objects'):
+                self.canvas.line_objects = []
+            
+            # If lines are currently shown, remove them
+            if self.canvas.line_objects:
+                # Remove all line objects
+                for line_obj in self.canvas.line_objects:
+                    try:
+                        line_obj.remove()
+                    except Exception:
+                        pass  # In case the line was already removed
+                
+                # Clear the list
+                self.canvas.line_objects = []
+                
+                # Update the canvas without redrawing everything
+                self.canvas.draw()
+                
+                self.message_box.on_sent_message("Removed all shown lines", "#008000")
+                return
+            
+            # Check if there's a line_list with identifications
+            if not hasattr(self.canvas, 'line_list') or self.canvas.line_list.empty:
+                self.message_box.on_sent_message("No line identifications to show", "#FFA500")
+                return
+            
+            # Get unique redshifts and assign colors
+            unique_redshifts = self.canvas.line_list['Zabs'].unique()
+            
+            # Define a set of distinct colors
+            colors = ['cyan', 'magenta', 'yellow', 'lime', 'orange', 'pink', 'white', 
+                     'red', 'green', 'blue', 'purple', 'gold', 'silver', 'turquoise']
+            
+            # Assign a color to each redshift
+            redshift_colors = {}
+            for i, z in enumerate(unique_redshifts):
+                redshift_colors[z] = colors[i % len(colors)]
+            
+            # Plot each identified line
+            lines_shown = 0
+            for _, row in self.canvas.line_list.iterrows():
+                wave_obs = row['Wave_obs']
+                name = row['Name']
+                zabs = row['Zabs']
+                
+                # Get the color for this redshift
+                color = redshift_colors[zabs]
+                
+                # Plot a vertical line on all axes
+                for i, ax in enumerate(self.canvas.axes):
+                    # Draw the line with specified properties
+                    line = ax.axvline(x=wave_obs, color=color, linestyle='--', 
+                                     alpha=0.5, linewidth=0.5)
+                    self.canvas.line_objects.append(line)
+                    
+                    # Add a text label (only on the top panel)
+                    if i == 0:  # Only for the first subplot
+                        # Get the current y limits
+                        ylim = ax.get_ylim()
+                        y_range = ylim[1] - ylim[0]
+                        
+                        # Position the text at 90% of the way up the panel
+                        y_pos = ylim[0] + 0.9 * y_range
+                        
+                        # Create vertical text with name and redshift
+                        text = ax.text(wave_obs, y_pos, f"{name}\nz={zabs:.4f}", 
+                                      rotation=90, color=color, fontsize=8,
+                                      horizontalalignment='right', verticalalignment='top')
+                        self.canvas.line_objects.append(text)
+                
+                lines_shown += 1
+            
+            # Update the canvas
+            self.canvas.draw()
+            
+            self.message_box.on_sent_message(f"Displayed {lines_shown} identified lines from {len(unique_redshifts)} absorber systems", "#008000")
+            
+        except Exception as e:
+            self.message_box.on_sent_message(f"Error showing lines: {str(e)}", "#FF0000")
+    # New method in MainWindow
+    def display_line_list(self):
+        """
+        Display a table of all identified lines.
+        """
+        try:
+            # Check if there's a line_list with identifications
+            if not hasattr(self.canvas, 'line_list') or self.canvas.line_list.empty:
+                self.message_box.on_sent_message("No line identifications to display", "#FFA500")
+                return
+                
+            # Create a dialog to show the line list
+            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QPushButton
+            
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Identified Lines")
+            dialog.setMinimumSize(600, 400)
+            
+            layout = QVBoxLayout(dialog)
+            
+            # Create table
+            table = QTableWidget()
+            table.setColumnCount(3)
+            table.setHorizontalHeaderLabels(['Name', 'Wavelength (Å)', 'Redshift'])
+            
+            # Add data
+            line_list = self.canvas.line_list
+            table.setRowCount(len(line_list))
+            
+            for i, (_, row) in enumerate(line_list.iterrows()):
+                table.setItem(i, 0, QTableWidgetItem(str(row['Name'])))
+                table.setItem(i, 1, QTableWidgetItem(f"{row['Wave_obs']:.2f}"))
+                table.setItem(i, 2, QTableWidgetItem(f"{row['Zabs']:.6f}"))
+            
+            # Resize columns to content
+            table.resizeColumnsToContents()
+            
+            # Add to layout
+            layout.addWidget(table)
+            
+            # Add export button
+            export_button = QPushButton("Export to CSV")
+            
+            def export_csv():
+                options = QFileDialog.Options()
+                file_path, _ = QFileDialog.getSaveFileName(
+                    dialog, "Export Line List", "", 
+                    "CSV Files (*.csv);;All Files (*)", options=options
+                )
+                
+                if file_path:
+                    # Add .csv extension if not present
+                    if not file_path.lower().endswith('.csv'):
+                        file_path += '.csv'
+                    
+                    # Export to CSV
+                    line_list.to_csv(file_path, index=False)
+                    self.message_box.on_sent_message(f"Exported line list to: {file_path}", "#008000")
+            
+            export_button.clicked.connect(export_csv)
+            layout.addWidget(export_button)
+            
+            # Show dialog
+            dialog.exec_()
+            
+        except Exception as e:
+            self.message_box.on_sent_message(f"Error displaying line list: {str(e)}", "#FF0000")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
