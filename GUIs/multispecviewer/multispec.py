@@ -1258,9 +1258,44 @@ class MainWindow(QMainWindow):
         """
         Handle the Load button click event.
         Uses IOManager to load line list and absorber data.
-        Sets all absorbers to not visible by default.
+        Provides option to append or overwrite existing data.
         """
         try:
+            # Check if we already have data that might be overwritten
+            has_existing_data = (
+                (hasattr(self.canvas, 'line_list') and not self.canvas.line_list.empty) or
+                (self.absorber_manager.get_absorber_count() > 0)
+            )
+            
+            append_mode = False
+            
+            # If we have existing data, ask if the user wants to append or overwrite
+            if has_existing_data:
+                from PyQt5.QtWidgets import QMessageBox
+                
+                # Create a custom message box
+                msgBox = QMessageBox(self)
+                msgBox.setWindowTitle("Append or Overwrite?")
+                msgBox.setText("Do you want to append to existing data or overwrite it?")
+                
+                # Add custom buttons
+                appendButton = msgBox.addButton("Append", QMessageBox.ActionRole)
+                overwriteButton = msgBox.addButton("Overwrite", QMessageBox.ActionRole)
+                cancelButton = msgBox.addButton(QMessageBox.Cancel)
+                
+                # Set default button
+                msgBox.setDefaultButton(appendButton)
+                
+                # Show the dialog and get the result
+                msgBox.exec_()
+                
+                # Check which button was clicked
+                if msgBox.clickedButton() == cancelButton:
+                    return
+                elif msgBox.clickedButton() == appendButton:
+                    append_mode = True
+                # else: Overwrite mode (clicked overwriteButton)
+            
             # Use IO Manager to load the data
             line_list, absorbers_df, error = self.io_manager.integrated_load_data(self)
             
@@ -1273,44 +1308,79 @@ class MainWindow(QMainWindow):
                 if not hasattr(self.canvas, 'line_list'):
                     self.canvas.line_list = pd.DataFrame(columns=['Name', 'Wave_obs', 'Zabs'])
                 
-                # Replace with loaded data
-                self.canvas.line_list = line_list
-                self.message_box.on_sent_message(f"Loaded {len(line_list)} line identifications", "#008000")
+                if append_mode:
+                    # Append to existing line list
+                    self.canvas.line_list = pd.concat([self.canvas.line_list, line_list], ignore_index=True)
+                    self.message_box.on_sent_message(f"Appended {len(line_list)} line identifications", "#008000")
+                else:
+                    # Replace with loaded data
+                    self.canvas.line_list = line_list
+                    self.message_box.on_sent_message(f"Loaded {len(line_list)} line identifications", "#008000")
             
             # Update absorbers if loaded
             if absorbers_df is not None and not absorbers_df.empty:
-                # Clear existing absorber lines from plot
-                if hasattr(self.canvas, 'absorber_lines'):
-                    for absorber_id in self.canvas.absorber_lines:
-                        for line_obj in self.canvas.absorber_lines[absorber_id]:
-                            try:
-                                line_obj.remove()
-                            except:
-                                pass
-                    self.canvas.absorber_lines = {}
-                    self.canvas.draw()
+                # Set all absorbers to not visible
+                if 'Visible' in absorbers_df.columns:
+                    absorbers_df['Visible'] = False
+                else:
+                    absorbers_df['Visible'] = False
                 
-                # Clear existing absorbers from manager
-                for i in range(self.absorber_manager.get_absorber_count()-1, -1, -1):
-                    self.absorber_manager.remove_absorber(i)
-                
-                # Set all absorbers to Visible=False
-                absorbers_df['Visible'] = False
-                
-                # Add loaded absorbers (all set to not visible)
-                for _, row in absorbers_df.iterrows():
-                    self.absorber_manager.add_absorber(
-                        row['Zabs'], row['LineList'], row['Color'], visible=False
+                if append_mode:
+                    # Get existing absorbers data
+                    existing_absorbers = self.absorber_manager.get_all_absorber_data()
+                    
+                    # For append mode, only clear the plot, not the absorber manager
+                    if hasattr(self.canvas, 'absorber_lines'):
+                        for absorber_id in self.canvas.absorber_lines:
+                            for line_obj in self.canvas.absorber_lines[absorber_id]:
+                                try:
+                                    line_obj.remove()
+                                except:
+                                    pass
+                        self.canvas.absorber_lines = {}
+                        self.canvas.draw()
+                    
+                    # Add new absorbers to manager
+                    for _, row in absorbers_df.iterrows():
+                        self.absorber_manager.add_absorber(
+                            row['Zabs'], row['LineList'], row['Color'], visible=False
+                        )
+                    
+                    self.message_box.on_sent_message(
+                        f"Appended {len(absorbers_df)} absorber systems (not displayed)", "#008000"
                     )
-                
-                self.message_box.on_sent_message(f"Loaded {len(absorbers_df)} absorber systems (not displayed)", "#008000")
+                else:
+                    # Clear existing absorber lines from plot
+                    if hasattr(self.canvas, 'absorber_lines'):
+                        for absorber_id in self.canvas.absorber_lines:
+                            for line_obj in self.canvas.absorber_lines[absorber_id]:
+                                try:
+                                    line_obj.remove()
+                                except:
+                                    pass
+                        self.canvas.absorber_lines = {}
+                        self.canvas.draw()
+                    
+                    # Clear existing absorbers from manager
+                    for i in range(self.absorber_manager.get_absorber_count()-1, -1, -1):
+                        self.absorber_manager.remove_absorber(i)
+                    
+                    # Add loaded absorbers
+                    for _, row in absorbers_df.iterrows():
+                        self.absorber_manager.add_absorber(
+                            row['Zabs'], row['LineList'], row['Color'], visible=False
+                        )
+                    
+                    self.message_box.on_sent_message(
+                        f"Loaded {len(absorbers_df)} absorber systems (not displayed)", "#008000"
+                    )
                 
         except Exception as e:
             self.message_box.on_sent_message(f"Error loading data: {str(e)}", "#FF0000")
             import traceback
             traceback.print_exc()
     
-        
+            
     # In MainWindow.handle_save_clicked method
     def handle_save_clicked(self):
         """
