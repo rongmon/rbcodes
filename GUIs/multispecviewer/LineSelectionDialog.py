@@ -28,7 +28,7 @@ class LineSelectionDialog(QDialog):
             self.setGeometry(
                 parent.x() + parent.width() // 4,
                 parent.y() + parent.height() // 4,
-                400, 300
+                400, 900
             )
             
         # Apply dark theme styling
