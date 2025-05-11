@@ -1253,10 +1253,12 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(error_message)
             self.message_box.on_sent_message(error_message, "#FF0000")    
 
+
     def handle_load_clicked(self):
         """
         Handle the Load button click event.
         Uses IOManager to load line list and absorber data.
+        Sets all absorbers to not visible by default.
         """
         try:
             # Use IO Manager to load the data
@@ -1292,26 +1294,22 @@ class MainWindow(QMainWindow):
                 for i in range(self.absorber_manager.get_absorber_count()-1, -1, -1):
                     self.absorber_manager.remove_absorber(i)
                 
-                # Add loaded absorbers
-                for _, row in absorbers_df.iterrows():
-                    visible = row.get('Visible', False)
-                    self.absorber_manager.add_absorber(
-                        row['Zabs'], row['LineList'], row['Color'], visible=visible
-                    )
-                    
-                    # Plot visible absorbers
-                    if visible:
-                        for i in range(self.absorber_manager.get_absorber_count()):
-                            data = self.absorber_manager.get_absorber_data(i)
-                            if data and data['Visible']:
-                                self.plot_absorber_lines(i, data['Zabs'], data['LineList'], data['Color'])
+                # Set all absorbers to Visible=False
+                absorbers_df['Visible'] = False
                 
-                self.message_box.on_sent_message(f"Loaded {len(absorbers_df)} absorber systems", "#008000")
+                # Add loaded absorbers (all set to not visible)
+                for _, row in absorbers_df.iterrows():
+                    self.absorber_manager.add_absorber(
+                        row['Zabs'], row['LineList'], row['Color'], visible=False
+                    )
+                
+                self.message_box.on_sent_message(f"Loaded {len(absorbers_df)} absorber systems (not displayed)", "#008000")
                 
         except Exception as e:
             self.message_box.on_sent_message(f"Error loading data: {str(e)}", "#FF0000")
             import traceback
             traceback.print_exc()
+    
         
     # In MainWindow.handle_save_clicked method
     def handle_save_clicked(self):
