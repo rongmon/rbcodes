@@ -36,7 +36,6 @@ import pandas as pd
 from rbcodes.GUIs.multispecviewer.RedshiftInputWidget import RedshiftInputWidget
 from rbcodes.GUIs.multispecviewer.MessageBox import MessageBox
 from rbcodes.GUIs.multispecviewer.AbsorberManager import AbsorberManager
-from rbcodes.GUIs.multispecviewer.io_manager import IOManager
 from rbcodes.IGM import rb_setline as rb_setline
 from rbcodes.utils import rb_utility as rt
 from rbcodes.GUIs.multispecviewer.LineSelectionDialog import LineSelectionDialog
@@ -914,8 +913,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
         
-        # Initialize IO Manager
-        self.io_manager = IOManager()
+
         
         # Create a container widget for the button layout
         button_container = QWidget()
@@ -939,7 +937,6 @@ class MainWindow(QMainWindow):
         
         # Create message box first so we can pass it to the SpectralPlot
         self.message_box = MessageBox()
-        self.io_manager.set_message_box(self.message_box)
         
         # Create SpectralPlot with reference to the message box
         self.canvas = SpectralPlot(self, message_box=self.message_box)
@@ -1233,119 +1230,215 @@ class MainWindow(QMainWindow):
     
     def load_fits_files(self, file_paths):
         """
-        Loads and plots the selected FITS files using the IO Manager.
+        Loads and plots the selected FITS files using XSpectrum1D directly.
+        Adds error spectrum as 5% of flux if none exists.
         """
         try:
-            # Use IO Manager to load the FITS files
-            self.spectra, error = self.io_manager.load_fits_files(file_paths)
+                    
+            self.spectra = []
+            for file_path in file_paths:                
+                # First, load the spectrum to get wavelength and flux
+                try:
+                    temp_spec = XSpectrum1D.from_file(file_path)
+                    wave = temp_spec.wavelength.value
+                    flux = temp_spec.flux.value
+                    
+                    # Check if the original spectrum has an error array
+                    if temp_spec.sig_is_set:
+                        # Use the existing error array
+                        sig = temp_spec.sig.value
+                        spec = XSpectrum1D.from_tuple((wave, flux, sig), verbose=False)
+                    else:
+                        # Create error array as 5% of flux values
+                        sig_array = 0.05 * flux
+                        
+                        # Create a new spectrum with the error array
+                        spec = XSpectrum1D.from_tuple((wave, flux, sig_array), verbose=False)
+                        
+                        # Send message that we're assuming 5% error
+                        self.message_box.on_sent_message(
+                            f"No error spectrum found for {os.path.basename(file_path)}. " 
+                            f"Using 5% of flux values as error.", "#FFA500")
+                    
+                    # Set the filename attribute to match the original
+                    spec.filename = file_path
+                    
+                    self.spectra.append(spec)
+                    
+                except Exception as spec_error:
+                    self.message_box.on_sent_message(
+                        f"Error loading {os.path.basename(file_path)}: {str(spec_error)}. Skipping file.", 
+                        "#FF0000")
+                    continue
             
-            # Exit if error occurred or no spectra loaded
-            if error or not self.spectra:
-                if not self.spectra:
-                    self.message_box.on_sent_message("No spectra could be loaded.", "#FF0000")
-                return
-            
-            # Plot the loaded spectra
-            self.canvas.plot_spectra(self.spectra)
-            self.canvas.setFocus()
+            if self.spectra:  # Only plot if we have loaded spectra
+                self.canvas.plot_spectra(self.spectra)
+            else:
+                self.message_box.on_sent_message("No spectra could be loaded.", "#FF0000")
         except Exception as e:
-            error_message = f"Error loading FITS files: {str(e)}"
+            error_message = f"Error: {str(e)}"
             self.statusBar().showMessage(error_message)
-            self.message_box.on_sent_message(error_message, "#FF0000")    
-
+            self.message_box.on_sent_message(error_message, "#FF0000")        
+    
     def handle_load_clicked(self):
         """
         Handle the Load button click event.
-        Uses IOManager to load line list and absorber data.
+        Loads line_list from .txt and absorbers_df from .csv file.
         """
         try:
-            # Use IO Manager to load the data
-            line_list, absorbers_df, error = self.io_manager.integrated_load_data(self)
+            options = QFileDialog.Options()
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "Load Data", "", 
+                "Text Files (*.txt);;All Files (*)", options=options
+            )
             
-            if error:
-                return
+            if not file_path:
+                return  # User cancelled
+                
+            self.message_box.on_sent_message(f"Loading data from: {file_path}", "#8AB4F8")
             
-            # Update line list if loaded
-            if line_list is not None and not line_list.empty:
-                # Initialize line_list if it doesn't exist
-                if not hasattr(self.canvas, 'line_list'):
-                    self.canvas.line_list = pd.DataFrame(columns=['Name', 'Wave_obs', 'Zabs'])
-                
-                # Replace with loaded data
-                self.canvas.line_list = line_list
-                self.message_box.on_sent_message(f"Loaded {len(line_list)} line identifications", "#008000")
+            # Base path for all files (without extension)
+            base_path = os.path.splitext(file_path)[0]
             
-            # Update absorbers if loaded
-            if absorbers_df is not None and not absorbers_df.empty:
-                # Clear existing absorber lines from plot
-                if hasattr(self.canvas, 'absorber_lines'):
-                    for absorber_id in self.canvas.absorber_lines:
-                        for line_obj in self.canvas.absorber_lines[absorber_id]:
-                            try:
-                                line_obj.remove()
-                            except:
-                                pass
-                    self.canvas.absorber_lines = {}
-                    self.canvas.draw()
-                
-                # Clear existing absorbers from manager
-                for i in range(self.absorber_manager.get_absorber_count()-1, -1, -1):
-                    self.absorber_manager.remove_absorber(i)
-                
-                # Add loaded absorbers
-                for _, row in absorbers_df.iterrows():
-                    visible = row.get('Visible', False)
-                    self.absorber_manager.add_absorber(
-                        row['Zabs'], row['LineList'], row['Color'], visible=visible
-                    )
+            # Load line_list from .txt file
+            line_list_path = file_path  # This is the .txt file
+            if os.path.exists(line_list_path):
+                try:
+                    # Initialize line_list if it doesn't exist
+                    if not hasattr(self.canvas, 'line_list'):
+                        self.canvas.line_list = pd.DataFrame(columns=['Name', 'Wave_obs', 'Zabs'])
                     
-                    # Plot visible absorbers
-                    if visible:
-                        for i in range(self.absorber_manager.get_absorber_count()):
-                            data = self.absorber_manager.get_absorber_data(i)
-                            if data and data['Visible']:
-                                self.plot_absorber_lines(i, data['Zabs'], data['LineList'], data['Color'])
-                
-                self.message_box.on_sent_message(f"Loaded {len(absorbers_df)} absorber systems", "#008000")
-                
+                    # Parse the text file
+                    with open(line_list_path, 'r') as f:
+                        lines = f.readlines()
+                    
+                    # Skip header (first two lines)
+                    data_lines = lines[2:]
+                    
+                    # Parse each line
+                    for line in data_lines:
+                        if line.strip():  # Skip empty lines
+                            parts = line.strip().split()
+                            if len(parts) >= 3:
+                                # Extract values
+                                # Name might contain spaces, so we need to be careful
+                                wave_index = -2  # Assume Wave_obs is second to last
+                                zabs_index = -1  # Assume Zabs is last
+                                
+                                # Extract the last two values as Wave_obs and Zabs
+                                try:
+                                    wave_obs = float(parts[wave_index])
+                                    zabs = float(parts[zabs_index])
+                                    
+                                    # Everything before these two values is the Name
+                                    name = ' '.join(parts[:wave_index])
+                                    
+                                    # Add to line_list
+                                    new_row = pd.Series({'Name': name, 'Wave_obs': wave_obs, 'Zabs': zabs})
+                                    self.canvas.line_list = self.canvas.line_list.append(new_row, ignore_index=True)
+                                except ValueError:
+                                    # If we can't convert to float, try another approach
+                                    # This is a simple fallback that assumes tab or multiple space delimiters
+                                    try:
+                                        import re
+                                        columns = re.split(r'\s{2,}', line.strip())
+                                        if len(columns) >= 3:
+                                            name = columns[0].strip()
+                                            wave_obs = float(columns[1].strip())
+                                            zabs = float(columns[2].strip())
+                                            
+                                            # Add to line_list
+                                            new_row = pd.Series({'Name': name, 'Wave_obs': wave_obs, 'Zabs': zabs})
+                                            self.canvas.line_list = self.canvas.line_list.append(new_row, ignore_index=True)
+                                    except Exception as e:
+                                        print(f"Could not parse line: {line} - {str(e)}")
+                    
+                    self.message_box.on_sent_message(f"Loaded {len(self.canvas.line_list)} line identifications", "#008000")
+                except Exception as e:
+                    self.message_box.on_sent_message(f"Error parsing line list: {str(e)}", "#FF0000")
+            
+            # Load absorbers_df from .csv file
+            absorbers_path = f"{base_path}_absorbers.csv"
+            if os.path.exists(absorbers_path):
+                try:
+                    absorbers_df = pd.read_csv(absorbers_path)
+                    
+                    # Check that required columns exist
+                    required_columns = ['Zabs', 'LineList', 'Color']
+                    if set(required_columns).issubset(absorbers_df.columns):
+                        # Update AbsorberManager with loaded data
+                        for _, row in absorbers_df.iterrows():
+                            self.absorber_manager.add_absorber(
+                                row['Zabs'], row['LineList'], row['Color'], 
+                                visible=row.get('Visible', False)  # Use get to handle missing column
+                            )
+                        
+                        self.message_box.on_sent_message(f"Loaded {len(absorbers_df)} absorber systems", "#008000")
+                    else:
+                        missing = [col for col in required_columns if col not in absorbers_df.columns]
+                        self.message_box.on_sent_message(f"Absorbers file missing columns: {', '.join(missing)}", "#FF0000")
+                except Exception as e:
+                    self.message_box.on_sent_message(f"Error loading absorbers: {str(e)}", "#FF0000")
+            
         except Exception as e:
             self.message_box.on_sent_message(f"Error loading data: {str(e)}", "#FF0000")
-            import traceback
-            traceback.print_exc()
-        
+
+    
     # In MainWindow.handle_save_clicked method
     def handle_save_clicked(self):
         """
         Handle the Save button click event.
-        Uses IOManager to save line list and absorber data.
+        Saves line_list as .txt and absorbers_df as .csv file.
         """
         try:
-            # Get spectrum filenames if available
-            spectrum_filenames = []
-            if hasattr(self, 'spectra') and self.spectra:
-                spectrum_filenames = [os.path.basename(spec.filename) for spec in self.spectra]
-            
-            # Get line list if available
-            line_list = None
-            if hasattr(self.canvas, 'line_list') and not self.canvas.line_list.empty:
-                line_list = self.canvas.line_list
-            
-            # Get absorbers if available
-            absorbers_df = None
-            if hasattr(self, 'absorber_manager'):
-                absorbers_df = self.absorber_manager.get_all_absorber_data()
-            
-            # Use IO Manager to save the data
-            success = self.io_manager.integrated_save_data(
-                self,  # parent window
-                line_list,
-                absorbers_df,
-                spectrum_filenames
+            options = QFileDialog.Options()
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "Save Data", "", 
+                "Text Files (*.txt);;All Files (*)", options=options
             )
             
-            if not success:
-                self.message_box.on_sent_message("Save operation was not completed.", "#FFA500")
+            if not file_path:
+                return  # User cancelled
                 
+            self.message_box.on_sent_message(f"Saving data to: {file_path}", "#8AB4F8")
+            
+            # Make sure file path has .txt extension for line_list
+            if not file_path.lower().endswith('.txt'):
+                file_path += '.txt'
+                
+            # Base path for all files (without extension)
+            base_path = os.path.splitext(file_path)[0]
+            
+            # Save line_list as .txt file
+            line_list_path = file_path  # This will be the .txt file
+            if hasattr(self.canvas, 'line_list') and not self.canvas.line_list.empty:
+                # Format the line_list as a nicely formatted text table
+                with open(line_list_path, 'w') as f:
+                    # Write header
+                    f.write(f"{'Name':<30} {'Wave_obs':<15} {'Zabs':<10}\n")
+                    f.write("-" * 55 + "\n")
+                    
+                    # Write each line
+                    for _, row in self.canvas.line_list.iterrows():
+                        name = str(row['Name'])
+                        wave_obs = f"{row['Wave_obs']:.4f}"
+                        zabs = f"{row['Zabs']:.6f}"
+                        f.write(f"{name:<30} {wave_obs:<15} {zabs:<10}\n")
+                
+                self.message_box.on_sent_message(f"Saved line list to: {line_list_path}", "#008000")
+            
+            # Save absorbers_df as .csv file
+            absorbers_path = f"{base_path}_absorbers.csv"
+            absorbers_df = self.absorber_manager.get_all_absorber_data()
+            if not absorbers_df.empty:
+                # Select only the columns we want
+                if set(['Zabs', 'LineList', 'Color']).issubset(absorbers_df.columns):
+                    absorbers_df = absorbers_df[['Zabs', 'LineList', 'Color']]
+                
+                # Save to CSV
+                absorbers_df.to_csv(absorbers_path, index=False)
+                self.message_box.on_sent_message(f"Saved absorbers to: {absorbers_path}", "#008000")
+            
         except Exception as e:
             self.message_box.on_sent_message(f"Error saving data: {str(e)}", "#FF0000")
 
@@ -1738,75 +1831,6 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             self.message_box.on_sent_message(f"Error displaying line list: {str(e)}", "#FF0000")
-
-    def handle_convert_clicked(self):
-        """
-        Handle conversion between file formats.
-        """
-        try:
-            from PyQt5.QtWidgets import QFileDialog, QMessageBox
-            
-            # Ask user for source file
-            options = QFileDialog.Options()
-            source_path, _ = QFileDialog.getOpenFileName(
-                self, "Select File to Convert", "", 
-                "All Files (*.json *.txt *.csv);;JSON Files (*.json);;Text Files (*.txt);;CSV Files (*.csv)",
-                options=options
-            )
-            
-            if not source_path:
-                return  # User cancelled
-                
-            # Determine source type from extension
-            ext = os.path.splitext(source_path)[1].lower()
-            
-            if ext == '.json':
-                # Converting from JSON to text/CSV
-                target_dir = os.path.dirname(source_path)
-                success = self.io_manager.convert_json_to_text(source_path, target_dir)
-                if success:
-                    QMessageBox.information(self, "Conversion Complete", 
-                        "Successfully converted JSON to text/CSV files.")
-            else:
-                # Converting from text/CSV to JSON
-                options = QFileDialog.Options()
-                target_path, _ = QFileDialog.getSaveFileName(
-                    self, "Save JSON File", os.path.splitext(source_path)[0] + ".json", 
-                    "JSON Files (*.json)", options=options
-                )
-                
-                if not target_path:
-                    return  # User cancelled
-                    
-                # Determine the companion file if needed
-                companion_path = None
-                if ext == '.txt':
-                    # Look for absorbers CSV
-                    potential_csv = os.path.splitext(source_path)[0] + "_absorbers.csv"
-                    if os.path.exists(potential_csv):
-                        companion_path = potential_csv
-                elif ext == '.csv':
-                    # Look for line list TXT
-                    potential_txt = os.path.splitext(source_path)[0] + "_lines.txt"
-                    if os.path.exists(potential_txt):
-                        companion_path = potential_txt
-                
-                # Determine which is which
-                line_list_path = source_path if ext == '.txt' else companion_path
-                absorbers_path = source_path if ext == '.csv' else companion_path
-                
-                # Convert
-                success = self.io_manager.convert_text_to_json(
-                    line_list_path, absorbers_path, target_path,
-                    "Converted from text/CSV", None
-                )
-                
-                if success:
-                    QMessageBox.information(self, "Conversion Complete", 
-                        "Successfully converted to JSON file.")
-                    
-        except Exception as e:
-            self.message_box.on_sent_message(f"Error converting file: {str(e)}", "#FF0000")
     
 
 if __name__ == "__main__":
