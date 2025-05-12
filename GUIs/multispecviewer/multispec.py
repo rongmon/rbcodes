@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, 
                              QVBoxLayout, QWidget, QFileDialog, QSplitter,
                              QLabel, QHBoxLayout, QSizePolicy, QInputDialog,
-                             QDialog, QListWidget)
+                             QDialog, QListWidget,QCheckBox)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette, QColor
 from PyQt5 import QtCore, QtGui
@@ -918,25 +918,70 @@ class MainWindow(QMainWindow):
         # Initialize IO Manager
         self.io_manager = IOManager()
         
-        # Create a container widget for the button layout
-        button_container = QWidget()
-        button_container.setFixedWidth(300)  # Set your desired width here
-        button_layout = QHBoxLayout(button_container)
+        # Create a single container for both the left and right buttons
+        top_buttons_container = QWidget()
+        top_buttons_layout = QHBoxLayout(top_buttons_container)
+        top_buttons_layout.setContentsMargins(5, 5, 5, 5)
         
-        # Add a stretch to push everything to the right
-        button_layout.addStretch(1)
+        # Create the Clear All Lines button (left side)
+        self.clear_lines_button = QPushButton("Clear All Lines")
+        self.clear_lines_button.setStyleSheet("""
+            QPushButton {
+                background-color: #8B3A3A;
+                color: #F2F2F2;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #A04545;
+            }
+            QPushButton:pressed {
+                background-color: #702E2E;
+            }
+        """)
+        self.clear_lines_button.clicked.connect(self.clear_all_absorber_lines)
         
-        # Now add the button and label
+        # Add the clear button to the left side
+        top_buttons_layout.addWidget(self.clear_lines_button, 0)
+        
+        # Add a stretch to push the next set of widgets to the right
+        top_buttons_layout.addStretch(1)
+        
+        # Create the Select FITS Files button and label (right side)
         self.select_button = QPushButton("Select FITS Files")
         self.select_button.clicked.connect(self.select_fits_files)
+        self.select_button.setStyleSheet("""
+            QPushButton {
+                background-color: #474747;
+                color: #F2F2F2;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #505050;
+            }
+            QPushButton:pressed {
+                background-color: #2A2A2A;
+            }
+        """)
+        
         self.file_label = QLabel("No files selected")
         self.file_label.setStyleSheet("color: white;")
         
-        button_layout.addWidget(self.select_button)
-        button_layout.addWidget(self.file_label)
+        # Add the select button and label to the right side
+        top_buttons_layout.addWidget(self.select_button)
+        top_buttons_layout.addWidget(self.file_label)
         
-        # Add the container widget to the main layout
-        main_layout.addWidget(button_container, 0, Qt.AlignRight)  # Align right in the main layout
+        # Add the container to the main layout
+        main_layout.addWidget(top_buttons_container, 0)
+
+
+
+
         
         # Create message box first so we can pass it to the SpectralPlot
         self.message_box = MessageBox()
@@ -1105,6 +1150,47 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(status_text)
         self.message_box.on_sent_message("Application ready. Select FITS files to begin.", "#FFFFFF")
     
+
+    def clear_all_absorber_lines(self):
+        """Remove all absorber lines from the plot and reset all checkboxes in the absorber manager"""
+        # Clear redshift lines from redshift widget
+        self.canvas.clear_redshift_lines()
+        
+        # Clear quick ID lines
+        self.canvas.clear_quickid_lines()
+        
+        # Clear all absorber lines
+        if hasattr(self.canvas, 'absorber_lines'):
+            for absorber_id in list(self.canvas.absorber_lines.keys()):
+                self.canvas.remove_absorber_lines(absorber_id)
+        
+        # Clear line objects if they exist
+        if hasattr(self.canvas, 'line_objects') and self.canvas.line_objects:
+            for line_obj in self.canvas.line_objects:
+                try:
+                    line_obj.remove()
+                except Exception:
+                    pass
+            self.canvas.line_objects = []
+        
+        # Update the canvas
+        self.canvas.draw()
+        
+        # Update UI to reflect cleared state
+        if hasattr(self, 'absorber_manager'):
+            for row in range(self.absorber_manager.table.rowCount()):
+                checkbox_container = self.absorber_manager.table.cellWidget(row, 3)
+                if checkbox_container:
+                    for child in checkbox_container.children():
+                        if isinstance(child, QCheckBox):
+                            child.setChecked(False)
+                            # Update the absorbers_df to reflect unchecked state
+                            if row < len(self.absorber_manager.absorbers_df):
+                                self.absorber_manager.absorbers_df.at[row, 'Visible'] = False
+                            break
+        
+        # Show success message
+        self.message_box.on_sent_message("Cleared all spectral lines from display", "#FFA500")    
     
     def handle_redshift_submission(self, redshift, linelist, color):
         """
@@ -1176,6 +1262,8 @@ class MainWindow(QMainWindow):
                 # Get the row of the newly added absorber
                 row = self.absorber_manager.get_absorber_count() - 1
                 
+                # Clear the redshift window lines
+                self.canvas.clear_redshift_lines()
                 # Automatically plot the absorber lines
                 self.canvas.plot_absorber_lines(row, redshift, linelist, color)
             else:
