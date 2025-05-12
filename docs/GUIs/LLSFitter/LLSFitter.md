@@ -156,8 +156,63 @@ python LLSFitter_GUI.py
 
 7. **Exporting**
    - Plots can be exported with "File" → "Export Current Plot"
-   - Results can be saved to a text file with "File" → "Save Results"
+   - Results can be saved to a JSON file with "File" → "Save Results"
+   - Saved results include spectrum details, continuum regions, and fit results
    - Continuum regions can be saved/loaded as templates
+
+8. **Reading Saved Results**
+   - Results are saved in a machine-readable JSON format
+   - These can be loaded back into the GUI with "File" → "Load Results"
+   - The JSON files can also be processed programmatically (see example below)
+
+### Example of Reading Saved Results Programmatically
+
+```python
+# Example code for reading saved LLS fit results:
+import json
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Load the results file
+with open('your_saved_results.json', 'r') as f:
+    data = json.load(f)
+
+# Extract metadata
+spectrum_file = data['metadata']['spectrum_file']
+redshift = data['metadata']['redshift']
+print(f"Analysis of {spectrum_file} at z={redshift}")
+
+# Extract continuum regions
+regions = data['continuum_regions']
+print(f"Used {len(regions)} continuum regions")
+
+# Extract results
+results = data['results']
+
+# Curve fit results
+if 'curve_fit' in results:
+    logNHI_cf = results['curve_fit']['logNHI']
+    logNHI_err_cf = results['curve_fit']['logNHI_err']
+    print(f"Curve fit: log N(HI) = {logNHI_cf:.2f} ± {logNHI_err_cf:.2f}")
+
+# MCMC results
+if 'mcmc' in results:
+    logNHI_mc = results['mcmc']['logNHI']
+    logNHI_err_mc = results['mcmc']['logNHI_err']
+    print(f"MCMC: log N(HI) = {logNHI_mc:.2f} ± {logNHI_err_mc:.2f}")
+
+# MCMC percentiles
+if 'mcmc_percentiles' in results:
+    logNHI_p50 = results['mcmc_percentiles']['logNHI']['p50']
+    logNHI_upper = results['mcmc_percentiles']['logNHI']['upper_error']
+    logNHI_lower = results['mcmc_percentiles']['logNHI']['lower_error']
+    print(f"MCMC (percentiles): log N(HI) = {logNHI_p50:.2f} +{logNHI_upper:.2f} -{logNHI_lower:.2f}")
+
+# Example: Compare results from different files
+# results1 = json.load(open('analysis1.json'))['results']
+# results2 = json.load(open('analysis2.json'))['results']
+# print(f"Difference in log N(HI): {results1['mcmc']['logNHI'] - results2['mcmc']['logNHI']:.2f}")
+```
 
 ## Best Practices
 

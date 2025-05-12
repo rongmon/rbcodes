@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                            QGridLayout, QGroupBox, QFormLayout, QDoubleSpinBox, QSpinBox, 
                            QCheckBox, QMessageBox, QTableWidget, QTableWidgetItem, QHeaderView,
                            QSplitter, QFrame, QComboBox, QSizePolicy, QMenu, QAction,
-                           QProgressBar, QStatusBar, QTextEdit, QDialog)
+                           QProgressBar, QStatusBar, QTextEdit, QDialog,QScrollArea)
 from PyQt5.QtCore import Qt, QSettings, QTimer
 from PyQt5.QtGui import QIcon, QFont, QTextCursor
 import datetime  # Add this to fix the datetime error
@@ -468,6 +468,11 @@ class LLSFitterGUI(QMainWindow):
         save_results_action.setShortcut("Ctrl+S")
         save_results_action.triggered.connect(self.save_results)
         file_menu.addAction(save_results_action)
+
+        load_results_action = QAction("&Load Results...", self)
+        load_results_action.setShortcut("Ctrl+L")
+        load_results_action.triggered.connect(self.load_results)
+        file_menu.addAction(load_results_action)
         
         export_plot_action = QAction("&Export Current Plot...", self)
         export_plot_action.setShortcut("Ctrl+E")
@@ -532,8 +537,9 @@ class LLSFitterGUI(QMainWindow):
         help_action.triggered.connect(self.show_help)
         help_menu.addAction(help_action)
     
+
     def save_results(self):
-        """Save fit results to a text file"""
+        """Save fit results to a JSON file"""
         if self.lls_fitter is None or (
             self.lls_fitter.curve_fit_results is None and 
             self.lls_fitter.mcmc_results is None
@@ -541,64 +547,166 @@ class LLSFitterGUI(QMainWindow):
             QMessageBox.warning(self, "No Results", "No fit results available to save")
             return
         
-        # Open file dialog
+        # Open file dialog for JSON
         file_path, _ = QFileDialog.getSaveFileName(
-            self, "Save Results", "", "Text Files (*.txt);;All Files (*.*)"
+            self, "Save Results", "", "JSON Files (*.json);;All Files (*.*)"
         )
         
         if not file_path:
             return
         
         try:
+            import json
+            import datetime
+            
+            # Get results and other data
             results = self.lls_fitter.get_results_summary()
             
-            with open(file_path, 'w') as f:
-                f.write("LLS Fit Results\n")
-                f.write("==============\n\n")
+            # Create simplified data structure
+            data = {
+                "metadata": {
+                    "created": datetime.datetime.now().isoformat(),
+                    "spectrum_file": self.file_path_edit.text(),
+                    "redshift": float(self.redshift_edit.text())
+                },
+                "continuum_regions": self.get_current_continuum_regions(),
+                "results": {}
+            }
+            
+            # Add curve fit results if available
+            if 'curve_fit' in results:
+                data["results"]["curve_fit"] = results['curve_fit']
+            
+            # Add MCMC results if available
+            if 'mcmc' in results:
+                data["results"]["mcmc"] = results['mcmc']
                 
-                # Write metadata
-                f.write(f"Spectrum File: {self.file_path_edit.text()}\n")
-                f.write(f"Absorption Redshift: {self.redshift_edit.text()}\n\n")
-                
-                # Write curve fit results
-                if 'curve_fit' in results:
-                    cf = results['curve_fit']
-                    f.write("Curve Fit Results:\n")
-                    f.write("-----------------\n")
-                    f.write(f"C0:      {cf['C0']:.6f} ± {cf['C0_err']:.6f}\n")
-                    f.write(f"C1:      {cf['C1']:.6f} ± {cf['C1_err']:.6f}\n")
-                    f.write(f"log N(HI): {cf['logNHI']:.4f} ± {cf['logNHI_err']:.4f}\n\n")
-                
-                # Write MCMC results
-                if 'mcmc' in results:
-                    mc = results['mcmc']
-                    f.write("MCMC Results:\n")
-                    f.write("------------\n")
-                    f.write(f"C0:      {mc['C0']:.6f} ± {mc['C0_err']:.6f}\n")
-                    f.write(f"C1:      {mc['C1']:.6f} ± {mc['C1_err']:.6f}\n")
-                    f.write(f"log N(HI): {mc['logNHI']:.4f} ± {mc['logNHI_err']:.4f}\n\n")
+                # Add percentiles if available
+                if self.lls_fitter.mcmc_results and 'samples' in self.lls_fitter.mcmc_results:
+                    samples = self.lls_fitter.mcmc_results['samples']
+                    percentiles = {}
                     
-                    # Add percentiles if available
-                    if self.lls_fitter.mcmc_results and 'samples' in self.lls_fitter.mcmc_results:
-                        samples = self.lls_fitter.mcmc_results['samples']
-                        f.write("MCMC Percentiles:\n")
-                        f.write("----------------\n")
-                        for i, param in enumerate(['C0', 'C1', 'log N(HI)']):
-                            p16, p50, p84 = np.percentile(samples[:, i], [16, 50, 84])
-                            f.write(f"{param}: {p50:.6f} (+{p84-p50:.6f}) (-{p50-p16:.6f})\n")
-                
-                # Write continuum regions
-                f.write("\nContinuum Regions Used:\n")
-                f.write("---------------------\n")
-                regions = self.get_current_continuum_regions()
-                for i, (wmin, wmax) in enumerate(regions):
-                    f.write(f"Region {i+1}: {wmin:.1f} - {wmax:.1f} Å\n")
+                    for i, param_name in enumerate(['C0', 'C1', 'logNHI']):
+                        p16, p50, p84 = np.percentile(samples[:, i], [16, 50, 84])
+                        percentiles[param_name] = {
+                            "p16": float(p16),
+                            "p50": float(p50),
+                            "p84": float(p84),
+                            "upper_error": float(p84-p50),
+                            "lower_error": float(p50-p16)
+                        }
+                    
+                    data["results"]["mcmc_percentiles"] = percentiles
+            
+            # Write to file with nice formatting
+            with open(file_path, 'w') as f:
+                json.dump(data, f, indent=2)
             
             self.statusBar().showMessage(f"Results saved to {file_path}", 3000)
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error saving results: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Error saving results: {str(e)}")    
+
+    def load_results(self):
+        """Load and display saved results from a JSON file"""
+        # Open file dialog
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Load Results", "", "JSON Files (*.json);;All Files (*.*)"
+        )
+        
+        if not file_path:
+            return
+        
+        try:
+            import json
+            
+            # Read the JSON file
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+            
+            # Display a summary of the loaded results
+            if 'metadata' in data and 'results' in data:
+                # Create a dialog to show the loaded results
+                dialog = QDialog(self)
+                dialog.setWindowTitle("Loaded Results")
+                dialog.resize(600, 400)
+                
+                layout = QVBoxLayout(dialog)
+                
+                # Create text display
+                text_edit = QTextEdit()
+                text_edit.setReadOnly(True)
+                font = QFont("Monospace")
+                font.setStyleHint(QFont.TypeWriter)
+                text_edit.setFont(font)
+                
+                # Format results
+                text = "Loaded LLS Fit Results\n"
+                text += "====================\n\n"
+                
+                # Metadata
+                meta = data['metadata']
+                text += f"Spectrum: {meta.get('spectrum_file', 'N/A')}\n"
+                text += f"Redshift: {meta.get('redshift', 'N/A')}\n"
+                text += f"Created: {meta.get('created', 'N/A')}\n\n"
+                
+                # Continuum regions
+                if 'continuum_regions' in data:
+                    text += "Continuum Regions:\n"
+                    for i, (wmin, wmax) in enumerate(data['continuum_regions']):
+                        text += f"  Region {i+1}: {wmin:.1f} - {wmax:.1f} Å\n"
+                    text += "\n"
+                
+                # Results
+                if 'results' in data:
+                    results = data['results']
+                    
+                    if 'curve_fit' in results:
+                        cf = results['curve_fit']
+                        text += "Curve Fit Results:\n"
+                        text += f"  C0:      {cf['C0']:.6f} ± {cf['C0_err']:.6f}\n"
+                        text += f"  C1:      {cf['C1']:.6f} ± {cf['C1_err']:.6f}\n"
+                        text += f"  log N(HI): {cf['logNHI']:.4f} ± {cf['logNHI_err']:.4f}\n\n"
+                    
+                    if 'mcmc' in results:
+                        mc = results['mcmc']
+                        text += "MCMC Results:\n"
+                        text += f"  C0:      {mc['C0']:.6f} ± {mc['C0_err']:.6f}\n"
+                        text += f"  C1:      {mc['C1']:.6f} ± {mc['C1_err']:.6f}\n"
+                        text += f"  log N(HI): {mc['logNHI']:.4f} ± {mc['logNHI_err']:.4f}\n\n"
+                    
+                    if 'mcmc_percentiles' in results:
+                        percentiles = results['mcmc_percentiles']
+                        text += "MCMC Percentiles:\n"
+                        for param, values in percentiles.items():
+                            p50, upper, lower = values['p50'], values['upper_error'], values['lower_error']
+                            text += f"  {param}: {p50:.6f} (+{upper:.6f}) (-{lower:.6f})\n"
+                
+                text_edit.setText(text)
+                layout.addWidget(text_edit)
+                
+                # Add buttons
+                button_layout = QHBoxLayout()
+                close_button = QPushButton("Close")
+                close_button.clicked.connect(dialog.accept)
+                copy_button = QPushButton("Copy to Clipboard")
+                copy_button.clicked.connect(lambda: QApplication.clipboard().setText(text))
+                
+                button_layout.addWidget(copy_button)
+                button_layout.addWidget(close_button)
+                layout.addLayout(button_layout)
+                
+                # Show dialog
+                dialog.exec_()
+                
+                self.statusBar().showMessage(f"Results loaded from {file_path}", 3000)
+            else:
+                QMessageBox.warning(self, "Invalid File", "The file does not contain valid LLS fit results")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error loading results: {str(e)}")
     
+        
     def export_current_plot(self):
         """Export the current plot to an image file"""
         # Determine which plot is currently visible
@@ -778,8 +886,12 @@ class LLSFitterGUI(QMainWindow):
         
         # Tab 2: Fit Parameters
         fit_tab = QWidget()
-        fit_layout = QFormLayout(fit_tab)
-        
+        fit_scroll = QScrollArea()
+        fit_scroll.setWidgetResizable(True)
+        fit_scroll_content = QWidget()
+        fit_layout = QFormLayout(fit_scroll_content)
+        fit_scroll.setWidget(fit_scroll_content)
+
         # Initial parameters
         params_group = QGroupBox("Initial Parameters")
         params_layout = QFormLayout(params_group)
@@ -937,6 +1049,10 @@ class LLSFitterGUI(QMainWindow):
         fit_layout.addRow(bounds_group)
         fit_layout.addRow(mcmc_group)
         fit_layout.addRow(plot_group)
+
+        fit_tab_layout = QVBoxLayout(fit_tab)
+        fit_tab_layout.addWidget(fit_scroll)
+
         
         # Add tabs to the left panel
         left_panel.addTab(continuum_tab, "Continuum Regions")
@@ -993,14 +1109,14 @@ class LLSFitterGUI(QMainWindow):
         button_row.addWidget(self.result_label)
         
         # Progress bar
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setVisible(False)
+        #self.progress_bar = QProgressBar()
+        #self.progress_bar.setRange(0, 100)
+        #self.progress_bar.setValue(0)
+        #self.progress_bar.setVisible(False)
         
         # Add to bottom layout
         bottom_layout.addLayout(button_row)
-        bottom_layout.addWidget(self.progress_bar)
+        #bottom_layout.addWidget(self.progress_bar)
         
         # Add all widgets to main layout
         main_layout.addWidget(top_controls)
@@ -1294,8 +1410,8 @@ class LLSFitterGUI(QMainWindow):
 
             # Show progress in status bar
             self.status_bar.showMessage("Running curve_fit...")
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setValue(20)  # Initial progress
+            #self.progress_bar.setVisible(True)
+            #self.progress_bar.setValue(20)  # Initial progress
             QApplication.processEvents()  # Update UI
             
             # Disable UI elements during fitting
@@ -1306,7 +1422,7 @@ class LLSFitterGUI(QMainWindow):
             popt, pcov = self.lls_fitter.fit_curve_fit(self.lls_fitter.theta_init)
             
             # Update progress
-            self.progress_bar.setValue(70)
+            #self.progress_bar.setValue(70)
             QApplication.processEvents()
 
             # Get plot limits
@@ -1336,7 +1452,7 @@ class LLSFitterGUI(QMainWindow):
             self.curve_fit_plot_widget.canvas.draw()
             
             # Update progress
-            self.progress_bar.setValue(100)
+            #self.progress_bar.setValue(100)
             QApplication.processEvents()
             
             # Switch to the curve_fit tab
@@ -1353,7 +1469,7 @@ class LLSFitterGUI(QMainWindow):
             self.status_bar.showMessage("Curve fit completed successfully", 3000)
             
             # Hide progress bar after a delay
-            QTimer.singleShot(1000, lambda: self.progress_bar.setVisible(False))
+            #QTimer.singleShot(1000, lambda: self.progress_bar.setVisible(False))
             
             # Update initial parameters for potential MCMC run
             self.c0_input.setValue(popt[0])
@@ -1367,7 +1483,7 @@ class LLSFitterGUI(QMainWindow):
         except Exception as e:
             # Handle errors
             self.status_bar.showMessage("Error in curve_fit")
-            self.progress_bar.setVisible(False)
+            #self.progress_bar.setVisible(False)
             self.curve_fit_button.setEnabled(True)
             self.mcmc_fit_button.setEnabled(True)
             QMessageBox.critical(self, "Error", f"Error in curve_fit: {str(e)}")
@@ -1424,8 +1540,8 @@ class LLSFitterGUI(QMainWindow):
             
             # Show progress in status bar
             self.status_bar.showMessage("Running MCMC fit (this may take a while)...")
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setValue(0)  # Initial progress
+            #self.progress_bar.setVisible(True)
+            #self.progress_bar.setValue(0)  # Initial progress
             QApplication.processEvents()  # Update UI
             
             # Disable UI elements during fitting
@@ -1434,12 +1550,12 @@ class LLSFitterGUI(QMainWindow):
             
             # Define a custom progress callback for MCMC
             # This will be called by the modified LLSFitter.fit_emcee method
-            def progress_callback(iteration, total_iterations):
-                progress = int(100 * iteration / total_iterations)
-                self.progress_bar.setValue(progress)
-                if iteration % 10 == 0:  # Only update UI every 10 iterations
-                    self.status_bar.showMessage(f"MCMC progress: {progress}% ({iteration}/{total_iterations} steps)")
-                    QApplication.processEvents()
+            #def progress_callback(iteration, total_iterations):
+            #    progress = int(100 * iteration / total_iterations)
+            #    self.progress_bar.setValue(progress)
+            #    if iteration % 10 == 0:  # Only update UI every 10 iterations
+            #        self.status_bar.showMessage(f"MCMC progress: {progress}% ({iteration}/{total_iterations} steps)")
+            #        QApplication.processEvents()
             
             # Run MCMC
             # Note: We'll need to modify LLSFitter.fit_emcee to accept a progress_callback
@@ -1454,13 +1570,13 @@ class LLSFitterGUI(QMainWindow):
             # Since we don't have the callback in the original class, simulate progress updates
             # Remove this block after implementing the callback in LLSFitter
             for i in range(0, 101, 10):
-                self.progress_bar.setValue(i)
+                #self.progress_bar.setValue(i)
                 self.status_bar.showMessage(f"MCMC progress: {i}%")
                 QApplication.processEvents()
                 QTimer.singleShot(100, lambda: None)  # Small delay for visual feedback
             
             # Update progress
-            self.progress_bar.setValue(80)
+            #self.progress_bar.setValue(80)
             self.status_bar.showMessage("Generating plots...")
             QApplication.processEvents()
 
@@ -1495,7 +1611,7 @@ class LLSFitterGUI(QMainWindow):
             self.mcmc_plot_widget.canvas.draw()
             
             # Update progress
-            self.progress_bar.setValue(90)
+            #self.progress_bar.setValue(90)
             self.status_bar.showMessage("Generating corner plot...")
             QApplication.processEvents()
             
@@ -1509,7 +1625,7 @@ class LLSFitterGUI(QMainWindow):
             self.corner_plot_widget.canvas.draw()
             
             # Update progress
-            self.progress_bar.setValue(100)
+            #self.progress_bar.setValue(100)
             QApplication.processEvents()
             
             # Switch to the MCMC tab
@@ -1529,7 +1645,7 @@ class LLSFitterGUI(QMainWindow):
             self.status_bar.showMessage("MCMC fit completed successfully", 3000)
             
             # Hide progress bar after a delay
-            QTimer.singleShot(1000, lambda: self.progress_bar.setVisible(False))
+            #QTimer.singleShot(1000, lambda: self.progress_bar.setVisible(False))
             
             # Re-enable UI elements
             self.curve_fit_button.setEnabled(True)
@@ -1538,7 +1654,7 @@ class LLSFitterGUI(QMainWindow):
         except Exception as e:
             # Handle errors
             self.status_bar.showMessage("Error in MCMC fit")
-            self.progress_bar.setVisible(False)
+            #self.progress_bar.setVisible(False)
             self.curve_fit_button.setEnabled(True)
             self.mcmc_fit_button.setEnabled(True)
             QMessageBox.critical(self, "Error", f"Error in MCMC fit: {str(e)}")
