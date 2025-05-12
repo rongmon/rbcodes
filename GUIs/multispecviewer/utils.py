@@ -386,6 +386,9 @@ def reconcile_linelists(input_files, velocity_threshold=20, output_file=None, cr
         
     print(f"Total lines loaded: {len(master_linelist)}")
     
+    # Calculate rest wavelength for each line
+    master_linelist['Wave_rest'] = master_linelist['Wave_obs'] / (1 + master_linelist['Zabs'])
+    
     # Extract base transition names by removing any modifiers
     def extract_base_name(name):
         # Remove annotation markers like [b] or [p]
@@ -394,8 +397,8 @@ def reconcile_linelists(input_files, velocity_threshold=20, output_file=None, cr
     
     master_linelist['BaseName'] = master_linelist['Name'].apply(extract_base_name)
     
-    # Sort by BaseName and Wave_obs for easier processing
-    master_linelist = master_linelist.sort_values(['BaseName', 'Wave_obs']).reset_index(drop=True)
+    # Sort by BaseName and Wave_rest for easier processing
+    master_linelist = master_linelist.sort_values(['BaseName', 'Wave_rest']).reset_index(drop=True)
     
     # Group by BaseName
     grouped = master_linelist.groupby('BaseName')
@@ -410,8 +413,8 @@ def reconcile_linelists(input_files, velocity_threshold=20, output_file=None, cr
             reconciled_lines.append(group.iloc[0].to_dict())
             continue
             
-        # Sort by Wave_obs
-        sorted_group = group.sort_values('Wave_obs')
+        # Sort by Wave_rest
+        sorted_group = group.sort_values('Wave_rest')
         
         # Initialize cluster with first line
         current_cluster = [sorted_group.iloc[0]]
@@ -421,9 +424,9 @@ def reconcile_linelists(input_files, velocity_threshold=20, output_file=None, cr
             line = sorted_group.iloc[i]
             last_line = current_cluster[-1]
             
-            # Calculate velocity difference
+            # Calculate velocity difference in rest frame
             # v = c * (λ2 - λ1) / λ1
-            v_diff = c * (line['Wave_obs'] - last_line['Wave_obs']) / last_line['Wave_obs']
+            v_diff = c * (line['Wave_rest'] - last_line['Wave_rest']) / last_line['Wave_rest']
             v_diff_abs = abs(v_diff)
             
             # If within threshold, add to current cluster
@@ -434,10 +437,21 @@ def reconcile_linelists(input_files, velocity_threshold=20, output_file=None, cr
                 if len(current_cluster) > 1:
                     # Create merged entry
                     cluster_df = pd.DataFrame(current_cluster)
+                    
+                    # Calculate mean redshift
+                    mean_z = cluster_df['Zabs'].mean()
+                    
+                    # Calculate mean rest wavelength
+                    mean_rest = cluster_df['Wave_rest'].mean()
+                    
+                    # Convert back to observed wavelength using mean redshift
+                    mean_obs = mean_rest * (1 + mean_z)
+                    
                     merged_entry = {
                         'Name': name,
-                        'Wave_obs': cluster_df['Wave_obs'].mean(),
-                        'Zabs': cluster_df['Zabs'].mean(),
+                        'Wave_obs': mean_obs,
+                        'Zabs': mean_z,
+                        'Wave_rest': mean_rest,
                         'MergedCount': len(current_cluster)
                     }
                     reconciled_lines.append(merged_entry)
@@ -452,10 +466,21 @@ def reconcile_linelists(input_files, velocity_threshold=20, output_file=None, cr
         if len(current_cluster) > 1:
             # Create merged entry
             cluster_df = pd.DataFrame(current_cluster)
+            
+            # Calculate mean redshift
+            mean_z = cluster_df['Zabs'].mean()
+            
+            # Calculate mean rest wavelength
+            mean_rest = cluster_df['Wave_rest'].mean()
+            
+            # Convert back to observed wavelength using mean redshift
+            mean_obs = mean_rest * (1 + mean_z)
+            
             merged_entry = {
                 'Name': name,
-                'Wave_obs': cluster_df['Wave_obs'].mean(),
-                'Zabs': cluster_df['Zabs'].mean(),
+                'Wave_obs': mean_obs,
+                'Zabs': mean_z,
+                'Wave_rest': mean_rest,
                 'MergedCount': len(current_cluster)
             }
             reconciled_lines.append(merged_entry)
@@ -467,10 +492,11 @@ def reconcile_linelists(input_files, velocity_threshold=20, output_file=None, cr
     reconciled_df = pd.DataFrame(reconciled_lines)
     
     # Clean up DataFrame - remove unnecessary columns
-    if 'BaseName' in reconciled_df.columns:
-        reconciled_df = reconciled_df.drop(columns=['BaseName'])
-    if 'index' in reconciled_df.columns:
-        reconciled_df = reconciled_df.drop(columns=['index'])
+    columns_to_keep = ['Name', 'Wave_obs', 'Zabs']
+    if 'MergedCount' in reconciled_df.columns:
+        columns_to_keep.append('MergedCount')
+    
+    reconciled_df = reconciled_df[columns_to_keep]
     
     # Round numerical values
     if 'Wave_obs' in reconciled_df.columns:
