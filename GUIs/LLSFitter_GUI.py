@@ -525,6 +525,10 @@ class LLSFitterGUI(QMainWindow):
         view_results_action = QAction("&View Detailed Results", self)
         view_results_action.triggered.connect(self.view_detailed_results)
         analysis_menu.addAction(view_results_action)
+
+        save_posterior_action = QAction("Save MCMC Posterior...", self)
+        save_posterior_action.triggered.connect(self.save_mcmc_posterior)
+        analysis_menu.addAction(save_posterior_action)
         
         # Help menu
         help_menu = menubar.addMenu("&Help")
@@ -537,7 +541,46 @@ class LLSFitterGUI(QMainWindow):
         help_action.triggered.connect(self.show_help)
         help_menu.addAction(help_action)
     
-
+    def save_mcmc_posterior(self):
+        """Save the MCMC posterior samples to a file"""
+        if self.lls_fitter is None or self.lls_fitter.mcmc_results is None:
+            QMessageBox.warning(self, "No Results", "No MCMC results available to save")
+            return
+        
+        # Open file dialog for CSV or NPY
+        file_path, selected_filter = QFileDialog.getSaveFileName(
+            self, "Save MCMC Posterior", "", 
+            "CSV Files (*.csv);;NumPy Files (*.npy);;All Files (*.*)"
+        )
+        
+        if not file_path:
+            return
+        
+        try:
+            samples = self.lls_fitter.mcmc_results['samples']
+            
+            # Create a header for the columns
+            header = "C0,C1,logNHI"
+            
+            # Check selected format
+            if selected_filter == "CSV Files (*.csv)" or file_path.lower().endswith('.csv'):
+                # Save as CSV
+                np.savetxt(file_path, samples, delimiter=',', header=header)
+                self.status_bar.showMessage(f"MCMC posterior saved to {file_path}", 3000)
+                
+            elif selected_filter == "NumPy Files (*.npy)" or file_path.lower().endswith('.npy'):
+                # Save as NumPy array
+                np.save(file_path, samples)
+                self.status_bar.showMessage(f"MCMC posterior saved to {file_path}", 3000)
+                
+            else:
+                # Default to CSV if extension is unknown
+                np.savetxt(file_path, samples, delimiter=',', header=header)
+                self.status_bar.showMessage(f"MCMC posterior saved to {file_path}", 3000)
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error saving MCMC posterior: {str(e)}")
+    
     def save_results(self):
         """Save fit results to a JSON file"""
         if self.lls_fitter is None or (

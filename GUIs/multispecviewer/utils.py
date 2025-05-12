@@ -38,9 +38,6 @@ def read_line_options():
         return ["None", "LLS", "LLS Small", "DLA", "LBG", "Gal", "Eiger_Strong", "AGN"]
 
 
-# Add to rbcodes/GUIs/multispecviewer/utils.py
-
-# Add this function to rbcodes/GUIs/multispecviewer/utils.py
 
 def show_help_dialog(parent=None):
     """
@@ -258,3 +255,343 @@ GETTING HELP:
     
     # Show dialog
     dialog.exec_()
+
+def reconcile_linelists(input_files, velocity_threshold=20, output_file=None, create_absorber_df=True):
+    """
+    Reconcile multiple linelist files by merging duplicate entries based on line name and velocity separation.
+    
+    Parameters:
+    -----------
+    input_files : list
+        List of file paths to linelist files (can be txt, csv, or json format)
+    velocity_threshold : float, optional
+        Maximum velocity difference in km/s to consider lines as duplicates (default: 20)
+    output_file : str, optional
+        Path to save the reconciled linelist (if None, doesn't save to file)
+    create_absorber_df : bool, optional
+        Whether to create an absorber DataFrame from unique redshifts (default: True)
+        
+    Returns:
+    --------
+    tuple
+        (reconciled_linelist, absorber_df) where reconciled_linelist is a DataFrame with
+        merged line entries and absorber_df is a DataFrame of unique absorber systems
+    """
+    import pandas as pd
+    import numpy as np
+    import os
+    from scipy import constants
+    
+    # Speed of light in km/s
+    c = constants.c / 1000  # Convert from m/s to km/s
+    
+    # Initialize empty master linelist
+    master_linelist = pd.DataFrame(columns=['Name', 'Wave_obs', 'Zabs'])
+    
+    # Try to import IO manager for file loading
+    try:
+        from rbcodes.GUIs.multispecviewer.io_manager import IOManager
+        io_manager = IOManager()
+        has_io_manager = True
+    except ImportError:
+        has_io_manager = False
+        print("IOManager not available. Using basic file loading methods.")
+    
+    # Load all input files
+    for file_path in input_files:
+        if not os.path.exists(file_path):
+            print(f"Warning: File not found: {file_path}")
+            continue
+            
+        # Determine file format from extension
+        ext = os.path.splitext(file_path)[1].lower()
+        
+        try:
+            # Use IOManager if available
+            if has_io_manager:
+                if ext == '.json':
+                    ll_df, _, _, _, _ = io_manager.load_combined_data(file_path)
+                else:
+                    ll_df, _ = io_manager.load_line_list(file_path)
+            # Otherwise use basic loading methods
+            else:
+                if ext == '.json':
+                    # Try to load as JSON
+                    import json
+                    with open(file_path, 'r') as f:
+                        data = json.load(f)
+                    
+                    if 'line_list' in data:
+                        ll_df = pd.DataFrame(data['line_list'])
+                    else:
+                        # Try different structure
+                        ll_df = pd.DataFrame(data)
+                elif ext == '.csv':
+                    # Load as CSV
+                    ll_df = pd.read_csv(file_path)
+                else:
+                    # Load as text file
+                    ll_df = pd.DataFrame(columns=['Name', 'Wave_obs', 'Zabs'])
+                    
+                    # Parse the text file
+                    with open(file_path, 'r') as f:
+                        lines = f.readlines()
+                    
+                    # Skip header (first two lines)
+                    data_lines = lines[2:] if len(lines) > 2 else lines
+                    
+                    # Parse each line
+                    for line in data_lines:
+                        if line.strip():  # Skip empty lines
+                            try:
+                                # Split by whitespace with careful handling
+                                parts = line.strip().split()
+                                if len(parts) >= 3:
+                                    # Extract values
+                                    wave_obs = float(parts[-2])
+                                    zabs = float(parts[-1])
+                                    
+                                    # Everything before these two values is the Name
+                                    name = ' '.join(parts[:-2])
+                                    
+                                    # Add to ll_df
+                                    new_row = pd.Series({'Name': name, 'Wave_obs': wave_obs, 'Zabs': zabs})
+                                    ll_df = pd.concat([ll_df, pd.DataFrame([new_row])], ignore_index=True)
+                            except Exception as e:
+                                print(f"Error parsing line: {line} - {str(e)}")
+                                continue
+            
+            # Skip if loading failed
+            if ll_df is None or ll_df.empty:
+                print(f"Warning: No valid data found in {file_path}")
+                continue
+                
+            # Verify required columns
+            required_cols = ['Name', 'Wave_obs', 'Zabs']
+            if not all(col in ll_df.columns for col in required_cols):
+                print(f"Warning: File {file_path} is missing required columns: {required_cols}")
+                continue
+            
+            # Append to master linelist
+            master_linelist = pd.concat([master_linelist, ll_df], ignore_index=True)
+            print(f"Loaded {len(ll_df)} lines from {file_path}")
+            
+        except Exception as e:
+            print(f"Error loading {file_path}: {str(e)}")
+    
+    # Check if we have any data to process
+    if master_linelist.empty:
+        print("No valid linelist data loaded.")
+        return master_linelist, None
+        
+    print(f"Total lines loaded: {len(master_linelist)}")
+    
+    # Extract base transition names by removing any modifiers
+    def extract_base_name(name):
+        # Remove annotation markers like [b] or [p]
+        base_name = name.split('[')[0].strip()
+        return base_name
+    
+    master_linelist['BaseName'] = master_linelist['Name'].apply(extract_base_name)
+    
+    # Sort by BaseName and Wave_obs for easier processing
+    master_linelist = master_linelist.sort_values(['BaseName', 'Wave_obs']).reset_index(drop=True)
+    
+    # Group by BaseName
+    grouped = master_linelist.groupby('BaseName')
+    
+    # Initialize reconciled linelist
+    reconciled_lines = []
+    
+    # Process each group
+    for name, group in grouped:
+        # Skip if only one entry for this name
+        if len(group) == 1:
+            reconciled_lines.append(group.iloc[0].to_dict())
+            continue
+            
+        # Sort by Wave_obs
+        sorted_group = group.sort_values('Wave_obs')
+        
+        # Initialize cluster with first line
+        current_cluster = [sorted_group.iloc[0]]
+        
+        # Compare each subsequent line
+        for i in range(1, len(sorted_group)):
+            line = sorted_group.iloc[i]
+            last_line = current_cluster[-1]
+            
+            # Calculate velocity difference
+            # v = c * (λ2 - λ1) / λ1
+            v_diff = c * (line['Wave_obs'] - last_line['Wave_obs']) / last_line['Wave_obs']
+            v_diff_abs = abs(v_diff)
+            
+            # If within threshold, add to current cluster
+            if v_diff_abs <= velocity_threshold:
+                current_cluster.append(line)
+            else:
+                # Process current cluster
+                if len(current_cluster) > 1:
+                    # Create merged entry
+                    cluster_df = pd.DataFrame(current_cluster)
+                    merged_entry = {
+                        'Name': name,
+                        'Wave_obs': cluster_df['Wave_obs'].mean(),
+                        'Zabs': cluster_df['Zabs'].mean(),
+                        'MergedCount': len(current_cluster)
+                    }
+                    reconciled_lines.append(merged_entry)
+                else:
+                    # Single entry, no need to merge
+                    reconciled_lines.append(current_cluster[0].to_dict())
+                
+                # Start new cluster
+                current_cluster = [line]
+        
+        # Process final cluster
+        if len(current_cluster) > 1:
+            # Create merged entry
+            cluster_df = pd.DataFrame(current_cluster)
+            merged_entry = {
+                'Name': name,
+                'Wave_obs': cluster_df['Wave_obs'].mean(),
+                'Zabs': cluster_df['Zabs'].mean(),
+                'MergedCount': len(current_cluster)
+            }
+            reconciled_lines.append(merged_entry)
+        else:
+            # Single entry, no need to merge
+            reconciled_lines.append(current_cluster[0].to_dict())
+    
+    # Create reconciled DataFrame
+    reconciled_df = pd.DataFrame(reconciled_lines)
+    
+    # Clean up DataFrame - remove unnecessary columns
+    if 'BaseName' in reconciled_df.columns:
+        reconciled_df = reconciled_df.drop(columns=['BaseName'])
+    if 'index' in reconciled_df.columns:
+        reconciled_df = reconciled_df.drop(columns=['index'])
+    
+    # Round numerical values
+    if 'Wave_obs' in reconciled_df.columns:
+        reconciled_df['Wave_obs'] = reconciled_df['Wave_obs'].round(4)
+    if 'Zabs' in reconciled_df.columns:
+        reconciled_df['Zabs'] = reconciled_df['Zabs'].round(6)
+    
+    print(f"Reconciled to {len(reconciled_df)} unique lines")
+    
+    # Create absorber DataFrame if requested
+    absorber_df = None
+    if create_absorber_df:
+        # Get unique redshifts with a small tolerance
+        unique_zabs = []
+        z_tolerance = 1e-4  # Tolerance for grouping redshifts
+        
+        # Sort by redshift
+        sorted_by_z = reconciled_df.sort_values('Zabs').reset_index(drop=True)
+        
+        # Group similar redshifts
+        current_z_group = [sorted_by_z['Zabs'].iloc[0]]
+        
+        for i in range(1, len(sorted_by_z)):
+            current_z = sorted_by_z['Zabs'].iloc[i]
+            prev_z = current_z_group[-1]
+            
+            # If close to previous z, add to current group
+            if abs(current_z - prev_z) < z_tolerance:
+                current_z_group.append(current_z)
+            else:
+                # Add average of current group to unique list
+                unique_zabs.append(np.mean(current_z_group))
+                # Start new group
+                current_z_group = [current_z]
+        
+        # Add final group
+        if current_z_group:
+            unique_zabs.append(np.mean(current_z_group))
+        
+        # Create DataFrame with default values
+        absorber_data = []
+        for z in unique_zabs:
+            absorber_data.append({
+                'Zabs': round(z, 6),
+                'LineList': 'LLS',  # Default line list
+                'Color': 'white',   # Default color
+                'Visible': False    # Default to not visible
+            })
+        
+        absorber_df = pd.DataFrame(absorber_data)
+        print(f"Created {len(absorber_df)} unique absorber systems")
+    
+    # Save to file if requested
+    if output_file:
+        output_dir = os.path.dirname(output_file)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            
+        # Determine output format
+        output_ext = os.path.splitext(output_file)[1].lower()
+        
+        if output_ext == '.json':
+            # Create combined data structure
+            output_data = {
+                'line_list': reconciled_df.to_dict(orient='records')
+            }
+            
+            # Add absorber data if available
+            if absorber_df is not None and not absorber_df.empty:
+                output_data['absorbers'] = absorber_df.to_dict(orient='records')
+                
+            # Add metadata
+            import datetime
+            output_data['metadata'] = {
+                'creation_date': datetime.datetime.now().isoformat(),
+                'reconciliation_info': {
+                    'velocity_threshold': velocity_threshold,
+                    'input_files': [os.path.basename(f) for f in input_files],
+                    'original_line_count': len(master_linelist),
+                    'reconciled_line_count': len(reconciled_df)
+                }
+            }
+            
+            # Save to JSON
+            import json
+            with open(output_file, 'w') as f:
+                json.dump(output_data, f, indent=2)
+                
+            print(f"Saved reconciled data to {output_file}")
+        else:
+            # Warn about extension but save as JSON anyway
+            print(f"Warning: Recommended file extension is .json. Saving as JSON format.")
+            
+            output_file_json = os.path.splitext(output_file)[0] + '.json'
+            
+            # Create combined data structure
+            output_data = {
+                'line_list': reconciled_df.to_dict(orient='records')
+            }
+            
+            # Add absorber data if available
+            if absorber_df is not None and not absorber_df.empty:
+                output_data['absorbers'] = absorber_df.to_dict(orient='records')
+                
+            # Add metadata
+            import datetime
+            output_data['metadata'] = {
+                'creation_date': datetime.datetime.now().isoformat(),
+                'reconciliation_info': {
+                    'velocity_threshold': velocity_threshold,
+                    'input_files': [os.path.basename(f) for f in input_files],
+                    'original_line_count': len(master_linelist),
+                    'reconciled_line_count': len(reconciled_df)
+                }
+            }
+            
+            # Save to JSON
+            import json
+            with open(output_file_json, 'w') as f:
+                json.dump(output_data, f, indent=2)
+                
+            print(f"Saved reconciled data to {output_file_json}")
+    
+    return reconciled_df, absorber_df

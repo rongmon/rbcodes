@@ -263,6 +263,36 @@ The new version adds several enhancements:
 ![New Version](images/interface_components.png)
 *Figure 8: New version of MultispecViewer with enhanced features.*
 
+## Reconciling Line Identifications from Multiple Sessions
+
+MultispecViewer includes a utility function for reconciling line identifications from multiple saved files. This is particularly useful when combining line catalogs from different observers or analysis sessions.
+
+### Using the Line Reconciliation Tool
+
+You can use the line reconciliation tool directly in Python script outside the GUI:
+
+```python
+from rbcodes.GUIs.multispecviewer.utils import reconcile_linelists
+
+# Combine line identifications from multiple files
+input_files = [
+    '/path/to/session1_lines.json',
+    '/path/to/session2_lines.txt',
+    '/path/to/session3_lines.csv'
+]
+
+# Reconcile lines that have the same name and are within 20 km/s of each other
+reconciled_lines, absorber_systems = reconcile_linelists(
+    input_files,
+    velocity_threshold=20,                 # Velocity difference threshold in km/s
+    output_file='combined_catalog.json',   # Output file (optional)
+    create_absorber_df=True                # Create absorber systems DataFrame
+)
+
+print(f"Combined {len(input_files)} files into {len(reconciled_lines)} unique line identifications")
+print(f"Identified {len(absorber_systems)} distinct absorber systems")
+```
+
 ## Tips and Best Practices
 
 ### Keyboard Navigation
