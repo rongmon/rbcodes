@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                            QProgressBar, QStatusBar, QTextEdit, QDialog)
 from PyQt5.QtCore import Qt, QSettings, QTimer
 from PyQt5.QtGui import QIcon, QFont, QTextCursor
+import datetime  # Add this to fix the datetime error
 
 # Import the LLSFitter class
 try:
@@ -126,12 +127,38 @@ class ContinuumRegionsTable(QTableWidget):
             item.setText("0.0")
 
     
+    # For the ContinuumRegionsTable class, add a sort_regions method and modify add_row to call it
+    
+    def sort_regions(self):
+        """Sort the continuum regions by minimum wavelength"""
+        # Get all regions
+        regions = self.get_regions()
+        if not regions:
+            return
+        
+        # Sort regions by minimum wavelength
+        regions.sort(key=lambda r: r[0])
+        
+        # Clear the table
+        self.blockSignals(True)  # Block signals to prevent recursive calls
+        self.setRowCount(0)
+        
+        # Add sorted regions back
+        for wmin, wmax in regions:
+            row = self.rowCount()
+            self.insertRow(row)
+            self.setItem(row, 0, QTableWidgetItem(str(wmin)))
+            self.setItem(row, 1, QTableWidgetItem(str(wmax)))
+        
+        self.blockSignals(False)  # Unblock signals
+    
     def add_row(self):
-        """Add a new empty row to the table"""
+        """Add a new empty row to the table and sort"""
         row = self.rowCount()
         self.insertRow(row)
         self.setItem(row, 0, QTableWidgetItem("0.0"))
         self.setItem(row, 1, QTableWidgetItem("0.0"))
+        self.sort_regions()  # Sort after adding    
     
     def remove_selected_rows(self):
         """Remove the selected rows"""
