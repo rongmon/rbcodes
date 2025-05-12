@@ -181,7 +181,7 @@ spec.compute_EW(
 
 # Access results
 print(f"W_λ = {spec.W:.3f} ± {spec.W_e:.3f} Å")
-print(f"log N = {np.log10(spec.logN):.2f} ± {0.434 * spec.logN_e/spec.logN:.2f}")
+print(f"log N = {np.log10(spec.N):.2f} ± {0.434 * spec.N_e/spec.logN:.2f}")
 print(f"Velocity centroid = {spec.vel_centroid:.1f} km/s")
 ```
 
@@ -246,8 +246,10 @@ After analysis, the `rb_spec` object contains:
 | `enorm` | Normalized error |
 | `W` | Rest-frame equivalent width |
 | `W_e` | EW uncertainty |
-| `logN` | AOD column density |
-| `logN_e` | Column density uncertainty |
+| `N` |  AOD column density |
+| `N_e` |  Column density uncertainty |
+| `logN` | log AOD column density |
+| `logN_e` | log Column density uncertainty |
 | `vel_centroid` | EW-weighted velocity centroid |
 | `vel_disp` | Velocity dispersion |
 | `Tau` | Apparent optical depth |
@@ -318,7 +320,7 @@ for file in files:
         'file': file,
         'EW': spec.W,
         'EW_err': spec.W_e,
-        'logN': np.log10(spec.logN),
+        'logN': np.log10(spec.N),
         'SNR': spec.SNR
     })
 ```
