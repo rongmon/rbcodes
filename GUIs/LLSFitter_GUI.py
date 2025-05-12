@@ -56,11 +56,18 @@ class ContinuumRegionsTable(QTableWidget):
         header.setSectionResizeMode(1, QHeaderView.Stretch)
         
         # Add default regions
+        #self.default_regions = [
+        #    (860, 872), (893, 899), (897, 899), (905, 910),
+        #    (940, 944), (946, 948), (927, 928), (918.5, 919),
+        #    (931, 933), (934, 936), (951, 970)
+        #]
+
         self.default_regions = [
-            (860, 872), (893, 899), (897, 899), (905, 910),
+             (893, 899), (897, 899), (905, 910),
             (940, 944), (946, 948), (927, 928), (918.5, 919),
             (931, 933), (934, 936), (951, 970)
         ]
+
         
         # Connect signals
         self.cellChanged.connect(self.validate_cell)
@@ -668,19 +675,7 @@ class LLSFitterGUI(QMainWindow):
         msg.setText(help_text)
         msg.exec_()
     
-
-    def update_redshift(self):
-        """Update the redshift when the value changes"""
-        if self.lls_fitter is not None:
-            try:
-                zabs_text = self.redshift_edit.text()
-                if zabs_text:
-                    zabs = float(zabs_text)
-                    self.lls_fitter.set_redshift(zabs)
-                    self.preview_continuum_regions()
-            except ValueError:
-                # Ignore invalid redshift values during typing
-                pass
+    
 
     def init_ui(self):
         # Create central widget
@@ -708,8 +703,13 @@ class LLSFitterGUI(QMainWindow):
         redshift_group = QGroupBox("Absorption Redshift")
         redshift_layout = QHBoxLayout(redshift_group)
         self.redshift_edit = QLineEdit()
-        self.redshift_edit.textChanged.connect(self.update_redshift)  # Add this line
+        #self.redshift_edit.textChanged.connect(self.update_redshift)  # Add this line
+        
+        self.redshift_edit.returnPressed.connect(self.submit_redshift)
+        redshift_submit_button = QPushButton("Submit")
+        redshift_submit_button.clicked.connect(self.submit_redshift)
         redshift_layout.addWidget(self.redshift_edit)
+        redshift_layout.addWidget(redshift_submit_button)
         
         # Add to top layout
         top_layout.addWidget(file_group, 3)
@@ -987,6 +987,22 @@ class LLSFitterGUI(QMainWindow):
         # Set initial state
         self.continuum_table.set_default_regions()
 
+    def submit_redshift(self):
+        """Update the redshift when the submit button is clicked or Enter is pressed"""
+        if self.lls_fitter is not None:
+            try:
+                zabs_text = self.redshift_edit.text()
+                if zabs_text:
+                    zabs = float(zabs_text)
+                    self.lls_fitter.set_redshift(zabs)
+                    self.status_bar.showMessage(f"Redshift updated to {zabs:.6f}", 3000)
+                    self.preview_continuum_regions()
+                else:
+                    self.status_bar.showMessage("Please enter a valid redshift", 3000)
+            except ValueError:
+                self.status_bar.showMessage("Invalid redshift format", 3000)
+                QMessageBox.warning(self, "Invalid Input", "Please enter a valid numeric redshift value")
+
     def toggle_y_limits(self, state):
         """Enable or disable custom y-limit inputs based on checkbox state"""
         enabled = not bool(state)  # Checkbox checked = auto limits = disable inputs
@@ -1031,9 +1047,13 @@ class LLSFitterGUI(QMainWindow):
             # Preview continuum regions
             self.preview_continuum_regions()
             
+        except ValueError:
+            QMessageBox.warning(self, "Invalid Input", "Please enter a valid numeric redshift value")
+            return
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error loading spectrum: {str(e)}")
             self.statusBar().showMessage("Error loading spectrum")
+
     
     def get_current_continuum_regions(self):
         """Get the current continuum regions from the table"""
