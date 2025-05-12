@@ -1,7 +1,5 @@
 # MultispecViewer
 
-[Back to Main Page](../../main_readme.md)
-
 A tool for visualizing and analyzing multiple spectroscopic datasets simultaneously.
 
 ⚠️ **WARNING: UNDER ACTIVE DEVELOPMENT** ⚠️
@@ -20,6 +18,9 @@ MultispecViewer is a PyQt-based GUI tool that allows users to:
 - Use velocity plots (vStack) for detailed line analysis
 - Save and load line identifications and absorber systems
 
+![MultispecViewer Main Interface](images/main_interface.png)
+*Figure 1: Main interface of MultispecViewer showing spectrum display, absorber manager, and control panels.*
+
 ## Usage
 
 MultispecViewer can be run from the command line using:
@@ -31,7 +32,7 @@ python /path/to/rbcodes/GUIs/multispecviewer/rb_multispec.py
 For convenience, you can create an alias:
 
 ```bash
-alias multispec='python /Users/bordoloi/WORK/python/rbcodes/GUIs/multispecviewer/rb_multispec.py'
+alias multispec='python /path/to/rbcodes/GUIs/multispecviewer/rb_multispec.py'
 ```
 
 Then simply run:
@@ -59,20 +60,24 @@ optional arguments:
 
 The MultispecViewer interface consists of several components:
 
-- A toolbar for selecting FITS files
+- A toolbar for selecting FITS files and clearing displayed lines
 - A main plotting area for displaying spectra
 - A redshift input panel for applying and cataloging redshifts
 - A message box for displaying status information
 - An absorber manager for cataloging multiple systems (new version only)
 - Action buttons for loading, saving, and displaying identified lines
 
-[Insert screenshot of UI here]
+![Interface Components](images/interface_components.png)
+*Figure 2: Key components of the MultispecViewer interface.*
 
 ### Loading Data
 
 1. Click the "Select FITS Files" button
 2. Navigate to and select one or more FITS format spectral files
 3. The spectra will be loaded and displayed in the main plotting area
+
+![Loading Spectra](images/loading_data.png)
+*Figure 3: Loading FITS files into MultispecViewer.*
 
 ### Navigation Controls
 
@@ -90,6 +95,7 @@ MultispecViewer supports the following keyboard shortcuts for navigating the dis
 | `o` | Zoom out (x-axis) |
 | `r` | Reset view to original state |
 | `R` | Clear all line identifications |
+| `H` | Show help window |
 | `q` | Quit application |
 
 ### Spectral Processing
@@ -105,16 +111,22 @@ Press the following keys with the cursor positioned at a spectral feature to ide
 
 | Key | Line |
 |-----|------|
-| `C` | CIV doublet |
-| `M` | MgII doublet |
-| `F` | FeII multiplet |
-| `6` | OVI doublet |
-| `4` | SiIV doublet |
-| `8` | NeVIII doublet |
-| `2` | Lyman-beta |
-| `1` | Lyman-alpha |
+| `C` | CIV doublet (1548, 1550) |
+| `M` | MgII doublet (2796, 2803) |
+| `F` | FeII multiplet (2600, 2586, 2382) |
+| `6` | OVI doublet (1031, 1037) |
+| `4` | SiIV doublet (1393, 1402) |
+| `8` | NeVIII doublet (778, 770) |
+| `2` | Lyb/Lya |
+| `1` | Lya/Lyb |
+
+![Quick Line Identification](images/quick_id.png)
+*Figure 4: Example of quick line identification using keyboard shortcuts.*
 
 Right-clicking anywhere on the spectrum opens a dialog with a complete list of lines from the selected line list at the clicked wavelength.
+
+![Right-Click Line Identification](images/right_click_id.png)
+*Figure 5: Line identification dialog from right-clicking on a feature.*
 
 ### Redshift Controls
 
@@ -124,6 +136,9 @@ Right-clicking anywhere on the spectrum opens a dialog with a complete list of l
 4. Click "Submit" to mark lines at the specified redshift
 
 In the new version, clicking "Catalog" adds the current redshift to the absorber manager for reference.
+
+![Redshift Controls](images/redshift_controls.png)
+*Figure 6: Redshift input widget and absorber cataloging.*
 
 ### Velocity Plot Analysis with vStack
 
@@ -139,16 +154,23 @@ The vStack feature allows you to analyze absorption lines in velocity space:
 | `S` | Save line identifications and return to main display |
 | `Y` | Manually set y-limits for the current vStack panel |
 
+![vStack Interface](images/vstack.png)
+*Figure 7: vStack interface for analyzing absorber lines in velocity space.*
+
 ### Action Buttons
 
 The new version includes several action buttons:
 
 | Button | Action |
 |--------|--------|
+| Clear All Lines | Remove all line identifications from the display |
 | Load | Load previously saved line identifications and absorber systems |
 | Save | Save current line identifications and absorber systems |
 | Show | Toggle visibility of all identified lines |
 | List | Display a table of all identified lines |
+
+![Action Buttons](images/action_buttons.png)
+*Figure 8: Action buttons for managing data in MultispecViewer.*
 
 ## Complete Workflow Examples
 
@@ -160,12 +182,16 @@ Here's a typical workflow for identifying and cataloging an absorber:
    - Click "Select FITS Files" and choose your FITS files
    - The spectra will be displayed in the main window
 
+   ![Step 1: Loading Data](images/workflow_step1.png)
+   *Step 1: Loading spectral data.*
+
 2. **Initial redshift identification**:
    - Right-click on a spectral feature
    - Select a possible line from the dialog to calculate the implied redshift
    - The redshift will be applied to the redshift input widget
 
-   [Insert screenshot of right-click identification here]
+   ![Step 2: Line Identification](images/workflow_step2.png)
+   *Step 2: Initial line identification via right-click.*
 
 3. **Apply redshift and check for additional lines**:
    - Verify the selected line list in the redshift widget
@@ -173,7 +199,8 @@ Here's a typical workflow for identifying and cataloging an absorber:
    - Click "Submit" to mark all lines at that redshift
    - Visually inspect the marked lines to confirm the identification
 
-   [Insert screenshot of applied redshift with marked lines here]
+   ![Step 3: Applied Redshift](images/workflow_step3.png)
+   *Step 3: Applied redshift with marked lines.*
 
 4. **Detailed analysis with vStack**:
    - Position your cursor on the spectrum and press `v` for default velocity windows or `V` to set custom velocity limits
@@ -181,19 +208,24 @@ Here's a typical workflow for identifying and cataloging an absorber:
    - Mark each line as Detection, Non-Detection, Blended, or Low-Confidence using the `w` key
    - Press `S` to save all marked lines and return to the main display
 
-   [Insert screenshot of vStack interface here]
+   ![Step 4: vStack Analysis](images/workflow_step4.png)
+   *Step 4: Analyzing lines in vStack.*
 
 5. **Catalog the absorber system**:
    - Click "Catalog" to add the current redshift system to the absorber manager
    - The absorber will appear in the left panel with its redshift, line list, and color
    - Use the checkbox to toggle visibility of the system
 
-   [Insert screenshot of absorber manager with cataloged system here]
+   ![Step 5: Cataloged System](images/workflow_step5.png)
+   *Step 5: Absorber system cataloged in the manager.*
 
 6. **Save your work**:
    - Click the "Save" button to save your line identifications and absorber systems
-   - Choose a filename to save the data
-   - Two files will be created: a .txt file with line identifications and a .csv file with absorber systems
+   - Choose a filename and format (JSON recommended for complete data)
+   - Add optional metadata when prompted
+
+   ![Step 6: Saving Data](images/workflow_step6.png)
+   *Step 6: Saving analysis results.*
 
 ### Identifying Multiple Systems
 
@@ -206,7 +238,8 @@ To identify multiple absorber systems:
 5. Confirm the identification and add it to the catalog
 6. Repeat for additional systems
 
-[Insert screenshot showing multiple absorber systems in different colors here]
+![Multiple Absorber Systems](images/multiple_systems.png)
+*Figure 9: Multiple absorber systems displayed in different colors.*
 
 ### Managing Line Identifications
 
@@ -217,7 +250,8 @@ After identifying multiple systems:
 3. Use the absorber manager checkboxes to control which systems are displayed
 4. Click the "Save" button to save all identifications
 
-[Insert screenshot of line list dialog here]
+![Line List Dialog](images/line_list_dialog.png)
+*Figure 10: Line list dialog showing all identified lines.*
 
 ## Classic vs New Version
 
@@ -229,7 +263,8 @@ The classic version provides the core functionality in a streamlined interface:
 - Line identification
 - Basic navigation
 
-[Insert classic version screenshot here]
+![Classic Version](images/classic_version.png)
+*Figure 11: Classic version of MultispecViewer.*
 
 ### New Version
 
@@ -241,8 +276,10 @@ The new version adds several enhancements:
 - Improved performance and error handling
 - Action buttons for common tasks (Load, Save, Show, List)
 - Better visualization of multiple absorber systems
+- Help function (press `H` key)
 
-[Insert new version screenshot here]
+![New Version](images/new_version.png)
+*Figure 12: New version of MultispecViewer with enhanced features.*
 
 ## Tips and Best Practices
 
@@ -251,6 +288,7 @@ The new version adds several enhancements:
 - Use the keyboard navigation keys (`x`, `X`, `t`, `b`) for precise control of the display
 - Press `r` to reset to the original view if you get lost
 - Use `R` to clear line identifications without changing the view
+- Press `H` at any time to see the help window with keyboard shortcuts
 
 ### Redshift Identification
 
@@ -270,16 +308,15 @@ The new version adds several enhancements:
 
 - Use different colors for different absorber systems
 - Use the absorber manager to toggle visibility of systems when the display gets crowded
+- Use the "Clear All Lines" button to remove all line identifications at once
 - Save your work frequently using the "Save" button
-- For complex spectra with many systems, focus on one redshift at a time
 
 ### File Management
 
+- Use JSON format for complete data preservation (includes all metadata)
+- CSV and TXT formats are available for compatibility with other tools
+- When loading data, you can choose to append to or overwrite existing data
 - Use consistent file naming conventions for your saved data
-- The program creates two files when saving:
-  - A .txt file containing line identifications
-  - A .csv file with the same base name containing absorber systems
-- Both files are needed for a complete restoration of your work
 
 ## Development
 
@@ -301,3 +338,7 @@ MultispecViewer is part of the rbcodes package for spectroscopic analysis. It ut
 ### Error Messages
 
 Watch the message box at the bottom of the screen for helpful error messages and status updates.
+
+### Getting Help
+
+Press `H` at any time to open the help dialog with keyboard shortcuts and quick reference information.

@@ -5,6 +5,8 @@ from PyQt5.QtWidgets import (QWidget, QTableWidget, QTableWidgetItem,
 from PyQt5.QtGui import QColor
 from PyQt5 import QtCore, QtGui, QtWidgets
 from rbcodes.utils import rb_utility as rt
+from rbcodes.GUIs.multispecviewer.utils import read_line_options
+
 clr = rt.rb_set_color()
 
 class AbsorberManager(QWidget):
@@ -27,7 +29,9 @@ class AbsorberManager(QWidget):
         self.colors = colors or list(clr.keys())[1:]  # Skip the first color (usually background)        
 
         # Define available line lists
-        self.line_options = ['LLS', 'LLS Small', 'DLA', 'LBG', 'Gal', 'Eiger_Strong','AGN', 'None']
+        #self.line_options = ['LLS', 'LLS Small', 'DLA', 'LBG', 'Gal', 'Eiger_Strong','AGN', 'None']
+        self.line_options = read_line_options()
+
         
         # Initialize data storage for absorbers
         if absorbers_df is not None:

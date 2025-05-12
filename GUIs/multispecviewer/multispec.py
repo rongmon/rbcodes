@@ -336,7 +336,19 @@ class SpectralPlot(FigureCanvas):
             delx = xlim[1] - xcen
             self.axes[ax_index].set_xlim([xcen - 1.5*delx, xcen + 1.5*delx])
             self.draw()
-            
+        
+
+
+        # Add to the on_key_press method in SpectralPlot class
+        elif event.key == 'h' or event.key == 'H':
+            # Show help dialog
+            from rbcodes.GUIs.multispecviewer.utils import show_help_dialog
+            show_help_dialog(self.parent_window)
+            if self.message_box:
+                self.message_box.on_sent_message("Displayed help window", "#8AB4F8")
+        
+
+
         # New quick line identification keystroke handlers
         elif (event.key == 'C'):
             self.check_lineid(event.xdata, 'CIV', event.ydata, ax_index)

@@ -8,8 +8,11 @@ from PyQt5.QtGui import QColor
 # Import color utility from rb_utility
 try:
     from rbcodes.utils import rb_utility as rt
+    from rbcodes.GUIs.multispecviewer.utils import read_line_options
+
 except:
     from utils import rb_utility as rt
+    from GUIs.multispecviewer.utils import read_line_options
 
 class RedshiftInputWidget(QWidget):
     """
@@ -74,7 +77,9 @@ class RedshiftInputWidget(QWidget):
         linelist_label = QLabel("Line List:")
         linelist_label.setStyleSheet("color: white;")  
         self.linelist_combo = QComboBox()
-        self.linelist_combo.addItems(["None", "LLS", "LLS Small", "DLA", "LBG", "Gal", "Eiger_Strong","AGN"])
+        #self.linelist_combo.addItems(["None", "LLS", "LLS Small", "DLA", "LBG", "Gal", "Eiger_Strong","AGN"])
+        self.linelist_combo.addItems(read_line_options())
+
         # AGN, DLA, Eiger_Strong, Gal, Gal_Abs, Gal_Em, Gal_long, HI_recomb, HI_recomb_light, LBG, LLS, LLS Small, atom
         self.linelist_combo.setCurrentText(self.default_linelist)
 
