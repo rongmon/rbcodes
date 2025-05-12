@@ -76,8 +76,6 @@ The MultispecViewer interface consists of several components:
 2. Navigate to and select one or more FITS format spectral files
 3. The spectra will be loaded and displayed in the main plotting area
 
-![Loading Spectra](images/loading_data.png)
-*Figure 3: Loading FITS files into MultispecViewer.*
 
 ### Navigation Controls
 
@@ -121,12 +119,12 @@ Press the following keys with the cursor positioned at a spectral feature to ide
 | `1` | Lya/Lyb |
 
 ![Quick Line Identification](images/quick_id.png)
-*Figure 4: Example of quick line identification using keyboard shortcuts.*
+*Figure 3: Example of quick line identification using keyboard shortcuts.*
 
 Right-clicking anywhere on the spectrum opens a dialog with a complete list of lines from the selected line list at the clicked wavelength.
 
 ![Right-Click Line Identification](images/right_click_id.png)
-*Figure 5: Line identification dialog from right-clicking on a feature.*
+*Figure 4: Line identification dialog from right-clicking on a feature.*
 
 ### Redshift Controls
 
@@ -138,7 +136,7 @@ Right-clicking anywhere on the spectrum opens a dialog with a complete list of l
 In the new version, clicking "Catalog" adds the current redshift to the absorber manager for reference.
 
 ![Redshift Controls](images/redshift_controls.png)
-*Figure 6: Redshift input widget and absorber cataloging.*
+*Figure 5: Redshift input widget and absorber cataloging.*
 
 ### Velocity Plot Analysis with vStack
 
@@ -155,7 +153,7 @@ The vStack feature allows you to analyze absorption lines in velocity space:
 | `Y` | Manually set y-limits for the current vStack panel |
 
 ![vStack Interface](images/vstack.png)
-*Figure 7: vStack interface for analyzing absorber lines in velocity space.*
+*Figure 6: vStack interface for analyzing absorber lines in velocity space.*
 
 ### Action Buttons
 
@@ -169,8 +167,6 @@ The new version includes several action buttons:
 | Show | Toggle visibility of all identified lines |
 | List | Display a table of all identified lines |
 
-![Action Buttons](images/action_buttons.png)
-*Figure 8: Action buttons for managing data in MultispecViewer.*
 
 ## Complete Workflow Examples
 
@@ -182,16 +178,12 @@ Here's a typical workflow for identifying and cataloging an absorber:
    - Click "Select FITS Files" and choose your FITS files
    - The spectra will be displayed in the main window
 
-   ![Step 1: Loading Data](images/workflow_step1.png)
-   *Step 1: Loading spectral data.*
 
 2. **Initial redshift identification**:
    - Right-click on a spectral feature
    - Select a possible line from the dialog to calculate the implied redshift
    - The redshift will be applied to the redshift input widget
 
-   ![Step 2: Line Identification](images/workflow_step2.png)
-   *Step 2: Initial line identification via right-click.*
 
 3. **Apply redshift and check for additional lines**:
    - Verify the selected line list in the redshift widget
@@ -199,8 +191,6 @@ Here's a typical workflow for identifying and cataloging an absorber:
    - Click "Submit" to mark all lines at that redshift
    - Visually inspect the marked lines to confirm the identification
 
-   ![Step 3: Applied Redshift](images/workflow_step3.png)
-   *Step 3: Applied redshift with marked lines.*
 
 4. **Detailed analysis with vStack**:
    - Position your cursor on the spectrum and press `v` for default velocity windows or `V` to set custom velocity limits
@@ -208,24 +198,18 @@ Here's a typical workflow for identifying and cataloging an absorber:
    - Mark each line as Detection, Non-Detection, Blended, or Low-Confidence using the `w` key
    - Press `S` to save all marked lines and return to the main display
 
-   ![Step 4: vStack Analysis](images/workflow_step4.png)
-   *Step 4: Analyzing lines in vStack.*
 
 5. **Catalog the absorber system**:
    - Click "Catalog" to add the current redshift system to the absorber manager
    - The absorber will appear in the left panel with its redshift, line list, and color
    - Use the checkbox to toggle visibility of the system
 
-   ![Step 5: Cataloged System](images/workflow_step5.png)
-   *Step 5: Absorber system cataloged in the manager.*
 
 6. **Save your work**:
    - Click the "Save" button to save your line identifications and absorber systems
    - Choose a filename and format (JSON recommended for complete data)
    - Add optional metadata when prompted
 
-   ![Step 6: Saving Data](images/workflow_step6.png)
-   *Step 6: Saving analysis results.*
 
 ### Identifying Multiple Systems
 
@@ -238,8 +222,6 @@ To identify multiple absorber systems:
 5. Confirm the identification and add it to the catalog
 6. Repeat for additional systems
 
-![Multiple Absorber Systems](images/multiple_systems.png)
-*Figure 9: Multiple absorber systems displayed in different colors.*
 
 ### Managing Line Identifications
 
@@ -251,7 +233,7 @@ After identifying multiple systems:
 4. Click the "Save" button to save all identifications
 
 ![Line List Dialog](images/line_list_dialog.png)
-*Figure 10: Line list dialog showing all identified lines.*
+*Figure 6: Line list dialog showing all identified lines.*
 
 ## Classic vs New Version
 
@@ -264,7 +246,7 @@ The classic version provides the core functionality in a streamlined interface:
 - Basic navigation
 
 ![Classic Version](images/classic_version.png)
-*Figure 11: Classic version of MultispecViewer.*
+*Figure 7: Classic version of MultispecViewer.*
 
 ### New Version
 
@@ -278,8 +260,8 @@ The new version adds several enhancements:
 - Better visualization of multiple absorber systems
 - Help function (press `H` key)
 
-![New Version](images/new_version.png)
-*Figure 12: New version of MultispecViewer with enhanced features.*
+![New Version](images/interface_components.png)
+*Figure 8: New version of MultispecViewer with enhanced features.*
 
 ## Tips and Best Practices
 
