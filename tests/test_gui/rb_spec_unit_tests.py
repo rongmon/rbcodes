@@ -250,6 +250,7 @@ class TestSpectralAnalysisPipelineWithTestFits(unittest.TestCase):
         Validates:
         - Successful EW calculation
         - Physically meaningful column density
+        - Proper error propagation from linear to log units
         """
         print("\n--- Testing Equivalent Width Computation ---")
         
@@ -280,22 +281,41 @@ class TestSpectralAnalysisPipelineWithTestFits(unittest.TestCase):
                 "Equivalent width not computed")
             self.assertTrue(hasattr(self.spec, 'W_e'), 
                 "Equivalent width uncertainty not computed")
+            
+            # Verify column density attributes (both linear and logarithmic)
+            self.assertTrue(hasattr(self.spec, 'N'), 
+                "Linear column density not computed")
+            self.assertTrue(hasattr(self.spec, 'N_e'), 
+                "Linear column density uncertainty not computed")
             self.assertTrue(hasattr(self.spec, 'logN'), 
-                "Column density not computed")
+                "Log column density not computed")
+            self.assertTrue(hasattr(self.spec, 'logN_e'), 
+                "Log column density uncertainty not computed")
             
             # Validate physical constraints
             self.assertGreater(self.spec.W, 0, 
                 "Equivalent width is non-positive")
+            self.assertGreater(self.spec.N, 0, 
+                "Linear column density is non-positive")
             self.assertGreater(self.spec.logN, 0, 
-                "Column density is non-positive")
+                "Log column density is non-positive")
+            
+            # Validate error propagation consistency
+            # Check if logN and logN_e are consistent with N and N_e
+            expected_logN = np.log10(self.spec.N) if self.spec.N > 0 else 0
+            expected_logN_e = 0.434 * self.spec.N_e/self.spec.N if self.spec.N > 0 else 0
+            
+            self.assertAlmostEqual(self.spec.logN, expected_logN, places=5,
+                msg="Log column density calculation inconsistent with linear value")
+            self.assertAlmostEqual(self.spec.logN_e, expected_logN_e, places=5,
+                msg="Log column density error propagation is inconsistent")
             
             print("Equivalent Width Computation Successful")
             print(f"Equivalent Width: {self.spec.W:.3f} Å")
-            print(f"Column Density (log N): {self.spec.logN:.3f}")
+            print(f"Column Density: N = {self.spec.N:.3e}, logN = {self.spec.logN:.3f}±{self.spec.logN_e:.3f}")
         
         except Exception as e:
             self.fail(f"Equivalent width computation failed: {str(e)}")
-
     def test_spectrum_saving(self):
         """
         Test Spectrum Saving Methods

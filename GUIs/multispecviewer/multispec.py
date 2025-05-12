@@ -463,10 +463,11 @@ class SpectralPlot(FigureCanvas):
         # Update the canvas
         self.draw()
         
-        # Reapply the redshift lines if they existed before
-        if had_redshift_lines:
-            # Re-plot the redshift lines with the previously used values
-            self.plot_redshift_lines()
+        #
+        ## Reapply the redshift lines if they existed before
+        #if had_redshift_lines:
+        #    # Re-plot the redshift lines with the previously used values
+        #    self.plot_redshift_lines()
         
         if self.message_box:
             self.message_box.on_sent_message("Reset view to original state", "#008000")

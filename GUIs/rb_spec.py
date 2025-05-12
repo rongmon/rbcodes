@@ -113,8 +113,10 @@ class rb_spec(object):
         self.vmax=    velocity maximum used for equivalent width calculation
         self.W=    Rest Frame equivalenth width
         self.W_e=  uncertainty on rest frame equivalent width
-        self.logN=  AOD column density
-        self.logN_e= AOD column density uncertainty
+        self.N=  AOD column density
+        self.N_e= AOD column density uncertainty
+        self.logN=  log AOD column density
+        self.logN_e= log AOD column density uncertainty
         self.Tau= Apparant optical depth as a function of velocity
         self.vel_centroid= EW weighted velocity centroid of the absorption line
         self.vel_disp=    1sigma velocity dispersion
@@ -1120,8 +1122,11 @@ class rb_spec(object):
 
         self.W= out['ew_tot']
         self.W_e=out['err_ew_tot']
-        self.logN=out['col']
-        self.logN_e=out['colerr']
+        # Convert to log10 units
+        self.N = out['col']
+        self.N_e = out['colerr']
+        self.logN=np.log10(self.N) if self.N > 0 else 0
+        self.logN_e=0.434 *self.N_e/self.N if self.N > 0 else 0
 
         self.Tau=out['Tau_a']
         self.vel_centroid=out['med_vel']
@@ -1221,6 +1226,8 @@ class rb_spec(object):
                 'vmax': self.vmax,
                 'W': self.W,
                 'W_e': self.W_e,
+                'N':self.N,
+                'N_e':self.N_e,
                 'logN': self.logN,
                 'logN_e': self.logN_e,
                 'vel_centroid': self.vel_centroid,
