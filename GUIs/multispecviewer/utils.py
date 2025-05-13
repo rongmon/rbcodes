@@ -512,147 +512,119 @@ def reconcile_linelists(input_files, velocity_threshold=20, output_file=None, cr
         # Calculate redshift tolerance from velocity threshold
         # v/c = Δz/(1+z) -> Δz = (v/c)*(1+z)
         # For small redshifts, we can approximate z_tolerance = v/c
-        # Speed of light in km/s
-        c = constants.c / 1000  # Convert from m/s to km/s
-        
-        # Base z_tolerance on velocity threshold
-        # This is conservative for higher redshifts but ensures systems 
-        # within velocity_threshold are grouped
         z_tolerance = velocity_threshold / c
         
         print(f"Using redshift tolerance of {z_tolerance:.6f} (corresponding to {velocity_threshold} km/s)")
         
-        # Get unique redshifts with tolerance
+        # Get unique redshifts from the reconciled linelist
         unique_zabs = []
         
         # Sort by redshift
         sorted_by_z = reconciled_df.sort_values('Zabs').reset_index(drop=True)
         
         # Group similar redshifts
-        current_z_group = []  # Will store dictionaries with z, linelist, color
+        current_z_group = []  # Will store redshift values
         
-        # Add first redshift with its properties
+        # Add first redshift
         first_z = sorted_by_z['Zabs'].iloc[0]
-        
-        # Try to find original properties in master_linelist
-        first_z_idx = master_linelist['Zabs'].sub(first_z).abs().idxmin()
-        first_line = master_linelist.iloc[first_z_idx]
-        
-        # Check if original data has LineList or Color
-        first_props = {
-            'Zabs': first_z,
-            'LineList': 'LLS',  # Default
-            'Color': 'white'    # Default
-        }
-        
-        # Try to get LineList from original data
-        if 'LineList' in master_linelist.columns:
-            first_props['LineList'] = first_line['LineList']
-        
-        # Try to get Color from original data
-        if 'Color' in master_linelist.columns:
-            first_props['Color'] = first_line['Color']
-            
-        current_z_group.append(first_props)
+        current_z_group.append(first_z)
         
         for i in range(1, len(sorted_by_z)):
             current_z = sorted_by_z['Zabs'].iloc[i]
-            prev_z = current_z_group[-1]['Zabs']
+            prev_z = current_z_group[-1]
             
-            # Calculate proper velocity difference between redshifts
-            # v/c = (z2 - z1)/(1 + z1)
+            # Calculate proper velocity difference
             v_diff = c * (current_z - prev_z)/(1 + prev_z)
             v_diff_abs = abs(v_diff)
             
             # If within velocity threshold, add to current group
             if v_diff_abs <= velocity_threshold:
-                # Find original properties for this z
-                z_idx = master_linelist['Zabs'].sub(current_z).abs().idxmin()
-                line = master_linelist.iloc[z_idx]
-                
-                # Create properties dictionary
-                props = {
-                    'Zabs': current_z,
-                    'LineList': 'LLS',  # Default
-                    'Color': 'white'    # Default
-                }
-                
-                # Try to get LineList from original data
-                if 'LineList' in master_linelist.columns:
-                    props['LineList'] = line['LineList']
-                
-                # Try to get Color from original data
-                if 'Color' in master_linelist.columns:
-                    props['Color'] = line['Color']
-                    
-                current_z_group.append(props)
+                current_z_group.append(current_z)
             else:
                 # Process current group
                 if current_z_group:
                     # Calculate mean z
-                    mean_z = np.mean([item['Zabs'] for item in current_z_group])
-                    
-                    # Use the first non-default LineList and Color in the group
-                    linelist = next((item['LineList'] for item in current_z_group 
-                                    if item['LineList'] != 'LLS'), 'LLS')
-                    color = next((item['Color'] for item in current_z_group 
-                                 if item['Color'] != 'white'), 'white')
+                    mean_z = np.mean(current_z_group)
                     
                     # Add to unique redshifts
-                    unique_zabs.append({
-                        'Zabs': round(mean_z, 6),
-                        'LineList': linelist,
-                        'Color': color
-                    })
+                    unique_zabs.append(round(mean_z, 6))
                     
                 # Start new group with current z
-                z_idx = master_linelist['Zabs'].sub(current_z).abs().idxmin()
-                line = master_linelist.iloc[z_idx]
-                
-                # Create properties dictionary
-                props = {
-                    'Zabs': current_z,
-                    'LineList': 'LLS',  # Default
-                    'Color': 'white'    # Default
-                }
-                
-                # Try to get LineList from original data
-                if 'LineList' in master_linelist.columns:
-                    props['LineList'] = line['LineList']
-                
-                # Try to get Color from original data
-                if 'Color' in master_linelist.columns:
-                    props['Color'] = line['Color']
-                    
-                current_z_group = [props]
+                current_z_group = [current_z]
         
         # Process final group
         if current_z_group:
             # Calculate mean z
-            mean_z = np.mean([item['Zabs'] for item in current_z_group])
-            
-            # Use the first non-default LineList and Color in the group
-            linelist = next((item['LineList'] for item in current_z_group 
-                            if item['LineList'] != 'LLS'), 'LLS')
-            color = next((item['Color'] for item in current_z_group 
-                         if item['Color'] != 'white'), 'white')
+            mean_z = np.mean(current_z_group)
             
             # Add to unique redshifts
-            unique_zabs.append({
-                'Zabs': round(mean_z, 6),
-                'LineList': linelist,
-                'Color': color
+            unique_zabs.append(round(mean_z, 6))
+        
+        # Create initial absorber DataFrame with default values
+        absorber_data = []
+        for z in unique_zabs:
+            absorber_data.append({
+                'Zabs': z,
+                'LineList': 'LLS',  # Default line list
+                'Visible': False    # Default to not visible
             })
         
-        # Create DataFrame
-        absorber_df = pd.DataFrame(unique_zabs)
+        absorber_df = pd.DataFrame(absorber_data)
         
-        # Always add Visible column if not present
-        if 'Visible' not in absorber_df.columns:
-            absorber_df['Visible'] = False
-            
+        # Now check if any CSV files were provided that might contain absorber information
+        csv_files = [f for f in input_files if f.lower().endswith('.csv')]
+        
+        if csv_files:
+            # Try to load absorber information from CSV files
+            for csv_file in csv_files:
+                try:
+                    # Load the CSV
+                    csv_data = pd.read_csv(csv_file)
+                    
+                    # Check if it has required columns for an absorber file
+                    if 'Zabs' in csv_data.columns:
+                        print(f"Found absorber information in {csv_file}")
+                        
+                        # Check for LineList column (might be named differently)
+                        linelist_col = None
+                        for col in csv_data.columns:
+                            if col.lower() == 'linelist' or col.lower() == 'list':
+                                linelist_col = col
+                                break
+                        
+                        if linelist_col:
+                            # Cross-match with absorber_df and update LineList for matching entries
+                            for i, row in absorber_df.iterrows():
+                                # Find closest matching redshift in CSV data
+                                closest_idx = csv_data['Zabs'].sub(row['Zabs']).abs().idxmin()
+                                closest_z = csv_data.loc[closest_idx, 'Zabs']
+                                
+                                # Calculate velocity difference
+                                v_diff = c * (closest_z - row['Zabs'])/(1 + row['Zabs'])
+                                v_diff_abs = abs(v_diff)
+                                
+                                # If within velocity threshold, use the LineList from CSV
+                                if v_diff_abs <= velocity_threshold:
+                                    absorber_df.at[i, 'LineList'] = csv_data.loc[closest_idx, linelist_col]
+                                    print(f"Updated LineList for z={row['Zabs']} to {csv_data.loc[closest_idx, linelist_col]}")
+                except Exception as e:
+                    print(f"Error processing CSV file {csv_file}: {str(e)}")
+        
+        # Get color list from rb_utility
+        try:
+            from rbcodes.utils import rb_utility as rt
+            clr = rt.rb_set_color()
+            colors = list(clr.keys())[1:]  # Skip the first color (usually background)
+        except ImportError:
+            # Fallback colors if rb_utility not available
+            colors = ['white', 'red', 'blue', 'green', 'yellow', 'cyan', 'magenta', 
+                    'orange', 'purple', 'pink', 'teal', 'lime', 'brown', 'navy']
+        
+        # Assign different colors to each absorber, cycling through the color list
+        absorber_df['Color'] = [colors[i % len(colors)] for i in range(len(absorber_df))]
+        
         print(f"Created {len(absorber_df)} unique absorber systems")
-            
+    
     # Save to file if requested
     if output_file:
         output_dir = os.path.dirname(output_file)
