@@ -383,9 +383,9 @@ class AbsorberManager(QWidget):
                             break
             
             # Add a new empty row at the end to maintain minimum rows
-            new_row_idx = self.table.rowCount()
-            self.table.insertRow(new_row_idx)
-            self._add_row_widgets(new_row_idx)
+            #new_row_idx = self.table.rowCount()
+            #self.table.insertRow(new_row_idx)
+            #self._add_row_widgets(new_row_idx)
                 
             return True
         except Exception as e:
