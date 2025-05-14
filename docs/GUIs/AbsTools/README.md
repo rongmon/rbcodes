@@ -171,7 +171,7 @@ The AbsTools interface is divided into two columns:
 
 Each row represents a different absorption line transition.
 
-![AbsTools Main Interface](path/to/main_interface_screenshot.png)
+![AbsTools Main Interface](images/main_interface_screenshot.png)
 *Screenshot of the AbsTools main interface showing continuum fitting and normalized spectrum views*
 
 ### Mouse Controls
