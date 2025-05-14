@@ -14,7 +14,7 @@ SPEED_OF_LIGHT = 2.9979e5  # km/s
 COLORS = rt.rb_set_color()
 
 # Default settings
-DEFAULT_POLY_ORDER = 4
+DEFAULT_POLY_ORDER = 6
 DEFAULT_MASK_RANGE = [-200, 200]
 DEFAULT_WINDOW_LIMITS = [-1000, 1000]
 DEFAULT_EW_LIMITS = [None, None]
@@ -67,8 +67,8 @@ HELP_TEXT = '''
             
             V (RHS only): Use active subplot velocity limits for all RHS plots
             
-            Up arrow    : Increase Polynomial Order [default 4]
-            Down arrow  : Decrease Polynomial Order [default 4]
+            Up arrow    : Increase Maximum Polynomial Order [default 6]
+            Down arrow  : Decrease Maximum Polynomial Order [default 6]
 
             m           : Measure EW/N for active subplot
             M           : Measure EW/N for ALL subplots

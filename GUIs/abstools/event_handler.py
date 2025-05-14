@@ -200,7 +200,7 @@ class EventHandler:
                     Plotting.plot(parent, parent.Lidx, modify=True)
                     
                     if hasattr(parent, 'signals'):
-                        parent.signals.status_message.emit(f"Polynomial order increased to {parent.ions[parent.keys[key_idx]]['order']}")
+                        parent.signals.status_message.emit(f"Maximum polynomial order increased to {parent.ions[parent.keys[key_idx]]['order']}")
                 else:
                     if hasattr(parent, 'signals'):
                         parent.signals.status_message.emit('Click on a left transition window first')
@@ -226,7 +226,7 @@ class EventHandler:
                     Plotting.plot(parent, parent.Lidx, modify=True)
                     
                     if hasattr(parent, 'signals'):
-                        parent.signals.status_message.emit(f"Polynomial order decreased to {parent.ions[parent.keys[key_idx]]['order']}")
+                        parent.signals.status_message.emit(f"Maximum polynomial order decreased to {parent.ions[parent.keys[key_idx]]['order']}")
                 else:
                     if hasattr(parent, 'signals'):
                         parent.signals.status_message.emit('Click on a transition window first')

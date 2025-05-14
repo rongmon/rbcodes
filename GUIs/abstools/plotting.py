@@ -6,7 +6,8 @@ Enhanced with improved error handling and signal-slot communication.
 """
 
 import numpy as np
-import numpy.polynomial.legendre as L
+#import numpy.polynomial.legendre as L
+from rbcodes.IGM import rb_iter_contfit as rf
 from rbcodes.GUIs.abstools.config import COLORS, PLOT_SETTINGS
 from rbcodes.GUIs.abstools.intervening_utils import grab_intervening_linelist, plot_intervening_lines
 
@@ -55,9 +56,19 @@ class Plotting:
                 if modify:
                     try:
                         # Re-evaluate continuum
-                        parent.ions[parent.keys[key_idx]]['pco'] = L.Legendre.fit(
-                            wave[wc], flux[wc], order, w=weight[wc]
-                        )
+                        try:
+                            # Try the optimal polynomial method first
+                            result = rf.fit_optimal_polynomial(wave[wc], flux[wc], min_order=1, max_order=order, 
+                                   maxiter=20, sigma=3.0, include_model=True, silent=True)
+                            parent.ions[parent.keys[key_idx]]['pco'] = result['model']
+                        except Exception as e:
+                            print(f"Optimal polynomial fitting failed: {e}, falling back to Legendre fit")
+                            # Fallback to original Legendre method
+                            import numpy.polynomial.legendre as L
+                            parent.ions[parent.keys[key_idx]]['pco'] = L.Legendre.fit(
+                                wave[wc], flux[wc], order, w=weight[wc]
+                            )
+
                         parent.ions[parent.keys[key_idx]]['cont'] = parent.ions[parent.keys[key_idx]]['pco'](wave)
                         cont = parent.ions[parent.keys[key_idx]]['cont']
                         

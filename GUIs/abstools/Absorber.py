@@ -54,7 +54,7 @@ class Absorber:
             if nofrills==False:
                 ion_dict['wc'] = ((ion_dict['vel']<mask[0])|(ion_dict['vel']>mask[1])) &(ion_dict['error'] != 0) #error != 0 is a bad pixel mask
                 ion_dict['weight'] = 1/(ion_dict['error']**2)
-                ion_dict['order'] = 4 #order of poly fit
+                ion_dict['order'] = 6 #max order of poly fit
                 ion_dict['pco']=L.Legendre.fit(ion_dict['wave'][ion_dict['wc']],ion_dict['flux'][ion_dict['wc']],ion_dict['order'],w=ion_dict['weight'][ion_dict['wc']])
                 ion_dict['cont'] = ion_dict['pco'](ion_dict['wave'])
 

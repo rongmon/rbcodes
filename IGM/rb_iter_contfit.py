@@ -48,6 +48,8 @@ def rb_iter_contfit(wave, flux, error=None, **kwargs):
     include_model : bool
         Whether to include the astropy model and fitter objects in the return dictionary (default: False)
         This replaces the previous return_model parameter for consistency.
+    silent : bool
+        If True, suppress all print statements and plots (default: False)
     
     Returns
     ---------
@@ -112,6 +114,7 @@ def rb_iter_contfit(wave, flux, error=None, **kwargs):
     Written by:  Rongmon Bordoloi
     Tested on Python 3.7  Sep 4 2019
     Modified April 2025 - Standardized return format to use dictionary
+    Modified May 2025 - Added silent parameter to suppress output
     --------------------------
     """
     # Get optional parameters
@@ -119,6 +122,7 @@ def rb_iter_contfit(wave, flux, error=None, **kwargs):
     order = kwargs.get('order', 4)
     sigma_level = kwargs.get('sigma', 3.0)
     use_weights = kwargs.get('use_weights', False)
+    silent = kwargs.get('silent', False)
     
     # For backward compatibility, check for both include_model and return_model
     include_model = kwargs.get('include_model', False) or kwargs.get('return_model', False)
@@ -307,7 +311,7 @@ def calculate_bic(residuals, n_params, n_points, error=None):
 
 def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6, 
                            maxiter=20, sigma=3.0, use_weights=False, include_model=True, 
-                           plot=True,save_plot=False, plot_filename=None, **kwargs):
+                           plot=True, save_plot=False, plot_filename=None, silent=False, **kwargs):
     """
     Fit a spectral region with the optimal polynomial order determined by Bayesian Information Criterion.
     
@@ -343,6 +347,8 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
         Whether to save the plot to a file (default: False)
     plot_filename : str, optional
         Filename for the saved plot (default: "polynomial_fit.png")
+    silent : bool, optional
+        If True, suppress all print statements and plots (default: False)
     **kwargs : 
         Additional parameters passed directly to rb_iter_contfit
     
@@ -399,6 +405,10 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
     >>> result = fit_optimal_polynomial(wavelength, flux, error, include_model=True)
     >>> new_wave = np.linspace(wavelength.min(), wavelength.max(), 1000)
     >>> new_cont = result['model'](new_wave)
+    
+    Running in silent mode (no output or plots):
+    
+    >>> result = fit_optimal_polynomial(wavelength, flux, error, silent=True)
     """
     # Check input arrays
     if wave is None or flux is None:
@@ -411,14 +421,17 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
     if error is None:
         # Create a constant error array (10% of median flux)
         error = np.ones_like(flux) * 0.1 * np.median(flux)
-        print("No error array provided. Using constant error (10% of median flux).")
+        if not silent:
+            print("No error array provided. Using constant error (10% of median flux).")
     
     # Ensure the number of points is sufficient for fitting
     n_points = len(wave)
     if n_points < max_order + 2:
-        print(f"Too few points ({n_points}) for requested max_order ({max_order})")
+        if not silent:
+            print(f"Too few points ({n_points}) for requested max_order ({max_order})")
         max_order = n_points - 2
-        print(f"Reduced max_order to {max_order}")
+        if not silent:
+            print(f"Reduced max_order to {max_order}")
     
     # Define the range of polynomial orders to test
     test_orders = range(min_order, max_order + 1)
@@ -427,7 +440,8 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
     all_fits = []
     bic_values = []
     
-    print(f"Testing polynomial orders from {min_order} to {max_order}...")
+    if not silent:
+        print(f"Testing polynomial orders from {min_order} to {max_order}...")
     
     # Test different polynomial orders
     for order in test_orders:
@@ -441,6 +455,7 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
             sigma=sigma,
             use_weights=use_weights,
             include_model=True,  # Always include model for BIC calculations
+            silent=silent,  # Pass silent parameter to rb_iter_contfit
             **kwargs 
         )
         
@@ -464,15 +479,17 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
         all_fits.append((order, fit_result, residuals, std_error, bic_value, fit_model, fitter))
         bic_values.append((order, bic_value))
         
-        print(f"Order {order}: BIC = {bic_value:.2f}, StdDev = {std_error:.4f}")
+        if not silent:
+            print(f"Order {order}: BIC = {bic_value:.2f}, StdDev = {std_error:.4f}")
     
     # Find the best order (minimum BIC)
     best_idx = np.argmin([bic for _, bic in bic_values])
     best_order, best_fit, best_residuals, best_std, best_bic, best_fit_model, best_fitter = all_fits[best_idx]
     
-    print(f"\nOptimal polynomial order: {best_order}")
-    print(f"BIC value: {best_bic:.2f}")
-    print(f"Standard deviation of residuals: {best_std:.4f}")
+    if not silent:
+        print(f"\nOptimal polynomial order: {best_order}")
+        print(f"BIC value: {best_bic:.2f}")
+        print(f"Standard deviation of residuals: {best_std:.4f}")
     
     # Calculate normalized flux
     normalized_flux = flux / best_fit
@@ -512,8 +529,8 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
         # Update the result dictionary with model information
         result_dict.update(model_info)
  
-    # Plot the results if requested
-    if plot:
+    # Plot the results if requested and not in silent mode
+    if plot and not silent:
         fig = plot_polynomial_fit_results(result_dict)
         
         # Save the plot if requested
@@ -523,20 +540,22 @@ def fit_optimal_polynomial(wave, flux, error=None, min_order=1, max_order=6,
                 plot_filename = "polynomial_fit.png"
             
             fig.savefig(plot_filename, dpi=300, bbox_inches='tight')
-            print(f"Saved plot to {plot_filename}")
+            if not silent:
+                print(f"Saved plot to {plot_filename}")
             result_dict['plot_file'] = plot_filename
         
         plt.show()
     else:
-        # If not showing plot but saving, still create figure
-        if save_plot:
+        # If not showing plot but saving, and not in silent mode
+        if save_plot and not silent:
             fig = plot_polynomial_fit_results(result_dict)
             
             if plot_filename is None:
                 plot_filename = "polynomial_fit.png"
             
             fig.savefig(plot_filename, dpi=300, bbox_inches='tight')
-            print(f"Saved plot to {plot_filename}")
+            if not silent:
+                print(f"Saved plot to {plot_filename}")
             result_dict['plot_file'] = plot_filename
             plt.close(fig)    
     # Remove 'all_fits' from the result dictionary if not needed for return
@@ -672,7 +691,7 @@ def plot_polynomial_fit_results(result_dict, figure_size=(10, 8)):
 def fit_spectral_region(filename, lam_min, lam_max, min_order=2, max_order=6, 
                         maxiter=20, sigma=3.0, use_weights=True, plot=True,
                         save_output=False, output_filename=None,
-                        save_plot=False, plot_filename=None):
+                        save_plot=False, plot_filename=None, silent=False):
     """
     Load a spectrum and fit a specific wavelength region with optimal polynomial order.
     
@@ -690,6 +709,8 @@ def fit_spectral_region(filename, lam_min, lam_max, min_order=2, max_order=6,
         Whether to save the normalized spectrum region (default: False)
     output_filename : str, optional
         Filename for the output normalized spectrum region
+    silent : bool, optional
+        If True, suppress all print statements and plots (default: False)
     
     Returns
     -------
@@ -699,7 +720,8 @@ def fit_spectral_region(filename, lam_min, lam_max, min_order=2, max_order=6,
     if not os.path.exists(filename):
         raise FileNotFoundError(f"File not found: {filename}")
     
-    print(f"Loading spectrum from {filename}...")
+    if not silent:
+        print(f"Loading spectrum from {filename}...")
     sp = XSpectrum1D.from_file(filename)
     
     # Extract wavelength, flux, and error arrays
@@ -717,8 +739,9 @@ def fit_spectral_region(filename, lam_min, lam_max, min_order=2, max_order=6,
     region_flux = flux[region_mask]
     region_error = error[region_mask] if error is not None else None
     
-    print(f"Selected region: {region_wave[0]:.2f} - {region_wave[-1]:.2f} Å")
-    print(f"Number of data points: {len(region_wave)}")
+    if not silent:
+        print(f"Selected region: {region_wave[0]:.2f} - {region_wave[-1]:.2f} Å")
+        print(f"Number of data points: {len(region_wave)}")
     
     # Fit the region with optimal polynomial order
     result = fit_optimal_polynomial(
@@ -732,7 +755,8 @@ def fit_spectral_region(filename, lam_min, lam_max, min_order=2, max_order=6,
         use_weights=use_weights,
         plot=plot,
         save_plot=save_plot,
-        plot_filename=plot_filename
+        plot_filename=plot_filename,
+        silent=silent  # Pass silent parameter to fit_optimal_polynomial
         )
     
     # Save the normalized region if requested
@@ -742,7 +766,8 @@ def fit_spectral_region(filename, lam_min, lam_max, min_order=2, max_order=6,
             (region_wave, region_flux, region_error, result['continuum'])
         )
         normalized_spec.write_to_fits(output_filename)
-        print(f"Saved normalized spectrum region to {output_filename}")
+        if not silent:
+            print(f"Saved normalized spectrum region to {output_filename}")
         result['output_file'] = output_filename
     
     return result
