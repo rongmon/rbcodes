@@ -861,7 +861,8 @@ class InteractiveMaskWindow(QMainWindow):
                     use_weights=self.fit_params['use_weights'],
                     sigma=self.fit_params['sigma'],
                     plot=False,
-                    include_model=True
+                    include_model=True,
+                    silent=True
                 )
                 
                 self.fit_result = result
