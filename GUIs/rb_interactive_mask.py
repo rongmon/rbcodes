@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout
                            QWidget, QPushButton, QLabel, QSpinBox, QCheckBox, 
                            QTabWidget, QGroupBox, QFormLayout, QDoubleSpinBox,
                            QMessageBox, QStatusBar, QDialog, QDialogButtonBox,
-                           QTextBrowser)
+                           QTextBrowser, QTextEdit)
 from PyQt5.QtCore import Qt
 
 from astropy.stats import sigma_clip
@@ -173,6 +173,16 @@ class InteractiveMaskWindow(QMainWindow):
         
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.clicked.connect(self.cancel)
+
+        self.results_display = QTextEdit()
+        self.results_display.setReadOnly(True)
+        self.results_display.setFixedHeight(120)  # Fixed height to control space
+        self.results_display.setStyleSheet("background-color: #f8f8f8; font-family: monospace;")
+        self.results_display.setPlaceholderText("Fitting results will appear here after fitting...")
+        
+        basic_layout.addWidget(QLabel("<b>Fitting Results:</b>"))
+        basic_layout.addWidget(self.results_display)
+        basic_layout.addStretch()
         
         basic_layout.addWidget(self.accept_btn)
         basic_layout.addWidget(self.cancel_btn)
@@ -338,6 +348,10 @@ class InteractiveMaskWindow(QMainWindow):
         self.order_spin.setEnabled(not checked)
         self.min_order_spin.setEnabled(checked)
         self.max_order_spin.setEnabled(checked)
+        
+        # Clear results display if parameters change significantly
+        if hasattr(self, 'results_display'):
+            self.results_display.setPlaceholderText("Parameters changed. Click 'Fit Continuum' to update...")
     
     def update_plots(self):
         """Update the plots with current data and masks."""
@@ -580,6 +594,11 @@ class InteractiveMaskWindow(QMainWindow):
         self.masks = []
         self.current_click = None
         self.statusBar.showMessage("All masks reset")
+        # Clear fitting results if masks are reset
+        self.fit_result = None
+        if hasattr(self, 'results_display'):
+            self.results_display.setText("Masks reset. No fitting results available.")
+        
         self.update_plots()
     
     def undo_last_mask(self):
@@ -876,6 +895,9 @@ class InteractiveMaskWindow(QMainWindow):
             self.statusBar.showMessage(f"Continuum fitted. {message}")
             self.accept_btn.setEnabled(True)
             
+            # Update the results display
+            self.update_results_display()
+            
             # Update plots
             self.update_plots()
             
@@ -968,6 +990,55 @@ class InteractiveMaskWindow(QMainWindow):
             self.result = {'cancelled': True}
         event.accept()
 
+
+    def update_results_display(self):
+        """Update the text display with current fitting results."""
+        if self.fit_result is None:
+            self.results_display.setText("No fitting has been performed yet.")
+            return
+        
+        result_text = []
+        result_text.append("<b>Continuum Fitting Results:</b>")
+        
+        # Add fitting method information
+        if self.fit_params['optimize_cont']:
+            result_text.append(f"• Method: Optimized polynomial (BIC)")
+            if 'best_order' in self.fit_result:
+                result_text.append(f"• Best polynomial order: {self.fit_result['best_order']}")
+            
+            # Add BIC information if available
+            if 'bic_results' in self.fit_result:
+                min_bic = min([b for _, b in self.fit_result['bic_results']])
+                result_text.append(f"• Minimum BIC: {min_bic:.2f}")
+        else:
+            result_text.append(f"• Method: Fixed order polynomial")
+            result_text.append(f"• Polynomial order: {self.fit_params['order']}")
+        
+        # Add fit quality information
+        if 'fit_error' in self.fit_result:
+            result_text.append(f"• Fit error: {self.fit_result['fit_error']:.5f}")
+        
+        # Add mask information
+        mask_count = len(self.masks) // 2
+        result_text.append(f"• Mask regions: {mask_count}")
+        
+        # Add weighting information
+        if self.fit_params['use_weights']:
+            result_text.append("• Using error-weighted fitting")
+        else:
+            result_text.append("• Using unweighted fitting")
+        
+        # Add timestamp
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+        result_text.append(f"<i>Last updated: {timestamp}</i>")
+        
+        # Set the text
+        self.results_display.setText("<br>".join(result_text))
+
+
+    #----------Class ENDED----
+
 def launch_interactive_mask(**kwargs):
     """
     Launch the interactive masking GUI.
@@ -1011,6 +1082,9 @@ def launch_interactive_mask(**kwargs):
     
     # Return the result
     return window.result
+
+
+
 
 if __name__ == "__main__":
     # Example usage
