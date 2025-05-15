@@ -6,6 +6,7 @@ import sys
 import os
 import pdb
 import warnings
+import datetime
 
 import json
 
@@ -301,6 +302,10 @@ class rb_spec(object):
         self.flux = np.array(flux) / median_flux
         self.error = np.array(error) / median_flux
         self.filename = filename
+        # Initialize mask storage
+        self.continuum_masks = []  # Store velocity ranges for masking
+        self.continuum_mask_wavelengths = []  # Store corresponding wavelength ranges
+        self.continuum_fit_params = {}  # Store parameters used for continuum fitting
     
     @classmethod
     def from_file(cls, filename, filetype=False, efil=None, **kwargs):
@@ -671,6 +676,17 @@ class rb_spec(object):
             vel_max=lam_max
             q=np.where((vel >= vel_min) & (vel <= vel_max))
 
+        # Check if any data points are in the slice
+        if len(q[0]) == 0:
+            if use_vel:
+                raise ValueError(f"No data points found in velocity range [{lam_min}, {lam_max}] km/s. "
+                               f"Available velocity range: [{min(vel):.1f}, {max(vel):.1f}] km/s")
+            else:
+                raise ValueError(f"No data points found in wavelength range [{lam_min}, {lam_max}]. "
+                               f"Available wavelength range: [{min(self.wrest):.2f}, {max(self.wrest):.2f}]")
+
+
+
         self.wave_slice=self.wrest[q]
         self.flux_slice=self.flux[q]
         self.error_slice=self.error[q]
@@ -685,7 +701,109 @@ class rb_spec(object):
         self.transition_name=str['name']
         self.line_sel_flag=method
 
+    def fit_continuum_interactive(self, **kwargs):
+        """
+        Launch an interactive GUI for continuum fitting with masking.
+        
+        This method opens a PyQt5 GUI that allows visual selection of mask regions
+        and interactive continuum fitting.
+        
+        Parameters
+        ----------
+        mask : list, optional
+            Initial mask regions to display. If not provided, uses existing masks.
+        domain : list, optional
+            Velocity domain limits [vmin, vmax] for fitting.
+        order : int, optional
+            Initial polynomial order for fitting.
+        use_weights : bool, optional
+            Whether to use flux errors as weights in fitting.
+        
+        Returns
+        -------
+        None
+            Updates the object in-place with new masks and continuum fit.
+        
+        Notes
+        -----
+        The GUI allows:
+        - Left-click pairs to add mask regions
+        - Right-click to remove mask regions
+        - Button to guess masks using sigma clipping
+        - Adjustment of fitting parameters
+        - Preview of the normalized spectrum
+        
+        See Also
+        --------
+        fit_continuum : Standard continuum fitting method
+        """
+        # Check if shift_spec has been called
+        if not hasattr(self, 'wrest'):
+            raise ValueError("Must call shift_spec before slice_spec and continuum fitting")
+        
+        # Check if the spectrum has been sliced
+        if not hasattr(self, 'wave_slice') or not hasattr(self, 'flux_slice') or not hasattr(self, 'velo'):
+            raise ValueError("Spectrum must be sliced first using slice_spec before interactive fitting")
+        
+        # Check for empty arrays - this could happen if slice_spec found no data in the range
+        if len(self.wave_slice) == 0 or len(self.flux_slice) == 0 or len(self.velo) == 0:
+            available_range = ""
+            if hasattr(self, 'wrest') and len(self.wrest) > 0:
+                available_range = f"\nAvailable wavelength range: [{min(self.wrest):.2f}, {max(self.wrest):.2f}]"
+                
+            raise ValueError(f"No data points in the sliced spectrum.{available_range}\n"
+                           f"Try different parameters in the slice_spec method.")
 
+
+        # Import the interactive masking GUI
+        try:
+            from rbcodes.GUIs import rb_interactive_mask as rim
+        except ImportError:
+            try:
+                from GUIs import rb_interactive_mask as rim
+            except ImportError:
+                raise ImportError("rb_interactive_mask module not found. Make sure it's installed.")
+        
+        # Prepare input parameters
+        input_params = {
+            'wave': self.wave_slice,
+            'flux': self.flux_slice,
+            'error': self.error_slice,
+            'velocity': self.velo,
+            'existing_masks': self.continuum_masks if hasattr(self, 'continuum_masks') else [],
+            'order': kwargs.get('order', 3),
+            'use_weights': kwargs.get('use_weights', False),
+            'domain': kwargs.get('domain', [min(self.velo), max(self.velo)])
+        }
+        
+        # Launch the interactive GUI
+        result = rim.launch_interactive_mask(**input_params)
+        
+        # If the user cancelled, return without changes
+        if result is None or result.get('cancelled', False):
+            print("Interactive fitting cancelled. No changes made.")
+            return
+        
+        # Update the object with the results
+        self.continuum_masks = result.get('masks', [])
+        self.continuum_mask_wavelengths = result.get('mask_wavelengths', [])
+        self.cont = result.get('continuum')
+        self.continuum_fit_params = result.get('fit_params', {})
+        self.continuum_fit_params['method'] = 'interactive'
+        
+        # Calculate normalized flux and error
+        if self.cont is not None:
+            self.fnorm = self.flux_slice / self.cont
+            self.enorm = self.error_slice / self.cont
+            
+            # Add additional parameters from the result if available
+            if 'fit_error' in result:
+                self.continuum_fit_params['fit_error'] = result['fit_error']
+            
+            print("Interactive continuum fitting complete.")
+        else:
+            print("Warning: No continuum was fitted.")
+    
     def fit_continuum(self,mask=False,domain=False,Legendre=False,**kwargs):
         """ By default calls an interactive continuum fitter to the sliced spectrum.
             Or an automated Legendre polynomial fitter if keyword set Legendre.
@@ -696,6 +814,36 @@ class rb_spec(object):
         optimize_cont = kwargs.get('optimize_cont', False)  # Default is False if not provided
 
         n_sigma=kwargs.get('n_sigma',3) # sigma clipping level 
+
+        # Store mask information
+        if mask is False:
+            self.continuum_masks = []
+            self.continuum_mask_wavelengths = []
+        else:
+            # Store a copy of the masks
+            self.continuum_masks = mask.copy() if isinstance(mask, list) else mask
+            
+            # Convert velocity masks to wavelength if possible
+            if hasattr(self, 'velo') and hasattr(self, 'wave_slice') and len(self.velo) == len(self.wave_slice):
+                self.continuum_mask_wavelengths = []
+                # Process each mask pair
+                for i in range(0, len(mask), 2):
+                    if i+1 < len(mask):
+                        vmin, vmax = mask[i], mask[i+1]
+                        # Find corresponding wavelength ranges
+                        wmin = self.wave_slice[np.abs(self.velo - vmin).argmin()]
+                        wmax = self.wave_slice[np.abs(self.velo - vmax).argmin()]
+                        self.continuum_mask_wavelengths.extend([wmin, wmax])
+        
+        # Store fitting parameters
+        self.continuum_fit_params = {
+            'method': 'interactive' if kwargs.get('Interactive', False) else 'polynomial',
+            'legendre_order': Legendre if Legendre is not False else None,
+            'use_weights': kwargs.get('use_weights', False),
+            'optimize_cont': kwargs.get('optimize_cont', False),
+            'sigma_clip': kwargs.get('sigma_clip', False),
+            'timestamp': datetime.datetime.now().isoformat()
+        }
 
         if Legendre==False:
             #pdb.set_trace()
@@ -1246,6 +1394,13 @@ class rb_spec(object):
                 'slice_spec_lam_max': self.slice_spec_lam_max,
                 'slice_spec_method': self.slice_spec_method
             }
+
+            # Add mask information to the output data
+            data_out.update({
+                'continuum_masks': getattr(self, 'continuum_masks', []),
+                'continuum_mask_wavelengths': getattr(self, 'continuum_mask_wavelengths', []),
+                'continuum_fit_params': getattr(self, 'continuum_fit_params', {})
+            })
 
             # Convert arrays to lists before saving
             for key, value in data_out.items():
