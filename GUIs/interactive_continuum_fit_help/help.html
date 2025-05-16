@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Continuum Fitting Help</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        h2 {
+            color: #2980b9;
+            margin-top: 30px;
+        }
+        
+        h3 {
+            color: #3498db;
+        }
+        
+        .key {
+            display: inline-block;
+            background: #f1f1f1;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            padding: 2px 5px;
+            font-family: monospace;
+            font-weight: bold;
+        }
+        
+        .note {
+            background-color: #e7f2fa;
+            border-left: 4px solid #3498db;
+            padding: 10px;
+            margin: 15px 0;
+        }
+        
+        .warning {
+            background-color: #fff4e6;
+            border-left: 4px solid #e67e22;
+            padding: 10px;
+            margin: 15px 0;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }
+        
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #f2f2f2;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .method-tab {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .method-tab h3 {
+            margin-top: 0;
+        }
+        
+        .screenshot {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin: 15px 0;
+        }
+        
+        .workflow {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .workflow ol {
+            margin-left: 20px;
+            padding-left: 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Interactive Continuum Fitting Help</h1>
+    
+    <div class="note">
+        This tool provides an interactive interface for fitting continuum to spectral data,
+        essential for absorption line analysis. You can choose between polynomial fitting 
+        or spline interpolation methods.
+    </div>
+    
+    <h2>Table of Contents</h2>
+    <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#interface">Interface Layout</a></li>
+        <li><a href="#workflow">Basic Workflow</a></li>
+        <li><a href="#methods">Fitting Methods</a>
+            <ul>
+                <li><a href="#polynomial">Polynomial Fitting</a></li>
+                <li><a href="#spline">Spline Fitting</a></li>
+            </ul>
+        </li>
+        <li><a href="#masks">Working with Masks</a></li>
+        <li><a href="#keyboard">Keyboard Shortcuts</a></li>
+        <li><a href="#tips">Tips and Best Practices</a></li>
+    </ul>
+    
+    <h2 id="overview">Overview</h2>
+    <p>
+        Continuum fitting is a critical step in spectral analysis, enabling the detection and 
+        measurement of absorption or emission features. This tool provides two approaches:
+    </p>
+    <ul>
+        <li><strong>Polynomial Fitting</strong>: Fits a Legendre polynomial to the unmasked portions of the spectrum</li>
+        <li><strong>Spline Fitting</strong>: Creates a cubic spline that passes through user-defined anchor points</li>
+    </ul>
+    <p>
+        Both methods allow for masking of spectral features that should be excluded from the 
+        continuum fit, such as absorption or emission lines.
+    </p>
+    
+    <h2 id="interface">Interface Layout</h2>
+    <p>The interface consists of:</p>
+    <ul>
+        <li><strong>Main Plot Area</strong>: Shows the original spectrum (top) and normalized spectrum after fitting (bottom)</li>
+        <li><strong>Toolbar</strong>: Contains standard matplotlib navigation tools plus specialized buttons</li>
+        <li><strong>Sidebar</strong>: Contains fitting controls and options organized in tabs</li>
+    </ul>
+    
+    <div class="note">
+        The plot area uses standard matplotlib interactions: pan, zoom, etc. Make sure no 
+        toolbar buttons are active when adding masks or spline points.
+    </div>
+    
+    <h2 id="workflow">Basic Workflow</h2>
+    <div class="workflow">
+        <ol>
+            <li>Select the fitting method: <strong>Polynomial</strong> or <strong>Spline</strong></li>
+            <li>For polynomial fitting:
+                <ul>
+                    <li>Add masks to exclude absorption or emission features</li>
+                    <li>Set polynomial options (order, optimization)</li>
+                    <li>Click "Fit Continuum" button</li>
+                </ul>
+            </li>
+            <li>For spline fitting:
+                <ul>
+                    <li>Add spline anchor points by left-clicking (for median points) or using 'b' key (for exact points)</li>
+                    <li>Set spline options (degree, smoothing)</li>
+                    <li>Click "Fit Continuum" button</li>
+                </ul>
+            </li>
+            <li>Review the normalized spectrum in the bottom panel</li>
+            <li>Make adjustments as needed and refit</li>
+            <li>When satisfied, click "Accept & Return" to use the continuum fit</li>
+        </ol>
+    </div>
+    
+    <h2 id="methods">Fitting Methods</h2>
+    
+    <div class="method-tab" id="polynomial">
+        <h3>Polynomial Fitting</h3>
+        <p>
+            Uses Legendre polynomials to fit a smooth continuum to unmasked portions of the spectrum.
+            This method is best for spectra with smooth continua and well-defined absorption or emission features.
+        </p>
+        
+        <h4>Options:</h4>
+        <ul>
+            <li><strong>Polynomial Order</strong>: Higher orders can fit more complex shapes but may overfit</li>
+            <li><strong>Use Weights</strong>: When checked, uses error spectrum for weighted fitting</li>
+            <li><strong>Auto Optimize</strong>: Uses Bayesian Information Criterion to select the optimal order</li>
+        </ul>
+        
+        <h4>Workflow:</h4>
+        <ol>
+            <li>Mask regions containing absorption or emission features</li>
+            <li>Set polynomial order or enable auto optimization</li>
+            <li>Click "Fit Continuum"</li>
+        </ol>
+        
+        <div class="note">
+            For complex spectra, it's often better to use Auto Optimize with a reasonable
+            range of orders (e.g., 1-6). This balances fitting quality with avoiding overfitting.
+        </div>
+    </div>
+    
+    <div class="method-tab" id="spline">
+        <h3>Spline Fitting</h3>
+        <p>
+            Uses cubic spline interpolation between user-selected anchor points. This method gives 
+            you more direct control and works well for irregular continua or when polynomial fitting 
+            struggles.
+        </p>
+        
+        <h4>Options:</h4>
+        <ul>
+            <li><strong>Spline Degree</strong>: Order of polynomial pieces (3 = cubic is standard)</li>
+            <li><strong>Smoothing</strong>: Higher values create smoother curves (0 = exact interpolation)</li>
+            <li><strong>Median Window</strong>: Size of window for calculating median flux when adding points</li>
+            <li><strong>Window Type</strong>: Units for median window (pixels or velocity/wavelength units)</li>
+        </ul>
+        
+        <h4>Adding Points:</h4>
+        <ul>
+            <li><strong>Left-click</strong>: Adds a point at the median flux within the specified window around the click</li>
+            <li><strong>Key 'b'</strong>: Adds a point at the exact cursor position</li>
+            <li><strong>Right-click</strong>: Removes the closest spline point</li>
+        </ul>
+        
+        <div class="warning">
+            Spline fitting requires at least 3 anchor points. Place points on parts of the 
+            spectrum that represent the true continuum level, avoiding absorption or emission features.
+        </div>
+    </div>
+    
+    <h2 id="masks">Working with Masks</h2>
+    <p>
+        Masks define regions to exclude from the continuum fit, typically absorption or emission features.
+    </p>
+    
+    <h3>Adding and Removing Masks:</h3>
+    <ul>
+        <li><strong>Left-click twice</strong>: First click defines start of mask, second click defines end</li>
+        <li><strong>Right-click twice</strong>: Defines a region where masks will be removed (any mask overlapping with this region will be removed)</li>
+        <li><strong>Auto-Mask button</strong>: Automatically detects potential features to mask based on statistical deviations</li>
+        <li><strong>Manual Entry button</strong>: Opens a dialog to precisely specify mask boundaries</li>
+        <li><strong>Reset Masks button</strong>: Clears all masks</li>
+        <li><strong>Undo Last button</strong>: Removes the most recently added mask</li>
+    </ul>
+    
+    <div class="note">
+        Overlapping masks are automatically merged into a single continuous mask region.
+    </div>
+    
+    <h3>Auto-Masking Parameters (Advanced tab):</h3>
+    <ul>
+        <li><strong>Auto-Mask Sigma</strong>: Threshold for detecting features (in standard deviations)</li>
+        <li><strong>Min Mask Width</strong>: Minimum width for a detected feature to be masked</li>
+    </ul>
+    
+    <h2 id="keyboard">Keyboard Shortcuts</h2>
+    <table>
+        <tr>
+            <th>Key</th>
+            <th>Action</th>
+        </tr>
+        <tr>
+            <td><span class="key">f</span></td>
+            <td>Fit continuum</td>
+        </tr>
+        <tr>
+            <td><span class="key">r</span></td>
+            <td>Reset masks</td>
+        </tr>
+        <tr>
+            <td><span class="key">R</span> (capital)</td>
+            <td>Reset everything (masks, spline points, and fit)</td>
+        </tr>
+        <tr>
+            <td><span class="key">z</span></td>
+            <td>Undo last mask</td>
+        </tr>
+        <tr>
+            <td><span class="key">a</span></td>
+            <td>Accept results</td>
+        </tr>
+        <tr>
+            <td><span class="key">escape</span></td>
+            <td>Cancel/close without saving</td>
+        </tr>
+        <tr>
+            <td><span class="key">b</span></td>
+            <td>Add spline point at exact cursor position (spline mode only)</td>
+        </tr>
+        <tr>
+            <td><span class="key">c</span></td>
+            <td>Clear all spline points (spline mode only)</td>
+        </tr>
+        <tr>
+            <td><span class="key">p</span></td>
+            <td>Switch to polynomial fitting mode</td>
+        </tr>
+        <tr>
+            <td><span class="key">s</span></td>
+            <td>Switch to spline fitting mode</td>
+        </tr>
+        <tr>
+            <td><span class="key">m</span></td>
+            <td>Open manual mask entry dialog</td>
+        </tr>
+        <tr>
+            <td><span class="key">+</span> / <span class="key">=</span></td>
+            <td>Zoom in</td>
+        </tr>
+        <tr>
+            <td><span class="key">-</span> / <span class="key">_</span></td>
+            <td>Zoom out</td>
+        </tr>
+        <tr>
+            <td><span class="key">0</span></td>
+            <td>Reset zoom</td>
+        </tr>
+        <tr>
+            <td><span class="key">h</span></td>
+            <td>Show this help dialog</td>
+        </tr>
+    </table>
+    
+    <h2 id="tips">Tips and Best Practices</h2>
+    <ul>
+        <li><strong>Fitting complex spectra</strong>: Try both methods and compare results</li>
+        <li><strong>For polynomial fitting</strong>: Start with low orders (2-3) and increase only if needed</li>
+        <li><strong>For spline fitting</strong>: Place anchor points at regular intervals in regions representing the true continuum</li>
+        <li><strong>When masking</strong>: Be generous with mask boundaries to fully exclude features</li>
+        <li><strong>Auto-optimizing</strong>: Use a reasonable range (e.g., 1-6) to avoid overfitting</li>
+        <li><strong>Check normalization</strong>: The bottom panel shows the normalized spectrum - the continuum should follow 1.0 in regions without features</li>
+        <li><strong>Use keyboard shortcuts</strong>: They speed up the workflow significantly</li>
+    </ul>
+    
+    <div class="warning">
+        <p><strong>Common issues to avoid:</strong></p>
+        <ul>
+            <li>Using polynomial orders that are too high, causing overfitting</li>
+            <li>Placing spline points on absorption or emission features instead of the true continuum</li>
+            <li>Not masking the full extent of spectral features</li>
+            <li>Not including enough spline points to adequately define the continuum shape</li>
+        </ul>
+    </div>
+    
+    <div class="note">
+        <p><strong>Remember</strong>: The quality of the continuum fit directly affects the 
+        accuracy of equivalent width measurements and column density calculations. Take time 
+        to ensure the fit is appropriate for your science goals.</p>
+    </div>
+</body>
+</html>

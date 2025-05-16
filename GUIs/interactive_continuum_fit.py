@@ -16,12 +16,15 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout
                            QWidget, QPushButton, QLabel, QSpinBox, QCheckBox, 
                            QTabWidget, QGroupBox, QFormLayout, QDoubleSpinBox,
                            QMessageBox, QStatusBar, QDialog, QDialogButtonBox,
-                           QComboBox,QScrollArea,QGridLayout)
+                           QComboBox,QScrollArea,QGridLayout,QTextBrowser)
 from PyQt5.QtCore import Qt
 from scipy.interpolate import splrep, splev
 import warnings
 import datetime
-
+import os
+import pkg_resources
+from PyQt5.QtCore import QUrl
+from PyQt5.QtGui import QIcon
 # Import the minimum required functions
 try:
     from rbcodes.IGM.rb_iter_contfit import fit_optimal_polynomial, rb_iter_contfit
@@ -112,9 +115,13 @@ class InteractiveContinuumFitWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
         
+         
         # Create plotting area
         self.canvas = MplCanvas(self, width=8, height=6)
         self.toolbar = NavigationToolbar2QT(self.canvas, self)
+
+        #Add a help window
+        self.add_help_button_to_toolbar()
         
         # Create plot layout
         plot_layout = QVBoxLayout()
@@ -433,7 +440,40 @@ class InteractiveContinuumFitWindow(QMainWindow):
         
         # Set initial UI state based on default method
         self.toggle_optimization(True)  # Initial state matches the default
-            
+
+
+    def show_help_dialog(self):
+        """Open the help dialog."""
+        dialog = HelpDialog(self)
+        dialog.exec_()
+
+    # After creating the toolbar, add a help button:
+    def add_help_button_to_toolbar(self):
+        """Add a help button to the matplotlib toolbar."""
+        spacer = QWidget()
+        spacer.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.toolbar.addWidget(spacer)
+        
+        # Create help button with icon if available
+        help_button = QPushButton("?")
+        help_button.setToolTip("Show Help")
+        help_button.setMaximumWidth(30)
+        help_button.clicked.connect(self.show_help_dialog)
+        
+        # Try to set an icon if available
+        try:
+            icon_path = pkg_resources.resource_filename(
+                'rbcodes.GUIs.interactive_continuum_fit_help', 'images/help_icon.png'
+            )
+            if os.path.exists(icon_path):
+                help_button.setIcon(QIcon(icon_path))
+                help_button.setText("")  # Remove text if icon is used
+        except (ImportError, pkg_resources.DistributionNotFound):
+            pass  # Use text-only button if icon not found
+        
+        self.toolbar.addWidget(help_button)    
+
+
     def toggle_method(self, checked):
         """Toggle between polynomial and spline fitting methods."""
         if self.poly_radio.isChecked():
@@ -510,7 +550,7 @@ class InteractiveContinuumFitWindow(QMainWindow):
         
         # Plot normalized spectrum if available
         if self.normalized_flux is not None:
-            ax_norm.step(self.x_axis, self.normalized_flux, 'k-', where='mid', lw=1)
+            ax_norm.step(self.x_axis, self.normalized_flux, 'k-', where='mid', lw=0.5)
             ax_norm.axhline(y=1.0, color='r', linestyle='--')
             
             # Mark masked regions in normalized plot
@@ -786,6 +826,9 @@ class InteractiveContinuumFitWindow(QMainWindow):
             self.zoom_out()
         elif event.key == '0':  # Reset zoom
             self.reset_zoom()
+
+        elif event.key == 'h':
+            self.show_help_dialog()
             
     def zoom_in(self):
         """Zoom in on the plot."""
@@ -1315,6 +1358,104 @@ def launch_interactive_continuum_fit(**kwargs):
     
     # Return the result
     return window.result
+
+#-- Help Window
+class HelpDialog(QDialog):
+    """Modal dialog to display HTML-formatted help content."""
+    def __init__(self, parent=None):
+        super(HelpDialog, self).__init__(parent)
+        self.setWindowTitle("Interactive Continuum Fitting Help")
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        self.resize(900, 700)  # Set a reasonable default size
+        
+        # Create layout
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        # Create text browser for HTML content
+        self.text_browser = QTextBrowser()
+        self.text_browser.setOpenExternalLinks(True)  # Allow clicking on links
+        layout.addWidget(self.text_browser)
+        
+        # Add close button at bottom
+        button_box = QDialogButtonBox(QDialogButtonBox.Close)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+        
+        # Load the help content
+        self.load_help_content()
+    
+    def load_help_content(self):
+        """Load the HTML help content from file."""
+        try:
+            # Try to find the help file
+            module_dir = os.path.dirname(os.path.abspath(__file__))
+            help_file = os.path.join(module_dir, 'interactive_continuum_fit_help', 'help.html')
+            
+            # Check if file exists
+            if os.path.exists(help_file):
+                with open(help_file, 'r', encoding='utf-8') as f:
+                    html_content = f.read()
+                self.text_browser.setHtml(html_content)
+                
+                # Set base URL for relative resources (like images)
+                base_url = QUrl.fromLocalFile(os.path.dirname(help_file) + '/')
+                self.text_browser.setSearchPaths([os.path.dirname(help_file)])
+                self.text_browser.setSource(QUrl())  # Reset source
+                self.text_browser.document().setBaseUrl(base_url)
+            else:
+                # Fallback to basic help content
+                self.load_fallback_help()
+                
+        except Exception as e:
+            # If any error occurs, show fallback help
+            print(f"Error loading help content: {str(e)}")
+            self.load_fallback_help()
+    
+    def load_fallback_help(self):
+        """Load a basic fallback help content if the file can't be found."""
+        fallback_html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Interactive Continuum Fitting Help</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                h1 { color: #2c3e50; }
+                h2 { color: #3498db; }
+                .section { margin-bottom: 20px; }
+                .key { display: inline-block; background: #f1f1f1; border: 1px solid #ddd; 
+                       border-radius: 3px; padding: 2px 5px; font-family: monospace; }
+            </style>
+        </head>
+        <body>
+            <h1>Interactive Continuum Fitting Help</h1>
+            
+            <div class="section">
+                <h2>Overview</h2>
+                <p>This tool allows you to interactively fit a continuum to spectral data using either 
+                polynomial fitting or spline interpolation methods.</p>
+            </div>
+            
+            <div class="section">
+                <h2>Basic Controls</h2>
+                <p><b>Left-click</b>: Add mask region (first click = start, second click = end)</p>
+                <p><b>Right-click</b>: Remove mask or spline point</p>
+                <p><b>Key <span class="key">b</span></b>: Add exact spline point at cursor position</p>
+                <p><b>Key <span class="key">f</span></b>: Fit continuum</p>
+                <p><b>Key <span class="key">a</span></b>: Accept results</p>
+                <p><b>Key <span class="key">r</span></b>: Reset masks</p>
+                <p><b>Key <span class="key">R</span></b>: Reset all (masks, spline points, fit)</p>
+            </div>
+            
+            <p><i>Note: This is a fallback help page. The full documentation should be in the 
+            interactive_continuum_fit_help folder.</i></p>
+        </body>
+        </html>
+        """
+        self.text_browser.setHtml(fallback_html)
+
+
 
 if __name__ == "__main__":
     # Example usage with synthetic data
