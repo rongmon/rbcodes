@@ -1060,6 +1060,10 @@ class InteractiveContinuumFitWindow(QMainWindow):
 
         # Update plots
         self.update_plots(input_xrange=xlim)
+
+        # Ensure canvas has focus capabilities
+        self.canvas.setFocusPolicy(Qt.StrongFocus)
+
     
     def reset_all(self):
         """Reset everything: masks, spline points, and fitted continuum."""
@@ -1089,6 +1093,10 @@ class InteractiveContinuumFitWindow(QMainWindow):
 
         # Update plots
         self.update_plots(input_xrange=xlim)
+    
+        # Ensure canvas has focus capabilities
+        self.canvas.setFocusPolicy(Qt.StrongFocus)
+
 
     
     def undo_last_mask(self):
@@ -1105,6 +1113,10 @@ class InteractiveContinuumFitWindow(QMainWindow):
 
         else:
             self.statusBar.showMessage("No masks to remove")
+
+        # Ensure canvas has focus capabilities
+        self.canvas.setFocusPolicy(Qt.StrongFocus)
+
 
     def auto_mask(self):
         """
@@ -1239,6 +1251,8 @@ class InteractiveContinuumFitWindow(QMainWindow):
             xlim = self.canvas.figure.gca().get_xlim()
 
             self.update_plots(input_xrange=xlim)
+            # Ensure canvas has focus capabilities
+            self.canvas.setFocusPolicy(Qt.StrongFocus)
     
         except Exception as e:
             self.statusBar.showMessage(f"Error in auto-masking: {str(e)}")
@@ -1247,7 +1261,7 @@ class InteractiveContinuumFitWindow(QMainWindow):
                 f"Error generating masks:\n{str(e)}\n\n"
                 "Try adjusting parameters or masking manually."
             )
-    
+
 
     def manual_mask_entry(self):
         """Open a dialog for manual entry of mask values."""
@@ -1299,6 +1313,9 @@ class InteractiveContinuumFitWindow(QMainWindow):
 
             else:
                 QMessageBox.warning(self, "Invalid Input", "Minimum and maximum values must be different")
+        # Ensure canvas has focus capabilities
+        self.canvas.setFocusPolicy(Qt.StrongFocus)
+
                 
     def fit_continuum(self):
         """Fit continuum using current parameters and masks."""
@@ -1344,6 +1361,10 @@ class InteractiveContinuumFitWindow(QMainWindow):
             QMessageBox.warning(self, "Fitting Error", 
                               f"Error fitting continuum: {str(e)}\n\n"
                               f"Try adjusting parameters or mask regions.")
+        
+        # Ensure canvas has focus capabilities
+        self.canvas.setFocusPolicy(Qt.StrongFocus)
+
 
     def fit_polynomial_continuum(self):
         """Fit continuum using polynomial method with masked regions excluded."""
@@ -1418,6 +1439,9 @@ class InteractiveContinuumFitWindow(QMainWindow):
                 
             except Exception as e:
                 raise ValueError(f"Fitting failed: {str(e)}")
+        # Ensure canvas has focus capabilities
+        self.canvas.setFocusPolicy(Qt.StrongFocus)
+
     
     def fit_spline_continuum(self):
         """Fit continuum using spline method with provided anchor points."""
@@ -1462,6 +1486,9 @@ class InteractiveContinuumFitWindow(QMainWindow):
             
         except Exception as e:
             raise ValueError(f"Spline fitting failed: {str(e)}")
+        # Ensure canvas has focus capabilities
+        self.canvas.setFocusPolicy(Qt.StrongFocus)
+
     
     def check_unmasked_points(self):
         """Check if there are enough unmasked points for fitting."""
