@@ -1645,6 +1645,49 @@ def launch_interactive_continuum_fit(**kwargs):
     # Return the result
     return window.result
 
+def launch_interactive_continuum_fit_dialog(**kwargs):
+    """
+    Launch the interactive continuum fitter as a modal dialog.
+    
+    This version uses QDialog.exec_() which works properly when called from
+    an application that already has an event loop running.
+    
+    Parameters
+    ----------
+    Same parameters as launch_interactive_continuum_fit
+    
+    Returns
+    -------
+    dict
+        Results including masks, continuum, and fit parameters,
+        or {'cancelled': True} if the user cancelled.
+    """
+    from PyQt5.QtWidgets import QDialog, QVBoxLayout
+    from PyQt5.QtCore import Qt
+    
+    # Create dialog to host the window
+    dialog = QDialog()
+    dialog.setWindowTitle("Interactive Continuum Fitting")
+    dialog.resize(1000, 700)
+    dialog.setWindowFlags(dialog.windowFlags() | Qt.WindowMaximizeButtonHint)
+    
+    # Create the continuum fit window as a widget inside the dialog
+    window = InteractiveContinuumFitWindow(**kwargs)
+    
+    # Connect the window's close event to accept the dialog
+    window.closeEvent = lambda event: dialog.accept()
+    
+    # Set up layout
+    layout = QVBoxLayout(dialog)
+    layout.addWidget(window)
+    layout.setContentsMargins(0, 0, 0, 0)
+    
+    # Execute the dialog
+    dialog.exec_()
+    
+    # Return the result from the window
+    return getattr(window, 'result', {'cancelled': True})
+
 #-- Help Window
 class HelpDialog(QDialog):
     """Modal dialog to display HTML-formatted help content."""
