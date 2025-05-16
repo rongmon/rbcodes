@@ -522,6 +522,15 @@ class InteractiveContinuumFitWindow(QMainWindow):
             self.x_axis_label = 'Velocity (km/s)'
             self.x_axis_unit = 'km/s'
             
+            # Set velocity-specific default values
+            self.min_mask_width_spin.setRange(1.0, 500.0)
+            self.min_mask_width_spin.setSingleStep(10.0)
+            self.min_mask_width_spin.setValue(20.0)  # Default 20 km/s minimum mask width
+            self.mask_gap_spin.setRange(1.0, 500.0)
+            self.mask_gap_spin.setSingleStep(10.0)
+            self.mask_gap_spin.setValue(100.0)  # Default 100 km/s grouping window
+
+            
             # Convert current wavelength view to velocity if needed
             if not hasattr(self, 'prev_was_velocity') or not self.prev_was_velocity:
                 # If we were in wavelength, convert the current view to equivalent velocity
@@ -544,6 +553,17 @@ class InteractiveContinuumFitWindow(QMainWindow):
             self.x_axis_type = 'wavelength'
             self.x_axis_label = 'Wavelength (Å)'
             self.x_axis_unit = 'Å'
+            
+            # Set wavelength-specific default values
+            self.min_mask_width_spin.setRange(0.001, 500.0)
+            self.min_mask_width_spin.setSingleStep(10.0)
+            self.min_mask_width_spin.setValue(1.0)  # 1 Å for wavelength
+            
+            self.mask_gap_spin.setRange(0.001, 500.0)
+            self.mask_gap_spin.setSingleStep(10.0)
+            self.mask_gap_spin.setValue(5.0)  # 5 Å for wavelength
+
+
             
             # Convert current velocity view to wavelength if needed
             if hasattr(self, 'prev_was_velocity') and self.prev_was_velocity:
