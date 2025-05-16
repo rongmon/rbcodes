@@ -73,6 +73,8 @@ class InteractiveContinuumFitWindow(QMainWindow):
         
         self.masks = list(existing_masks) if existing_masks is not None else []
         self.domain = domain if domain is not None else [min(self.x_axis), max(self.x_axis)]
+        self.velocity_domain = domain if domain is not None else [min(self.velocity), max(self.velocity)] if self.velocity is not None else None
+        self.wave_domain = [min(self.wave), max(self.wave)]
         
         # Working variables
         self.current_click = None  # Store first click of a pair
@@ -341,6 +343,16 @@ class InteractiveContinuumFitWindow(QMainWindow):
         # Connect radio buttons to switch stacked widget
         self.poly_radio.toggled.connect(lambda checked: self.method_stack.setCurrentIndex(0) if checked else None)
         self.spline_radio.toggled.connect(lambda checked: self.method_stack.setCurrentIndex(1) if checked else None)
+
+        # Add this right after them:
+        self.poly_radio.toggled.connect(lambda checked: self.canvas.setFocus() if checked else None)
+        self.spline_radio.toggled.connect(lambda checked: self.canvas.setFocus() if checked else None)
+
+        # For velocity/wavelength radio buttons (if they exist)
+        if hasattr(self, 'velocity_radio') and hasattr(self, 'wavelength_radio'):
+            self.velocity_radio.toggled.connect(lambda checked: self.canvas.setFocus() if checked else None)
+            self.wavelength_radio.toggled.connect(lambda checked: self.canvas.setFocus() if checked else None)
+
     
         # Set initial panel based on default method
         self.method_stack.setCurrentIndex(0 if self.fit_params['method'] == 'polynomial' else 1)
@@ -494,29 +506,69 @@ class InteractiveContinuumFitWindow(QMainWindow):
             self.fit_params['method'] = 'spline'
             self.method_stack.setCurrentIndex(1)
             self.statusBar.showMessage(f"Spline fitting mode. Left-click for median point, right-click to remove, 'b' for exact point. X-axis: {self.x_axis_type}.")
+        self.canvas.setFocusPolicy(Qt.StrongFocus)
         
     def toggle_x_axis(self, checked):
         """Toggle between velocity and wavelength x-axis."""
+        # Get current view limits before switching
+        ax_flux = self.canvas.axes[0]
+        current_xlim = ax_flux.get_xlim()
+        
+        # Calculate equivalent range in the other coordinate system
         if self.velocity_radio.isChecked():
+            # Switching to velocity
             self.x_axis = self.velocity
             self.x_axis_type = 'velocity'
             self.x_axis_label = 'Velocity (km/s)'
             self.x_axis_unit = 'km/s'
+            
+            # Convert current wavelength view to velocity if needed
+            if not hasattr(self, 'prev_was_velocity') or not self.prev_was_velocity:
+                # If we were in wavelength, convert the current view to equivalent velocity
+                # Find indices of closest wavelength values
+                left_idx = np.argmin(np.abs(self.wave - current_xlim[0]))
+                right_idx = np.argmin(np.abs(self.wave - current_xlim[1]))
+                # Get corresponding velocity values
+                new_xlim = [self.velocity[left_idx], self.velocity[right_idx]]
+                # Update domain
+                self.domain = new_xlim
+                self.velocity_domain = new_xlim
+            else:
+                # Use stored velocity domain
+                self.domain = self.velocity_domain
+            
+            self.prev_was_velocity = True
         else:
+            # Switching to wavelength
             self.x_axis = self.wave
             self.x_axis_type = 'wavelength'
             self.x_axis_label = 'Wavelength (Å)'
             self.x_axis_unit = 'Å'
             
+            # Convert current velocity view to wavelength if needed
+            if hasattr(self, 'prev_was_velocity') and self.prev_was_velocity:
+                # If we were in velocity, convert the current view to equivalent wavelength
+                # Find indices of closest velocity values
+                left_idx = np.argmin(np.abs(self.velocity - current_xlim[0]))
+                right_idx = np.argmin(np.abs(self.velocity - current_xlim[1]))
+                # Get corresponding wavelength values
+                new_xlim = [self.wave[left_idx], self.wave[right_idx]]
+                # Update domain
+                self.domain = new_xlim
+                self.wave_domain = new_xlim
+            else:
+                # Use stored wavelength domain
+                self.domain = self.wave_domain
+            
+            self.prev_was_velocity = False
+        
         # Update UI elements with correct units
         self.min_mask_width_spin.setSuffix(f" {self.x_axis_unit}")
         self.mask_gap_spin.setSuffix(f" {self.x_axis_unit}")
         
-        # Update plots with new x-axis
-        input_xrange=[min(self.x_axis),max(self.x_axis)]
-        self.update_plots(input_xrange=input_xrange)
+        # Update plots with new x-axis using the calculated domain
+        self.update_plots()
         
-
         # Ensure canvas has focus capabilities
         self.canvas.setFocusPolicy(Qt.StrongFocus)
         
@@ -524,8 +576,11 @@ class InteractiveContinuumFitWindow(QMainWindow):
         if self.fit_params['method'] == 'polynomial':
             self.statusBar.showMessage(f"Polynomial fitting mode. Mask absorption regions and set polynomial order. X-axis: {self.x_axis_type}.")
         else:
-            self.statusBar.showMessage(f"Spline fitting mode. Left-click for median point, right-click to remove, 'b' for exact point. X-axis: {self.x_axis_type}.")
-    
+            self.statusBar.showMessage(f"Spline fitting mode. Left-click for median point, right-click to remove, 'b' for exact point. X-axis: {self.x_axis_type}.")    
+
+
+
+
     def update_window_type(self, text):
         """Update the window type for median calculation."""
         self.fit_params['window_type'] = text.lower()
@@ -542,7 +597,26 @@ class InteractiveContinuumFitWindow(QMainWindow):
     def update_plots(self,**kwargs):
         """Update the plots with current data and masks."""
 
+        # Get the input range or use domain
         input_xrange = kwargs.get('input_xrange', self.domain)
+
+        # If we don't have a specific range, use domain
+        if input_xrange is None:
+            if self.x_axis_type == 'velocity' and self.velocity_domain is not None:
+                input_xrange = self.velocity_domain
+            else:
+                input_xrange = self.wave_domain
+        
+        # Keep track of current domain for the active coordinate system
+        if self.x_axis_type == 'velocity':
+            self.velocity_domain = input_xrange
+        else:
+            self.wave_domain = input_xrange
+        
+        # Update the main domain property
+        self.domain = input_xrange
+
+
         # Clear axes
         for ax in self.canvas.axes:
             ax.clear()
@@ -896,6 +970,16 @@ class InteractiveContinuumFitWindow(QMainWindow):
         # Apply new limits
         ax_flux.set_xlim(new_xlim)
         ax_flux.set_ylim(new_ylim)
+
+
+        # Update the appropriate domain based on current x-axis type
+        if self.x_axis_type == 'velocity':
+            self.velocity_domain = new_xlim
+        else:
+            self.wave_domain = new_xlim
+        
+        self.domain = new_xlim
+        self.canvas.draw()
         self.canvas.draw()
     
     def zoom_out(self):
@@ -915,13 +999,31 @@ class InteractiveContinuumFitWindow(QMainWindow):
         # Apply new limits
         ax_flux.set_xlim(new_xlim)
         ax_flux.set_ylim(new_ylim)
+        
+        # Update the appropriate domain based on current x-axis type
+        if self.x_axis_type == 'velocity':
+            self.velocity_domain = new_xlim
+        else:
+            self.wave_domain = new_xlim
+        
+        self.domain = new_xlim
+
         self.canvas.draw()
     
     def reset_zoom(self):
         """Reset the plot zoom to the domain limits."""
         ax_flux = self.canvas.axes[0]
+
+        # Update the appropriate domain based on current x-axis type
+        if self.x_axis_type == 'velocity':
+            self.velocity_domain = new_xlim
+        else:
+            self.wave_domain = new_xlim
+        
+        self.domain = new_xlim
         ax_flux.set_xlim(self.domain)
         ax_flux.autoscale(axis='y')
+
         self.canvas.draw()
     
     def reset_masks(self):
@@ -1632,7 +1734,7 @@ if __name__ == "__main__":
         existing_masks=[-300, -100, 100, 200],
         order=3,
         use_weights=False,
-        domain=[-4000, 4000]
+        domain=[-15000, 4000]
     )
     
     # Print the result
