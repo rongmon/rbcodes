@@ -383,6 +383,14 @@ class InteractiveContinuumFitWindow(QMainWindow):
         action_buttons_layout.addWidget(self.accept_btn, 1, 0)
         action_buttons_layout.addWidget(self.cancel_btn, 1, 1)
         
+        # After button signal connections in setup_ui, add these:
+        self.fit_btn.clicked.connect(lambda: self.canvas.setFocus())
+        self.reset_btn.clicked.connect(lambda: self.canvas.setFocus())
+        self.reset_all_btn.clicked.connect(lambda: self.canvas.setFocus())
+        self.auto_btn.clicked.connect(lambda: self.canvas.setFocus())
+        self.spline_clear_btn.clicked.connect(lambda: self.canvas.setFocus())
+
+
         basic_layout.addLayout(action_buttons_layout)
         basic_layout.addStretch()  # Add stretch to push everything to the top
         
@@ -590,7 +598,8 @@ class InteractiveContinuumFitWindow(QMainWindow):
         self.update_plots()
         
         # Ensure canvas has focus capabilities
-        self.canvas.setFocusPolicy(Qt.StrongFocus)
+        self.canvas.setFocus()
+
         
         # Update status bar
         if self.fit_params['method'] == 'polynomial':
@@ -825,6 +834,8 @@ class InteractiveContinuumFitWindow(QMainWindow):
 
         else:
             self.statusBar.showMessage("No spline points to clear")
+        self.canvas.setFocus()
+
     
     def handle_add_mask(self, event):
         """Handle adding mask regions."""
@@ -1062,7 +1073,8 @@ class InteractiveContinuumFitWindow(QMainWindow):
         self.update_plots(input_xrange=xlim)
 
         # Ensure canvas has focus capabilities
-        self.canvas.setFocusPolicy(Qt.StrongFocus)
+        self.canvas.setFocus()
+
 
     
     def reset_all(self):
@@ -1095,7 +1107,8 @@ class InteractiveContinuumFitWindow(QMainWindow):
         self.update_plots(input_xrange=xlim)
     
         # Ensure canvas has focus capabilities
-        self.canvas.setFocusPolicy(Qt.StrongFocus)
+        self.canvas.setFocus()
+
 
 
     
@@ -1363,7 +1376,7 @@ class InteractiveContinuumFitWindow(QMainWindow):
                               f"Try adjusting parameters or mask regions.")
         
         # Ensure canvas has focus capabilities
-        self.canvas.setFocusPolicy(Qt.StrongFocus)
+        self.canvas.setFocus()
 
 
     def fit_polynomial_continuum(self):
