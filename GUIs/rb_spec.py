@@ -64,6 +64,9 @@ def load_rb_spec_object(filename, verbose=True):
 
     if verbose:
         print('---Finished loading saved rb_spec object----')
+        # Add a hint about metadata if it exists
+        if 'metadata' in data and isinstance(data['metadata'], dict):
+            print('Metadata is available in the .metadata attribute.')
 
     return spec_object
 
@@ -856,7 +859,12 @@ class rb_spec(object):
         n_sigma = kwargs.get('n_sigma', 3)  # sigma clipping level
         interactive = kwargs.get('Interactive', False)  # Check if interactive mode is requested
         classic_gui = kwargs.get('classic', False)  # Check if classic GUI is requested
-    
+        
+        # If optimize_cont is True and Legendre is False, set a default value for Legendre
+        # This ensures automatic optimization works even if Legendre is not explicitly specified
+        if optimize_cont and Legendre is False:
+            Legendre = 3  # Default order for polynomial optimization
+        
         # Store mask information
         if mask is False:
             self.continuum_masks = []
@@ -893,13 +901,16 @@ class rb_spec(object):
     
         # Handle interactive mode
         if interactive:
-            
             # Check if the spectrum has been sliced
             if not hasattr(self, 'wave_slice') or not hasattr(self, 'flux_slice') or not hasattr(self, 'velo'):
                 raise ValueError("Spectrum must be sliced first using slice_spec before interactive fitting")
             
             # Check for empty arrays
-            if len(self.wave_slice) == 0 or len(self.flux_slice) == 0 or len(self.velo) == 0:                    
+            if len(self.wave_slice) == 0 or len(self.flux_slice) == 0 or len(self.velo) == 0:
+                available_range = ""
+                if hasattr(self, 'wave_slice') and len(self.wave_slice) > 0:
+                    available_range = f"\nAvailable wavelength range: [{min(self.wave_slice):.2f}, {max(self.wave_slice):.2f}]"
+                    
                 raise ValueError(f"No data points in the sliced spectrum.{available_range}\n"
                                f"Try different parameters in the slice_spec method.")
     
@@ -974,8 +985,7 @@ class rb_spec(object):
             
             return
         
-        # Continue with non-interactive fitting methods
-        # (Keep the rest of the existing function as is)
+        # Handle non-interactive fitting methods
         elif Legendre is False:
             # Handle prefit_cont case
             if 'prefit_cont' in kwargs:
@@ -991,8 +1001,11 @@ class rb_spec(object):
                     print('Initializing interactive continuum fitter...')
                 try:
                     from rbcodes.GUIs import rb_fit_interactive_continuum as f
-                except:
-                    from GUIs import rb_fit_interactive_continuum as f
+                except ImportError:
+                    try:
+                        from GUIs import rb_fit_interactive_continuum as f
+                    except ImportError:
+                        raise ImportError("rb_fit_interactive_continuum module not found. Make sure it's installed.")
                 
                 # Show deprecation warning for old interactive fitter
                 warnings.warn(
@@ -1005,14 +1018,16 @@ class rb_spec(object):
                 s = f.rb_fit_interactive_continuum(self.wave_slice, self.flux_slice, self.error_slice)
                 cont = s.cont
         else:
-            # Original Legendre polynomial fitting code (keep as is)
-            #Moving onto using my iterative continuum fitting module. More versatile.
+            # Standard polynomial fitting
             try:
                 from rbcodes.IGM.rb_iter_contfit import rb_iter_contfit,fit_optimal_polynomial
-            except:
-                from IGM.rb_iter_contfit import rb_iter_contfit,fit_optimal_polynomial
+            except ImportError:
+                try:
+                    from IGM.rb_iter_contfit import rb_iter_contfit,fit_optimal_polynomial
+                except ImportError:
+                    raise ImportError("rb_iter_contfit modules not found. Make sure they're installed.")
             
-            order=Legendre
+            order = Legendre
             
             # Handle masks
             if mask == False:
@@ -1036,16 +1051,15 @@ class rb_spec(object):
             
             # Extract only unmasked data points
             velo_unmasked = self.velo[unmasked_indices]  # Use velocity for fitting
-            wave_unmasked=self.wave_slice[unmasked_indices]
+            wave_unmasked = self.wave_slice[unmasked_indices]
             flux_unmasked = self.flux_slice[unmasked_indices]
             error_unmasked = self.error_slice[unmasked_indices]
             
             # Set up fitting parameters
             use_weights = kwargs.get('use_weights', False)
-            n_sigma = kwargs.get('n_sigma', 3.0) 
             
             #New option if we want to use a fixed Legendre polynomial or use Bayesian Information Criterion (BIC) to find the best continuum model.
-            if optimize_cont==True:
+            if optimize_cont:
                 min_order = kwargs.get('min_order', 0)           
                 max_order = kwargs.get('max_order', 7)
                 # Fit the region with optimal polynomial order
@@ -1061,14 +1075,11 @@ class rb_spec(object):
                         plot=False
                     )
                 # Now unpack each output
-                fit_error=result['fit_error']
-                fit_model=result['model']
-                fitter=result['fitter']
-    
-    
+                fit_error = result['fit_error']
+                fit_model = result['model']
+                fitter = result['fitter']
             else: 
                 # Call rb_iter_contfit with only unmasked points
-                #_, _, fit_error, fit_model,fitter 
                 result = rb_iter_contfit(
                     velo_unmasked,
                     flux_unmasked,
@@ -1080,10 +1091,9 @@ class rb_spec(object):
                     maxiter=kwargs.get('maxiter', 25)
                 )
                 # Now unpack required output
-                fit_error=result['fit_error']
-                fit_model=result['model']
-                fitter=result['fitter']
-    
+                fit_error = result['fit_error']
+                fit_model = result['model']
+                fitter = result['fitter']
             
             # Generate continuum over the full range
             cont = fit_model(self.velo)
@@ -1101,24 +1111,20 @@ class rb_spec(object):
                     else:
                         print("Covariance matrix is not available. The fit might be poorly constrained.")
                         print("Using fit-error as proxy.")
-                        self.cont_err= np.ones(len(self.velo),)*fit_error
+                        self.cont_err = np.ones(len(self.velo),) * fit_error
                         self.error_slice = np.sqrt((self.error_slice**2) + (self.cont_err**2))                        
                 else:
-                    self.cont_err=fit_error
+                    self.cont_err = fit_error
                     print("Using only statistical error.")
             else:
-                self.cont_err=fit_error
+                self.cont_err = fit_error
                 print("Unweighted fit performed - using only statistical error.")
         
         # Set final results
         self.cont = cont
         self.fnorm = self.flux_slice / self.cont
         self.enorm = self.error_slice / self.cont
-        self.cont_mask = mask
-    
-    
-    
-        #return self.cont,self.fnorm,self.enorm
+        self.cont_mask = mask    
 
     def fit_polynomial_ransac(self,degree=3,residual_threshold=0.1,**kwargs):
         """
@@ -1536,6 +1542,49 @@ class rb_spec(object):
                 if isinstance(value, np.ndarray):
                     data_out[key] = value.tolist()
 
+        
+            # Add metadata with field descriptions
+            field_descriptions = {
+                'zabs': "Absorber redshift",
+                'linelist': "Line list used for atomic data",
+                'line_sel_flag': "Line selection method",
+                'trans': "Name of the transition",
+                'fval': "Oscillator strength of the transition",
+                'trans_wave': "Rest frame wavelength of transition (Angstroms)",
+                'vmin': "Minimum velocity for equivalent width calculation (km/s)",
+                'vmax': "Maximum velocity for equivalent width calculation (km/s)",
+                'W': "Rest frame equivalent width (Angstroms)",
+                'W_e': "Uncertainty in rest frame equivalent width (Angstroms)",
+                'N': "Apparent optical depth column density (cm^-2)",
+                'N_e': "Uncertainty in column density (cm^-2)",
+                'logN': "Log10 of the column density (cm^-2)",
+                'logN_e': "Uncertainty in log column density",
+                'vel_centroid': "Velocity centroid of absorption line (km/s)",
+                'vel_disp': "1-sigma velocity dispersion (km/s)",
+                'vel50_err': "Error on velocity centroid (km/s)",
+                'SNR': "Signal-to-noise ratio",
+                'wave_slice': "Wavelength array for the slice (Angstroms)",
+                'flux_slice': "Flux array for the slice",
+                'error_slice': "Error array for the slice",
+                'velo': "Velocity array (km/s)",
+                'cont': "Fitted continuum array",
+                'fnorm': "Normalized flux array",
+                'enorm': "Normalized error array",
+                'Tau': "Apparent optical depth as a function of velocity",
+                'continuum_masks': "Velocity ranges excluded from continuum fitting (km/s)",
+                'continuum_mask_wavelengths': "Wavelength ranges excluded from continuum fitting (Angstroms)",
+                'continuum_fit_params': "Parameters used for continuum fitting"
+            }
+            
+            # Add the metadata to the output data
+            data_out['metadata'] = {
+                'field_descriptions': field_descriptions,
+                'timestamp': datetime.datetime.now().isoformat(),
+                'rbcodes_version': '1.0.0'  # Replace with actual version
+            }
+        
+
+
             # Write JSON data to a file with error handling
             try:
                 with open(outfilename, 'w') as json_file:
@@ -1547,6 +1596,50 @@ class rb_spec(object):
 
 
 
+    def display_field_info(self, field=None):
+        """
+        Display information about fields in the rb_spec object.
+        
+        Parameters
+        ----------
+        field : str, optional
+            Specific field to display information about.
+            If None, displays information about all fields.
+        """
+        if not hasattr(self, 'metadata') or 'field_descriptions' not in self.metadata:
+            print("No field descriptions available")
+            return
+        
+        if field is not None:
+            # Display info for a specific field
+            description = self.metadata['field_descriptions'].get(field, "No description available")
+            if hasattr(self, field):
+                value = getattr(self, field)
+                value_str = str(value) if not isinstance(value, (list, np.ndarray)) else f"[{type(value).__name__} with {len(value)} elements]"
+                print(f"{field}: {description}")
+                print(f"Value: {value_str}")
+            else:
+                print(f"{field}: {description}")
+                print("Field not present in this object")
+        else:
+            # Display info for all fields
+            print("\nAvailable fields and descriptions:")
+            print("---------------------------------")
+            for field, description in sorted(self.metadata['field_descriptions'].items()):
+                if hasattr(self, field):
+                    value = getattr(self, field)
+                    if isinstance(value, (list, np.ndarray)):
+                        value_str = f"[{type(value).__name__} with {len(value)} elements]"
+                    elif isinstance(value, dict):
+                        value_str = f"[Dictionary with {len(value)} keys]"
+                    elif isinstance(value, (int, float)) and not isinstance(value, bool):
+                        value_str = f"{value:.6g}"
+                    else:
+                        value_str = str(value)
+                    print(f"{field}: {description}")
+                    print(f"  Value: {value_str}\n")
+                else:
+                    print(f"{field}: {description} (not present in this object)\n")
 
     def plot_doublet(self,lam1,lam2,vmin=-600.,vmax=600.,method='closest'):
         """Plot a given doublet defined by the lam1 and lam2 wavelength centers.
