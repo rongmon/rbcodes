@@ -385,7 +385,7 @@ class InteractiveMaskWindow(QMainWindow):
         # Set labels and limits
         ax_flux.set_ylabel('Flux')
         ax_flux.set_title('Original Spectrum with Masks')
-        ax_flux.legend()
+        #ax_flux.legend()
         
         ax_norm.set_xlabel('Velocity (km/s)')
         ax_norm.set_ylabel('Normalized Flux')

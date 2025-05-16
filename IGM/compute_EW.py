@@ -276,7 +276,10 @@ def compute_EW(
 
     # Optional Signal-to-Noise Ratio calculation
     if SNR:
-        from utils import compute_SNR_1d as c
+        try: 
+            from rbcodes.utils import compute_SNR_1d as c 
+        except:
+            from utils import compute_SNR_1d as c
         snr_result = c.estimate_snr(
             lambda_r, 
             norm_flx, 

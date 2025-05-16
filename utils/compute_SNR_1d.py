@@ -1,7 +1,11 @@
 import numpy as np 
 import matplotlib.pyplot as plt
 from astropy.stats import sigma_clipped_stats, sigma_clip
-from IGM import rb_specbin as b
+
+try:
+    from rbcodes.IGM import rb_specbin as b
+except:
+    from IGM import rb_specbin as b
 
 def estimate_snr(wave, flux, error, binsize=3, snr_range=[-1, -1], verbose=True, plot=False, robust_median=False, sigma_clip_threshold=3):
     """

@@ -738,6 +738,13 @@ class rb_spec(object):
         fit_continuum : Standard continuum fitting method
         """
         # Check if shift_spec has been called
+
+        warnings.warn(
+            "fit_continuum_interactive() is deprecated and will be removed in a future version. "
+            "Use fit_continuum(Interactive=True) instead.",
+        DeprecationWarning, 
+        stacklevel=2
+        )
         if not hasattr(self, 'wrest'):
             raise ValueError("Must call shift_spec before slice_spec and continuum fitting")
         
@@ -804,17 +811,57 @@ class rb_spec(object):
         else:
             print("Warning: No continuum was fitted.")
     
-    def fit_continuum(self,mask=False,domain=False,Legendre=False,**kwargs):
-        """ By default calls an interactive continuum fitter to the sliced spectrum.
-            Or an automated Legendre polynomial fitter if keyword set Legendre.
-            Order is given by Legendre=order
+    def fit_continuum(self, mask=False, domain=False, Legendre=False, **kwargs):
+        """ 
+        Fit continuum to the sliced spectrum using multiple methods.
+        
+        By default uses a Legendre polynomial fit. With Interactive=True,
+        launches a GUI for interactive continuum fitting.
+        
+        Parameters
+        ----------
+        mask : list or False, optional
+            Velocity ranges to mask during fitting, e.g., [vmin1, vmax1, vmin2, vmax2, ...].
+            If False, no regions are masked.
+        domain : list or False, optional
+            Velocity domain limits [vmin, vmax] for fitting.
+            If False, defaults to [-600, 600] km/s.
+        Legendre : int or False, optional
+            Order of Legendre polynomial to fit. If False, uses interactive fitting.
+        Interactive : bool, optional
+            If True, launches interactive continuum fitting GUI. Default is False.
+        classic : bool, optional
+            If True and Interactive=True, uses the classic GUI instead of the new one.
+            Default is False (use new GUI).
+        use_weights : bool, optional
+            If True, uses flux errors as weights in fitting. Default is False.
+        
+        Other Parameters
+        ----------------
+        optimize_cont : bool, optional
+            If True, uses BIC to determine the optimal polynomial order. Default is False.
+        n_sigma : float, optional
+            Sigma clipping threshold for outlier rejection. Default is 3.
+        min_order : int, optional
+            Minimum polynomial order to try when optimize_cont=True. Default is 1.
+        max_order : int, optional
+            Maximum polynomial order to try when optimize_cont=True. Default is 6.
+        sigma_clip : bool, optional
+            If True, uses sigma clipping during polynomial fitting. Default is False.
+        prefit_cont : array, optional
+            Predefined continuum array to use instead of fitting. Must match length of slice.
+        
+        Returns
+        -------
+        None
+            Updates the object in-place with fitted continuum and normalized spectrum.
         """
-
         verbose = kwargs.get('verbose', False)  # Default is False if not provided
         optimize_cont = kwargs.get('optimize_cont', False)  # Default is False if not provided
-
-        n_sigma=kwargs.get('n_sigma',3) # sigma clipping level 
-
+        n_sigma = kwargs.get('n_sigma', 3)  # sigma clipping level
+        interactive = kwargs.get('Interactive', False)  # Check if interactive mode is requested
+        classic_gui = kwargs.get('classic', False)  # Check if classic GUI is requested
+    
         # Store mask information
         if mask is False:
             self.continuum_masks = []
@@ -835,44 +882,142 @@ class rb_spec(object):
                         wmax = self.wave_slice[np.abs(self.velo - vmax).argmin()]
                         self.continuum_mask_wavelengths.extend([wmin, wmax])
         
+        # Set the domain if not provided
+        if domain is False:
+            domain = [-600., 600.]
+        
         # Store fitting parameters
         self.continuum_fit_params = {
-            'method': 'interactive' if kwargs.get('Interactive', False) else 'polynomial',
+            'method': 'interactive' if interactive else 'polynomial',
             'legendre_order': Legendre if Legendre is not False else None,
             'use_weights': kwargs.get('use_weights', False),
             'optimize_cont': kwargs.get('optimize_cont', False),
             'sigma_clip': kwargs.get('sigma_clip', False),
             'timestamp': datetime.datetime.now().isoformat()
         }
-
-        if Legendre==False:
-            #pdb.set_trace()
-            if 'Interactive' in kwargs:
-                Interactive=kwargs['Interactive']
+    
+        # Handle interactive mode
+        if interactive:
+            # Check if shift_spec has been called
+            if not hasattr(self, 'wrest'):
+                raise ValueError("Must call shift_spec before slice_spec and continuum fitting")
+            
+            # Check if the spectrum has been sliced
+            if not hasattr(self, 'wave_slice') or not hasattr(self, 'flux_slice') or not hasattr(self, 'velo'):
+                raise ValueError("Spectrum must be sliced first using slice_spec before interactive fitting")
+            
+            # Check for empty arrays
+            if len(self.wave_slice) == 0 or len(self.flux_slice) == 0 or len(self.velo) == 0:
+                available_range = ""
+                if hasattr(self, 'wrest') and len(self.wrest) > 0:
+                    available_range = f"\nAvailable wavelength range: [{min(self.wrest):.2f}, {max(self.wrest):.2f}]"
+                    
+                raise ValueError(f"No data points in the sliced spectrum.{available_range}\n"
+                               f"Try different parameters in the slice_spec method.")
+    
+            # Prepare input parameters
+            input_params = {
+                'wave': self.wave_slice,
+                'flux': self.flux_slice,
+                'error': self.error_slice,
+                'velocity': self.velo,
+                'existing_masks': self.continuum_masks if hasattr(self, 'continuum_masks') else [],
+                'order': kwargs.get('order', 3),
+                'use_weights': kwargs.get('use_weights', False),
+                'domain': domain if domain else [min(self.velo), max(self.velo)]
+            }
+            
+            # Use classic GUI if requested, otherwise use the new one
+            if classic_gui:
+                warnings.warn(
+                    "Using classic GUI (classic=True) is deprecated and will be removed in a future version.",
+                    DeprecationWarning,
+                    stacklevel=2
+                )
+                
+                # Import the old interactive masking GUI
+                try:
+                    from rbcodes.GUIs import rb_interactive_mask as rim
+                except ImportError:
+                    try:
+                        from GUIs import rb_interactive_mask as rim
+                    except ImportError:
+                        raise ImportError("rb_interactive_mask module not found. Make sure it's installed.")
+                
+                # Launch the old interactive GUI
+                result = rim.launch_interactive_mask(**input_params)
             else:
-                Interactive=False
-
+                # Import the new interactive GUI
+                try:
+                    from rbcodes.GUIs import interactive_continuum_fit as icf
+                except ImportError:
+                    try:
+                        from GUIs import interactive_continuum_fit as icf
+                    except ImportError:
+                        raise ImportError("interactive_continuum_fit module not found. Make sure it's installed.")
+                
+                # Launch the new interactive GUI
+                result = icf.launch_interactive_continuum_fit(**input_params)
+            
+            # If the user cancelled, return without changes
+            if result is None or result.get('cancelled', False):
+                print("Interactive fitting cancelled. No changes made.")
+                return
+            
+            # Update the object with the results
+            self.continuum_masks = result.get('masks', [])
+            self.continuum_mask_wavelengths = result.get('mask_wavelengths', [])
+            self.cont = result.get('continuum')
+            self.continuum_fit_params = result.get('fit_params', {})
+            self.continuum_fit_params['method'] = 'interactive'
+            
+            # Calculate normalized flux and error
+            if self.cont is not None:
+                self.fnorm = self.flux_slice / self.cont
+                self.enorm = self.error_slice / self.cont
+                
+                # Add additional parameters from the result if available
+                if 'fit_error' in result:
+                    self.continuum_fit_params['fit_error'] = result['fit_error']
+                
+                print("Interactive continuum fitting complete.")
+            else:
+                print("Warning: No continuum was fitted.")
+            
+            return
+        
+        # Continue with non-interactive fitting methods
+        # (Keep the rest of the existing function as is)
+        elif Legendre is False:
+            # Handle prefit_cont case
             if 'prefit_cont' in kwargs:
-                prefit_cont=kwargs['prefit_cont']
+                prefit_cont = kwargs['prefit_cont']
                 if verbose:
                     print('Using prefitted continuum...')
-                if len(prefit_cont)==1:
-                    prefit_cont=prefit_cont*np.ones(len(self.velo),)
-                cont=prefit_cont
+                if len(prefit_cont) == 1:
+                    prefit_cont = prefit_cont * np.ones(len(self.velo),)
+                cont = prefit_cont
             else:
+                # Original interactive continuum fitter (old behavior)
                 if verbose:
                     print('Initializing interactive continuum fitter...')
                 try:
                     from rbcodes.GUIs import rb_fit_interactive_continuum as f
                 except:
                     from GUIs import rb_fit_interactive_continuum as f
-                s=f.rb_fit_interactive_continuum(self.wave_slice,self.flux_slice,self.error_slice)
-                cont=s.cont
-
-
-
+                
+                # Show deprecation warning for old interactive fitter
+                warnings.warn(
+                    "The old interactive continuum fitter (Legendre=False) is deprecated. "
+                    "Use Interactive=True for the new GUI.",
+                    DeprecationWarning,
+                    stacklevel=2
+                )
+                
+                s = f.rb_fit_interactive_continuum(self.wave_slice, self.flux_slice, self.error_slice)
+                cont = s.cont
         else:
-
+            # Original Legendre polynomial fitting code (keep as is)
             #Moving onto using my iterative continuum fitting module. More versatile.
             try:
                 from rbcodes.IGM.rb_iter_contfit import rb_iter_contfit,fit_optimal_polynomial
@@ -880,9 +1025,6 @@ class rb_spec(object):
                 from IGM.rb_iter_contfit import rb_iter_contfit,fit_optimal_polynomial
             
             order=Legendre
-            # Setup parameters
-            if domain == False:
-                domain = [-600., 600.]
             
             # Handle masks
             if mask == False:
@@ -914,7 +1056,6 @@ class rb_spec(object):
             use_weights = kwargs.get('use_weights', False)
             n_sigma = kwargs.get('n_sigma', 3.0) 
             
-                
             #New option if we want to use a fixed Legendre polynomial or use Bayesian Information Criterion (BIC) to find the best continuum model.
             if optimize_cont==True:
                 min_order = kwargs.get('min_order', 0)           
@@ -935,12 +1076,12 @@ class rb_spec(object):
                 fit_error=result['fit_error']
                 fit_model=result['model']
                 fitter=result['fitter']
-
-
+    
+    
             else: 
                 # Call rb_iter_contfit with only unmasked points
                 #_, _, fit_error, fit_model,fitter 
-                result  = rb_iter_contfit(
+                result = rb_iter_contfit(
                     velo_unmasked,
                     flux_unmasked,
                     error=error_unmasked,
@@ -954,14 +1095,13 @@ class rb_spec(object):
                 fit_error=result['fit_error']
                 fit_model=result['model']
                 fitter=result['fitter']
-
+    
             
             # Generate continuum over the full range
             cont = fit_model(self.velo)
             
             # Calculate uncertainties from the fit
             if use_weights:
-
                 if hasattr(fitter, 'fit_info') and 'param_cov' in fitter.fit_info:
                     cov_matrix = fitter.fit_info['param_cov']
                     if cov_matrix is not None:
@@ -981,14 +1121,15 @@ class rb_spec(object):
             else:
                 self.cont_err=fit_error
                 print("Unweighted fit performed - using only statistical error.")
-            
-        self.cont=cont
-        self.fnorm=self.flux_slice/self.cont
-        self.enorm=self.error_slice/self.cont
-        self.cont_mask=mask
-
-
-
+        
+        # Set final results
+        self.cont = cont
+        self.fnorm = self.flux_slice / self.cont
+        self.enorm = self.error_slice / self.cont
+        self.cont_mask = mask
+    
+    
+    
         #return self.cont,self.fnorm,self.enorm
 
     def fit_polynomial_ransac(self,degree=3,residual_threshold=0.1,**kwargs):
