@@ -8,6 +8,7 @@ continuum fitting with both polynomial and spline methods.
 import sys
 import numpy as np
 import matplotlib
+
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
@@ -412,12 +413,21 @@ class InteractiveContinuumFitWindow(QMainWindow):
         self.min_mask_width_spin.setValue(20.0)  # Default 20 km/s minimum mask width
         # Set suffix based on current x-axis type
         self.min_mask_width_spin.setSuffix(f" {self.x_axis_unit}")
-        
+
+
+        self.mask_gap_spin = QDoubleSpinBox()
+        self.mask_gap_spin.setRange(1.0, 500.0)
+        self.mask_gap_spin.setSingleStep(10.0)
+        self.mask_gap_spin.setValue(100.0)  # Default 100 km/s grouping window
+        self.mask_gap_spin.setSuffix(f" {self.x_axis_unit}")
+
+
         advanced_layout.addRow("Min Polynomial Order:", self.min_order_spin)
         advanced_layout.addRow("Max Polynomial Order:", self.max_order_spin)
         advanced_layout.addRow("Fitting Sigma:", self.sigma_spin)
         advanced_layout.addRow("Auto-Mask Sigma:", self.auto_mask_sigma_spin)
         advanced_layout.addRow("Min Mask Width:", self.min_mask_width_spin)
+        advanced_layout.addRow("Grouping Window:", self.mask_gap_spin)
         
         # Add tabs to sidebar
         sidebar.addTab(basic_tab, "Basic")
@@ -500,9 +510,15 @@ class InteractiveContinuumFitWindow(QMainWindow):
             
         # Update UI elements with correct units
         self.min_mask_width_spin.setSuffix(f" {self.x_axis_unit}")
+        self.mask_gap_spin.setSuffix(f" {self.x_axis_unit}")
         
         # Update plots with new x-axis
-        self.update_plots()
+        input_xrange=[min(self.x_axis),max(self.x_axis)]
+        self.update_plots(input_xrange=input_xrange)
+        
+
+        # Ensure canvas has focus capabilities
+        self.canvas.setFocusPolicy(Qt.StrongFocus)
         
         # Update status bar
         if self.fit_params['method'] == 'polynomial':
@@ -523,8 +539,10 @@ class InteractiveContinuumFitWindow(QMainWindow):
             self.min_order_spin.setEnabled(checked)
             self.max_order_spin.setEnabled(checked)
     
-    def update_plots(self):
+    def update_plots(self,**kwargs):
         """Update the plots with current data and masks."""
+
+        input_xrange = kwargs.get('input_xrange', self.domain)
         # Clear axes
         for ax in self.canvas.axes:
             ax.clear()
@@ -566,9 +584,11 @@ class InteractiveContinuumFitWindow(QMainWindow):
         
         ax_norm.set_xlabel(self.x_axis_label)
         ax_norm.set_ylabel('Normalized Flux')
+        ax_norm.set_xlim(input_xrange)
+        
         
         # Set x-axis limits
-        ax_flux.set_xlim(self.domain)
+        ax_flux.set_xlim(input_xrange)
         
         # Update canvas
         self.canvas.draw()
@@ -620,7 +640,12 @@ class InteractiveContinuumFitWindow(QMainWindow):
         self.spline_points.sort(key=lambda point: point[0])
         
         self.statusBar.showMessage(f"Exact spline point added at ({x:.1f}, {y:.2f}). Total: {len(self.spline_points)}")
+
+        # Update plots
+        ax_flux = self.canvas.axes[0]
+        xlim = ax_flux.get_xlim()
         self.update_plots()
+
     
     def add_median_spline_point(self, x, y):
         """Add a spline anchor point using the median flux in a window."""
@@ -665,7 +690,12 @@ class InteractiveContinuumFitWindow(QMainWindow):
             window_info += f", {end_idx - start_idx + 1} pixels"
         
         self.statusBar.showMessage(f"Median spline point added at ({x:.1f}, {median_flux:.2f}) using window: {window_info}. Total: {len(self.spline_points)}")
+        
+        ax_flux = self.canvas.axes[0]
+        xlim = ax_flux.get_xlim()
+        # Update plots
         self.update_plots()
+
     
     def remove_closest_spline_point(self, x, y):
         """Remove the spline point closest to the given coordinates."""
@@ -682,6 +712,10 @@ class InteractiveContinuumFitWindow(QMainWindow):
         removed_point = self.spline_points.pop(closest_idx)
         
         self.statusBar.showMessage(f"Removed spline point at ({removed_point[0]:.1f}, {removed_point[1]:.2f})")
+
+        ax_flux = self.canvas.axes[0]
+        xlim = ax_flux.get_xlim()
+        # Update plots
         self.update_plots()
     
     def clear_spline_points(self):
@@ -689,7 +723,12 @@ class InteractiveContinuumFitWindow(QMainWindow):
         if self.spline_points:
             self.spline_points = []
             self.statusBar.showMessage("All spline points cleared")
+
+            ax_flux = self.canvas.axes[0]
+            xlim = ax_flux.get_xlim()
+            # Update plots
             self.update_plots()
+
         else:
             self.statusBar.showMessage("No spline points to clear")
     
@@ -717,7 +756,12 @@ class InteractiveContinuumFitWindow(QMainWindow):
             
             # Reset current click and update plot
             self.current_click = None
+
+            ax_flux = self.canvas.axes[0]
+            xlim = ax_flux.get_xlim()
+            # Update plots
             self.update_plots()
+
     
     def handle_remove_mask(self, event):
         """Handle removing mask regions with right clicks."""
@@ -759,7 +803,12 @@ class InteractiveContinuumFitWindow(QMainWindow):
             
             # Reset current click and update plot
             self.current_click = None
+
+            ax_flux = self.canvas.axes[0]
+            xlim = ax_flux.get_xlim()
+            # Update plots
             self.update_plots()
+
     
     def merge_masks(self):
         """Merge overlapping mask regions."""
@@ -884,7 +933,11 @@ class InteractiveContinuumFitWindow(QMainWindow):
         self.masks = []
         self.current_click = None
         self.statusBar.showMessage("All masks reset")
-        self.update_plots()
+        ax_flux = self.canvas.axes[0]
+        xlim = ax_flux.get_xlim()
+
+        # Update plots
+        self.update_plots(input_xrange=xlim)
     
     def reset_all(self):
         """Reset everything: masks, spline points, and fitted continuum."""
@@ -909,7 +962,12 @@ class InteractiveContinuumFitWindow(QMainWindow):
         self.accept_btn.setEnabled(False)
         
         self.statusBar.showMessage("Reset complete. All masks, spline points, and fitted continuum cleared.")
-        self.update_plots()
+        ax_flux = self.canvas.axes[0]
+        xlim = ax_flux.get_xlim()
+
+        # Update plots
+        self.update_plots(input_xrange=xlim)
+
     
     def undo_last_mask(self):
         """Remove the last mask pair."""
@@ -917,100 +975,158 @@ class InteractiveContinuumFitWindow(QMainWindow):
             self.masks.pop()
             self.masks.pop()
             self.statusBar.showMessage("Last mask removed")
-            self.update_plots()
+            ax_flux = self.canvas.axes[0]
+            xlim = ax_flux.get_xlim()
+
+            # Update plots
+            self.update_plots(input_xrange=xlim)
+
         else:
             self.statusBar.showMessage("No masks to remove")
 
     def auto_mask(self):
         """
-        Automatically generate masks by detecting spectral features.
-        
-        This is a simplified version that detects deviations from a preliminary fit.
+        Automatically generate masks using robust detection of spectral features,
+        applicable in either wavelength or velocity space.
+    
+        Features:
+        - Sigma clipping using MAD.
+        - Error threshold masking.
+        - Continuum fitting with fallback.
+        - Minimum mask width and gap merging.
+        - Applies in selected coordinate system: 'velocity' or 'wavelength'.
         """
-        # Get current parameters
+        # Parameters
         sigma = self.auto_mask_sigma_spin.value()
         min_width = self.min_mask_width_spin.value()
-        
-        # Ask if user wants to replace or add to existing masks
+        gap_threshold = self.mask_gap_spin.value() if hasattr(self, 'mask_gap_spin') else 10.0
+        error_threshold = 0.5  # 50% relative error threshold
+    
+        coord_type = self.fit_params.get('window_type', 'velocity')  # 'velocity' or 'wavelength'
+        x_data = self.velocity if coord_type == 'velocity' else self.x_axis
+    
         if self.masks:
-            reply = QMessageBox.question(self, 'Auto-Mask', 
-                                         'Replace existing masks?',
-                                         QMessageBox.Yes | QMessageBox.No, 
-                                         QMessageBox.No)
+            reply = QMessageBox.question(
+                self, 'Auto-Mask',
+                'Replace existing masks?',
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
             replace = reply == QMessageBox.Yes
         else:
             replace = True
-        
+    
         self.statusBar.showMessage("Generating masks automatically...")
-        
+    
         try:
-            # Fit a simple low-order polynomial to get a baseline
-            # This is a basic implementation - will be enhanced in later stages
-            poly_order = 2  # Use low order for rough continuum
-            polyfit = np.polyfit(self.x_axis, self.flux, poly_order)
-            prelim_continuum = np.polyval(polyfit, self.x_axis)
-            
-            # Calculate residuals
+            # Step 1: Build current unmasked index array
+            current_mask = np.ones_like(x_data, dtype=bool)
+            if not replace and self.masks:
+                for i in range(0, len(self.masks), 2):
+                    if i + 1 < len(self.masks):
+                        x_min, x_max = self.masks[i], self.masks[i + 1]
+                        current_mask[(x_data >= x_min) & (x_data <= x_max)] = False
+    
+            unmasked_x = x_data[current_mask]
+            unmasked_flux = self.flux[current_mask]
+            unmasked_error = self.error[current_mask]
+    
+            # Step 2: Continuum fit
+            try:
+                from rbcodes.IGM.rb_iter_contfit import rb_iter_contfit
+                temp_order = min(2, max(0, len(unmasked_x) // 10 - 1))
+                prelim_fit = rb_iter_contfit(
+                    unmasked_x,
+                    unmasked_flux,
+                    error=unmasked_error,
+                    order=temp_order,
+                    sigma=3.0,
+                    use_weights=False,
+                    return_model=True
+                )
+                prelim_continuum = prelim_fit['model'](x_data)
+            except Exception as e:
+                self.statusBar.showMessage(f"Continuum fit failed: {str(e)}. Using median fallback.")
+                prelim_continuum = np.full_like(x_data, np.nanmedian(unmasked_flux))
+    
+            # Step 3: Normalize flux, compute residuals
             normalized_flux = self.flux / prelim_continuum
             residual = normalized_flux - 1.0
-            
-            # Find deviations beyond sigma threshold
-            std_dev = np.std(residual)
-            potential_masks = np.abs(residual) > sigma * std_dev
-            
-            # Find contiguous regions
+    
+            from astropy.stats import mad_std
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                robust_std = mad_std(residual, ignore_nan=True)
+    
+            # Step 4: Identify potential masked points
+            potential_masks = (np.abs(residual) > sigma * robust_std) | \
+                              (self.error / prelim_continuum > error_threshold)
+    
+            # Step 5: Find contiguous mask regions
             mask_regions = []
             in_region = False
             start_idx = None
-            
-            for i in range(len(potential_masks)):
-                if potential_masks[i] and not in_region:
-                    # Start of a new region
-                    in_region = True
+            for i, flag in enumerate(potential_masks):
+                if flag and not in_region:
                     start_idx = i
-                elif not potential_masks[i] and in_region:
-                    # End of a region
-                    in_region = False
+                    in_region = True
+                elif not flag and in_region:
                     end_idx = i - 1
+                    in_region = False
                     mask_regions.append((start_idx, end_idx))
-            
-            # Add the last region if we were still in one
             if in_region:
                 mask_regions.append((start_idx, len(potential_masks) - 1))
-            
-            # Check if min width is in pixels or units
-            if self.fit_params['window_type'] == 'pixels':
-                # Min width is in number of pixels
-                new_masks = []
-                for start_idx, end_idx in mask_regions:
-                    # Check if region is wide enough in pixels
-                    if end_idx - start_idx + 1 >= min_width:
-                        new_masks.extend([self.x_axis[start_idx], self.x_axis[end_idx]])
-            else:
-                # Min width is in x-axis units
-                new_masks = []
-                for start_idx, end_idx in mask_regions:
-                    # Check if region is wide enough in units
-                    if self.x_axis[end_idx] - self.x_axis[start_idx] >= min_width:
-                        new_masks.extend([self.x_axis[start_idx], self.x_axis[end_idx]])
-            
-            # Apply the masks
+    
+            # Step 6: Filter by min width in appropriate units
+            filtered_regions = []
+            for start_idx, end_idx in mask_regions:
+                x_start = x_data[start_idx]
+                x_end = x_data[end_idx]
+                if x_end - x_start >= min_width:
+                    filtered_regions.append((start_idx, end_idx))
+    
+            # Step 7: Merge regions closer than gap_threshold
+            if len(filtered_regions) > 1:
+                merged = [filtered_regions[0]]
+                for s, e in filtered_regions[1:]:
+                    last_s, last_e = merged[-1]
+                    if x_data[s] - x_data[last_e] <= gap_threshold:
+                        merged[-1] = (last_s, e)
+                    else:
+                        merged.append((s, e))
+                filtered_regions = merged
+    
+            # Step 8: Finalize new masks
+            new_masks = []
+            for start_idx, end_idx in filtered_regions:
+                new_masks.extend([x_data[start_idx], x_data[end_idx]])
+    
             if replace:
                 self.masks = new_masks
             else:
                 self.masks.extend(new_masks)
                 self.merge_masks()
-            
-            count = len(new_masks) // 2
-            self.statusBar.showMessage(f"Added {count} mask regions using sigma={sigma}")
-            self.update_plots()
-            
+    
+            region_count = len(new_masks) // 2
+            units = "km/s" if coord_type == "velocity" else "Å"
+            self.statusBar.showMessage(
+                f"Added {region_count} mask regions (σ={sigma}, MAD={robust_std:.3f}, "
+                f"min_width={min_width} {units}, error>{error_threshold*100:.0f}%)"
+            )
+            xlim = self.canvas.figure.gca().get_xlim()
+
+            self.update_plots(input_xrange=xlim)
+    
         except Exception as e:
             self.statusBar.showMessage(f"Error in auto-masking: {str(e)}")
-            QMessageBox.warning(self, "Auto-Masking Error", 
-                              f"Error generating masks: {str(e)}\n\n"
-                              f"Try adjusting parameters or masking manually.")
-            
+            QMessageBox.warning(
+                self, "Auto-Masking Error",
+                f"Error generating masks:\n{str(e)}\n\n"
+                "Try adjusting parameters or masking manually."
+            )
+    
+
     def manual_mask_entry(self):
         """Open a dialog for manual entry of mask values."""
         # Create dialog
@@ -1052,7 +1168,13 @@ class InteractiveContinuumFitWindow(QMainWindow):
             if v_min != v_max:
                 self.masks.extend([v_min, v_max])
                 self.statusBar.showMessage(f"Mask added: {v_min:.1f} to {v_max:.1f} {self.x_axis_unit}")
-                self.update_plots()
+                
+                ax_flux = self.canvas.axes[0]
+                xlim = ax_flux.get_xlim()
+
+                # Update plots
+                self.update_plots(input_xrange=xlim)
+
             else:
                 QMessageBox.warning(self, "Invalid Input", "Minimum and maximum values must be different")
                 
@@ -1090,8 +1212,10 @@ class InteractiveContinuumFitWindow(QMainWindow):
             # Enable accept button
             self.accept_btn.setEnabled(True)
             
+            ax_flux = self.canvas.axes[0]
+            xlim = ax_flux.get_xlim()
             # Update plots
-            self.update_plots()
+            self.update_plots(input_xrange=xlim)
             
         except Exception as e:
             self.statusBar.showMessage(f"Error fitting continuum: {str(e)}")
@@ -1467,8 +1591,8 @@ if __name__ == "__main__":
     
     # Optionally create velocity array (but can work without it)
     # Using arbitrary redshift for example
-    z = 0.1
-    rest_wave = 4050  # Arbitrary rest wavelength
+    z = 0.0
+    rest_wave = np.mean(wave)  # Arbitrary rest wavelength
     velocity = (wave - rest_wave * (1.0 + z)) * 299792.458 / (rest_wave * (1.0 + z))
     
     # Create a realistic continuum with some complexity
@@ -1487,20 +1611,19 @@ if __name__ == "__main__":
     
     # Launch the tool with some pre-existing masks
     # Note that we don't pass velocity for this example to show wavelength-only operation
-    result = launch_interactive_continuum_fit(
-        wave=wave,
-        flux=flux,
-        error=error,
-        velocity=None,  # Test wavelength-only mode
-        existing_masks=[4090, 4110, 4190, 4210],
-        order=3,
-        use_weights=False,
-        domain=[4050, 4450]
-    )
+    #result = launch_interactive_continuum_fit(
+    #    wave=wave,
+    #    flux=flux,
+    #    error=error,
+    #    velocity=None,  # Test wavelength-only mode
+    #    existing_masks=[4090, 4110, 4190, 4210],
+    #    order=3,
+    #    use_weights=False,
+    #    domain=[4050, 4450]
+    #)
     
     # Test also with velocity
     # Uncomment to run with velocity x-axis
-    """
     result = launch_interactive_continuum_fit(
         wave=wave,
         flux=flux,
@@ -1509,9 +1632,8 @@ if __name__ == "__main__":
         existing_masks=[-300, -100, 100, 200],
         order=3,
         use_weights=False,
-        domain=[-400, 400]
+        domain=[-4000, 4000]
     )
-    """
     
     # Print the result
     if not result.get('cancelled', False):

@@ -745,19 +745,14 @@ class rb_spec(object):
         DeprecationWarning, 
         stacklevel=2
         )
-        if not hasattr(self, 'wrest'):
-            raise ValueError("Must call shift_spec before slice_spec and continuum fitting")
+        
         
         # Check if the spectrum has been sliced
         if not hasattr(self, 'wave_slice') or not hasattr(self, 'flux_slice') or not hasattr(self, 'velo'):
             raise ValueError("Spectrum must be sliced first using slice_spec before interactive fitting")
         
         # Check for empty arrays - this could happen if slice_spec found no data in the range
-        if len(self.wave_slice) == 0 or len(self.flux_slice) == 0 or len(self.velo) == 0:
-            available_range = ""
-            if hasattr(self, 'wrest') and len(self.wrest) > 0:
-                available_range = f"\nAvailable wavelength range: [{min(self.wrest):.2f}, {max(self.wrest):.2f}]"
-                
+        if len(self.wave_slice) == 0 or len(self.flux_slice) == 0 or len(self.velo) == 0:                            
             raise ValueError(f"No data points in the sliced spectrum.{available_range}\n"
                            f"Try different parameters in the slice_spec method.")
 
@@ -898,20 +893,13 @@ class rb_spec(object):
     
         # Handle interactive mode
         if interactive:
-            # Check if shift_spec has been called
-            if not hasattr(self, 'wrest'):
-                raise ValueError("Must call shift_spec before slice_spec and continuum fitting")
             
             # Check if the spectrum has been sliced
             if not hasattr(self, 'wave_slice') or not hasattr(self, 'flux_slice') or not hasattr(self, 'velo'):
                 raise ValueError("Spectrum must be sliced first using slice_spec before interactive fitting")
             
             # Check for empty arrays
-            if len(self.wave_slice) == 0 or len(self.flux_slice) == 0 or len(self.velo) == 0:
-                available_range = ""
-                if hasattr(self, 'wrest') and len(self.wrest) > 0:
-                    available_range = f"\nAvailable wavelength range: [{min(self.wrest):.2f}, {max(self.wrest):.2f}]"
-                    
+            if len(self.wave_slice) == 0 or len(self.flux_slice) == 0 or len(self.velo) == 0:                    
                 raise ValueError(f"No data points in the sliced spectrum.{available_range}\n"
                                f"Try different parameters in the slice_spec method.")
     
