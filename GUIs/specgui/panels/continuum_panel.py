@@ -12,7 +12,7 @@ class MatplotlibCanvas(FigureCanvasQTAgg):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = self.fig.add_subplot(111)
         super(MatplotlibCanvas, self).__init__(self.fig)
-
+   
 class ContinuumPanel(QWidget):
     """Panel that launches the existing interactive continuum fitter."""
     
@@ -26,6 +26,8 @@ class ContinuumPanel(QWidget):
         
         # Connect to controller signals
         self.controller.spectrum_changed.connect(self.update_plot)
+        self.controller.spectrum_changed.connect(self.reset)
+
     
     def init_ui(self):
         """Initialize the user interface."""
@@ -85,6 +87,15 @@ class ContinuumPanel(QWidget):
         
         plot_group.setLayout(plot_layout)
         main_layout.addWidget(plot_group)    
+
+
+    def reset(self):
+        """Reset panel state when a new file is loaded."""
+        self.status_label.setText("No continuum fitted yet")
+        # Reset any continuum-related UI elements
+        self.skip_continuum.setChecked(False)
+        self.update_plot()
+
 
 
     def launch_fitter(self):

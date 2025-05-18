@@ -54,7 +54,10 @@ class InputPanel(QWidget):
  
         # Add stretch to push everything to the top
         main_layout.addStretch(1)
-    
+
+
+
+        
     def browse_file(self):
         """Open file dialog to browse for spectrum file."""
         file_filter = "All Files (*);;FITS Files (*.fits);;Text Files (*.txt);;JSON Files (*.json)"

@@ -33,7 +33,8 @@ class MeasurementPanel(QWidget):
         self.vmax_default = 200
         
         # Check if controller already has vmin/vmax values (e.g., from loaded JSON)
-        if controller.has_spectrum() and hasattr(controller.spec, 'vmin') and hasattr(controller.spec, 'vmax'):
+        if (hasattr(controller, 'has_spectrum') and controller.has_spectrum() and 
+            hasattr(controller.spec, 'vmin') and hasattr(controller.spec, 'vmax')):
             # Use existing values if available
             self.vmin_default = controller.spec.vmin
             self.vmax_default = controller.spec.vmax
@@ -44,6 +45,8 @@ class MeasurementPanel(QWidget):
         # Connect to controller signals
         self.controller.spectrum_changed.connect(self.update_plot)
         self.controller.spectrum_changed.connect(self.update_velocity_range)
+        self.controller.spectrum_changed.connect(self.reset)
+
         
     def init_ui(self):
         """Initialize the user interface."""
@@ -175,6 +178,18 @@ class MeasurementPanel(QWidget):
         # Add sections to main layout with desired proportions
         main_layout.addWidget(top_widget, 3)    # 35% for top section
         main_layout.addWidget(plot_group, 7)    # 65% for bottom section
+
+    def reset(self):
+        """Reset panel state when a new file is loaded."""
+        self.measurement_results = None
+        # Only reset velocity range if not loaded from JSON
+        if not (hasattr(self.controller.spec, 'vmin') and hasattr(self.controller.spec, 'vmax')):
+            self.vmin_spinbox.setValue(self.vmin_default)
+            self.vmax_spinbox.setValue(self.vmax_default)
+        # Clear results table
+        self.results_table.setRowCount(0)
+        self.update_plot()
+    
 
     def update_velocity_range(self):
         """Update velocity range inputs if spectrum has changed and contains vmin/vmax values."""

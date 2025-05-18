@@ -86,8 +86,13 @@ class RbSpecGUI(QMainWindow):
         if success:
             self.statusBar().showMessage("Spectrum loaded successfully.")
             
-            # Enable the redshift tab
-            self.tabs.setTabEnabled(1, True)
+            # Reset all tab states when loading a new file
+            # Disable all tabs except input and redshift initially
+            self.tabs.setTabEnabled(1, True)  # Redshift tab
+            self.tabs.setTabEnabled(2, False)  # Transition tab
+            self.tabs.setTabEnabled(3, False)  # Continuum tab
+            self.tabs.setTabEnabled(4, False)  # Measurement tab
+            self.tabs.setTabEnabled(5, False)  # Output tab
             
             if has_redshift:
                 # Pre-populate redshift panel with value from JSON
@@ -104,13 +109,6 @@ class RbSpecGUI(QMainWindow):
                     if trans_wave is not None:
                         self.transition_panel.set_transition(trans_wave, trans_name)
                         
-                        # Set velocity limits if available but don't use EW limits
-                        # Just use the default velocity limits
-                        # We'll leave the set_velocity_limits call commented out
-                        # vmin, vmax = vel_limits
-                        # if vmin is not None and vmax is not None:
-                        #     self.transition_panel.set_velocity_limits(vmin, vmax)
-                            
                         # Automatically slice with loaded values
                         self.transition_panel.slice_spectrum()
                         
@@ -124,7 +122,7 @@ class RbSpecGUI(QMainWindow):
                 self.tabs.setCurrentIndex(1)
         else:
             self.statusBar().showMessage("Failed to load spectrum.")
-            QMessageBox.warning(self, "Load Error", "Failed to load spectrum. Check console for details.")
+            QMessageBox.warning(self, "Load Error", "Failed to load spectrum. Check console for details.")    
     
     def on_redshift_applied(self, redshift):
         """Handle redshift applied signal."""

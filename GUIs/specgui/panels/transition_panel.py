@@ -15,6 +15,7 @@ class MatplotlibCanvas(FigureCanvasQTAgg):
         self.axes = self.fig.add_subplot(111)
         super(MatplotlibCanvas, self).__init__(self.fig)
 
+
 class TransitionPanel(QWidget):
     """Panel for selecting a transition and slicing the spectrum."""
     
@@ -34,7 +35,8 @@ class TransitionPanel(QWidget):
         
         # Connect to controller signals
         self.controller.spectrum_changed.connect(self.update_plot)
-    
+        self.controller.spectrum_changed.connect(self.reset)
+
     def init_ui(self):
         """Initialize the user interface."""
         main_layout = QVBoxLayout(self)
@@ -162,6 +164,15 @@ class TransitionPanel(QWidget):
         plot_group.setLayout(plot_layout)
         main_layout.addWidget(plot_group)
 
+    def reset(self):
+        """Reset panel state when a new file is loaded."""
+        self.status_label.setText("No slicing applied")
+        # Reset transition selector if needed
+        # Only reset if we don't have transition info from a JSON file
+        if not (hasattr(self.controller.spec, 'trans_wave') and hasattr(self.controller.spec, 'trans')):
+            self.transition_combo.setCurrentIndex(0)  # Reset to first transition
+            self.transition_spinbox.setValue(1215.67)  # Reset to Lyman-alpha
+        self.update_plot()
 
     def reset_transition(self):
         """Reset the transition selection and clear downstream analysis."""

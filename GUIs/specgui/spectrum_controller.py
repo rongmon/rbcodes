@@ -17,9 +17,28 @@ class SpectrumController(QObject):
         self.current_filename = None
         self.history = []  # Simple history for undo
     
+    def reset_state(self):
+        """Reset all analysis-related attributes."""
+        # Keep only the basic spec object reference but clear its analysis attributes
+        if hasattr(self, 'spec') and self.spec is not None:
+            # Clear specific attributes while keeping the spec object itself
+            for attr in ['cont', 'fnorm', 'enorm', 'velo', 'wave_slice', 'flux_slice', 
+                        'error_slice', 'zabs', 'transition', 'transition_name', 
+                        'vmin', 'vmax', 'W', 'W_e', 'N', 'N_e', 'logN', 'logN_e', 
+                        'Tau', 'vel_centroid', 'vel_disp', 'SNR']:
+                if hasattr(self.spec, attr):
+                    delattr(self.spec, attr)
+        
+        # Reset controller state
+        self.current_filename = None
+        self.history = []  # Reset history
+    
     def load_from_file(self, filename, filetype=None):
         """Load spectrum from file using rb_spec."""
         try:
+            # Reset state before loading new file
+            self.reset_state()
+            
             self.spec = rb_spec.from_file(filename, filetype=filetype)
             self.current_filename = filename
             self.history = []  # Reset history
@@ -32,6 +51,9 @@ class SpectrumController(QObject):
     def load_from_data(self, wave, flux, error):
         """Load spectrum from numpy arrays."""
         try:
+            # Reset state before loading new data
+            self.reset_state()
+            
             self.spec = rb_spec.from_data(wave, flux, error)
             self.current_filename = None
             self.history = []  # Reset history
@@ -44,6 +66,9 @@ class SpectrumController(QObject):
     def load_from_json(self, filename):
         """Load spectrum from saved JSON analysis."""
         try:
+            # Reset state before loading new file
+            self.reset_state()
+            
             self.spec = load_rb_spec_object(filename)
             self.current_filename = filename
             self.history = []  # Reset history
@@ -52,28 +77,12 @@ class SpectrumController(QObject):
             has_redshift = hasattr(self.spec, 'zabs')
             has_transition = hasattr(self.spec, 'trans_wave') and hasattr(self.spec, 'trans')
             
-            # Check if we need to reconstruct the full spectrum 
-            # (JSON files usually only have sliced data)
-            if not hasattr(self.spec, 'wave') and hasattr(self.spec, 'wave_slice') and has_redshift:
-                # Reconstruct observed wavelength from rest wavelength and redshift
-                self.spec.wave = self.spec.wave_slice * (1 + self.spec.zabs)
-                
-                # Copy flux and error data (they're already in observed frame)
-                self.spec.flux = self.spec.flux_slice.copy()
-                self.spec.error = self.spec.error_slice.copy()
-                
-                # Create wrest if needed
-                if not hasattr(self.spec, 'wrest'):
-                    self.spec.wrest = self.spec.wave_slice.copy()
-                    
-                print("Reconstructed full spectrum from sliced data.")
-            
             self.spectrum_changed.emit()
             return True, has_redshift, has_transition
         except Exception as e:
             print(f"Error loading JSON: {str(e)}")
             return False, False, False
-
+    
     def get_json_info(self):
         """Get information from a loaded JSON file."""
         if not self.has_spectrum():
@@ -96,8 +105,8 @@ class SpectrumController(QObject):
 
     def has_spectrum(self):
         """Check if a spectrum is loaded."""
-        return self.spec is not None
-    
+        return hasattr(self, 'spec') and self.spec is not None
+
     def get_spectrum_data(self):
         """Get the current spectrum data for plotting."""
         if not self.has_spectrum():
@@ -242,9 +251,6 @@ class SpectrumController(QObject):
         
         return self.spec.cont
 
-    def has_spectrum(self):
-        """Check if a spectrum is loaded."""
-        return self.spec is not None
     
 
     def compute_equivalent_width(self, vmin, vmax, snr=False, binsize=1, plot=False):

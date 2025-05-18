@@ -29,7 +29,8 @@ class RedshiftPanel(QWidget):
         
         # Connect to controller signals
         self.controller.spectrum_changed.connect(self.update_plot)
-    
+        self.controller.spectrum_changed.connect(self.reset)
+
 
     def init_ui(self):
         """Initialize the user interface."""
@@ -121,6 +122,15 @@ class RedshiftPanel(QWidget):
         plot_group.setLayout(plot_layout)
         main_layout.addWidget(plot_group)
     
+
+    def reset(self):
+        """Reset panel state when a new file is loaded."""
+        self.status_label.setText("No redshift applied")
+        # Only reset if we don't have redshift info from a JSON file
+        if not hasattr(self.controller.spec, 'zabs'):
+            self.redshift_spinbox.setValue(0.0)  # Reset to default redshift
+        self.update_plot()
+
     
     def on_redshift_changed(self, value):
         """Handle redshift spinbox value changes."""

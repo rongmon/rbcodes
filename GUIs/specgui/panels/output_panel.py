@@ -25,6 +25,8 @@ class OutputPanel(QWidget):
         # Connect to controller signals to update when spectrum changes
         self.controller.spectrum_changed.connect(self.update_default_filename)
         self.controller.spectrum_changed.connect(self.update_summary)
+        self.controller.spectrum_changed.connect(self.reset)
+
     
     def init_ui(self):
         """Initialize the user interface."""
@@ -147,6 +149,11 @@ class OutputPanel(QWidget):
         summary_group.setLayout(summary_layout)
         main_layout.addWidget(summary_group)
 
+    def reset(self):
+        """Reset panel state when a new file is loaded."""
+        self.update_default_filename()
+        self.update_summary()
+    
 
     def showEvent(self, event):
         """Override the show event to update the filename when the panel becomes visible."""
@@ -248,7 +255,7 @@ class OutputPanel(QWidget):
     
     def update_summary(self):
         """Update the analysis summary display."""
-        if not self.controller.has_spectrum():
+        if not hasattr(self.controller, 'has_spectrum') or not self.controller.has_spectrum():
             self.summary_label.setText("No analysis to summarize yet.")
             return
         
