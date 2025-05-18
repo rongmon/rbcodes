@@ -3,13 +3,13 @@ import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTabWidget, QVBoxLayout, QWidget, QMessageBox
 from PyQt5.QtCore import Qt
 
-from spectrum_controller import SpectrumController
-from panels.input_panel import InputPanel
-from panels.redshift_panel import RedshiftPanel
-from panels.transition_panel import TransitionPanel
-from panels.continuum_panel import ContinuumPanel
-from panels.measurement_panel import MeasurementPanel
-from panels.output_panel import OutputPanel
+from rbcodes.GUIs.specgui.spectrum_controller import SpectrumController
+from rbcodes.GUIs.specgui.panels.input_panel import InputPanel
+from rbcodes.GUIs.specgui.panels.redshift_panel import RedshiftPanel
+from rbcodes.GUIs.specgui.panels.transition_panel import TransitionPanel
+from rbcodes.GUIs.specgui.panels.continuum_panel import ContinuumPanel
+from rbcodes.GUIs.specgui.panels.measurement_panel import MeasurementPanel
+from rbcodes.GUIs.specgui.panels.output_panel import OutputPanel
 
 class RbSpecGUI(QMainWindow):
     """Main application window for the rb_spec GUI."""
