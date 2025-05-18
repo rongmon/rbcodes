@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                            QLineEdit, QFileDialog, QComboBox, QCheckBox,
                            QDialog, QDialogButtonBox)
 from PyQt5.QtCore import pyqtSignal
+
 class OutputPanel(QWidget):
     """Panel for saving analysis results and generating output."""
     
@@ -17,6 +18,13 @@ class OutputPanel(QWidget):
         super().__init__()
         self.controller = controller
         self.init_ui()
+        
+        # Update summary when this panel is shown
+        self.update_summary()
+        
+        # Connect to controller signals to update when spectrum changes
+        self.controller.spectrum_changed.connect(self.update_default_filename)
+        self.controller.spectrum_changed.connect(self.update_summary)
     
     def init_ui(self):
         """Initialize the user interface."""
@@ -38,20 +46,33 @@ class OutputPanel(QWidget):
         file_path_layout = QHBoxLayout()
         self.file_path = QLineEdit()
         # Create a good initial guess for the filename
-        default_filename = "analysis_results.json"
-        # If we have transition information, use it to create a more specific filename
-        if hasattr(self.controller, 'spec') and self.controller.has_spectrum():
-            if hasattr(self.controller.spec, 'trans'):
-                trans_name = self.controller.spec.trans.replace(' ', '_')
-                transition_wave = getattr(self.controller.spec, 'trans_wave', 0)
-                zabs = getattr(self.controller.spec, 'zabs', 0)
-                default_filename = f"{trans_name}_{transition_wave:.1f}_z{zabs:.3f}.json"
+
+        # Check if we're loading from a JSON file first
+        if hasattr(self.controller, 'current_filename') and self.controller.current_filename:
+            if self.controller.current_filename.lower().endswith('.json'):
+                default_filename = os.path.basename(self.controller.current_filename)
+            else:
+                # Create a good initial guess based on the spectrum data
+                default_filename = "analysis_results.json"
+                if hasattr(self.controller, 'spec') and self.controller.has_spectrum():
+                    if hasattr(self.controller.spec, 'trans'):
+                        trans_name = self.controller.spec.trans.replace(' ', '_')
+                        transition_wave = getattr(self.controller.spec, 'trans_wave', 0)
+                        zabs = getattr(self.controller.spec, 'zabs', 0)
+                        default_filename = f"{trans_name}_{transition_wave:.1f}_z{zabs:.3f}.json"
+        else:
+            # No file loaded, use a generic name
+            default_filename = "analysis_results.json"
         
         self.file_path.setText(default_filename)
+
+
+
         self.file_path.setPlaceholderText("Enter a file path or use Browse...")
         
         self.browse_btn = QPushButton("Browse")
         self.browse_btn.clicked.connect(self.browse_save_path)
+        self.browse_btn.setToolTip("Select where to save your analysis results")
         
         file_path_layout.addWidget(self.file_path)
         file_path_layout.addWidget(self.browse_btn)
@@ -66,6 +87,8 @@ class OutputPanel(QWidget):
         # Save button
         self.save_btn = QPushButton("Save Analysis")
         self.save_btn.clicked.connect(self.save_analysis)
+        self.save_btn.setToolTip("Save the current analysis to a file for later use")
+
         save_layout.addRow("", self.save_btn)
         
         save_group.setLayout(save_layout)
@@ -98,6 +121,16 @@ class OutputPanel(QWidget):
         # Export button
         self.export_btn = QPushButton("Export Plots")
         self.export_btn.clicked.connect(self.export_plots)
+        self.export_btn.setToolTip("Export plots of the continuum fit and measurements")
+
+
+        self.export_continuum.setToolTip("Include the continuum fit plot in the export")
+        self.export_measurement.setToolTip("Include the measurement plot in the export")
+    
+        # Format selector
+        self.format_combo.setToolTip("Select file format for saving analysis")
+        self.plot_format.setToolTip("Select image format for exported plots")
+
         export_layout.addWidget(self.export_btn)
         
         export_group.setLayout(export_layout)
@@ -113,9 +146,36 @@ class OutputPanel(QWidget):
         
         summary_group.setLayout(summary_layout)
         main_layout.addWidget(summary_group)
+
+
+    def showEvent(self, event):
+        """Override the show event to update the filename when the panel becomes visible."""
+        super().showEvent(event)
+        self.update_default_filename()
+    
+    def update_default_filename(self):
+        """Update the default filename based on the current state."""
+        # Priority 1: If loaded from a JSON file, use that filename
+        if hasattr(self.controller, 'current_filename') and self.controller.current_filename:
+            if self.controller.current_filename.lower().endswith('.json'):
+                new_filename = os.path.basename(self.controller.current_filename)
+                self.file_path.setText(new_filename)
+                return
         
-        # Update summary when this panel is shown
-        self.update_summary()
+        # Priority 2: If we have spectrum with transition info, use that
+        if self.controller.has_spectrum():
+            if all(hasattr(self.controller.spec, attr) for attr in ['trans', 'trans_wave', 'zabs']):
+                trans_name = self.controller.spec.trans.replace(' ', '_')
+                transition_wave = self.controller.spec.trans_wave
+                zabs = self.controller.spec.zabs
+                new_filename = f"{trans_name}_{transition_wave:.1f}_z{zabs:.3f}.json"
+                self.file_path.setText(new_filename)
+                return
+        
+        # Priority 3: Default filename
+        if not self.file_path.text():
+            self.file_path.setText("analysis_results.json")
+    
     
     def browse_save_path(self):
         """Open file dialog to select save path."""
@@ -132,10 +192,21 @@ class OutputPanel(QWidget):
         if not current_filename.lower().endswith(extension):
             current_filename = os.path.splitext(current_filename)[0] + extension
         
+        # If we loaded from a file, start in the same directory
+        initial_dir = ""
+        if hasattr(self.controller, 'current_filename') and self.controller.current_filename:
+            initial_dir = os.path.dirname(self.controller.current_filename)
+        
         file_filter = f"{fmt.upper()} Files (*{extension});;All Files (*)"
         
+        # Use the initial directory if available
+        if initial_dir:
+            start_path = os.path.join(initial_dir, current_filename)
+        else:
+            start_path = current_filename
+        
         filename, _ = QFileDialog.getSaveFileName(
-            self, "Save Analysis", current_filename, file_filter
+            self, "Save Analysis", start_path, file_filter
         )
         
         if filename:
@@ -143,7 +214,8 @@ class OutputPanel(QWidget):
             if not filename.lower().endswith(extension):
                 filename += extension
                 
-            self.file_path.setText(filename)    
+            self.file_path.setText(filename)
+            
     def save_analysis(self):
         """Save the analysis to a file."""
         filepath = self.file_path.text()
@@ -173,7 +245,6 @@ class OutputPanel(QWidget):
             QMessageBox.warning(
                 self, "Error", f"Failed to save analysis: {str(e)}"
             )
-    
     
     def update_summary(self):
         """Update the analysis summary display."""
@@ -205,8 +276,7 @@ class OutputPanel(QWidget):
         except Exception as e:
             print(f"Error updating summary: {str(e)}")
             self.summary_label.setText(f"Error updating summary: {str(e)}")
-
-
+            
     def export_plots(self):
         """Export plots of the analysis using the same path as the JSON file."""
         # Get format
@@ -280,4 +350,4 @@ class OutputPanel(QWidget):
             print(f"Error exporting plots: {str(e)}")
             QMessageBox.warning(
                 self, "Error", f"Failed to export plots: {str(e)}"
-            )    
+            )

@@ -97,11 +97,54 @@ class TransitionPanel(QWidget):
         # Slice button
         self.slice_btn = QPushButton("Slice Spectrum")
         self.slice_btn.clicked.connect(self.slice_spectrum)
+        self.slice_btn.setToolTip("Extract a portion of the spectrum around the selected transition")
+    
         transition_layout.addRow("", self.slice_btn)
         
         # Status label
         self.status_label = QLabel("No slicing applied")
         transition_layout.addRow("Status:", self.status_label)
+   
+        # Add New Transition button
+        new_transition_layout = QHBoxLayout()
+        self.new_transition_btn = QPushButton("New Transition")
+        self.new_transition_btn.setToolTip("Reset current transition selection and analyze a different transition at the same redshift")
+        self.new_transition_btn.clicked.connect(self.reset_transition)
+        
+        # Set a pale red color for the new transition button
+        self.new_transition_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #ffcccc; 
+                color: #990000; 
+                border: 1px solid #cc0000;
+                padding: 5px;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #ffb3b3;
+            }
+            QPushButton:pressed {
+                background-color: #ff9999;
+            }
+        """)
+        
+        # Add the button to your layout, positioned to the right
+        transition_button_layout = QHBoxLayout()
+        transition_button_layout.addWidget(self.slice_btn)
+        transition_button_layout.addWidget(self.new_transition_btn)
+
+
+        new_transition_layout.addWidget(self.new_transition_btn)
+        
+        transition_layout.addRow("", new_transition_layout)
+
+        # Tooltips for dropdown and spinboxes
+        self.transition_combo.setToolTip("Select a common transition or choose 'Custom'")
+        self.transition_spinbox.setToolTip("Wavelength of the transition in Angstroms")
+        self.vmin_spinbox.setToolTip("Minimum velocity for slicing (km/s)")
+        self.vmax_spinbox.setToolTip("Maximum velocity for slicing (km/s)")
+        self.use_vel_checkbox.setToolTip("Use velocity space for slicing instead of wavelength")
+        self.linelist_combo.setToolTip("Select the atomic line list to use")
         
         transition_group.setLayout(transition_layout)
         main_layout.addWidget(transition_group)
@@ -118,10 +161,33 @@ class TransitionPanel(QWidget):
         
         plot_group.setLayout(plot_layout)
         main_layout.addWidget(plot_group)
+
+
+    def reset_transition(self):
+        """Reset the transition selection and clear downstream analysis."""
+        # Ask for confirmation
+        reply = QMessageBox.question(self, 'Confirm Reset', 
+                                   'Reset transition? This will clear all downstream analysis steps.',
+                                   QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        
+        if reply == QMessageBox.No:
+            return
+        
+        # Reset UI elements to default values
+        self.transition_combo.setCurrentIndex(0)  # Reset to first transition
+        self.vmin_spinbox.setValue(self.vmin)     # Reset to default velocity range
+        self.vmax_spinbox.setValue(self.vmax)
+        self.status_label.setText("Transition reset")
+        
+        # Signal to the main application that transition was reset
+        self.spectrum_sliced.emit(-99999, 0, 0)  # Special values to indicate reset
+    
+
     
     def populate_transition_combo(self):
         """Populate the transition combo box with common transitions."""
         transitions = [
+            "Custom",
             "Lyα (1215.67 Å)",
             "Lyβ (1025.72 Å)",
             "Lyγ (972.54 Å)",
@@ -130,8 +196,7 @@ class TransitionPanel(QWidget):
             "MgII (2796.35 Å)",
             "MgII (2803.53 Å)",
             "SiIV (1393.76 Å)",
-            "SiIV (1402.77 Å)",
-            "Custom"
+            "SiIV (1402.77 Å)"
         ]
         self.transition_combo.addItems(transitions)
         

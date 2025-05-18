@@ -52,12 +52,28 @@ class SpectrumController(QObject):
             has_redshift = hasattr(self.spec, 'zabs')
             has_transition = hasattr(self.spec, 'trans_wave') and hasattr(self.spec, 'trans')
             
+            # Check if we need to reconstruct the full spectrum 
+            # (JSON files usually only have sliced data)
+            if not hasattr(self.spec, 'wave') and hasattr(self.spec, 'wave_slice') and has_redshift:
+                # Reconstruct observed wavelength from rest wavelength and redshift
+                self.spec.wave = self.spec.wave_slice * (1 + self.spec.zabs)
+                
+                # Copy flux and error data (they're already in observed frame)
+                self.spec.flux = self.spec.flux_slice.copy()
+                self.spec.error = self.spec.error_slice.copy()
+                
+                # Create wrest if needed
+                if not hasattr(self.spec, 'wrest'):
+                    self.spec.wrest = self.spec.wave_slice.copy()
+                    
+                print("Reconstructed full spectrum from sliced data.")
+            
             self.spectrum_changed.emit()
             return True, has_redshift, has_transition
         except Exception as e:
             print(f"Error loading JSON: {str(e)}")
             return False, False, False
-    
+
     def get_json_info(self):
         """Get information from a loaded JSON file."""
         if not self.has_spectrum():
@@ -104,6 +120,40 @@ class SpectrumController(QObject):
             print(f"Error applying redshift: {str(e)}")
             return False
 
+    def reset_after_redshift(self):
+        """Reset analysis after redshift change, preserving the loaded spectrum."""
+        if not self.has_spectrum():
+            return False
+        
+        # Clear transition-specific attributes that depend on redshift
+        for attr in ['wave_slice', 'flux_slice', 'error_slice', 'velo', 'cont',
+                    'fnorm', 'enorm', 'trans', 'fval', 'trans_wave', 'vmin',
+                    'vmax', 'W', 'W_e', 'N', 'N_e', 'logN', 'logN_e',
+                    'vel_centroid', 'vel_disp', 'transition', 'linelist']:
+            if hasattr(self.spec, attr):
+                delattr(self.spec, attr)
+        
+        # Signal that spectrum data has changed
+        self.spectrum_changed.emit()
+        return True
+
+
+    def reset_after_transition(self):
+        """Reset analysis after transition change, preserving spectrum and redshift."""
+        if not self.has_spectrum():
+            return False
+        
+        # Clear attributes specific to analysis after slicing
+        for attr in ['cont', 'fnorm', 'enorm', 'vmin', 'vmax', 
+                    'W', 'W_e', 'N', 'N_e', 'logN', 'logN_e',
+                    'vel_centroid', 'vel_disp']:
+            if hasattr(self.spec, attr):
+                delattr(self.spec, attr)
+        
+        # Signal that spectrum data has changed
+        self.spectrum_changed.emit()
+        return True
+            
 
     def slice_spectrum(self, transition, lam_min, lam_max, use_vel=True, linelist="atom", method="closest"):
         """Slice the spectrum around a transition using rb_spec."""
@@ -138,6 +188,8 @@ class SpectrumController(QObject):
             return self.spec.transition, self.spec.transition_name
         except AttributeError:
             return None, None
+
+
 
 
     def fit_continuum(self):
@@ -190,7 +242,10 @@ class SpectrumController(QObject):
         
         return self.spec.cont
 
-
+    def has_spectrum(self):
+        """Check if a spectrum is loaded."""
+        return self.spec is not None
+    
 
     def compute_equivalent_width(self, vmin, vmax, snr=False, binsize=1, plot=False):
         """Compute equivalent width using rb_spec's compute_EW method."""
@@ -426,4 +481,4 @@ class SpectrumController(QObject):
             return True
         except Exception as e:
             print(f"Error exporting measurement plot: {str(e)}")
-            return False    
+            return False 

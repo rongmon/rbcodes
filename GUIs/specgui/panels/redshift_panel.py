@@ -30,6 +30,7 @@ class RedshiftPanel(QWidget):
         # Connect to controller signals
         self.controller.spectrum_changed.connect(self.update_plot)
     
+
     def init_ui(self):
         """Initialize the user interface."""
         main_layout = QVBoxLayout(self)
@@ -56,6 +57,8 @@ class RedshiftPanel(QWidget):
         # Apply button
         self.apply_btn = QPushButton("Apply Redshift")
         self.apply_btn.clicked.connect(self.apply_redshift)
+        self.apply_btn.setToolTip("Apply the current redshift value to the spectrum")
+
         
         redshift_input_layout.addWidget(self.redshift_spinbox)
         redshift_input_layout.addWidget(self.common_redshifts)
@@ -63,6 +66,41 @@ class RedshiftPanel(QWidget):
         
         redshift_layout.addRow("Absorber Redshift (z):", redshift_input_layout)
         
+        # Add Reset button
+        reset_layout = QHBoxLayout()
+        self.reset_btn = QPushButton("Reset Redshift")
+        self.reset_btn.setToolTip("Clear current redshift and reset analysis. Use this to analyze the spectrum with a different redshift.")
+        self.reset_btn.clicked.connect(self.reset_redshift)
+        
+
+        # Set a pale red color for the reset button
+        self.reset_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #ffcccc; 
+                color: #990000; 
+                border: 1px solid #cc0000;
+                padding: 5px;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #ffb3b3;
+            }
+            QPushButton:pressed {
+                background-color: #ff9999;
+            }
+        """)
+
+        # Add the button to your layout
+        redshift_button_layout = QHBoxLayout()
+        redshift_button_layout.addWidget(self.apply_btn)
+        redshift_button_layout.addWidget(self.reset_btn)
+
+        reset_layout.addWidget(self.reset_btn)
+        
+        redshift_layout.addRow("", reset_layout)
+        
+        self.common_redshifts.setToolTip("Select from common redshift values or choose 'Custom'")
+
         # Status label
         self.status_label = QLabel("No redshift applied")
         redshift_layout.addRow("Status:", self.status_label)
@@ -83,6 +121,7 @@ class RedshiftPanel(QWidget):
         plot_group.setLayout(plot_layout)
         main_layout.addWidget(plot_group)
     
+    
     def on_redshift_changed(self, value):
         """Handle redshift spinbox value changes."""
         self.redshift = value
@@ -98,6 +137,25 @@ class RedshiftPanel(QWidget):
         if not found:
             self.common_redshifts.setCurrentIndex(0)  # Set to "Custom"
     
+    def reset_redshift(self):
+        """Reset the redshift and clear downstream analysis."""
+        # Ask for confirmation
+        reply = QMessageBox.question(self, 'Confirm Reset', 
+                                   'Reset redshift? This will clear all downstream analysis steps.',
+                                   QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        
+        if reply == QMessageBox.No:
+            return
+        
+        # Reset the spinbox to default value
+        self.redshift_spinbox.setValue(0.0)
+        self.redshift = 0.0
+        self.status_label.setText("Redshift reset")
+        
+        # Signal to the main application that redshift was reset
+        self.redshift_applied.emit(-99999)  # Use a special value to indicate reset   
+    
+
     def on_common_redshift_selected(self, text):
         """Handle selection from common redshifts dropdown."""
         if text == "Custom":

@@ -26,14 +26,36 @@ class MeasurementPanel(QWidget):
         super().__init__()
         self.controller = controller
         self.measurement_results = None  # Store the most recent results
+
+    
+        # Initialize with default values
+        self.vmin_default = -200
+        self.vmax_default = 200
+        
+        # Check if controller already has vmin/vmax values (e.g., from loaded JSON)
+        if controller.has_spectrum() and hasattr(controller.spec, 'vmin') and hasattr(controller.spec, 'vmax'):
+            # Use existing values if available
+            self.vmin_default = controller.spec.vmin
+            self.vmax_default = controller.spec.vmax
+            print(f"Using existing velocity range from loaded data: [{self.vmin_default}, {self.vmax_default}]")
+    
         self.init_ui()
         
         # Connect to controller signals
         self.controller.spectrum_changed.connect(self.update_plot)
-    
+        self.controller.spectrum_changed.connect(self.update_velocity_range)
+        
     def init_ui(self):
         """Initialize the user interface."""
         main_layout = QVBoxLayout(self)
+        
+        # Top section with two columns (40% of total height)
+        top_widget = QWidget()
+        top_layout = QHBoxLayout(top_widget)
+        
+        # Left side: controls (smaller width)
+        controls_widget = QWidget()
+        controls_layout = QVBoxLayout(controls_widget)
         
         # Measurement controls
         measurement_group = QGroupBox("Equivalent Width Measurement")
@@ -43,12 +65,12 @@ class MeasurementPanel(QWidget):
         velocity_layout = QHBoxLayout()
         
         self.vmin_spinbox = QSpinBox()
-        self.vmin_spinbox.setRange(-10000, 0)
+        self.vmin_spinbox.setRange(-10000, 10000)
         self.vmin_spinbox.setValue(-200)
         self.vmin_spinbox.setSingleStep(10)
         
         self.vmax_spinbox = QSpinBox()
-        self.vmax_spinbox.setRange(0, 10000)
+        self.vmax_spinbox.setRange(-10000, 10000)
         self.vmax_spinbox.setValue(200)
         self.vmax_spinbox.setSingleStep(10)
         
@@ -87,12 +109,36 @@ class MeasurementPanel(QWidget):
         # Compute button
         self.compute_btn = QPushButton("Compute Equivalent Width")
         self.compute_btn.clicked.connect(self.compute_equivalent_width)
+        self.compute_btn.setToolTip("Calculate the equivalent width and column density within the selected velocity range")
+
         measurement_layout.addRow("", self.compute_btn)
+    
+        # Interactive selection option
+        self.interactive_selection = QCheckBox("Enable Interactive Selection")
+        self.interactive_selection.setChecked(False)
+        self.interactive_selection.toggled.connect(self.toggle_interactive_selection)
+        self.interactive_selection.setToolTip("Enable clicking on the plot to set velocity limits")
+
+        measurement_layout.addRow("", self.interactive_selection) 
+
+        # Other input elements
+        self.vmin_spinbox.setToolTip("Minimum velocity for EW calculation (km/s)")
+        self.vmax_spinbox.setToolTip("Maximum velocity for EW calculation (km/s)")
+        self.snr_checkbox.setToolTip("Calculate the signal-to-noise ratio")
+        self.binsize_spinbox.setToolTip("Bin size for SNR calculation")
+        self.plot_checkbox.setToolTip("Show diagnostic plot after calculation")
+    
+        # Tooltip help:
+        help_text = QLabel("When enabled, click on plot to set integration limits. Press 'r' to reset.")
+        help_text.setWordWrap(True)
+        help_text.setStyleSheet("color: gray; font-style: italic;")
+        measurement_layout.addRow("", help_text)
         
         measurement_group.setLayout(measurement_layout)
-        main_layout.addWidget(measurement_group)
+        controls_layout.addWidget(measurement_group)
+        controls_layout.addStretch(1)  # Add stretch to push everything to the top
         
-        # Results display
+        # Right side: results table (larger width)
         results_group = QGroupBox("Measurement Results")
         results_layout = QVBoxLayout()
         
@@ -105,25 +151,109 @@ class MeasurementPanel(QWidget):
         self.results_table.setRowCount(0)  # No rows initially
         
         results_layout.addWidget(self.results_table)
-        
-        # Save button will be added in the next panel (Output Panel)
-        
         results_group.setLayout(results_layout)
-        main_layout.addWidget(results_group)
         
-        # Plot area
+        # Add widgets to top layout with desired proportions (40:60)
+        top_layout.addWidget(controls_widget, 3)  # 40%
+        top_layout.addWidget(results_group, 7)    # 60%
+        
+        # Bottom section: plot (60% of total height)
         plot_group = QGroupBox("Measurement Preview")
         plot_layout = QVBoxLayout()
         
-        self.canvas = MatplotlibCanvas(self, width=8, height=9, dpi=100)
+        self.canvas = MatplotlibCanvas(self, width=5, height=4, dpi=100)
         self.toolbar = NavigationToolbar2QT(self.canvas, self)
-        
+
+
         plot_layout.addWidget(self.toolbar)
         plot_layout.addWidget(self.canvas)
+
+
         
         plot_group.setLayout(plot_layout)
-        main_layout.addWidget(plot_group)
+        
+        # Add sections to main layout with desired proportions
+        main_layout.addWidget(top_widget, 3)    # 35% for top section
+        main_layout.addWidget(plot_group, 7)    # 65% for bottom section
+
+    def update_velocity_range(self):
+        """Update velocity range inputs if spectrum has changed and contains vmin/vmax values."""
+        if self.controller.has_spectrum() and hasattr(self.controller.spec, 'vmin') and hasattr(self.controller.spec, 'vmax'):
+            # Only update if the values differ from current spinbox values
+            new_vmin = self.controller.spec.vmin
+            new_vmax = self.controller.spec.vmax
+            
+            if new_vmin != self.vmin_spinbox.value() or new_vmax != self.vmax_spinbox.value():
+                print(f"Updating velocity range to: [{new_vmin}, {new_vmax}]")
+                self.vmin_spinbox.setValue(new_vmin)
+                self.vmax_spinbox.setValue(new_vmax)
     
+
+    def toggle_interactive_selection(self, enabled):
+        """Enable or disable interactive velocity range selection."""
+        if enabled:
+            # Connect click and key events
+            self.canvas.mpl_connect('button_press_event', self.on_plot_click)
+            self.canvas.mpl_connect('key_press_event', self.on_plot_key_press)
+
+            # Give focus to the canvas
+            self.canvas.setFocus()
+            
+            # Update status with instructions
+            self.setToolTip("Click on plot to set vmin/vmax. Press 'r' to reset.")
+            
+            # Update plot to show current selection points more prominently
+            self.update_plot()
+        else:
+            # Disconnect events (not strictly necessary as the connections
+            # would be automatically garbage collected)
+            # Disconnect events if they exist
+            if hasattr(self, 'click_cid'):
+                self.canvas.mpl_disconnect(self.click_cid)
+                delattr(self, 'click_cid')
+            if hasattr(self, 'key_cid'):
+                self.canvas.mpl_disconnect(self.key_cid)
+                delattr(self, 'key_cid')            
+            self.setToolTip("")
+    
+    def on_plot_click(self, event):
+        """Handle mouse clicks on the plot for setting vmin/vmax."""
+        if not event.inaxes or not self.interactive_selection.isChecked():
+            return
+            
+        # Get the x-coordinate (velocity)
+        velocity = event.xdata
+        
+        # Determine whether to set vmin or vmax based on which is closer
+        current_vmin = self.vmin_spinbox.value()
+        current_vmax = self.vmax_spinbox.value()
+        
+        # If velocity is outside current range, set the closest endpoint
+        if velocity < current_vmin:
+            self.vmin_spinbox.setValue(int(velocity))
+        elif velocity > current_vmax:
+            self.vmax_spinbox.setValue(int(velocity))
+        else:
+            # If inside current range, set whichever endpoint is closer
+            if abs(velocity - current_vmin) < abs(velocity - current_vmax):
+                self.vmin_spinbox.setValue(int(velocity))
+            else:
+                self.vmax_spinbox.setValue(int(velocity))
+        
+        # Update the plot
+        self.update_plot()
+
+    def on_plot_key_press(self, event):
+        """Handle key presses on the plot."""
+        if not self.interactive_selection.isChecked():
+            return
+            
+        if event.key == 'r':
+            # Reset velocity limits to default
+            self.vmin_spinbox.setValue(-200)
+            self.vmax_spinbox.setValue(200)
+            self.update_plot()
+        
     def compute_equivalent_width(self):
         """Compute equivalent width using rb_spec's compute_EW method."""
         if not self.controller.has_spectrum():
@@ -167,7 +297,7 @@ class MeasurementPanel(QWidget):
         except Exception as e:
             print(f"Error computing equivalent width: {str(e)}")
             QMessageBox.warning(self, "Error", f"Failed to compute equivalent width: {str(e)}")
-    
+        
     def update_results_table(self, results):
         """Update the results table with the computation results."""
         # Clear existing rows
@@ -204,103 +334,112 @@ class MeasurementPanel(QWidget):
             self.results_table.setItem(i, 1, QTableWidgetItem(str(value)))
     
     def update_plot(self):
-        """Update the preview plot with current data and measurement results."""
+        """Update the preview plot with normalized spectrum and measurement results."""
         if not self.controller.has_spectrum():
             return
         
         try:
-            # Use rb_spec's built-in plot if a measurement has been made and plot option is checked
-            if self.measurement_results is not None and self.plot_checkbox.isChecked():
-                # Clear the existing figure
-                self.canvas.fig.clear()
+            # Get normalized data from controller
+            velocity, flux, error, continuum = self.controller.get_normalized_data()
+            
+            if velocity is None or continuum is None:
+                return
+            
+            # Calculate normalized flux and error
+            norm_flux = flux / continuum
+            norm_error = error / continuum
+            
+            # Clear the existing figure
+            self.canvas.axes.clear()
+            
+            # Plot normalized flux
+            self.canvas.axes.step(velocity, norm_flux, 'k-', where='mid', label='Normalized Flux')
+            self.canvas.axes.step(velocity, norm_error, 'r-', where='mid', alpha=0.5, label='Error')
+            self.canvas.axes.axhline(y=1.0, color='g', linestyle='--', alpha=0.7)
+            self.canvas.axes.set_ylabel('Normalized Flux')
+            self.canvas.axes.set_xlabel('Velocity (km/s)')
+            self.canvas.axes.grid(True, linestyle='--', alpha=0.5)
+            
+            # Get current velocity range from spinboxes
+            vmin = self.vmin_spinbox.value()
+            vmax = self.vmax_spinbox.value()
+            
+            # Highlight the EW measurement region
+            if vmin < vmax:
+                self.canvas.axes.axvspan(vmin, vmax, alpha=0.1, color='blue', label='EW Region')
                 
-                # Get rb_spec's figure for the measurement
-                rb_spec_fig = self.controller.get_measurement_figure()
+                # Add vertical lines at vmin and vmax
+                self.canvas.axes.axvline(x=vmin, color='b', linestyle=':', alpha=0.7)
+                self.canvas.axes.axvline(x=vmax, color='b', linestyle=':', alpha=0.7)
+            
+            # If measurement results exist, add them to the plot
+            if self.measurement_results:
+                # Construct measurement text
+                measurement_text = ""
+                if 'W' in self.measurement_results and 'W_e' in self.measurement_results:
+                    measurement_text += f"EW = {self.measurement_results['W']:.3f} ± {self.measurement_results['W_e']:.3f} Å\n"
+                if 'logN' in self.measurement_results and 'logN_e' in self.measurement_results:
+                    measurement_text += f"log N = {self.measurement_results['logN']:.2f} ± {self.measurement_results['logN_e']:.2f}"
                 
-                if rb_spec_fig:
-                    # Copy the rb_spec figure to our canvas
-                    for i, ax in enumerate(rb_spec_fig.axes):
-                        # Create a new axis in our figure
-                        if i == 0:
-                            new_ax = self.canvas.fig.add_subplot(2, 1, 1)
-                        else:
-                            new_ax = self.canvas.fig.add_subplot(2, 1, 2, sharex=self.canvas.fig.axes[0])
-                        
-                        # Copy the content from rb_spec's figure
-                        for line in ax.lines:
-                            new_ax.plot(line.get_xdata(), line.get_ydata(), 
-                                      color=line.get_color(), linestyle=line.get_linestyle(),
-                                      linewidth=0.5,marker=line.get_marker())
-                        
-                        # Copy axis labels and limits
-                        new_ax.set_xlabel(ax.get_xlabel())
-                        new_ax.set_ylabel(ax.get_ylabel())
-                        new_ax.set_xlim(ax.get_xlim())
-                        new_ax.set_ylim(ax.get_ylim())
-                        
-                        # Add a grid
-                        new_ax.grid(True, linestyle='--', alpha=0.7)
+                if measurement_text:
+                    # Add title with transition name
+                    transition_name = self.measurement_results.get('transition_name', 'Unknown')
+                    title = f"{transition_name}: Equivalent Width Measurement"
                     
-                    # Add title with key measurement results
-                    if 'W' in self.measurement_results and 'W_e' in self.measurement_results:
-                        ew = self.measurement_results['W']
-                        ew_err = self.measurement_results['W_e']
-                        transition = self.measurement_results.get('transition_name', 'Unknown')
-                        
-                        title = f"{transition}: W = {ew:.3f} ± {ew_err:.3f} Å"
-                        
-                        if 'line_saturation' in self.measurement_results and self.measurement_results['line_saturation']:
-                            title += " [SATURATED]"
-                            
-                        self.canvas.fig.suptitle(title)
+                    # Add saturation warning if line is saturated
+                    if self.measurement_results.get('line_saturation', False):
+                        title += " [SATURATED]"
+                    
+                    self.canvas.axes.set_title(title)
+                    
+                    # Add detailed text box
+                    self.canvas.axes.text(0.98, 0.05, measurement_text,
+                                         transform=self.canvas.axes.transAxes,
+                                         horizontalalignment='right',
+                                         verticalalignment='bottom',
+                                         bbox=dict(facecolor='white', alpha=0.7, boxstyle='round'),
+                                         fontsize=10)
+            
+            # Add markers at vmin and vmax if interactive selection is enabled
+            if hasattr(self, 'interactive_selection') and self.interactive_selection.isChecked():
+                # Add circle markers at vmin and vmax with labels
+                self.canvas.axes.plot([vmin], [1.0], 'bo', ms=6, zorder=10)
+                self.canvas.axes.plot([vmax], [1.0], 'bo', ms=6, zorder=10)
                 
-                # Apply tight layout
-                self.canvas.fig.tight_layout()
-                if self.measurement_results:
-                    self.canvas.fig.subplots_adjust(top=0.9)  # Make room for the title
+                # Add labels
+                self.canvas.axes.text(vmin, 1.05, f'vmin: {vmin}', 
+                                     ha='center', va='bottom', fontsize=8, color='blue')
+                self.canvas.axes.text(vmax, 1.05, f'vmax: {vmax}', 
+                                     ha='center', va='bottom', fontsize=8, color='blue')
+            
+            x_limits = self.canvas.axes.get_xlim()
+            y_limits = self.canvas.axes.get_ylim()
+            
+            #self.canvas.fig.subplots_adjust(left=0.10, right=0.95, top=0.92, bottom=0.12)
+
+            
+            # Restore the original axis limits
+            self.canvas.axes.set_xlim(x_limits)
+            self.canvas.axes.set_ylim(y_limits)
+            
+            self.canvas.fig.tight_layout() 
+            # Draw the canvas
+            self.canvas.draw()
+            
+            # Connect interactive events and set focus when interactive selection is enabled
+            if hasattr(self, 'interactive_selection') and self.interactive_selection.isChecked():
+                # First disconnect any existing connections to avoid duplicates
+                if hasattr(self, 'click_cid') and self.click_cid:
+                    self.canvas.mpl_disconnect(self.click_cid)
+                if hasattr(self, 'key_cid') and self.key_cid:
+                    self.canvas.mpl_disconnect(self.key_cid)
+                    
+                # Connect the events
+                self.click_cid = self.canvas.mpl_connect('button_press_event', self.on_plot_click)
+                self.key_cid = self.canvas.mpl_connect('key_press_event', self.on_plot_key_press)
                 
-                # Redraw
-                self.canvas.draw()
-            else:
-                # If no measurement, or plot option unchecked, just show the normalized spectrum
-                velocity = None
-                norm_flux = None
-                norm_error = None
-                
-                if self.controller.has_continuum():
-                    velocity, flux, error, continuum = self.controller.get_normalized_data()
-                    if velocity is not None:
-                        norm_flux = flux / continuum
-                        norm_error = error / continuum
-                
-                if velocity is not None and norm_flux is not None:
-                    # Clear the plot
-                    self.canvas.axes.clear()
-                    
-                    # Plot normalized data
-                    self.canvas.axes.step(velocity, norm_flux, 'k-', where='mid', label='Normalized Flux')
-                    self.canvas.axes.step(velocity, norm_error, 'r-', where='mid', alpha=0.5, label='Error')
-                    
-                    # Add a horizontal line at y=1
-                    self.canvas.axes.axhline(y=1.0, color='g', linestyle='--', alpha=0.7)
-                    
-                    # Plot velocity range if it's been set
-                    vmin = self.vmin_spinbox.value()
-                    vmax = self.vmax_spinbox.value()
-                    
-                    if vmin < vmax:
-                        self.canvas.axes.axvline(x=vmin, color='b', linestyle=':', alpha=0.7)
-                        self.canvas.axes.axvline(x=vmax, color='b', linestyle=':', alpha=0.7)
-                        self.canvas.axes.axvspan(vmin, vmax, alpha=0.1, color='blue')
-                    
-                    # Labels and title
-                    self.canvas.axes.set_xlabel('Velocity (km/s)')
-                    self.canvas.axes.set_ylabel('Normalized Flux')
-                    self.canvas.axes.set_title('Normalized Spectrum')
-                    #self.canvas.axes.legend()
-                    
-                    # Redraw
-                    self.canvas.fig.tight_layout()
-                    self.canvas.draw()
+                # Set focus to the canvas so it can receive keyboard events
+                self.canvas.setFocus()
+            
         except Exception as e:
-            print(f"Error updating measurement plot: {str(e)}")
+            print(f"Error updating measurement plot: {str(e)}")    

@@ -47,17 +47,23 @@ class ContinuumPanel(QWidget):
         self.skip_continuum = QCheckBox("Skip continuum fitting (use flat continuum)")
         self.skip_continuum.setChecked(False)
         self.skip_continuum.toggled.connect(self.toggle_skip_continuum)
+        self.skip_continuum.setToolTip("Skip continuum fitting and use a flat continuum instead")
+
         launch_layout.addWidget(self.skip_continuum)
         
         # Launch interactive fitter button
         self.launch_btn = QPushButton("Launch Interactive Continuum Fitter")
         self.launch_btn.clicked.connect(self.launch_fitter)
+        self.launch_btn.setToolTip("Open the interactive tool to fit a continuum to the spectrum")
+
         launch_layout.addWidget(self.launch_btn)
         
         # Apply flat continuum button
         self.flat_btn = QPushButton("Apply Flat Continuum")
         self.flat_btn.clicked.connect(self.apply_flat_continuum)
         self.flat_btn.setEnabled(False)  # Initially disabled
+        self.flat_btn.setToolTip("Use a flat line at value 1.0 as the continuum (skips fitting)")
+
         launch_layout.addWidget(self.flat_btn)
         
         # Status label

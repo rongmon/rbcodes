@@ -126,23 +126,47 @@ class RbSpecGUI(QMainWindow):
             self.statusBar().showMessage("Failed to load spectrum.")
             QMessageBox.warning(self, "Load Error", "Failed to load spectrum. Check console for details.")
     
-    
     def on_redshift_applied(self, redshift):
         """Handle redshift applied signal."""
-        self.statusBar().showMessage(f"Redshift z = {redshift} applied successfully.")
-        # Enable the transition tab
-        self.tabs.setTabEnabled(2, True)
-        # Switch to the transition tab
-        self.tabs.setCurrentIndex(2)
+        if redshift == -99999:  # Special value indicating reset
+            # Reset downstream tabs
+            self.statusBar().showMessage("Redshift has been reset. Select a new redshift.")
+            self.tabs.setTabEnabled(2, False)  # Disable transition tab
+            self.tabs.setTabEnabled(3, False)  # Disable continuum tab
+            self.tabs.setTabEnabled(4, False)  # Disable measurement tab
+            self.tabs.setTabEnabled(5, False)  # Disable output tab
+            
+            # Reset controller state
+            self.controller.reset_after_redshift()
+        else:
+            # Original code for normal redshift application
+            self.statusBar().showMessage(f"Redshift z = {redshift} applied successfully.")
+            # Enable the transition tab
+            self.tabs.setTabEnabled(2, True)
+            # Switch to the transition tab
+            self.tabs.setCurrentIndex(2)
+    
+
 
     def on_spectrum_sliced(self, transition, vmin, vmax):
         """Handle spectrum sliced signal."""
-        self.statusBar().showMessage(f"Spectrum sliced around {transition:.2f} Å")
-        # Enable the continuum tab
-        self.tabs.setTabEnabled(3, True)
-        # Switch to the continuum tab
-        self.tabs.setCurrentIndex(3)
-
+        if transition == -99999:  # Special value indicating reset
+            # Reset downstream tabs
+            self.statusBar().showMessage("Transition has been reset. Select a new transition.")
+            self.tabs.setTabEnabled(3, False)  # Disable continuum tab
+            self.tabs.setTabEnabled(4, False)  # Disable measurement tab
+            self.tabs.setTabEnabled(5, False)  # Disable output tab
+            
+            # Reset controller state
+            self.controller.reset_after_transition()
+        else:
+            # Original code for normal transition slicing
+            self.statusBar().showMessage(f"Spectrum sliced around {transition:.2f} Å")
+            # Enable the continuum tab
+            self.tabs.setTabEnabled(3, True)
+            # Switch to the continuum tab
+            self.tabs.setCurrentIndex(3)
+            
     def on_continuum_fitted(self, success):
         """Handle continuum fitted signal."""
         if success:
@@ -162,6 +186,10 @@ class RbSpecGUI(QMainWindow):
             self.tabs.setTabEnabled(5, True)
             # Switch to the output tab
             self.tabs.setCurrentIndex(5)
+
+
+
+    
     
 if __name__ == "__main__":
     app = QApplication(sys.argv)
