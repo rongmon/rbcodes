@@ -68,23 +68,25 @@ pip install -e .  # This requires a setup.py file in the package #COMING SOON.
 ## Contents
 
 ### Graphical User Interfaces (GUIs)
-1. [rb_spec.py](/docs/GUIs/rb_spec/rb_spec.md): Comprehensive absorption line analysis pipeline
+
+#### Active Tools
+1. [multispecviewer](/docs/GUIs/multispec/multispec.md): Enhanced spectrum viewer for handling multiple 1D spectra simultaneously with advanced line identification and absorber cataloging capabilities.
+2. [rb_spec.py](/docs/GUIs/rb_spec/rb_spec.md): Comprehensive absorption line analysis pipeline
    - Continuum fitting
    - Equivalent width/column density measurements
    - Simple Voigt profile fitting
-2. [rb_specgui](/docs/GUIs/rb_specgui/rb_specgui.md): Advanced 1D spectrum viewer and line identifier
-3. [multispecviewer](/docs/GUIs/multispec/multispec.md): 🛠️: Improved rb_specgui to handle multiple 1D spectra simultaneously. **WARNING: This tool is under active development and may undergo significant changes. Use with caution in production environments. Features and interfaces may change without prior notice. Consider backing up your data and analysis before using this tool.**
-
+3. [launch_specgui.py](/docs/GUIs/rb_spec/launch_specgui.md): An interactive GUI wrapper for rb_spec pipeline.
 4. [AbsTools](/docs/GUIs/AbsTools/README.md): Complex absorption line analysis GUI
 5. [Tutorial for zgui/main.py (PDF)](/docs/GUIs/zgui/Tutorial_for_Emission_Line_Redshift_Estimator_GUI.pdf): Redshift measurement GUI for galaxies
    - Supports 1D and 2D spectra
    - Optimized for JWST NIRCam/Grism spectroscopy
-
 6. [LLSFitter_GUI.py](/docs/GUIs/LLSFitter/LLSFitter.md): A Simple GUI to fit Lyman Limit System column densities.
 7. [rb_cont.py](/docs/GUIs/rb_cont.md): Simple interactive continuum fitter
-8. [rb_interactive_vpfit_singlet.py](/docs/GUIs/rb_interactive_vpfit_singlet.md): Interactive Voigt profile     fitter
-9. [rb_plot_spec.py](/docs/GUIs/rb_plot_spec.md): Spectrum plotting and analysis tool ⚠️ **DEPRECATED**
+8. [rb_interactive_vpfit_singlet.py](/docs/GUIs/rb_interactive_vpfit_singlet.md): Interactive Voigt profile fitter
 
+#### Deprecated Tools
+9. [rb_specgui](/docs/GUIs/rb_specgui/rb_specgui.md): ⚠️ **DEPRECATED** - Advanced 1D spectrum viewer and line identifier (Superseded by multispecviewer)
+10. [rb_plot_spec.py](/docs/GUIs/rb_plot_spec.md): ⚠️ **DEPRECATED** - Spectrum plotting and analysis tool
 
 ### Intergalactic Medium (IGM) Tools
 
