@@ -81,6 +81,11 @@ class InputPanel(QWidget):
         if filetype == "json" or (filetype is None and filename.lower().endswith('.json')):
             success, has_redshift, has_transition = self.controller.load_from_json(filename)
             self.spectrum_loaded.emit(success, has_redshift, has_transition)
+        elif filetype is None and filename.lower().endswith('.fits'):
+            # Use 'linetools' as the default filetype for FITS files
+            filetype = 'linetools'
+            success, _, _ = self.controller.load_from_file(filename, filetype)
+            self.spectrum_loaded.emit(success, False, False)
         else:
             success, _, _ = self.controller.load_from_file(filename, filetype)
-            self.spectrum_loaded.emit(success, False, False)  # Regular file - no redshift or transition info    
+            self.spectrum_loaded.emit(success, False, False)

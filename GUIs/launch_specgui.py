@@ -56,11 +56,14 @@ def launch():
             # Use Qt's timer to load the file after the UI is fully initialized
             from PyQt5.QtCore import QTimer
             
+            
             def load_file():
-                filetype = args.filetype if args.filetype else None
-                window.controller.load_from_file(args.filename, filetype)
-                window.input_panel.file_path.setText(args.filename)
-                
+                # If filetype is not specified and it's a FITS file, use 'linetools' as default
+                if args.filetype is None and args.filename.lower().endswith('.fits'):
+                    filetype = 'linetools'
+                else:
+                    filetype = args.filetype
+            
                 # If the file is JSON, properly update the UI state through the input panel
                 if args.filename.lower().endswith('.json'):
                     success, has_redshift, has_transition = window.controller.load_from_json(args.filename)
@@ -68,7 +71,11 @@ def launch():
                 else:
                     success, _, _ = window.controller.load_from_file(args.filename, filetype)
                     window.input_panel.spectrum_loaded.emit(success, False, False)
-            
+                
+                # Update the file path text field
+                window.input_panel.file_path.setText(args.filename)
+
+
             # Schedule file loading after GUI is displayed
             QTimer.singleShot(100, load_file)
     
