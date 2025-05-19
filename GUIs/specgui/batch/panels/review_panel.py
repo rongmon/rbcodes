@@ -439,34 +439,262 @@ class ReviewPanel(QWidget):
                 if parent.tabText(i) == "Processing":
                     parent.setCurrentIndex(i)
                     break
-    
+
     def edit_continuum(self):
         """Launch the interactive continuum editor for the selected item."""
         if not self.selected_item:
             return
         
-        # This would typically launch the interactive continuum fitter
-        # In a real implementation, you would:
-        # 1. Get the rb_spec object from the selected item
-        # 2. Call the interactive continuum fitting method
-        # 3. Update the results when done
+        # Get the rb_spec object
+        spec_object = self.selected_item.get('spec_object')
         
-        QMessageBox.information(
-            self, "Not Implemented", 
-            "Interactive continuum editing will be implemented in a future version."
-        )
+        if not spec_object or not hasattr(spec_object, 'velo'):
+            QMessageBox.warning(
+                self, "Cannot Edit", 
+                "Cannot edit continuum: the spectrum data is not available."
+            )
+            return
+        
+        try:
+            # Launch the interactive continuum fitter
+            from rbcodes.GUIs.interactive_continuum_fit import launch_interactive_continuum_fit_dialog
+            
+            # Prepare input parameters
+            input_params = {
+                'wave': spec_object.wave_slice,
+                'flux': spec_object.flux_slice,
+                'error': spec_object.error_slice,
+                'velocity': spec_object.velo,
+                'existing_masks': getattr(spec_object, 'continuum_masks', []),
+                'order': 3,  # Default order, could be improved
+                'use_weights': False,
+                'domain': [min(spec_object.velo), max(spec_object.velo)]
+            }
+            
+            # Launch the interactive GUI
+            result = launch_interactive_continuum_fit_dialog(**input_params)
+            
+            # Check if fitting was cancelled
+            if result is None or result.get('cancelled', True):
+                QMessageBox.information(
+                    self, "Cancelled", 
+                    "Continuum fitting was cancelled. No changes made."
+                )
+                return
+            
+            # Update the rb_spec object with the new continuum
+            spec_object.cont = result.get('continuum')
+            spec_object.fnorm = spec_object.flux_slice / spec_object.cont
+            spec_object.enorm = spec_object.error_slice / spec_object.cont
+            
+            # Store mask information if available
+            if 'masks' in result:
+                spec_object.continuum_masks = result.get('masks', [])
+            
+            # Re-compute EW with the new continuum
+            spec_object.compute_EW(
+                spec_object.transition,
+                vmin=spec_object.vmin,
+                vmax=spec_object.vmax,
+                SNR=getattr(spec_object, 'SNR', 0) > 0,  # Use SNR if previously calculated
+                _binsize=3  # Could be from settings
+            )
+            
+            # Update the selected item with new EW values
+            self.selected_item['W'] = spec_object.W
+            self.selected_item['W_e'] = spec_object.W_e
+            self.selected_item['logN'] = spec_object.logN
+            self.selected_item['logN_e'] = spec_object.logN_e
+            if hasattr(spec_object, 'SNR'):
+                self.selected_item['SNR'] = spec_object.SNR
+            
+            # Update the plot and details
+            self.update_preview()
+            
+            # Update the results table row
+            row = -1
+            for i in range(self.results_table.rowCount()):
+                if self.results_table.item(i, 1).text() == os.path.basename(self.selected_item.get('filename', '')) and \
+                   float(self.results_table.item(i, 2).text()) == self.selected_item.get('redshift', 0):
+                    row = i
+                    break
+            
+            if row >= 0:
+                # Update EW cell
+                ew_text = f"{self.selected_item['W']:.3f} ± {self.selected_item['W_e']:.3f}"
+                self.results_table.setItem(row, 5, QTableWidgetItem(ew_text))
+                
+                # Update logN cell
+                logn_text = f"{self.selected_item['logN']:.2f} ± {self.selected_item['logN_e']:.2f}"
+                self.results_table.setItem(row, 6, QTableWidgetItem(logn_text))
+            
+            QMessageBox.information(
+                self, "Continuum Updated", 
+                "Continuum has been updated and measurements recalculated."
+            )
+            
+        except Exception as e:
+            QMessageBox.warning(
+                self, "Error", 
+                f"Error during continuum editing: {str(e)}"
+            )
+            import traceback
+            traceback.print_exc()
     
     def edit_ew_range(self):
         """Launch the EW range editor for the selected item."""
         if not self.selected_item:
             return
         
-        # This would typically launch a dialog to edit the EW range
-        # In a real implementation, you would:
-        # 1. Get the current vmin/vmax from the selected item
-        # 2. Show a dialog to edit these values
-        # 3. Update the item with new values
-        # 4. Recompute EW measurements
+        # Get the rb_spec object
+        spec_object = self.selected_item.get('spec_object')
+        
+        if not spec_object or not hasattr(spec_object, 'velo'):
+            QMessageBox.warning(
+                self, "Cannot Edit", 
+                "Cannot edit EW range: the spectrum data is not available."
+            )
+            return
+        
+        try:
+            # Create a dialog to edit the velocity range
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Edit EW Measurement Range")
+            layout = QVBoxLayout(dialog)
+            
+            # Get current values
+            vmin = spec_object.vmin if hasattr(spec_object, 'vmin') else     self.selected_item.get('vmin', -200)
+            vmax = spec_object.vmax if hasattr(spec_object, 'vmax') else     self.selected_item.get('vmax', 200)
+            
+            # Form for velocity range
+            form = QFormLayout()
+            
+            # Velocity min/max inputs
+            vmin_spin = QSpinBox()
+            vmin_spin.setRange(-5000, 0)
+            vmin_spin.setValue(vmin)
+            vmin_spin.setSingleStep(10)
+            
+            vmax_spin = QSpinBox()
+            vmax_spin.setRange(0, 5000)
+            vmax_spin.setValue(vmax)
+            vmax_spin.setSingleStep(10)
+            
+            form.addRow("Velocity Min (km/s):", vmin_spin)
+            form.addRow("Velocity Max (km/s):", vmax_spin)
+            
+            # SNR calculation option
+            snr_check = QCheckBox("Calculate SNR")
+            snr_check.setChecked(getattr(spec_object, 'SNR', 0) > 0)
+            
+            binsize_spin = QSpinBox()
+            binsize_spin.setRange(1, 10)
+            binsize_spin.setValue(3)
+            binsize_spin.setEnabled(snr_check.isChecked())
+            
+            snr_check.toggled.connect(binsize_spin.setEnabled)
+            
+            snr_layout = QHBoxLayout()
+            snr_layout.addWidget(snr_check)
+            snr_layout.addWidget(QLabel("Bin Size:"))
+            snr_layout.addWidget(binsize_spin)
+            
+            form.addRow("", snr_layout)
+            
+            layout.addLayout(form)
+            
+            # Add a small preview plot
+            preview_label = QLabel("Current measurement range:")
+            layout.addWidget(preview_label)
+            
+            canvas = MatplotlibCanvas(dialog, width=4, height=3, dpi=100)
+            canvas.axes.step(spec_object.velo, spec_object.fnorm, 'k-', where='mid')
+            canvas.axes.axhline(y=1.0, color='r', linestyle='--', alpha=0.7)
+            canvas.axes.axvspan(vmin, vmax, alpha=0.2, color='blue')
+            canvas.axes.set_xlabel('Velocity (km/s)')
+            canvas.axes.set_ylabel('Normalized Flux')
+            
+            # Function to update the preview plot
+            def update_preview():
+                canvas.axes.clear()
+                canvas.axes.step(spec_object.velo, spec_object.fnorm, 'k-',     where='mid')
+                canvas.axes.axhline(y=1.0, color='r', linestyle='--', alpha=0.7)
+                canvas.axes.axvspan(vmin_spin.value(), vmax_spin.value(), alpha=0.2,     color='blue')
+                canvas.axes.set_xlabel('Velocity (km/s)')
+                canvas.axes.set_ylabel('Normalized Flux')
+                canvas.draw()
+            
+            # Connect value changes to update preview
+            vmin_spin.valueChanged.connect(update_preview)
+            vmax_spin.valueChanged.connect(update_preview)
+            
+            layout.addWidget(canvas)
+            
+            # Add buttons
+            button_box = QDialogButtonBox(QDialogButtonBox.Ok |     QDialogButtonBox.Cancel)
+            button_box.accepted.connect(dialog.accept)
+            button_box.rejected.connect(dialog.reject)
+            layout.addWidget(button_box)
+            
+            # Show dialog
+            if dialog.exec_() == QDialog.Accepted:
+                # Get new values
+                new_vmin = vmin_spin.value()
+                new_vmax = vmax_spin.value()
+                calculate_snr = snr_check.isChecked()
+                binsize = binsize_spin.value()
+                
+                # Re-compute EW with the new velocity range
+                spec_object.compute_EW(
+                    spec_object.transition,
+                    vmin=new_vmin,
+                    vmax=new_vmax,
+                    SNR=calculate_snr,
+                    _binsize=binsize
+                )
+                
+                # Update the selected item with new values
+                self.selected_item['vmin'] = new_vmin
+                self.selected_item['vmax'] = new_vmax
+                self.selected_item['W'] = spec_object.W
+                self.selected_item['W_e'] = spec_object.W_e
+                self.selected_item['logN'] = spec_object.logN
+                self.selected_item['logN_e'] = spec_object.logN_e
+                if hasattr(spec_object, 'SNR'):
+                    self.selected_item['SNR'] = spec_object.SNR
+                
+                # Update the plot and details
+                self.update_preview()
+                
+                # Update the results table row
+                row = -1
+                for i in range(self.results_table.rowCount()):
+                    if self.results_table.item(i, 1).text() == os.path.basename(    self.selected_item.get('filename', '')) and \
+                       float(self.results_table.item(i, 2).text()) ==     self.selected_item.get('redshift', 0):
+                        row = i
+                        break
+                
+                if row >= 0:
+                    # Update EW cell
+                    ew_text = f"{self.selected_item['W']:.3f} ±     {self.selected_item['W_e']:.3f}"
+                    self.results_table.setItem(row, 5, QTableWidgetItem(ew_text))
+                    
+                    # Update logN cell
+                    logn_text = f"{self.selected_item['logN']:.2f} ±     {self.selected_item['logN_e']:.2f}"
+                    self.results_table.setItem(row, 6, QTableWidgetItem(logn_text))
+                
+                QMessageBox.information(
+                    self, "EW Range Updated", 
+                    "EW measurement range has been updated and measurements     recalculated."
+                )
+                
+        except Exception as e:
+            QMessageBox.warning(
+                self, "Error", 
+                f"Error during EW range editing: {str(e)}"
+            )
+            import traceback
+            traceback.print_exc()    
         
         QMessageBox.information(
             self, "Not Implemented", 
