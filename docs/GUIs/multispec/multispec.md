@@ -1,10 +1,6 @@
-# MultispecViewer
+# MultispecViewer v1.0.0
 
 A tool for visualizing and analyzing multiple spectroscopic datasets simultaneously.
-
-⚠️ **WARNING: UNDER ACTIVE DEVELOPMENT** ⚠️
-
-This tool is still in development. Features and interfaces are subject to change, particularly in the non-classic version. The classic version provides stable functionality while new features are being integrated into the main version.
 
 ## Overview
 
@@ -44,14 +40,45 @@ multispec
 ### Command Line Options
 
 ```
-usage: rb_multispec.py [-h] [-c] [-v]
+usage: rb_multispec.py [-h] [-c] [-v] [-e] [filenames [filenames ...]]
 
 rb_multispec - A tool for visualizing spectral data
 
+positional arguments:
+  filenames          FITS files to load automatically on startup
+
 optional arguments:
-  -h, --help      show this help message and exit
-  -c, --classic   Run the classic version of multispecviewer
-  -v, --version   Display version information
+  -h, --help         show this help message and exit
+  -c, --classic      Run the classic version of multispecviewer
+  -v, --version      Display version information
+  -e, --examples     Display detailed usage examples
+```
+
+### Loading Files from Command Line
+
+You can now load FITS files directly from the command line:
+
+```bash
+# Load a single file
+multispec file.fits
+
+# Load multiple files
+multispec file1.fits file2.fits
+
+# Use wildcards
+multispec *.fits
+
+# Specify full paths
+multispec /path/to/data/file.fits
+
+# Mix files from different directories
+multispec dir1/file1.fits dir2/file2.fits
+```
+
+Use the `-e` or `--examples` flag to see more detailed usage examples:
+
+```bash
+multispec --examples
 ```
 
 ## Features
@@ -72,10 +99,16 @@ The MultispecViewer interface consists of several components:
 
 ### Loading Data
 
-1. Click the "Select FITS Files" button
-2. Navigate to and select one or more FITS format spectral files
-3. The spectra will be loaded and displayed in the main plotting area
+You can load data in two ways:
 
+1. **Command Line**: Specify FITS files when launching the application:
+   ```bash
+   multispec file1.fits file2.fits
+   ```
+
+2. **GUI**: Click the "Select FITS Files" button, then navigate to and select one or more FITS format spectral files.
+
+The spectra will be loaded and displayed in the main plotting area.
 
 ### Navigation Controls
 
@@ -175,7 +208,8 @@ The new version includes several action buttons:
 Here's a typical workflow for identifying and cataloging an absorber:
 
 1. **Load spectral data**:
-   - Click "Select FITS Files" and choose your FITS files
+   - Use command line: `multispec file1.fits file2.fits`
+   - Or click "Select FITS Files" and choose your FITS files
    - The spectra will be displayed in the main window
 
 
@@ -295,6 +329,13 @@ print(f"Identified {len(absorber_systems)} distinct absorber systems")
 
 ## Tips and Best Practices
 
+### Command Line Usage
+
+- Use wildcards to load multiple files: `multispec *.fits`
+- For files with spaces in names, use quotes: `multispec "My Data/file.fits"`
+- Run classic mode with files: `multispec -c file1.fits file2.fits`
+- View detailed examples: `multispec --examples`
+
 ### Keyboard Navigation
 
 - Use the keyboard navigation keys (`x`, `X`, `t`, `b`) for precise control of the display
@@ -330,6 +371,20 @@ print(f"Identified {len(absorber_systems)} distinct absorber systems")
 - When loading data, you can choose to append to or overwrite existing data
 - Use consistent file naming conventions for your saved data
 
+## Version Information
+
+MultispecViewer follows semantic versioning (MAJOR.MINOR.PATCH):
+
+- MAJOR version changes indicate incompatible API changes
+- MINOR version changes add functionality in a backward-compatible manner
+- PATCH version changes make backward-compatible bug fixes
+
+You can check the current version by running:
+
+```bash
+multispec --version
+```
+
 ## Development
 
 MultispecViewer is part of the rbcodes package for spectroscopic analysis. It utilizes:
@@ -342,7 +397,7 @@ MultispecViewer is part of the rbcodes package for spectroscopic analysis. It ut
 
 ### Common Issues
 
-- **No files selected**: Ensure you've clicked "Select FITS Files" and chosen valid FITS files
+- **No files selected**: Ensure you've clicked "Select FITS Files" and chosen valid FITS files or specified files on the command line
 - **No error spectrum**: If no error spectrum is found, the program will assume 5% of flux values
 - **No lines visible after applying redshift**: Check that the selected line list contains lines within your wavelength range
 - **vStack not launching**: Ensure you have a redshift and line list selected before pressing `v` or `V`
