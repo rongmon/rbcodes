@@ -1205,10 +1205,37 @@ class InteractiveContinuumFitWindow(QMainWindow):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 robust_std = mad_std(residual, ignore_nan=True)
+
     
             # Step 4: Identify potential masked points
             potential_masks = (np.abs(residual) > sigma * robust_std) | \
                               (self.error / prelim_continuum > error_threshold)
+
+            # Try wavelet method
+            #from rbcodes.IGM.find_line_features_wavelet import find_spectral_lines_wavelet, create_feature_mask 
+            #try:
+            #    # Apply wavelet line finder to normalized residuals
+            #    results = find_spectral_lines_wavelet(x_data, residual,
+            #    line_type='absorption', 
+            #    min_snr=sigma,
+            #    min_scale=1,
+            #    max_scale=5,
+            #    num_scales=15,
+            #    fit_lines=True,
+            #    edge_buffer=10
+            #)
+            #   
+            #    # Create a boolean mask (True = keep, False = mask out)
+            #    wavelet_mask = create_feature_mask(x_data, results, width_scale_factor=5.0)
+            #    #potential_masks = ~wavelet_mask  # invert because we want to mask the detected lines
+            #    potential_masks = (( ~wavelet_mask) |
+            #        (np.abs(residual) > sigma * robust_std) |(self.error / prelim_continuum > error_threshold)
+            #        )
+            #except Exception as e:
+            #    self.statusBar.showMessage(f"Wavelet-based detection failed: {str(e)}. Falling back to MAD.")
+            #    potential_masks = (np.abs(residual) > sigma * robust_std) | \
+            #                    (self.error / prelim_continuum > error_threshold)
+    
     
             # Step 5: Find contiguous mask regions
             mask_regions = []
