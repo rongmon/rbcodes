@@ -5,7 +5,7 @@ import argparse
 import importlib
 
 # Version information
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 def display_examples():
     """Display detailed usage examples for the rb_multispec tool."""
