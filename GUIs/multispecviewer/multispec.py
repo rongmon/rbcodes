@@ -1608,9 +1608,10 @@ class MainWindow(QMainWindow):
             self.message_box.on_sent_message(f"Error showing lines: {str(e)}", "#FF0000")
 
     # Display linelist and edit
+
     def display_line_list(self):
         """
-        Display a table of all identified lines with options to select and delete entries.
+        Display a sortable table of all identified lines with options to select and delete entries.
         """
         try:
             # Check if there's a line_list with identifications
@@ -1630,36 +1631,22 @@ class MainWindow(QMainWindow):
             layout = QVBoxLayout(dialog)
             
             # Add header label with instructions
-            header_label = QLabel("Select lines to delete and click 'Delete Selected' button")
-            #header_label.setStyleSheet("color: #FFFFFF; font-weight: bold;")
+            header_label = QLabel("Select lines to delete and click 'Delete Selected' button. Click column headers to sort.")
             layout.addWidget(header_label)
             
             # Create table
             table = QTableWidget()
-            table.setColumnCount(4)  # Added checkbox column
+            table.setColumnCount(4)  # Checkbox, Name, Wavelength, Redshift
             table.setHorizontalHeaderLabels(['Delete', 'Name', 'Wavelength (Å)', 'Redshift'])
             
-            ## Set table properties
-            #table.setStyleSheet("""
-            #    QTableWidget {
-            #        background-color: #252525;
-            #        color: #F2F2F7;
-            #        gridline-color: #636366;
-            #        border-radius: 6px;
-            #    }
-            #    QTableWidget::item {
-            #        padding: 4px;
-            #    }
-            #    QHeaderView::section {
-            #        background-color: #3A3A3C;
-            #        color: #F2F2F7;
-            #        padding: 6px;
-            #        border: 1px solid #636366;
-            #    }
-            #""")
-
+            # Enable sorting on data columns only (not the checkbox column)
+            table.setSortingEnabled(True)
+            table.horizontalHeader().setSortIndicatorShown(True)
+            
+            # Reset DataFrame indices to ensure clean 0,1,2,3... sequence
+            line_list = self.canvas.line_list.reset_index(drop=True)
+            
             # Add data
-            line_list = self.canvas.line_list
             table.setRowCount(len(line_list))
             
             for i, (idx, row) in enumerate(line_list.iterrows()):
@@ -1670,36 +1657,30 @@ class MainWindow(QMainWindow):
                 checkbox_layout.setAlignment(Qt.AlignCenter)
                 checkbox = QCheckBox()
                 
-                #checkbox.setStyleSheet("""
-                #    QCheckBox {
-                #        background-color: transparent;
-                #    }
-                #    QCheckBox::indicator {
-                #        width: 16px;
-                #        height: 16px;
-                #    }
-                #    QCheckBox::indicator:unchecked {
-                #        background-color: #3A3A3C;
-                #        border: 1px solid #636366;
-                #        border-radius: 3px;
-                #    }
-                #    QCheckBox::indicator:checked {
-                #        background-color: #0A84FF;
-                #        border: 1px solid #0A84FF;
-                #        border-radius: 3px;
-                #    }
-                #""")
-                
                 checkbox_layout.addWidget(checkbox)
                 table.setCellWidget(i, 0, checkbox_widget)
                 
-                # Store the DataFrame index with the checkbox for easier deletion
-                checkbox.setProperty("row_index", idx)
+                # Store data tuple for robust identification (Name, Wave_obs, Zabs, DataFrame_index)
+                data_tuple = (str(row['Name']), float(row['Wave_obs']), float(row['Zabs']), idx)
+                checkbox.setProperty("data_identifier", data_tuple)
                 
-                # Add other data columns
+                # Add other data columns with proper data types for sorting
                 table.setItem(i, 1, QTableWidgetItem(str(row['Name'])))
-                table.setItem(i, 2, QTableWidgetItem(f"{row['Wave_obs']:.2f}"))
-                table.setItem(i, 3, QTableWidgetItem(f"{row['Zabs']:.6f}"))
+                
+                # Create numeric items for proper sorting
+                wavelength_item = QTableWidgetItem()
+                wavelength_item.setData(Qt.DisplayRole, f"{row['Wave_obs']:.2f}")
+                wavelength_item.setData(Qt.UserRole, float(row['Wave_obs']))  # Store numeric value for sorting
+                table.setItem(i, 2, wavelength_item)
+                
+                redshift_item = QTableWidgetItem()
+                redshift_item.setData(Qt.DisplayRole, f"{row['Zabs']:.6f}")
+                redshift_item.setData(Qt.UserRole, float(row['Zabs']))  # Store numeric value for sorting
+                table.setItem(i, 3, redshift_item)
+            
+            # Disable sorting on the checkbox column
+            table.horizontalHeader().setSortIndicator(1, Qt.AscendingOrder)  # Default sort by Name
+            table.horizontalHeaderItem(0).setFlags(table.horizontalHeaderItem(0).flags() & ~Qt.ItemIsEnabled)
             
             # Set column widths
             table.setColumnWidth(0, 60)  # Checkbox column
@@ -1719,22 +1700,28 @@ class MainWindow(QMainWindow):
             select_layout.setContentsMargins(0, 0, 0, 0)
             
             select_all = QCheckBox("Select All")
-            #select_all.setStyleSheet("color: #FFFFFF;")
             select_none = QCheckBox("Deselect All")
-            #select_none.setStyleSheet("color: #FFFFFF;")
             
             select_layout.addWidget(select_all)
             select_layout.addWidget(select_none)
             buttons_layout.addWidget(select_widget)
             
-            # Connect select all/none checkboxes
-            def on_select_all_changed(state):
+            # Function to get all checkboxes from table
+            def get_all_checkboxes():
+                checkboxes = []
                 for i in range(table.rowCount()):
                     checkbox_widget = table.cellWidget(i, 0)
                     if checkbox_widget:
                         checkbox = checkbox_widget.findChild(QCheckBox)
                         if checkbox:
-                            checkbox.setChecked(state == Qt.Checked)
+                            checkboxes.append(checkbox)
+                return checkboxes
+            
+            # Connect select all/none checkboxes
+            def on_select_all_changed(state):
+                checkboxes = get_all_checkboxes()
+                for checkbox in checkboxes:
+                    checkbox.setChecked(state == Qt.Checked)
                 # Uncheck deselect_all if select_all is checked
                 if state == Qt.Checked:
                     select_none.blockSignals(True)
@@ -1743,12 +1730,9 @@ class MainWindow(QMainWindow):
             
             def on_select_none_changed(state):
                 if state == Qt.Checked:
-                    for i in range(table.rowCount()):
-                        checkbox_widget = table.cellWidget(i, 0)
-                        if checkbox_widget:
-                            checkbox = checkbox_widget.findChild(QCheckBox)
-                            if checkbox:
-                                checkbox.setChecked(False)
+                    checkboxes = get_all_checkboxes()
+                    for checkbox in checkboxes:
+                        checkbox.setChecked(False)
                     # Uncheck select_all
                     select_all.blockSignals(True)
                     select_all.setChecked(False)
@@ -1827,40 +1811,60 @@ class MainWindow(QMainWindow):
             
             layout.addLayout(buttons_layout)
             
-            # Function to delete selected lines
+            # Function to delete selected lines using data tuples
             def delete_selected():
-                # Get all checked rows
-                rows_to_delete = []
-                indices_to_delete = []
+                # Get all checked rows and their data identifiers
+                rows_to_delete_data = []
                 
-                for i in range(table.rowCount()):
-                    checkbox_widget = table.cellWidget(i, 0)
-                    if checkbox_widget:
-                        checkbox = checkbox_widget.findChild(QCheckBox)
-                        if checkbox and checkbox.isChecked():
-                            # Get the stored DataFrame index
-                            idx = checkbox.property("row_index")
-                            if idx is not None:
-                                indices_to_delete.append(idx)
-                                rows_to_delete.append(i)
+                checkboxes = get_all_checkboxes()
+                for checkbox in checkboxes:
+                    if checkbox.isChecked():
+                        data_identifier = checkbox.property("data_identifier")
+                        if data_identifier:
+                            rows_to_delete_data.append(data_identifier)
                 
                 # If nothing selected, show message and return
-                if not rows_to_delete:
+                if not rows_to_delete_data:
                     QMessageBox.information(dialog, "No Selection", 
                                           "No lines selected for deletion.", 
                                           QMessageBox.Ok)
                     return
                 
                 # Confirm deletion
-                confirm_msg = f"Delete {len(rows_to_delete)} selected lines? This cannot be undone."
+                confirm_msg = f"Delete {len(rows_to_delete_data)} selected lines? This cannot be undone."
                 reply = QMessageBox.question(dialog, "Confirm Deletion", 
                                             confirm_msg, 
                                             QMessageBox.Yes | QMessageBox.No, 
                                             QMessageBox.No)
                 
                 if reply == QMessageBox.Yes:
-                    # Remove from DataFrame - must convert indices to list to avoid issues
-                    # with changing indices during deletion
+                    # Find matching rows in the current DataFrame and collect indices to delete
+                    indices_to_delete = []
+                    
+                    for data_tuple in rows_to_delete_data:
+                        name, wave_obs, zabs, stored_idx = data_tuple
+                        
+                        # Find rows that match the data (handle potential duplicates)
+                        matching_mask = (
+                            (self.canvas.line_list['Name'] == name) & 
+                            (abs(self.canvas.line_list['Wave_obs'] - wave_obs) < 0.01) &  # Small tolerance for float comparison
+                            (abs(self.canvas.line_list['Zabs'] - zabs) < 1e-6)  # Small tolerance for redshift
+                        )
+                        
+                        matching_indices = self.canvas.line_list[matching_mask].index.tolist()
+                        
+                        if matching_indices:
+                            # If we have the exact stored index and it matches, use it
+                            if stored_idx in matching_indices:
+                                indices_to_delete.append(stored_idx)
+                            else:
+                                # Otherwise, take the first match (handles case where indices changed)
+                                indices_to_delete.append(matching_indices[0])
+                    
+                    # Remove duplicates from indices_to_delete
+                    indices_to_delete = list(set(indices_to_delete))
+                    
+                    # Remove from DataFrame and reset indices
                     self.canvas.line_list = self.canvas.line_list.drop(indices_to_delete).reset_index(drop=True)
                     
                     # If lines are currently displayed, remove them and redraw
@@ -1875,7 +1879,7 @@ class MainWindow(QMainWindow):
                         self.canvas.draw()
                     
                     # Notify success
-                    self.message_box.on_sent_message(f"Deleted {len(rows_to_delete)} lines", "#008000")
+                    self.message_box.on_sent_message(f"Deleted {len(indices_to_delete)} lines", "#008000")
                     
                     # Close dialog
                     dialog.accept()
@@ -1906,7 +1910,306 @@ class MainWindow(QMainWindow):
             dialog.exec_()
             
         except Exception as e:
-            self.message_box.on_sent_message(f"Error displaying line list: {str(e)}", "#FF0000")
+            self.message_box.on_sent_message(f"Error displaying line list: {str(e)}", "#FF0000")    
+
+    #def display_line_list(self):
+    #    """
+    #    Display a table of all identified lines with options to select and delete entries.
+    #    """
+    #    try:
+    #        # Check if there's a line_list with identifications
+    #        if not hasattr(self.canvas, 'line_list') or self.canvas.line_list.empty:
+    #            self.message_box.on_sent_message("No line identifications to display", "#FFA500")
+    #            return
+    #            
+    #        # Create a dialog to show the line list
+    #        from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, 
+    #                                    QPushButton, QHBoxLayout, QCheckBox, QMessageBox,
+    #                                    QHeaderView, QLabel)
+    #        
+    #        dialog = QDialog(self)
+    #        dialog.setWindowTitle("Identified Lines")
+    #        dialog.setMinimumSize(650, 400)
+    #        
+    #        layout = QVBoxLayout(dialog)
+    #        
+    #        # Add header label with instructions
+    #        header_label = QLabel("Select lines to delete and click 'Delete Selected' button")
+    #        #header_label.setStyleSheet("color: #FFFFFF; font-weight: bold;")
+    #        layout.addWidget(header_label)
+    #        
+    #        # Create table
+    #        table = QTableWidget()
+    #        table.setColumnCount(4)  # Added checkbox column
+    #        table.setHorizontalHeaderLabels(['Delete', 'Name', 'Wavelength (Å)', 'Redshift'])
+    #        
+    #        ## Set table properties
+    #        #table.setStyleSheet("""
+    #        #    QTableWidget {
+    #        #        background-color: #252525;
+    #        #        color: #F2F2F7;
+    #        #        gridline-color: #636366;
+    #        #        border-radius: 6px;
+    #        #    }
+    #        #    QTableWidget::item {
+    #        #        padding: 4px;
+    #        #    }
+    #        #    QHeaderView::section {
+    #        #        background-color: #3A3A3C;
+    #        #        color: #F2F2F7;
+    #        #        padding: 6px;
+    #        #        border: 1px solid #636366;
+    #        #    }
+    #        #""")
+    #        # Add data
+    #        line_list = self.canvas.line_list
+    #        table.setRowCount(len(line_list))
+    #        
+    #        for i, (idx, row) in enumerate(line_list.iterrows()):
+    #            # Add checkbox in first column
+    #            checkbox_widget = QWidget()
+    #            checkbox_layout = QHBoxLayout(checkbox_widget)
+    #            checkbox_layout.setContentsMargins(5, 0, 5, 0)
+    #            checkbox_layout.setAlignment(Qt.AlignCenter)
+    #            checkbox = QCheckBox()
+    #            
+    #            #checkbox.setStyleSheet("""
+    #            #    QCheckBox {
+    #            #        background-color: transparent;
+    #            #    }
+    #            #    QCheckBox::indicator {
+    #            #        width: 16px;
+    #            #        height: 16px;
+    #            #    }
+    #            #    QCheckBox::indicator:unchecked {
+    #            #        background-color: #3A3A3C;
+    #            #        border: 1px solid #636366;
+    #            #        border-radius: 3px;
+    #            #    }
+    #            #    QCheckBox::indicator:checked {
+    #            #        background-color: #0A84FF;
+    #            #        border: 1px solid #0A84FF;
+    #            #        border-radius: 3px;
+    #            #    }
+    #            #""")
+    #            
+    #            checkbox_layout.addWidget(checkbox)
+    #            table.setCellWidget(i, 0, checkbox_widget)
+    #            
+    #            # Store the DataFrame index with the checkbox for easier deletion
+    #            checkbox.setProperty("row_index", idx)
+    #            
+    #            # Add other data columns
+    #            table.setItem(i, 1, QTableWidgetItem(str(row['Name'])))
+    #            table.setItem(i, 2, QTableWidgetItem(f"{row['Wave_obs']:.2f}"))
+    #            table.setItem(i, 3, QTableWidgetItem(f"{row['Zabs']:.6f}"))
+    #        
+    #        # Set column widths
+    #        table.setColumnWidth(0, 60)  # Checkbox column
+    #        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)  # Name column
+    #        table.setColumnWidth(2, 120)  # Wavelength column
+    #        table.setColumnWidth(3, 120)  # Redshift column
+    #        
+    #        # Add to layout
+    #        layout.addWidget(table)
+    #        
+    #        # Buttons layout
+    #        buttons_layout = QHBoxLayout()
+    #        
+    #        # Add select all / deselect all checkboxes
+    #        select_widget = QWidget()
+    #        select_layout = QHBoxLayout(select_widget)
+    #        select_layout.setContentsMargins(0, 0, 0, 0)
+    #        
+    #        select_all = QCheckBox("Select All")
+    #        #select_all.setStyleSheet("color: #FFFFFF;")
+    #        select_none = QCheckBox("Deselect All")
+    #        #select_none.setStyleSheet("color: #FFFFFF;")
+    #        
+    #        select_layout.addWidget(select_all)
+    #        select_layout.addWidget(select_none)
+    #        buttons_layout.addWidget(select_widget)
+    #        
+    #        # Connect select all/none checkboxes
+    #        def on_select_all_changed(state):
+    #            for i in range(table.rowCount()):
+    #                checkbox_widget = table.cellWidget(i, 0)
+    #                if checkbox_widget:
+    #                    checkbox = checkbox_widget.findChild(QCheckBox)
+    #                    if checkbox:
+    #                        checkbox.setChecked(state == Qt.Checked)
+    #            # Uncheck deselect_all if select_all is checked
+    #            if state == Qt.Checked:
+    #                select_none.blockSignals(True)
+    #                select_none.setChecked(False)
+    #                select_none.blockSignals(False)
+    #        
+    #        def on_select_none_changed(state):
+    #            if state == Qt.Checked:
+    #                for i in range(table.rowCount()):
+    #                    checkbox_widget = table.cellWidget(i, 0)
+    #                    if checkbox_widget:
+    #                        checkbox = checkbox_widget.findChild(QCheckBox)
+    #                        if checkbox:
+    #                            checkbox.setChecked(False)
+    #                # Uncheck select_all
+    #                select_all.blockSignals(True)
+    #                select_all.setChecked(False)
+    #                select_all.blockSignals(False)
+    #                # Reset deselect_all checkbox
+    #                select_none.blockSignals(True)
+    #                select_none.setChecked(False)
+    #                select_none.blockSignals(False)
+    #        
+    #        select_all.stateChanged.connect(on_select_all_changed)
+    #        select_none.stateChanged.connect(on_select_none_changed)
+    #        
+    #        # Add spacer to push buttons to the right
+    #        buttons_layout.addStretch(1)
+    #        
+    #        # Add delete button
+    #        delete_button = QPushButton("Delete Selected")
+    #        delete_button.setStyleSheet("""
+    #            QPushButton {
+    #                background-color: #FF453A;
+    #                color: white;
+    #                border: none;
+    #                border-radius: 6px;
+    #                padding: 8px 16px;
+    #                font-size: 14px;
+    #            }
+    #            QPushButton:hover {
+    #                background-color: #FF6961;
+    #            }
+    #            QPushButton:pressed {
+    #                background-color: #D91C0D;
+    #            }
+    #        """)
+    #        
+    #        # Add export button
+    #        export_button = QPushButton("Export to CSV")
+    #        export_button.setStyleSheet("""
+    #            QPushButton {
+    #                background-color: #30D158;
+    #                color: white;
+    #                border: none;
+    #                border-radius: 6px;
+    #                padding: 8px 16px;
+    #                font-size: 14px;
+    #            }
+    #            QPushButton:hover {
+    #                background-color: #4CD964;
+    #            }
+    #            QPushButton:pressed {
+    #                background-color: #248A3D;
+    #            }
+    #        """)
+    #        
+    #        # Add close button
+    #        close_button = QPushButton("Close")
+    #        close_button.setStyleSheet("""
+    #            QPushButton {
+    #                background-color: #3A3A3C;
+    #                color: white;
+    #                border: none;
+    #                border-radius: 6px;
+    #                padding: 8px 16px;
+    #                font-size: 14px;
+    #            }
+    #            QPushButton:hover {
+    #                background-color: #48484A;
+    #            }
+    #            QPushButton:pressed {
+    #                background-color: #303032;
+    #            }
+    #        """)
+    #        
+    #        buttons_layout.addWidget(export_button)
+    #        buttons_layout.addWidget(delete_button)
+    #        buttons_layout.addWidget(close_button)
+    #        
+    #        layout.addLayout(buttons_layout)
+    #        
+    #        # Function to delete selected lines
+    #        def delete_selected():
+    #            # Get all checked rows
+    #            rows_to_delete = []
+    #            indices_to_delete = []
+    #            
+    #            for i in range(table.rowCount()):
+    #                checkbox_widget = table.cellWidget(i, 0)
+    #                if checkbox_widget:
+    #                    checkbox = checkbox_widget.findChild(QCheckBox)
+    #                    if checkbox and checkbox.isChecked():
+    #                        # Get the stored DataFrame index
+    #                        idx = checkbox.property("row_index")
+    #                        if idx is not None:
+    #                            indices_to_delete.append(idx)
+    #                            rows_to_delete.append(i)
+    #            
+    #            # If nothing selected, show message and return
+    #            if not rows_to_delete:
+    #                QMessageBox.information(dialog, "No Selection", 
+    #                                      "No lines selected for deletion.", 
+    #                                      QMessageBox.Ok)
+    #                return
+    #            
+    #            # Confirm deletion
+    #            confirm_msg = f"Delete {len(rows_to_delete)} selected lines? This cannot be undone."
+    #            reply = QMessageBox.question(dialog, "Confirm Deletion", 
+    #                                        confirm_msg, 
+    #                                        QMessageBox.Yes | QMessageBox.No, 
+    #                                        QMessageBox.No)
+    #            
+    #            if reply == QMessageBox.Yes:
+    #                # Remove from DataFrame - must convert indices to list to avoid issues
+    #                # with changing indices during deletion
+    #                self.canvas.line_list = self.canvas.line_list.drop(indices_to_delete).reset_index(drop=True)
+    #                
+    #                # If lines are currently displayed, remove them and redraw
+    #                if hasattr(self.canvas, 'line_objects') and self.canvas.line_objects:
+    #                    # Remove all line objects and redraw
+    #                    for line_obj in self.canvas.line_objects:
+    #                        try:
+    #                            line_obj.remove()
+    #                        except Exception:
+    #                            pass
+    #                    self.canvas.line_objects = []
+    #                    self.canvas.draw()
+    #                
+    #                # Notify success
+    #                self.message_box.on_sent_message(f"Deleted {len(rows_to_delete)} lines", "#008000")
+    #                
+    #                # Close dialog
+    #                dialog.accept()
+    #        
+    #        # Function to export to CSV
+    #        def export_csv():
+    #            options = QFileDialog.Options()
+    #            file_path, _ = QFileDialog.getSaveFileName(
+    #                dialog, "Export Line List", "", 
+    #                "CSV Files (*.csv);;All Files (*)", options=options
+    #            )
+    #            
+    #            if file_path:
+    #                # Add .csv extension if not present
+    #                if not file_path.lower().endswith('.csv'):
+    #                    file_path += '.csv'
+    #                
+    #                # Export to CSV
+    #                line_list.to_csv(file_path, index=False)
+    #                self.message_box.on_sent_message(f"Exported line list to: {file_path}", "#008000")
+    #        
+    #        # Connect buttons
+    #        delete_button.clicked.connect(delete_selected)
+    #        export_button.clicked.connect(export_csv)
+    #        close_button.clicked.connect(dialog.reject)
+    #        
+    #        # Show dialog
+    #        dialog.exec_()
+    #        
+    #    except Exception as e:
+    #        self.message_box.on_sent_message(f"Error displaying line list: {str(e)}", "#FF0000")
 
     def handle_convert_clicked(self):
         """
