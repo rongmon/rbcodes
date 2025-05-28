@@ -257,7 +257,6 @@ class vStack:
         event : matplotlib.backend_bases.KeyEvent
             Keyboard event
         """
-        print(f"Key pressed: {event.key}")
         
         # Set up custom y-limit for an individual panel
         if event.key == 'Y':
@@ -444,16 +443,16 @@ class vStack:
             ax.set_title('Page ' + str(self.page) + ' of ' + str(self.npages), color=clr['teal'])
 
         # Plot normalized flux and error
-        ax.step(vel, flux/np.nanmean(flux), where='mid', color=clr['teal'])
-        ax.step(vel, error/np.nanmean(flux), where='mid', color=clr['orange2'])
+        ax.step(vel, flux/np.nanmean(flux), where='mid', color=clr['teal'],lw=0.5)
+        ax.step(vel, error/np.nanmean(flux), where='mid', color=clr['orange2'],lw=0.5)
         
         # Add reference lines
         ax.axhline(1, color=clr['light_gray'], linestyle='dotted')
         ax.axvline(0, color=clr['light_gray'], linestyle='dotted')
         
         # Add transition name and oscillator strength
-        ax.text(x=0.05, y=0.815, s=name, fontsize=10, transform=ax.transAxes, color=clr['red'])
-        ax.text(x=0.75, y=0.815, s='f0: '+str(f0), fontsize=10, transform=ax.transAxes, color=clr['red'])
+        ax.text(x=0.05, y=0.815, s=name, fontsize=8, transform=ax.transAxes, color=clr['red'])
+        ax.text(x=0.75, y=0.815, s='f0: '+str(f0), fontsize=8, transform=ax.transAxes, color=clr['red'])
         
         # Add custom comment if provided
         if comment != False:
@@ -480,6 +479,36 @@ class vStack:
                 textcolor = clr['light_gray']
 
             ax.text(x=0.05, y=0.01, s=textout, fontsize=12, transform=ax.transAxes, color=textcolor)
+
+        # Calculate grid position
+        panel_in_page = i % self.plotppage  # Position within current page (0-11)
+        row = panel_in_page // self.ncol    # Which row (0-3)
+        col = panel_in_page % self.ncol     # Which column (0-2)
+        
+        # Determine if this is the bottom-most panel in its column
+        is_bottom_in_column = True
+        for check_i in range(i + 1, min(i + (self.nrow - row) * self.ncol, self.nions)):
+            check_panel = check_i % self.plotppage
+            check_col = check_panel % self.ncol
+            if check_col == col:  # Same column, but lower row exists
+                is_bottom_in_column = False
+                break
+        
+        # Set x-axis labels and ticks
+        if is_bottom_in_column:
+            # Show x-tick labels and add x-label
+            ax.tick_params(axis='x', labelbottom=True)
+            ax.set_xlabel('Velocity [km/s]', fontsize=12)
+        else:
+            # Hide x-tick labels
+            ax.tick_params(axis='x', labelbottom=False)
+        
+        # Set y-axis label for leftmost column
+        if col == 0:  # First column
+            ax.set_ylabel('Flux', fontsize=12)
+        else:
+            ax.set_ylabel('')  # Clear any existing y-label
+
     
     def plotText(self, flag=1):
         """

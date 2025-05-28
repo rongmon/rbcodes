@@ -4,6 +4,14 @@ All notable changes to MultispecViewer will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.1] - 2025-05-28
+
+### Fixed
+- Improved vStack panel layout with proper axis labeling
+- X-axis labels now only appear on bottom-most panels in each column
+- Y-axis labels only appear on left-most panels
+- Eliminated overlapping velocity labels between panels
+
 ## [1.1.0] - 2025-05-28
 
 ### Added

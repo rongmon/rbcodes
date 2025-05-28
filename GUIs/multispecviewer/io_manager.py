@@ -8,6 +8,11 @@ import platform
 import getpass
 import traceback
 from pathlib import Path
+try:
+    from .rb_multispec import __version__
+except ImportError:
+    # Fallback if import fails
+    __version__ = "1.1.1"
 
 class IOManager:
     """
@@ -16,6 +21,7 @@ class IOManager:
     JSON for combined data, and traditional text/CSV formats for backward compatibility.
     """
     _instance = None
+
     
     def __new__(cls):
         """Ensure only one instance of IOManager exists (singleton pattern)"""
@@ -35,7 +41,7 @@ class IOManager:
         }
         
         # Version info for file formats
-        self.current_version = "1.0.0"
+        self.current_version = __version__  # Use imported version
         
         # Reference to message box (to be set by MainWindow)
         self.message_box = None

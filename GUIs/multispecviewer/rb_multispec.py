@@ -3,9 +3,10 @@ import sys
 import os
 import argparse
 import importlib
+from rbcodes.GUIs.multispecviewer.io_manager import IOManager
 
 # Version information
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 def display_examples():
     """Display detailed usage examples for the rb_multispec tool."""
