@@ -1,0 +1,207 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "created": "2025-05-27T15:51:14.408443",
+    "description": "",
+    "software_version": "1.0"
+  },
+  "template": {
+    "version": "1.0",
+    "description": "",
+    "items": [
+      {
+        "filename": "/Users/bordoloi/WORK/python/rbcodes/example-data/test.fits",
+        "redshift": 0.0,
+        "transition": 1550.78,
+        "transition_name": "CIV",
+        "slice_vmin": -1500,
+        "slice_vmax": 1500,
+        "ew_vmin": -94,
+        "ew_vmax": 138,
+        "linelist": "atom",
+        "method": "closest"
+      },
+      {
+        "filename": "/Users/bordoloi/WORK/python/rbcodes/example-data/test.fits",
+        "redshift": 0.0,
+        "transition": 1548.2,
+        "transition_name": "CIV",
+        "slice_vmin": -1500,
+        "slice_vmax": 1500,
+        "ew_vmin": -200,
+        "ew_vmax": 200,
+        "linelist": "atom",
+        "method": "closest"
+      },
+      {
+        "filename": "/Users/bordoloi/WORK/python/rbcodes/example-data/test.fits",
+        "redshift": 0.0,
+        "transition": 1393.76,
+        "transition_name": "SiIV",
+        "slice_vmin": -1500,
+        "slice_vmax": 1500,
+        "ew_vmin": -200,
+        "ew_vmax": 200,
+        "linelist": "atom",
+        "method": "closest"
+      },
+      {
+        "filename": "/Users/bordoloi/WORK/python/rbcodes/example-data/test.fits",
+        "redshift": 0.0,
+        "transition": 1402.77,
+        "transition_name": "SiIV",
+        "slice_vmin": -1500,
+        "slice_vmax": 1500,
+        "ew_vmin": -96,
+        "ew_vmax": 83,
+        "linelist": "atom",
+        "method": "closest"
+      }
+    ]
+  },
+  "analysis": {
+    "created": "2025-05-27T15:51:14.408443",
+    "software_version": "1.0",
+    "items": [
+      {
+        "id": "13fdcee2-8280-4429-a8d0-e7dfbd0cb930",
+        "analysis": {
+          "continuum_method": "polynomial",
+          "continuum_order": 3,
+          "continuum_masks": [
+            [
+              -1008.3434556165452,
+              376.4843742790749
+            ],
+            [
+              768.3155044433397,
+              1278.2327286297113
+            ]
+          ],
+          "continuum_fit_params": {},
+          "use_weights": false,
+          "calculate_snr": true,
+          "binsize": 3,
+          "processing_status": "complete",
+          "last_modified": "2025-05-27T15:51:53.897335",
+          "error_message": ""
+        },
+        "results": {
+          "W": 0.26617003871730754,
+          "W_e": 0.0347976413475981,
+          "N": 174262321512109.38,
+          "N_e": 23814777394725.492,
+          "logN": 14.24120349538142,
+          "logN_e": 0.059310660500942816,
+          "vel_centroid": 4.016060425964582,
+          "vel_disp": 56.00181239806185,
+          "SNR": 9.878313071107769,
+          "calculation_timestamp": "2025-05-27T15:51:53.896973"
+        }
+      },
+      {
+        "id": "5c5b600f-c0cd-4476-9d6b-96f5346f77e0",
+        "analysis": {
+          "continuum_method": "polynomial",
+          "continuum_order": 3,
+          "continuum_masks": [],
+          "continuum_fit_params": {},
+          "use_weights": false,
+          "calculate_snr": true,
+          "binsize": 3,
+          "processing_status": "complete",
+          "last_modified": "2025-05-27T15:51:30.505797",
+          "error_message": ""
+        },
+        "results": {
+          "W": 0.39962719758721443,
+          "W_e": 0.055071790858261055,
+          "N": 142782307496643.88,
+          "N_e": 19178315223233.984,
+          "logN": 14.154674396287387,
+          "logN_e": 0.05829425895137037,
+          "vel_centroid": -13.536687442118998,
+          "vel_disp": 157.28591083030608,
+          "SNR": 9.562684121047253,
+          "calculation_timestamp": "2025-05-27T15:51:30.505770"
+        }
+      },
+      {
+        "id": "219289ce-5a67-41d7-9996-d63ac97bae02",
+        "analysis": {
+          "continuum_method": "polynomial",
+          "continuum_order": 3,
+          "continuum_masks": [],
+          "continuum_fit_params": {},
+          "use_weights": false,
+          "calculate_snr": true,
+          "binsize": 3,
+          "processing_status": "complete",
+          "last_modified": "2025-05-27T15:51:30.521683",
+          "error_message": ""
+        },
+        "results": {
+          "W": 0.11204355257935025,
+          "W_e": 0.05141348145774613,
+          "N": 31589330807841.758,
+          "N_e": 7707124495653.171,
+          "logN": 13.4995404258564,
+          "logN_e": 0.10588676447312197,
+          "vel_centroid": -25.016520376070762,
+          "vel_disp": 42.710735079426115,
+          "SNR": 8.39997599632099,
+          "calculation_timestamp": "2025-05-27T15:51:30.521666"
+        }
+      },
+      {
+        "id": "7fcd0a5a-64c0-4729-a910-89b68694b99f",
+        "analysis": {
+          "continuum_method": "polynomial",
+          "continuum_order": 3,
+          "continuum_masks": [
+            [
+              -424.6851985024434,
+              -285.32009164135366
+            ],
+            [
+              -81.63262776745364,
+              138.1354253596494
+            ],
+            [
+              465.10740684143616,
+              781.358995487755
+            ]
+          ],
+          "continuum_fit_params": {},
+          "use_weights": false,
+          "calculate_snr": true,
+          "binsize": 3,
+          "processing_status": "complete",
+          "last_modified": "2025-05-27T15:52:50.667637",
+          "error_message": ""
+        },
+        "results": {
+          "W": 0.07955691211102013,
+          "W_e": 0.03491073410200662,
+          "N": 22689342150551.547,
+          "N_e": 9102553235786.809,
+          "logN": 13.355821904235437,
+          "logN_e": 0.17411294157928875,
+          "vel_centroid": -15.743749872643258,
+          "vel_disp": 46.68346415067889,
+          "SNR": 8.578064099593005,
+          "calculation_timestamp": "2025-05-27T15:52:50.667234"
+        }
+      }
+    ]
+  },
+  "batch_settings": {
+    "continuum_method": "polynomial",
+    "polynomial_order": 3,
+    "use_weights": false,
+    "calculate_snr": true,
+    "binsize": 3,
+    "save_individual_json": false,
+    "output_directory": ""
+  }
+}
