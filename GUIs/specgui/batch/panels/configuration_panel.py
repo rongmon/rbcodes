@@ -6,21 +6,26 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                            QPushButton, QTableWidget, QTableWidgetItem,
                            QHeaderView, QComboBox, QGroupBox, QFormLayout,
                            QMessageBox, QFileDialog, QCheckBox, QSpinBox,
-                           QDoubleSpinBox, QDialog, QDialogButtonBox, QLineEdit,QAbstractItemView)
+                           QDoubleSpinBox, QDialog, QDialogButtonBox, QLineEdit,
+                           QAbstractItemView)
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QColor
 
+from ..master_batch_table import TemplateParams
+
 class ConfigurationPanel(QWidget):
-    """Panel for configuring batch processing items."""
+    """Panel for configuring batch processing items using master table."""
     
     # Signals
-    configuration_changed = pyqtSignal(list)  # Emitted when batch configuration changes
+    configuration_changed = pyqtSignal()  # Emitted when batch configuration changes
     
     def __init__(self, controller):
         super().__init__()
         self.controller = controller
-        self.batch_items = []  # List to store batch items
         self.init_ui()
+        
+        # Connect to controller signals
+        self.controller.table_changed.connect(self.refresh_table)
     
     def init_ui(self):
         """Initialize the user interface."""
@@ -29,28 +34,36 @@ class ConfigurationPanel(QWidget):
         # Add instructions
         instructions = QLabel(
             "Configure batch processing by adding items to analyze. "
-            "You can add multiple systems, transitions, or files to process in batch."
+            "Each item can have different slice and EW measurement velocity ranges."
         )
         instructions.setWordWrap(True)
         main_layout.addWidget(instructions)
         
-        # Batch mode selection
-        mode_group = QGroupBox("Batch Mode")
-        mode_layout = QHBoxLayout()
+        # Input method selection
+        input_group = QGroupBox("Add Items to Batch")
+        input_layout = QHBoxLayout()
         
-        self.mode_combo = QComboBox()
-        self.mode_combo.addItems([
-            "Multiple Absorption Systems (Same File)", 
-            "Multiple Transitions (Same Redshift)", 
-            "Multiple Files (Single Transition Each)"
-        ])
-        self.mode_combo.currentIndexChanged.connect(self.update_ui_for_mode)
+        # Single item button
+        self.add_btn = QPushButton("Add Single Ion")
+        self.add_btn.clicked.connect(self.add_batch_item)
+        self.add_btn.setToolTip("Manually add one spectrum analysis item")
         
-        mode_layout.addWidget(QLabel("Mode:"))
-        mode_layout.addWidget(self.mode_combo)
+        # Bulk import button (new)
+        self.import_json_btn = QPushButton("Import Multiple JSON Files")
+        self.import_json_btn.clicked.connect(self.import_multiple_json_files_placeholder)
+        self.import_json_btn.setToolTip("Import multiple rb_spec JSON files to create batch items")
         
-        mode_group.setLayout(mode_layout)
-        main_layout.addWidget(mode_group)
+        # CSV import button
+        self.import_btn = QPushButton("Import from CSV")
+        self.import_btn.clicked.connect(self.import_from_csv)
+        self.import_btn.setToolTip("Import batch items from a CSV template file")
+        
+        input_layout.addWidget(self.add_btn)
+        input_layout.addWidget(self.import_json_btn)
+        input_layout.addWidget(self.import_btn)
+        
+        input_group.setLayout(input_layout)
+        main_layout.addWidget(input_group)
         
         # Batch items table
         self.table_group = QGroupBox("Batch Items")
@@ -58,16 +71,11 @@ class ConfigurationPanel(QWidget):
         
         self.batch_table = QTableWidget()
         self.batch_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.setup_table_for_mode(0)  # Initial setup for first mode
+        self.setup_table()
         
-        # Buttons for managing batch items
-        table_buttons = QHBoxLayout()
-        
-        self.add_btn = QPushButton("Add Item")
-        self.add_btn.clicked.connect(self.add_batch_item)
-        
-        self.import_btn = QPushButton("Import from CSV")
-        self.import_btn.clicked.connect(self.import_from_csv)
+        # CREATE buttons first, THEN add them to layout
+        self.export_template_btn = QPushButton("Export Template CSV")
+        self.export_template_btn.clicked.connect(self.export_template_csv)
         
         self.remove_btn = QPushButton("Remove Selected")
         self.remove_btn.clicked.connect(self.remove_batch_item)
@@ -75,8 +83,9 @@ class ConfigurationPanel(QWidget):
         self.clear_btn = QPushButton("Clear All")
         self.clear_btn.clicked.connect(self.clear_batch_items)
         
-        table_buttons.addWidget(self.add_btn)
-        table_buttons.addWidget(self.import_btn)
+        # Buttons for managing batch items
+        table_buttons = QHBoxLayout()
+        table_buttons.addWidget(self.export_template_btn)
         table_buttons.addWidget(self.remove_btn)
         table_buttons.addWidget(self.clear_btn)
         
@@ -100,64 +109,54 @@ class ConfigurationPanel(QWidget):
         config_layout.addWidget(self.load_config_btn)
         
         config_group.setLayout(config_layout)
-        main_layout.addWidget(config_group)
+        main_layout.addWidget(config_group)    
+
+    def import_multiple_json_files_placeholder(self):
+        """Placeholder for bulk JSON import - will implement next."""
+        QMessageBox.information(
+            self, "Coming Soon", 
+            "Multiple JSON file import will be implemented next!"
+        )
     
-    def setup_table_for_mode(self, mode_index):
-        """Setup table columns based on the selected batch mode."""
-        self.batch_table.clear()
-        
-        if mode_index == 0:  # Multiple systems
-            self.batch_table.setColumnCount(5)
-            self.batch_table.setHorizontalHeaderLabels([
-                "Filename", "Redshift", "Transition", "Velocity Min", "Velocity Max"
-            ])
-        elif mode_index == 1:  # Multiple transitions
-            self.batch_table.setColumnCount(5)
-            self.batch_table.setHorizontalHeaderLabels([
-                "Filename", "Redshift", "Transition", "Velocity Min", "Velocity Max"
-            ])
-        else:  # Multiple files
-            self.batch_table.setColumnCount(5)
-            self.batch_table.setHorizontalHeaderLabels([
-                "Filename", "Redshift", "Transition", "Velocity Min", "Velocity Max"
-            ])
+    def setup_table(self):
+        """Setup table columns."""
+        self.batch_table.setColumnCount(7)
+        self.batch_table.setHorizontalHeaderLabels([
+            "Filename", "Redshift", "Transition", "Slice Range", "EW Range", "Line List", "Status"
+        ])
         
         # Set column widths
         header = self.batch_table.horizontalHeader()
-        for i in range(self.batch_table.columnCount()):
-            header.setSectionResizeMode(i, QHeaderView.Stretch)
+        header.setSectionResizeMode(0, QHeaderView.Stretch)  # Filename
+        for i in range(1, 7):
+            header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
         
         self.batch_table.setRowCount(0)
     
-    def update_ui_for_mode(self, mode_index):
-        """Update UI elements based on the selected batch mode."""
-        self.setup_table_for_mode(mode_index)
-        self.clear_batch_items()  # Clear items when mode changes
-    
+
+
     def add_batch_item(self):
-        """Add an item to the batch processing list."""
-        mode_index = self.mode_combo.currentIndex()
-        
-        if mode_index == 0:  # Multiple systems
-            self.add_system_dialog()
-        elif mode_index == 1:  # Multiple transitions
-            self.add_transition_dialog()
-        else:  # Multiple files
-            self.add_file_dialog()
-    
-    def add_system_dialog(self):
-        """Open dialog to add a multiple systems batch item."""
+        """Add an item to the batch processing list with smart defaults."""
         dialog = QDialog(self)
-        dialog.setWindowTitle("Add Absorption System")
+        dialog.setWindowTitle("Add Single Ion")
+        dialog.setMinimumSize(500, 450)
         layout = QVBoxLayout(dialog)
         
-        # Form for system details
-        form = QFormLayout()
+        # Get smart defaults from existing table entries
+        default_values = self._get_smart_defaults()
+        
+        # Main form
+        form_layout = QFormLayout()
         
         # Filename
         file_layout = QHBoxLayout()
         filename = QLineEdit()
         filename.setReadOnly(True)
+        
+        # Pre-populate with smart default
+        if default_values['filename']:
+            filename.setText(default_values['filename'])
+        
         browse_btn = QPushButton("Browse")
         
         def browse_file():
@@ -173,19 +172,20 @@ class ConfigurationPanel(QWidget):
         browse_btn.clicked.connect(browse_file)
         file_layout.addWidget(filename)
         file_layout.addWidget(browse_btn)
-        form.addRow("Spectrum File:", file_layout)
+        form_layout.addRow("Spectrum File:", file_layout)
         
         # Redshift
         redshift = QDoubleSpinBox()
         redshift.setDecimals(6)
         redshift.setRange(0.0, 10.0)
-        redshift.setValue(0.0)
-        form.addRow("Redshift:", redshift)
+        redshift.setValue(default_values['redshift'])  # Smart default
+        form_layout.addRow("Redshift:", redshift)
         
         # Transition
         transition_layout = QHBoxLayout()
         transition_combo = QComboBox()
         transitions = [
+            "Custom",
             "Lyα (1215.67 Å)",
             "Lyβ (1025.72 Å)",
             "Lyγ (972.54 Å)",
@@ -194,8 +194,7 @@ class ConfigurationPanel(QWidget):
             "MgII (2796.35 Å)",
             "MgII (2803.53 Å)",
             "SiIV (1393.76 Å)",
-            "SiIV (1402.77 Å)",
-            "Custom"
+            "SiIV (1402.77 Å)"
         ]
         transition_combo.addItems(transitions)
         
@@ -203,7 +202,9 @@ class ConfigurationPanel(QWidget):
         custom_wavelength.setRange(1.0, 10000.0)
         custom_wavelength.setValue(1215.67)
         custom_wavelength.setDecimals(2)
-        custom_wavelength.setEnabled(False)
+        custom_wavelength.setEnabled(True)  # ✅ Changed from False
+        custom_wavelength.setFocus()        # ✅ Put cursor here
+        custom_wavelength.selectAll()       # ✅ Select default value
         
         transition_combo.currentTextChanged.connect(
             lambda text: custom_wavelength.setEnabled(text == "Custom")
@@ -211,168 +212,116 @@ class ConfigurationPanel(QWidget):
         
         transition_layout.addWidget(transition_combo)
         transition_layout.addWidget(custom_wavelength)
-        form.addRow("Transition:", transition_layout)
-        
-        # Velocity range
-        velocity_layout = QHBoxLayout()
-        vmin = QSpinBox()
-        vmin.setRange(-5000, 0)
-        vmin.setValue(-200)
-        
-        vmax = QSpinBox()
-        vmax.setRange(0, 5000)
-        vmax.setValue(200)
-        
-        velocity_layout.addWidget(QLabel("Min:"))
-        velocity_layout.addWidget(vmin)
-        velocity_layout.addWidget(QLabel("Max:"))
-        velocity_layout.addWidget(vmax)
-        
-        form.addRow("Velocity Range:", velocity_layout)
-        
-        layout.addLayout(form)
-        
-        # Add buttons
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(dialog.accept)
-        button_box.rejected.connect(dialog.reject)
-        layout.addWidget(button_box)
-        
-        # Show dialog
-        if dialog.exec_() == QDialog.Accepted:
-            # Get values
-            file_path = filename.text()
-            z = redshift.value()
-            
-            # Get transition details
-            trans_text = transition_combo.currentText()
-            if trans_text == "Custom":
-                trans_wavelength = custom_wavelength.value()
-                trans_name = f"Custom ({trans_wavelength:.2f} Å)"
-            else:
-                # Extract wavelength from the selected item
-                trans_wavelength = float(trans_text.split("(")[1].split(" Å")[0])
-                trans_name = trans_text.split(" (")[0]
-            
-            # Add to table
-            row = self.batch_table.rowCount()
-            self.batch_table.insertRow(row)
-            
-            self.batch_table.setItem(row, 0, QTableWidgetItem(file_path))
-            self.batch_table.setItem(row, 1, QTableWidgetItem(f"{z:.6f}"))
-            self.batch_table.setItem(row, 2, QTableWidgetItem(f"{trans_name} ({trans_wavelength:.2f} Å)"))
-            self.batch_table.setItem(row, 3, QTableWidgetItem(f"{vmin.value()}"))
-            self.batch_table.setItem(row, 4, QTableWidgetItem(f"{vmax.value()}"))
-            
-            # Store item data
-            self.batch_items.append({
-                'type': 'multiple_systems',
-                'filename': file_path,
-                'redshift': z,
-                'transition': trans_wavelength,
-                'transition_name': trans_name,
-                'vmin': vmin.value(),
-                'vmax': vmax.value()
-            })
-            
-            # Emit signal that configuration has changed
-            self.configuration_changed.emit(self.batch_items)
-    
-    def add_transition_dialog(self):
-        """Open dialog to add a transition to the batch."""
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Add Transition")
-        layout = QVBoxLayout(dialog)
-        
-        # Form for transition details
-        form = QFormLayout()
-        
-        # Filename
-        file_layout = QHBoxLayout()
-        filename = QLineEdit()
-        filename.setReadOnly(True)
-        browse_btn = QPushButton("Browse")
-        
-        def browse_file():
-            options = QFileDialog.Options()
-            filepath, _ = QFileDialog.getOpenFileName(
-                dialog, "Select Spectrum File", "", 
-                "All Files (*);;FITS Files (*.fits);;JSON Files (*.json)",
-                options=options
-            )
-            if filepath:
-                filename.setText(filepath)
-        
-        browse_btn.clicked.connect(browse_file)
-        file_layout.addWidget(filename)
-        file_layout.addWidget(browse_btn)
-        form.addRow("Spectrum File:", file_layout)
-        
-        # Redshift
-        redshift = QDoubleSpinBox()
-        redshift.setDecimals(6)
-        redshift.setRange(0.0, 10.0)
-        redshift.setValue(0.0)
-        form.addRow("Redshift:", redshift)
-        
-        # Transition
-        transition_layout = QHBoxLayout()
-        transition_combo = QComboBox()
-        transitions = [
-            "Lyα (1215.67 Å)",
-            "Lyβ (1025.72 Å)",
-            "Lyγ (972.54 Å)",
-            "CIV (1548.20 Å)",
-            "CIV (1550.78 Å)",
-            "MgII (2796.35 Å)",
-            "MgII (2803.53 Å)",
-            "SiIV (1393.76 Å)",
-            "SiIV (1402.77 Å)",
-            "Custom"
-        ]
-        transition_combo.addItems(transitions)
-        
-        custom_wavelength = QDoubleSpinBox()
-        custom_wavelength.setRange(1.0, 10000.0)
-        custom_wavelength.setValue(1215.67)
-        custom_wavelength.setDecimals(2)
-        custom_wavelength.setEnabled(False)
-        
-        transition_combo.currentTextChanged.connect(
-            lambda text: custom_wavelength.setEnabled(text == "Custom")
-        )
-        
-        transition_layout.addWidget(transition_combo)
-        transition_layout.addWidget(custom_wavelength)
-        form.addRow("Transition:", transition_layout)
+        form_layout.addRow("Transition:", transition_layout)
         
         # Line list selection
         linelist_combo = QComboBox()
         linelist_combo.addItems(["atom", "LLS", "LLS Small", "DLA", "LBG", "Gal"])
-        form.addRow("Line List:", linelist_combo)
+        # Set smart default for linelist
+        if default_values['linelist']:
+            linelist_index = linelist_combo.findText(default_values['linelist'])
+            if linelist_index >= 0:
+                linelist_combo.setCurrentIndex(linelist_index)
+        form_layout.addRow("Line List:", linelist_combo)
         
-        # Velocity range
-        velocity_layout = QHBoxLayout()
-        vmin = QSpinBox()
-        vmin.setRange(-5000, 0)
-        vmin.setValue(-200)
+        # Add separator
+        separator = QLabel()
+        separator.setStyleSheet("QLabel { border-bottom: 1px solid gray; }")
+        form_layout.addRow(separator)
         
-        vmax = QSpinBox()
-        vmax.setRange(0, 5000)
-        vmax.setValue(200)
+        # Velocity ranges section
+        velocity_label = QLabel("<b>Velocity Ranges:</b>")
+        form_layout.addRow(velocity_label)
         
-        velocity_layout.addWidget(QLabel("Min:"))
-        velocity_layout.addWidget(vmin)
-        velocity_layout.addWidget(QLabel("Max:"))
-        velocity_layout.addWidget(vmax)
+        # Add explanatory text
+        explanation = QLabel(
+            "• Slice Range: Wide range for extracting spectrum (includes continuum regions)\n"
+            "• EW Range: Narrow range for equivalent width integration (around absorption)"
+        )
+        explanation.setWordWrap(True)
+        explanation.setStyleSheet("QLabel { color: gray; font-style: italic; margin-bottom: 10px; }")
+        form_layout.addRow(explanation)
         
-        form.addRow("Velocity Range:", velocity_layout)
+        # Slice velocity range with smart defaults
+        slice_range_layout = QHBoxLayout()
+        slice_vmin = QSpinBox()
+        slice_vmin.setRange(-5000, 0)
+        slice_vmin.setValue(default_values['slice_vmin'])  # Smart default
+        slice_vmin.setSuffix(" km/s")
         
-        layout.addLayout(form)
+        slice_vmax = QSpinBox()
+        slice_vmax.setRange(0, 5000)
+        slice_vmax.setValue(default_values['slice_vmax'])  # Smart default
+        slice_vmax.setSuffix(" km/s")
+        
+        slice_range_layout.addWidget(QLabel("Min:"))
+        slice_range_layout.addWidget(slice_vmin)
+        slice_range_layout.addWidget(QLabel("Max:"))
+        slice_range_layout.addWidget(slice_vmax)
+        
+        form_layout.addRow("Slice Range:", slice_range_layout)
+        
+        # EW measurement range with smart defaults
+        ew_range_layout = QHBoxLayout()
+        ew_vmin = QSpinBox()
+        ew_vmin.setRange(-2000, 0)
+        ew_vmin.setValue(default_values['ew_vmin'])  # Smart default
+        ew_vmin.setSuffix(" km/s")
+        
+        ew_vmax = QSpinBox()
+        ew_vmax.setRange(0, 2000)
+        ew_vmax.setValue(default_values['ew_vmax'])  # Smart default
+        ew_vmax.setSuffix(" km/s")
+        
+        ew_range_layout.addWidget(QLabel("Min:"))
+        ew_range_layout.addWidget(ew_vmin)
+        ew_range_layout.addWidget(QLabel("Max:"))
+        ew_range_layout.addWidget(ew_vmax)
+        
+        form_layout.addRow("EW Range:", ew_range_layout)
+        
+        # Validation function and label
+        validation_label = QLabel("")
+        form_layout.addRow(validation_label)
+        
+        def validate_ranges():
+            """Validate that EW range is within slice range."""
+            slice_min, slice_max = slice_vmin.value(), slice_vmax.value()
+            ew_min, ew_max = ew_vmin.value(), ew_vmax.value()
+            
+            # Check if EW range is within slice range (with tolerance)
+            tolerance = 50  # km/s
+            if ew_min < (slice_min - tolerance) or ew_max > (slice_max + tolerance):
+                validation_label.setText(f"⚠️ EW range should be within slice range ± {tolerance} km/s")
+                validation_label.setStyleSheet("QLabel { color: red; }")
+                return False
+            else:
+                validation_label.setText("✓ Velocity ranges are valid")
+                validation_label.setStyleSheet("QLabel { color: green; }")
+                return True
+        
+        # Connect validation to value changes
+        slice_vmin.valueChanged.connect(validate_ranges)
+        slice_vmax.valueChanged.connect(validate_ranges)
+        ew_vmin.valueChanged.connect(validate_ranges)
+        ew_vmax.valueChanged.connect(validate_ranges)
+        
+        # Initial validation
+        validate_ranges()
+        
+        layout.addLayout(form_layout)
         
         # Add buttons
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(dialog.accept)
+        
+        def accept_with_validation():
+            if not validate_ranges():
+                QMessageBox.warning(dialog, "Validation Error", 
+                                  "Please fix the velocity range validation errors before proceeding.")
+                return
+            dialog.accept()
+        
+        button_box.accepted.connect(accept_with_validation)
         button_box.rejected.connect(dialog.reject)
         layout.addWidget(button_box)
         
@@ -380,215 +329,177 @@ class ConfigurationPanel(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             # Get values
             file_path = filename.text()
+            if not file_path:
+                QMessageBox.warning(self, "Input Error", "Please select a spectrum file.")
+                return
+                
             z = redshift.value()
             
-            # Get transition details
+            # Get transition details - UNIFIED rb_setline approach
             trans_text = transition_combo.currentText()
+            linelist = linelist_combo.currentText()
+            
+            # Extract wavelength from either dropdown or custom input
             if trans_text == "Custom":
                 trans_wavelength = custom_wavelength.value()
             else:
-                # Extract wavelength from the selected item
+                # Extract wavelength from dropdown selection
                 trans_wavelength = float(trans_text.split("(")[1].split(" Å")[0])
             
-            # Use rb_setline to look up the transition
+            # Always use rb_setline to get proper transition name from database
             try:
-                # Import rb_setline
-                try:
-                    from rbcodes.IGM import rb_setline as s
-                except ImportError:
-                    try:
-                        from IGM import rb_setline as s
-                    except ImportError:
-                        QMessageBox.warning(self, "Import Error", 
-                                         "Could not import rb_setline. Using entered     wavelength without lookup.")
-                        s = None
+                from rbcodes.IGM import rb_setline as s
+                line_info = s.rb_setline(trans_wavelength, 'closest', linelist=linelist)
+                trans_name = line_info['name']
+                actual_wavelength = line_info['wave']
                 
-                # Get line list
-                linelist = linelist_combo.currentText()
+                print(f"Input wavelength {trans_wavelength:.2f} Å matched to: {trans_name} ({actual_wavelength:.2f} Å)")
                 
-                # Get transition information if rb_setline is available
-                if s:
-                    try:
-                        transition_info = s.rb_setline(trans_wavelength, 'closest',     linelist=linelist)
-                        trans_wavelength = float(transition_info['wave'])
-                        trans_name = transition_info['name']
-                        fval = transition_info['fval']
-                    except Exception as e:
-                        print(f"Error in rb_setline: {str(e)}")
-                        # Fallback if rb_setline lookup fails
-                        if trans_text == "Custom":
-                            trans_name = f"Custom ({trans_wavelength:.2f} Å)"
-                        else:
-                            trans_name = trans_text.split(" (")[0]
-                        fval = None
-                else:
-                    # Fallback if rb_setline is not available
-                    if trans_text == "Custom":
-                        trans_name = f"Custom ({trans_wavelength:.2f} Å)"
-                    else:
-                        trans_name = trans_text.split(" (")[0]
-                    fval = None
-                    
+                # Optionally use the exact database wavelength instead of user input
+                # trans_wavelength = actual_wavelength
+                
             except Exception as e:
-                QMessageBox.warning(self, "Transition Lookup Error", 
-                                  f"Error looking up transition: {str(e)}\nUsing     entered wavelength.")
+                print(f"Warning: Could not find transition in database: {e}")
+                # Fallback to generic name if rb_setline fails
                 if trans_text == "Custom":
-                    trans_name = f"Custom ({trans_wavelength:.2f} Å)"
+                    trans_name = f"Unknown ({trans_wavelength:.2f} Å)"
                 else:
                     trans_name = trans_text.split(" (")[0]
-                fval = None
             
-            # Add to table
-            row = self.batch_table.rowCount()
-            self.batch_table.insertRow(row)
+            # Get line list
+            linelist = linelist_combo.currentText()
             
-            self.batch_table.setItem(row, 0, QTableWidgetItem(file_path))
-            self.batch_table.setItem(row, 1, QTableWidgetItem(f"{z:.6f}"))
-            self.batch_table.setItem(row, 2, QTableWidgetItem(f"{trans_name}     ({trans_wavelength:.2f} Å)"))
-            self.batch_table.setItem(row, 3, QTableWidgetItem(f"{vmin.value()}"))
-            self.batch_table.setItem(row, 4, QTableWidgetItem(f"{vmax.value()}"))
+            # Get velocity ranges
+            slice_min, slice_max = slice_vmin.value(), slice_vmax.value()
+            ew_min, ew_max = ew_vmin.value(), ew_vmax.value()
             
-            # Store item data
-            self.batch_items.append({
-                'type': 'multiple_transitions',
-                'filename': file_path,
-                'redshift': z,
-                'transition': trans_wavelength,
-                'transition_name': trans_name,
-                'fval': fval,  # Store the oscillator strength
-                'linelist': linelist,  # Store the line list
-                'vmin': vmin.value(),
-                'vmax': vmax.value()
+            # Create template parameters
+            template_params = TemplateParams(
+                filename=file_path,
+                redshift=z,
+                transition=trans_wavelength,
+                transition_name=trans_name,
+                slice_vmin=slice_min,
+                slice_vmax=slice_max,
+                ew_vmin=ew_min,
+                ew_vmax=ew_max,
+                linelist=linelist,
+                method='closest'
+            )
+            
+            # Add to master table
+            self.controller.master_table.add_item(template_params)
+            
+            # Refresh display
+            self.refresh_table()
+            self.configuration_changed.emit()
+    
+    def _get_smart_defaults(self):
+        """Get smart default values from existing table entries."""
+        # Default values (used if no existing entries)
+        defaults = {
+            'filename': '',
+            'redshift': 0.0,
+            'linelist': 'atom',
+            'slice_vmin': -1500,
+            'slice_vmax': 1500,
+            'ew_vmin': -200,
+            'ew_vmax': 200
+        }
+        
+        # Get existing items from master table
+        items = self.controller.master_table.get_all_items()
+        
+        if items:
+            # Use the last added item as template
+            last_item = items[-1]
+            defaults.update({
+                'filename': last_item.template.filename,
+                'redshift': last_item.template.redshift,
+                'linelist': last_item.template.linelist,
+                'slice_vmin': last_item.template.slice_vmin,
+                'slice_vmax': last_item.template.slice_vmax,
+                'ew_vmin': last_item.template.ew_vmin,
+                'ew_vmax': last_item.template.ew_vmax
             })
             
-            # Emit signal that configuration has changed
-            self.configuration_changed.emit(self.batch_items)    
+            print(f"Using smart defaults from: {last_item.template.transition_name}")
+            print(f"  File: {os.path.basename(last_item.template.filename)}")
+            print(f"  Redshift: {last_item.template.redshift}")
+        
+        return defaults    
     
-    def add_file_dialog(self):
-        """Open dialog to add a multiple files batch item."""
-        # First select the file
-        options = QFileDialog.Options()
-        filename, _ = QFileDialog.getOpenFileName(
-            self, "Select Spectrum File", "", 
-            "All Files (*);;FITS Files (*.fits);;JSON Files (*.json)",
-            options=options
-        )
+    def refresh_table(self):
+        """Refresh the table display from the master table."""
+        # Clear existing rows
+        self.batch_table.setRowCount(0)
         
-        if not filename:
-            return
+        # Get all items from master table
+        items = self.controller.master_table.get_all_items()
         
-        # Now open dialog for additional parameters
-        dialog = QDialog(self)
-        dialog.setWindowTitle("File Parameters")
-        layout = QVBoxLayout(dialog)
-        
-        # Form for file parameters
-        form = QFormLayout()
-        
-        # Redshift
-        redshift = QDoubleSpinBox()
-        redshift.setDecimals(6)
-        redshift.setRange(0.0, 10.0)
-        redshift.setValue(0.0)
-        form.addRow("Redshift:", redshift)
-        
-        # Transition
-        transition_layout = QHBoxLayout()
-        transition_combo = QComboBox()
-        transitions = [
-            "Lyα (1215.67 Å)",
-            "Lyβ (1025.72 Å)",
-            "Lyγ (972.54 Å)",
-            "CIV (1548.20 Å)",
-            "CIV (1550.78 Å)",
-            "MgII (2796.35 Å)",
-            "MgII (2803.53 Å)",
-            "SiIV (1393.76 Å)",
-            "SiIV (1402.77 Å)",
-            "Custom"
-        ]
-        transition_combo.addItems(transitions)
-        
-        custom_wavelength = QDoubleSpinBox()
-        custom_wavelength.setRange(1.0, 10000.0)
-        custom_wavelength.setValue(1215.67)
-        custom_wavelength.setDecimals(2)
-        custom_wavelength.setEnabled(False)
-        
-        transition_combo.currentTextChanged.connect(
-            lambda text: custom_wavelength.setEnabled(text == "Custom")
-        )
-        
-        transition_layout.addWidget(transition_combo)
-        transition_layout.addWidget(custom_wavelength)
-        form.addRow("Transition:", transition_layout)
-        
-        # Velocity range
-        velocity_layout = QHBoxLayout()
-        vmin = QSpinBox()
-        vmin.setRange(-5000, 0)
-        vmin.setValue(-200)
-        
-        vmax = QSpinBox()
-        vmax.setRange(0, 5000)
-        vmax.setValue(200)
-        
-        velocity_layout.addWidget(QLabel("Min:"))
-        velocity_layout.addWidget(vmin)
-        velocity_layout.addWidget(QLabel("Max:"))
-        velocity_layout.addWidget(vmax)
-        
-        form.addRow("Velocity Range:", velocity_layout)
-        
-        layout.addLayout(form)
-        
-        # Add buttons
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(dialog.accept)
-        button_box.rejected.connect(dialog.reject)
-        layout.addWidget(button_box)
-        
-        # Show dialog
-        if dialog.exec_() == QDialog.Accepted:
-            # Get values
-            z = redshift.value()
-            
-            # Get transition details
-            trans_text = transition_combo.currentText()
-            if trans_text == "Custom":
-                trans_wavelength = custom_wavelength.value()
-                trans_name = f"Custom ({trans_wavelength:.2f} Å)"
-            else:
-                # Extract wavelength from the selected item
-                trans_wavelength = float(trans_text.split("(")[1].split(" Å")[0])
-                trans_name = trans_text.split(" (")[0]
-            
-            # Add to table
+        # Populate table
+        for item in items:
             row = self.batch_table.rowCount()
             self.batch_table.insertRow(row)
             
-            # Use basename for display but store full path
-            basename = os.path.basename(filename)
+            # Use basename for display
+            basename = os.path.basename(item.template.filename)
             
             self.batch_table.setItem(row, 0, QTableWidgetItem(basename))
-            self.batch_table.setItem(row, 1, QTableWidgetItem(f"{z:.6f}"))
-            self.batch_table.setItem(row, 2, QTableWidgetItem(f"{trans_name} ({trans_wavelength:.2f} Å)"))
-            self.batch_table.setItem(row, 3, QTableWidgetItem(f"{vmin.value()}"))
-            self.batch_table.setItem(row, 4, QTableWidgetItem(f"{vmax.value()}"))
+            self.batch_table.setItem(row, 1, QTableWidgetItem(f"{item.template.redshift:.6f}"))
+            self.batch_table.setItem(row, 2, QTableWidgetItem(f"{item.template.transition_name} ({item.template.transition:.2f} Å)"))
+            self.batch_table.setItem(row, 3, QTableWidgetItem(f"[{item.template.slice_vmin}, {item.template.slice_vmax}]"))
+            self.batch_table.setItem(row, 4, QTableWidgetItem(f"[{item.template.ew_vmin}, {item.template.ew_vmax}]"))
+            self.batch_table.setItem(row, 5, QTableWidgetItem(item.template.linelist))
             
-            # Store item data
-            self.batch_items.append({
-                'type': 'multiple_files',
-                'filename': filename,  # Store full path
-                'redshift': z,
-                'transition': trans_wavelength,
-                'transition_name': trans_name,
-                'vmin': vmin.value(),
-                'vmax': vmax.value()
-            })
+            # Status with color coding
+            status = item.analysis.processing_status
+            status_item = QTableWidgetItem(status.title())
             
-            # Emit signal that configuration has changed
-            self.configuration_changed.emit(self.batch_items)
+            if status == 'complete':
+                status_item.setBackground(QColor(200, 255, 200))  # Light green
+            elif status == 'processing':
+                status_item.setBackground(QColor(255, 255, 200))  # Light yellow
+            elif status == 'error':
+                status_item.setBackground(QColor(255, 200, 200))  # Light red
+            elif status in ['needs_processing', 'needs_ew_recalc']:
+                status_item.setBackground(QColor(255, 240, 200))  # Light orange
+            
+            self.batch_table.setItem(row, 6, status_item)
+    
+    def remove_batch_item(self):
+        """Remove the selected item from the batch."""
+        selected_rows = set(index.row() for index in self.batch_table.selectedIndexes())
+        
+        if not selected_rows:
+            QMessageBox.warning(self, "No Selection", "Please select items to remove.")
+            return
+        
+        # Get items in order (from master table)
+        items = self.controller.master_table.get_all_items()
+        
+        # Remove from bottom to top to avoid index shifting
+        for row in sorted(selected_rows, reverse=True):
+            if 0 <= row < len(items):
+                item_id = items[row].id
+                self.controller.master_table.remove_item(item_id)
+        
+        self.refresh_table()
+        self.configuration_changed.emit()
+    
+    def clear_batch_items(self):
+        """Clear all batch items."""
+        if self.controller.master_table.get_item_count() > 0:
+            reply = QMessageBox.question(
+                self, 'Clear All Items',
+                'Are you sure you want to clear all batch items?',
+                QMessageBox.Yes | QMessageBox.No
+            )
+            
+            if reply == QMessageBox.Yes:
+                self.controller.master_table.clear_all()
+                self.refresh_table()
+                self.configuration_changed.emit()
     
     def import_from_csv(self):
         """Import batch items from a CSV file."""
@@ -602,109 +513,43 @@ class ConfigurationPanel(QWidget):
         if not filepath:
             return
         
-        try:
-            with open(filepath, 'r', newline='') as csvfile:
-                reader = csv.DictReader(csvfile)
-                
-                if not reader.fieldnames:
-                    raise ValueError("CSV file has no headers")
-                
-                # Check for required fields based on mode
-                mode_index = self.mode_combo.currentIndex()
-                required_fields = ['filename', 'redshift', 'transition', 'vmin', 'vmax']
-                
-                # Ensure all required fields are in the CSV
-                missing_fields = [field for field in required_fields if field not in reader.fieldnames]
-                if missing_fields:
-                    raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
-                
-                # Clear existing items if we're importing a new set
-                self.clear_batch_items()
-                
-                # Add items from CSV
-                for row in reader:
-                    try:
-                        # Parse row data
-                        filename = row['filename']
-                        redshift = float(row['redshift'])
-                        transition = float(row['transition'])
-                        vmin = int(row['vmin'])
-                        vmax = int(row['vmax'])
-                        
-                        # Get transition name if available, otherwise use a generic name
-                        if 'transition_name' in row and row['transition_name']:
-                            transition_name = row['transition_name']
-                        else:
-                            transition_name = f"λ {transition:.2f}"
-                        
-                        # Add to table
-                        table_row = self.batch_table.rowCount()
-                        self.batch_table.insertRow(table_row)
-                        
-                        # Use basename for display but store full path
-                        basename = os.path.basename(filename)
-                        
-                        self.batch_table.setItem(table_row, 0, QTableWidgetItem(basename))
-                        self.batch_table.setItem(table_row, 1, QTableWidgetItem(f"{redshift:.6f}"))
-                        self.batch_table.setItem(table_row, 2, QTableWidgetItem(f"{transition_name} ({transition:.2f} Å)"))
-                        self.batch_table.setItem(table_row, 3, QTableWidgetItem(f"{vmin}"))
-                        self.batch_table.setItem(table_row, 4, QTableWidgetItem(f"{vmax}"))
-                        
-                        # Determine item type based on mode
-                        if mode_index == 0:
-                            item_type = 'multiple_systems'
-                        elif mode_index == 1:
-                            item_type = 'multiple_transitions'
-                        else:
-                            item_type = 'multiple_files'
-                        
-                        # Store item data
-                        self.batch_items.append({
-                            'type': item_type,
-                            'filename': filename,
-                            'redshift': redshift,
-                            'transition': transition,
-                            'transition_name': transition_name,
-                            'vmin': vmin,
-                            'vmax': vmax
-                        })
-                    except (ValueError, KeyError) as e:
-                        # Skip invalid rows but continue processing
-                        print(f"Error parsing row: {e}")
-                
-                # Emit signal that configuration has changed
-                self.configuration_changed.emit(self.batch_items)
-                
-                QMessageBox.information(
-                    self, "Import Successful", 
-                    f"Imported {len(self.batch_items)} batch items from {filepath}"
-                )
-        except Exception as e:
-            QMessageBox.warning(
-                self, "Import Error",
-                f"Failed to import batch items: {str(e)}"
+        success, message = self.controller.master_table.import_template_csv(filepath)
+        
+        if success:
+            self.refresh_table()
+            self.configuration_changed.emit()
+            QMessageBox.information(self, "Import Successful", message)
+        else:
+            QMessageBox.warning(self, "Import Error", f"Failed to import batch items:\n{message}")
+    
+    def export_template_csv(self):
+        """Export current configuration as CSV template."""
+        options = QFileDialog.Options()
+        filepath, _ = QFileDialog.getSaveFileName(
+            self, "Export Template CSV", "batch_template.csv", 
+            "CSV Files (*.csv);;All Files (*)",
+            options=options
+        )
+        
+        if not filepath:
+            return
+        
+        # Add .csv extension if not present
+        if not filepath.lower().endswith('.csv'):
+            filepath += '.csv'
+        
+        success = self.controller.master_table.export_template_csv(filepath)
+        
+        if success:
+            QMessageBox.information(
+                self, "Export Successful", 
+                f"Template exported to {filepath}\n\nYou can edit this file and import it back using 'Import from CSV'."
             )
-    
-    def remove_batch_item(self):
-        """Remove the selected item from the batch."""
-        selected_rows = set(index.row() for index in self.batch_table.selectedIndexes())
-        
-        # Remove from bottom to top to avoid index shifting
-        for row in sorted(selected_rows, reverse=True):
-            self.batch_table.removeRow(row)
-            if 0 <= row < len(self.batch_items):
-                self.batch_items.pop(row)
-        
-        # Emit signal that configuration has changed
-        self.configuration_changed.emit(self.batch_items)
-    
-    def clear_batch_items(self):
-        """Clear all batch items."""
-        self.batch_table.setRowCount(0)
-        self.batch_items = []
-        
-        # Emit signal that configuration has changed
-        self.configuration_changed.emit(self.batch_items)
+        else:
+            QMessageBox.warning(
+                self, "Export Error",
+                "Failed to export template CSV."
+            )
     
     def save_configuration(self):
         """Save the current batch configuration to a file."""
@@ -750,8 +595,16 @@ class ConfigurationPanel(QWidget):
         success = self.controller.load_batch_configuration(filepath)
         
         if success:
-            # Update UI with loaded batch items
-            self.update_ui_with_config(self.controller.batch_items)
+            self.refresh_table()
+            self.configuration_changed.emit()
+            
+            # FORCE REVIEW PANEL REFRESH - ADD THIS
+            # Get the main window and refresh review panel
+            main_window = self.window()  # Get the top-level window
+            if hasattr(main_window, 'review_panel'):
+                main_window.review_panel.refresh_results_table()
+                print("DEBUG: Forced review panel refresh")
+            
             QMessageBox.information(
                 self, "Load Successful", 
                 f"Batch configuration loaded from {filepath}"
@@ -762,40 +615,100 @@ class ConfigurationPanel(QWidget):
                 "Failed to load batch configuration."
             )
     
-    def update_ui_with_config(self, batch_items):
-        """Update the UI with loaded batch items."""
-        # Clear existing items
-        self.clear_batch_items()
+    def create_csv_template(self):
+        """Create an empty CSV template file."""
+        options = QFileDialog.Options()
+        filepath, _ = QFileDialog.getSaveFileName(
+            self, "Create CSV Template", "batch_template.csv", 
+            "CSV Files (*.csv);;All Files (*)",
+            options=options
+        )
         
-        # Update items list
-        self.batch_items = batch_items
+        if not filepath:
+            return
         
-        # Determine batch mode based on the first item
-        if batch_items and 'type' in batch_items[0]:
-            if batch_items[0]['type'] == 'multiple_systems':
-                self.mode_combo.setCurrentIndex(0)
-            elif batch_items[0]['type'] == 'multiple_transitions':
-                self.mode_combo.setCurrentIndex(1)
-            elif batch_items[0]['type'] == 'multiple_files':
-                self.mode_combo.setCurrentIndex(2)
+        # Add .csv extension if not present
+        if not filepath.lower().endswith('.csv'):
+            filepath += '.csv'
         
-        # Update table
-        for item in batch_items:
-            row = self.batch_table.rowCount()
-            self.batch_table.insertRow(row)
+        try:
+            with open(filepath, 'w', newline='') as csvfile:
+                fieldnames = ['filename', 'redshift', 'transition', 'transition_name', 
+                             'slice_vmin', 'slice_vmax', 'ew_vmin', 'ew_vmax', 'linelist']
+                
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                
+                # Add example rows
+                examples = [
+                    {
+                        'filename': '/path/to/spectrum1.fits',
+                        'redshift': 0.5,
+                        'transition': 1215.67,
+                        'transition_name': 'Lyα',
+                        'slice_vmin': -1500,
+                        'slice_vmax': 1500,
+                        'ew_vmin': -200,
+                        'ew_vmax': 200,
+                        'linelist': 'atom'
+                    },
+                    {
+                        'filename': '/path/to/spectrum1.fits',
+                        'redshift': 0.5,
+                        'transition': 1025.72,
+                        'transition_name': 'Lyβ',
+                        'slice_vmin': -1000,
+                        'slice_vmax': 1000,
+                        'ew_vmin': -150,
+                        'ew_vmax': 150,
+                        'linelist': 'atom'
+                    }
+                ]
+                
+                for example in examples:
+                    writer.writerow(example)
             
-            # Use basename for display but store full path
-            basename = os.path.basename(item['filename'])
+            QMessageBox.information(
+                self, "Template Created", 
+                f"CSV template saved to {filepath}\n\n"
+                f"Edit this file with your batch items and use 'Import from CSV' to load them.\n"
+                f"The template includes example rows to show the format."
+            )
             
-            self.batch_table.setItem(row, 0, QTableWidgetItem(basename))
-            self.batch_table.setItem(row, 1, QTableWidgetItem(f"{item['redshift']:.6f}"))
-            
-            # Format transition display
-            transition_display = f"{item.get('transition_name', 'Unknown')} ({item['transition']:.2f} Å)"
-            self.batch_table.setItem(row, 2, QTableWidgetItem(transition_display))
-            
-            self.batch_table.setItem(row, 3, QTableWidgetItem(f"{item['vmin']}"))
-            self.batch_table.setItem(row, 4, QTableWidgetItem(f"{item['vmax']}"))
+        except Exception as e:
+            QMessageBox.warning(
+                self, "Template Error",
+                f"Failed to create CSV template: {str(e)}"
+            )
+    
+    def validate_configuration(self):
+        """Validate the current batch configuration."""
+        valid_ids, invalid_items = self.controller.master_table.validate_all()
         
-        # Emit signal that configuration has changed
-        self.configuration_changed.emit(self.batch_items)
+        if not invalid_items:
+            QMessageBox.information(
+                self, "Validation Result",
+                f"All {len(valid_ids)} batch items are valid and ready for processing."
+            )
+        else:
+            error_details = "\n".join([f"Item {i+1}: {msg}" for i, (item_id, msg) in enumerate(invalid_items)])
+            QMessageBox.warning(
+                self, "Validation Errors",
+                f"Found {len(invalid_items)} invalid items:\n\n{error_details}"
+            )
+    
+    def get_item_count(self):
+        """Get the current number of items."""
+        return self.controller.master_table.get_item_count()
+    
+    def get_selected_item_ids(self):
+        """Get IDs of currently selected items."""
+        selected_rows = set(index.row() for index in self.batch_table.selectedIndexes())
+        items = self.controller.master_table.get_all_items()
+        
+        selected_ids = []
+        for row in selected_rows:
+            if 0 <= row < len(items):
+                selected_ids.append(items[row].id)
+        
+        return selected_ids
