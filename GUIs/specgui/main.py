@@ -36,6 +36,40 @@ class RbSpecGUI(QMainWindow):
         
         # Create tabs
         self.tabs = QTabWidget()
+
+        # Set custom stylesheet for better tab visibility
+        self.tabs.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #c0c0c0;
+                background-color: white;
+            }
+            QTabWidget::tab-bar {
+                alignment: left;
+            }
+            QTabBar::tab {
+                background-color: #f0f0f0;
+                border: 1px solid #c0c0c0;
+                border-bottom-color: #c0c0c0;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                min-width: 120px;
+                padding: 8px 12px;
+                margin-right: 2px;
+            }
+            QTabBar::tab:selected {
+                background-color: white;
+                border-bottom-color: white;
+                color: #000000;
+                font-weight: bold;
+            }
+            QTabBar::tab:hover {
+                background-color: #e0e0e0;
+            }
+            QTabBar::tab:!selected {
+                margin-top: 2px;
+            }
+        """)
+
         main_layout.addWidget(self.tabs)
         
 

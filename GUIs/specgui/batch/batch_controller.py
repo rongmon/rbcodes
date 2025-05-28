@@ -363,12 +363,14 @@ class BatchController(QObject):
             if self.batch_settings['save_individual_json'] and self.batch_settings['output_directory']:
                 output_dir = self.batch_settings['output_directory']
                 basename = os.path.splitext(os.path.basename(item.template.filename))[0]
-                output_file = f"{basename}_{item.template.transition_name}_z{item.template.redshift:.3f}.json"
+                
+                # Create a more descriptive transition identifier
+                transition_id = f"{item.template.transition_name}_{item.template.transition:.0f}"
+                output_file = f"{basename}_{transition_id}_z{item.template.redshift:.3f}.json"
                 output_path = os.path.join(output_dir, output_file)
                 
                 # Save the rb_spec object
-                spec.save_slice(output_path, file_format='json')
-            
+                spec.save_slice(output_path, file_format='json')            
             return True
             
         except Exception as e:
