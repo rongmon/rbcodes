@@ -26,16 +26,29 @@ def find_spectral_lines_wavelet(
     mean_step = np.mean(np.diff(wavelength))
     spectral_length = len(wavelength)
 
+    # Set adaptive scale ranges with width constraints
+    max_width_pixels = 30  # Maximum line width in pixels
     if min_scale is None:
         min_scale = 1
     if max_scale is None:
-        max_scale = max(30, int(spectral_length / 20))
-
-    scales = np.logspace(np.log10(min_scale), np.log10(max_scale), num_scales)
-
-    if cluster_tolerance is None:
-        cluster_tolerance = max(3, int(min_scale))
-
+        # Cap max_scale to avoid detecting very broad features
+        max_scale = min(max_width_pixels, int(spectral_length / 50))  # More conservative
+    
+    # Different scale ranges for emission vs absorption
+    if line_type == 'emission':
+        # More restrictive for emission to avoid broad continuum features
+        emission_max_scale = min(15, max_scale)  # Even tighter for emission
+        scales = np.logspace(np.log10(min_scale), np.log10(emission_max_scale), num_scales)
+    elif line_type == 'absorption':
+        # Full range for absorption (they're typically more reliable)
+        scales = np.logspace(np.log10(min_scale), np.log10(max_scale), num_scales)
+    else:  # 'both'
+        # Use the more restrictive range when detecting both
+        conservative_max = min(20, max_scale)
+        scales = np.logspace(np.log10(min_scale), np.log10(conservative_max), num_scales)
+        if cluster_tolerance is None:
+            cluster_tolerance = max(3, int(min_scale))
+    
     smoothed_flux = gaussian_filter1d(flux, 7)
     noise = flux - smoothed_flux
     noise_std = np.std(noise)
