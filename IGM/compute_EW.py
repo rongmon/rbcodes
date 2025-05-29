@@ -1,3 +1,27 @@
+__version__ = "2.1.0"
+__author__ = "Rongmon Bordoloi"
+__last_updated__ = "April 2025"
+
+"""
+compute_EW.py - Equivalent Width Measurement with Dynamic Saturation Detection
+Version: {version}
+Author: {author}
+Last Updated: {last_updated}
+
+Version History:
+- v1.0.0 (Nov 2016): Initial version by Rongmon Bordoloi, tested with COS-Halos/Dwarfs data
+- v1.1.0 (Jul 2017): Output changed to dictionary format, minor dictionary arrangement
+- v1.2.0 (Jul 2019): Added med_vel to output
+- v1.3.0 (Apr 2021): Modified med_vel to be weighted by EW and vel_disp
+- v1.4.0 (Feb 2025): Major rewrite for clarity, added SNR keyword for signal-to-noise computation
+- v2.0.0 (Apr 2025): Major improvements in robustness and error handling
+- v2.1.0 (Apr 2025): Added dynamic saturation detection, plotting updates, type annotations
+""".format(
+    version=__version__,
+    author=__author__,
+    last_updated=__last_updated__
+)
+
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Dict, List, Union, Optional, Any, Tuple
