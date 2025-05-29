@@ -257,7 +257,7 @@ class BatchSpecGUI(QMainWindow):
     def update_tab_states(self):
         """Update which tabs are enabled based on current state."""
         has_items = self.controller.get_item_count() > 0
-        has_results = len(self.batch_results) > 0
+        has_results = self.controller.get_completed_item_count() > 0  # Check completed items instead
         
         # Configuration tab is always enabled
         self.tabs.setTabEnabled(0, True)
@@ -353,9 +353,8 @@ class BatchSpecGUI(QMainWindow):
         
         if success:
             self.update_status(f"Batch processing completed. {len(results)} items processed.")
-            # Update review panel with results
-            self.review_panel.set_results(results)
-            # Switch to review tab
+            # The review panel will automatically refresh from the master table
+            # No need to call set_results - just switch to review tab
             self.tabs.setCurrentIndex(2)
         else:
             self.update_status("Batch processing failed or was cancelled.")
@@ -397,12 +396,14 @@ class BatchSpecGUI(QMainWindow):
                 else:
                     self.update_status("Configure processing settings and run batch processing.")
             elif index == 2:  # Review
-                if len(self.batch_results) == 0:
+                completed_count = self.controller.get_completed_item_count()
+                if completed_count == 0:
                     self.update_status("No results to review. Run batch processing first.")
                 else:
-                    self.update_status(f"Reviewing {len(self.batch_results)} batch results. Select items to edit or reprocess.")
+                    self.update_status(f"Reviewing {completed_count} batch results. Select items to edit or reprocess.")
             elif index == 3:  # Export
-                if len(self.batch_results) == 0:
+                completed_count = self.controller.get_completed_item_count()
+                if completed_count == 0:
                     self.update_status("No results to export. Run batch processing first.")
                 else:
                     self.update_status("Export batch results to CSV or individual JSON files.")
@@ -466,7 +467,7 @@ class BatchSpecGUI(QMainWindow):
         self.config_panel.load_configuration()
         
         # If successful, update state
-        if len(self.controller.batch_items) > 0:
+        if self.controller.get_item_count() > 0:
             self.has_unsaved_changes = False
             self.update_window_title()
             self.update_tab_states()
@@ -667,4 +668,3 @@ class BatchSpecGUI(QMainWindow):
             self.processing_panel.cancel_processing()
         
         event.accept()
-

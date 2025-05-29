@@ -1,5 +1,32 @@
-""" Spectrum class to read in, analyze and measure absorption lines."""
-import numpy as np
+__version__ = "2.3.2"
+__author__ = "Rongmon Bordoloi"
+__last_updated__ = "May 2025"
+
+"""
+rb_spec.py - Comprehensive Absorption Line Analysis Pipeline
+
+Version: {version}
+Author: {author}
+Last Updated: {last_updated}
+
+Version History:
+- v1.0.0 (2018): Initial release
+- v1.1.0 (2020): Added linetools integration
+- v1.2.0 (2021): Velocity centroid estimates
+- v1.5.0 (2022): Major API redesign, new calling sequence
+- v2.0.0 (2024): Interactive GUIs, JSON serialization
+- v2.1.0 (2024): Enhanced continuum fitting, improved error handling
+- v2.2.0 (2025): Brand new continuum fitting methods (interactive+using BIC to compute correct polynomial order), updated EW routine, added metadata to output json
+- v2.3.0 (2025): Continuum mask added to output, display_field_info module added 
+- v2.3.1 (2025): Fixed logN text in plot_continuum routine
+- v2.3.2 (2025): Unified version declaration, minor cleanup
+""".format(
+    version=__version__,
+    author=__author__,
+    last_updated=__last_updated__
+)
+
+
 from scipy.interpolate import splrep,splev
 from numpy.polynomial.legendre import Legendre
 import sys
@@ -21,7 +48,9 @@ except:
     from IGM import compute_EW as EW
     from IGM import rb_setline as s
 
-
+def get_version():
+    """Return the current version of rb_spec."""
+    return __version__
 
 
 def load_rb_spec_object(filename, verbose=True):
@@ -309,6 +338,12 @@ class rb_spec(object):
         self.continuum_masks = []  # Store velocity ranges for masking
         self.continuum_mask_wavelengths = []  # Store corresponding wavelength ranges
         self.continuum_fit_params = {}  # Store parameters used for continuum fitting
+
+    @property
+    def version(self):
+        """Return the rb_spec version."""
+        return __version__
+    
     
     @classmethod
     def from_file(cls, filename, filetype=False, efil=None, **kwargs):
@@ -1333,8 +1368,8 @@ class rb_spec(object):
             
             # Add hint about column density if available
             if hasattr(self, 'logN') and hasattr(self, 'logN_e'):
-                log_N = np.log10(self.logN)
-                log_N_err = 0.434 * self.logN_e/self.logN if self.logN > 0 else 0
+                log_N =self.logN
+                log_N_err = self.logN_e
                 if verbose:
                     print(f"Hint: Column density: log N = {log_N:.2f} ± {log_N_err:.2f}")
                 

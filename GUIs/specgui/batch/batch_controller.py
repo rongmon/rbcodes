@@ -23,6 +23,8 @@ class BatchController(QObject):
         super().__init__()
         self.master_table = MasterBatchTable()
         self.error_log = []  # List of errors during processing
+        self.config_load_directory = None  # Track where config was loaded from
+
         
         # Default batch settings
         self.batch_settings = {
@@ -40,6 +42,32 @@ class BatchController(QObject):
         self.master_table.item_removed.connect(lambda: self.table_changed.emit())
         self.master_table.item_updated.connect(self._on_item_updated)
         self.master_table.table_cleared.connect(lambda: self.table_changed.emit())
+
+
+    def load_batch_configuration(self, filepath: str) -> bool:
+        """Load a batch configuration using hybrid format."""
+        try:
+            with open(filepath, 'r') as f:
+                data = json.load(f)
+            
+            # Load master table
+            self.master_table.from_dict(data)
+            
+            # Load batch settings if available
+            if 'batch_settings' in data:
+                self.batch_settings.update(data['batch_settings'])
+            
+            # Store the directory where config was loaded from
+            self.config_load_directory = os.path.dirname(filepath)
+            
+            # RECREATE rb_spec objects for completed items
+            self._recreate_rb_spec_objects()
+            
+            self.status_updated.emit(f"Batch configuration loaded from {filepath}")
+            return True
+        except Exception as e:
+            self.status_updated.emit(f"Error loading batch configuration: {str(e)}")
+            return False
     
     def _on_item_updated(self, item_id: str, what_changed: str):
         """Handle item updates from master table."""
@@ -641,8 +669,9 @@ class BatchController(QObject):
         """Import template from CSV."""
         return self.master_table.import_template_csv(filepath)
     
+
     def export_results_csv(self, filepath: str) -> bool:
-        """Export batch results to a CSV file."""
+        """Export batch results to a CSV file with enhanced fields including velocity centroid and dispersion."""
         try:
             import csv
             
@@ -654,14 +683,15 @@ class BatchController(QObject):
             with open(filepath, 'w', newline='') as csvfile:
                 fieldnames = ['filename', 'redshift', 'transition', 'transition_name', 
                              'slice_vmin', 'slice_vmax', 'ew_vmin', 'ew_vmax',
-                             'W', 'W_e', 'logN', 'logN_e', 'SNR', 'status']
+                             'W', 'W_e', 'logN', 'logN_e', 'SNR', 
+                             'vel_centroid', 'vel_disp', 'status']
                 
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
                 
                 for item in items:
                     row = {
-                        'filename': item.template.filename,
+                        'filename': os.path.basename(item.template.filename),
                         'redshift': item.template.redshift,
                         'transition': item.template.transition,
                         'transition_name': item.template.transition_name,
@@ -674,14 +704,16 @@ class BatchController(QObject):
                         'logN': item.results.logN,
                         'logN_e': item.results.logN_e,
                         'SNR': item.results.SNR,
+                        'vel_centroid': item.results.vel_centroid,
+                        'vel_disp': item.results.vel_disp,
                         'status': item.analysis.processing_status
                     }
                     writer.writerow(row)
             
-            self.status_updated.emit(f"Results exported to {filepath}")
+            self.status_updated.emit(f"Enhanced CSV results exported to {filepath}")
             return True
         except Exception as e:
-            self.status_updated.emit(f"Error exporting results: {str(e)}")
+            self.status_updated.emit(f"Error exporting enhanced CSV results: {str(e)}")
             return False
     
     def export_error_log(self, filepath: str) -> bool:
