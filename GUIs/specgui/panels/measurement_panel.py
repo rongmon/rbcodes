@@ -330,7 +330,7 @@ class MeasurementPanel(QWidget):
         ]
         
         # Add SNR if calculated
-        if 'SNR' in results and results['SNR'] > 0:
+        if 'SNR' in results:
             measurements.append(("Signal-to-Noise Ratio", f"{results.get('SNR', 0):.1f}"))
         
         # Add saturation information if available
@@ -391,11 +391,8 @@ class MeasurementPanel(QWidget):
             if self.measurement_results:
                 # Construct measurement text
                 measurement_text = ""
-                if 'W' in self.measurement_results and 'W_e' in self.measurement_results:
-                    measurement_text += f"EW = {self.measurement_results['W']:.3f} ± {self.measurement_results['W_e']:.3f} Å\n"
-                if 'logN' in self.measurement_results and 'logN_e' in self.measurement_results:
-                    measurement_text += f"log N = {self.measurement_results['logN']:.2f} ± {self.measurement_results['logN_e']:.2f}"
-                
+                measurement_text = f"EW = {self.measurement_results.get('W', 0):.3f} ± {self.measurement_results.get('W_e', 0):.3f} Å\n"
+                measurement_text += f"log N = {self.measurement_results.get('logN', 0):.2f} ± {self.measurement_results.get('logN_e', 0):.2f}"                
                 if measurement_text:
                     # Add title with transition name
                     transition_name = self.measurement_results.get('transition_name', 'Unknown')

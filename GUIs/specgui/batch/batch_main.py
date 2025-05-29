@@ -12,7 +12,7 @@ from rbcodes.GUIs.specgui.batch.panels.configuration_panel import ConfigurationP
 from rbcodes.GUIs.specgui.batch.panels.processing_panel import ProcessingPanel
 from rbcodes.GUIs.specgui.batch.panels.review_panel import ReviewPanel
 from rbcodes.GUIs.specgui.batch.panels.export_panel import ExportPanel
-
+from rbcodes.GUIs.launch_specgui import __version__
 
 class BatchSpecGUI(QMainWindow):
     """Main window for batch processing of absorption line spectra."""
@@ -247,8 +247,6 @@ class BatchSpecGUI(QMainWindow):
         self.processing_panel.batch_started.connect(self.on_batch_started)
         self.processing_panel.batch_completed.connect(self.on_batch_completed)
         
-        # Review panel signals
-        self.review_panel.items_selected.connect(self.processing_panel.set_selected_items)
         
         # Export panel signals
         self.export_panel.export_completed.connect(self.on_export_completed)
@@ -605,7 +603,7 @@ class BatchSpecGUI(QMainWindow):
             "<li>Review and edit results interactively</li>"
             "<li>Export results to CSV or individual JSON files</li>"
             "</ul>"
-            "<p>Version 1.0<br>"
+            f"<p>Version: {__version__}<br>"
             "Part of the rbcodes package</p>"
         )
     
@@ -670,62 +668,3 @@ class BatchSpecGUI(QMainWindow):
         
         event.accept()
 
-
-def launch_batch_gui():
-    """Launch the batch processing GUI."""
-    app = QApplication(sys.argv)
-    
-    # Set application properties
-    app.setApplicationName("rb_spec Batch Processing")
-    app.setApplicationVersion("1.0")
-    app.setOrganizationName("rbcodes")
-    
-    window = BatchSpecGUI()
-    window.show()
-    
-    return app.exec_()
-
-
-def main():
-    """Main entry point for the batch processing application."""
-    import argparse
-    
-    # Parse command-line arguments
-    parser = argparse.ArgumentParser(description='Launch rb_spec Batch Processing GUI')
-    parser.add_argument('config', nargs='?', help='Batch configuration file to load on startup')
-    parser.add_argument('--version', action='version', version='rb_spec Batch Processing 1.0')
-    
-    args = parser.parse_args()
-    
-    # Create application
-    app = QApplication(sys.argv)
-    app.setApplicationName("rb_spec Batch Processing")
-    app.setApplicationVersion("1.0")
-    app.setOrganizationName("rbcodes")
-    
-    # Create main window
-    window = BatchSpecGUI()
-    window.show()
-    
-    # Load configuration file if specified
-    if args.config and os.path.exists(args.config):
-        def load_config():
-            success = window.controller.load_batch_configuration(args.config)
-            if success:
-                window.config_panel.update_ui_with_config(window.controller.batch_items)
-                window.current_config_file = args.config
-                window.has_unsaved_changes = False
-                window.update_window_title()
-                window.update_tab_states()
-                window.update_status(f"Loaded configuration from {args.config}")
-            else:
-                window.update_status(f"Failed to load configuration from {args.config}")
-        
-        # Schedule config loading after GUI is fully initialized
-        QTimer.singleShot(100, load_config)
-    
-    return app.exec_()
-
-
-if __name__ == "__main__":
-    sys.exit(main())

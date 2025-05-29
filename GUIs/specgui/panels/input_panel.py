@@ -44,9 +44,15 @@ class InputPanel(QWidget):
         self.load_file_btn = QPushButton("Load File")
         self.load_file_btn.clicked.connect(self.load_from_file)
         self.load_file_btn.setToolTip("Load the selected file into the application")
+        self.load_file_btn.setMaximumWidth(120)
         
         file_layout.addLayout(file_form)
-        file_layout.addWidget(self.load_file_btn)
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()  # Left stretch
+        button_layout.addWidget(self.load_file_btn)
+        button_layout.addStretch()  # Right stretch
+        
+        file_layout.addLayout(button_layout)
         
         file_group.setLayout(file_layout)
         main_layout.addWidget(file_group)

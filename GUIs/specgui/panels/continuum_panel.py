@@ -58,7 +58,7 @@ class ContinuumPanel(QWidget):
         self.launch_btn.clicked.connect(self.launch_fitter)
         self.launch_btn.setToolTip("Open the interactive tool to fit a continuum to the spectrum")
 
-        launch_layout.addWidget(self.launch_btn)
+        #launch_layout.addWidget(self.launch_btn)
         
         # Apply flat continuum button
         self.flat_btn = QPushButton("Apply Flat Continuum")
@@ -66,8 +66,18 @@ class ContinuumPanel(QWidget):
         self.flat_btn.setEnabled(False)  # Initially disabled
         self.flat_btn.setToolTip("Use a flat line at value 1.0 as the continuum (skips fitting)")
 
-        launch_layout.addWidget(self.flat_btn)
+        #launch_layout.addWidget(self.flat_btn)
         
+        buttons_layout = QHBoxLayout()
+        buttons_layout.addWidget(self.launch_btn)
+        buttons_layout.addSpacing(10)  # Add some space between buttons
+        buttons_layout.addWidget(self.flat_btn)
+        buttons_layout.addStretch()  # Push buttons to the left, or remove for center
+        
+        launch_layout.addLayout(buttons_layout)
+        self.launch_btn.setMaximumWidth(320)
+        self.flat_btn.setMaximumWidth(320)
+
         # Status label
         self.status_label = QLabel("No continuum fitted yet")
         launch_layout.addWidget(self.status_label)

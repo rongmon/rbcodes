@@ -50,7 +50,7 @@ class ConfigurationPanel(QWidget):
         
         # Bulk import button (new)
         self.import_json_btn = QPushButton("Import Multiple JSON Files")
-        self.import_json_btn.clicked.connect(self.import_multiple_json_files_placeholder)
+        self.import_json_btn.clicked.connect(self.import_multiple_json_files)
         self.import_json_btn.setToolTip("Import multiple rb_spec JSON files to create batch items")
         
         # CSV import button
@@ -111,12 +111,84 @@ class ConfigurationPanel(QWidget):
         config_group.setLayout(config_layout)
         main_layout.addWidget(config_group)    
 
-    def import_multiple_json_files_placeholder(self):
-        """Placeholder for bulk JSON import - will implement next."""
-        QMessageBox.information(
-            self, "Coming Soon", 
-            "Multiple JSON file import will be implemented next!"
+    def import_multiple_json_files(self):
+        """Import multiple rb_spec JSON files to create batch items."""
+
+        
+
+        # Select multiple JSON files
+        options = QFileDialog.Options()
+        filepaths, _ = QFileDialog.getOpenFileNames(
+            self, "Select rb_spec JSON Files", "", 
+            "JSON Files (*.json);;All Files (*)",
+            options=options
         )
+        
+        if not filepaths:
+            return
+        imported_count = 0
+        skipped_count = 0
+        
+        for filepath in filepaths:
+            try:
+                # Load JSON data
+                with open(filepath, 'r') as f:
+                    data = json.load(f)
+                
+                # Simple check - does it have key rb_spec attributes?
+                if not all(key in data for key in ['zabs', 'trans_wave']):
+                    print(f"Skipping {os.path.basename(filepath)} - not an rb_spec file")
+                    skipped_count += 1
+                    continue
+                
+                # Extract parameters from rb_spec JSON
+                redshift = data['zabs']
+                transition = data['trans_wave']
+                transition_name = data.get('trans', f"λ {transition:.2f}")
+                linelist = data.get('linelist', 'atom')
+                
+                # Get slice ranges from velocity array if available
+                if 'velo' in data and len(data['velo']) > 0:
+                    slice_vmin = int(min(data['velo']))
+                    slice_vmax = int(max(data['velo']))
+                else:
+                    # Default slice ranges
+                    slice_vmin = -1500
+                    slice_vmax = 1500
+                
+                # Get EW ranges if available, otherwise use defaults
+                ew_vmin = data.get('vmin', -200)
+                ew_vmax = data.get('vmax', 200)
+                
+                # Create template parameters
+                template_params = TemplateParams(
+                    filename=filepath,
+                    redshift=redshift,
+                    transition=transition,
+                    transition_name=transition_name,
+                    slice_vmin=slice_vmin,
+                    slice_vmax=slice_vmax,
+                    ew_vmin=int(ew_vmin),
+                    ew_vmax=int(ew_vmax),
+                    linelist=linelist,
+                    method='closest'
+                )
+                
+                # Add to master table
+                self.controller.master_table.add_item(template_params)
+                imported_count += 1
+                
+            except Exception as e:
+                print(f"Error importing {os.path.basename(filepath)}: {e}")
+                skipped_count += 1
+        
+        # Refresh UI and show results
+        self.refresh_table()
+        self.configuration_changed.emit()
+        
+        # Show summary message
+        self.controller.status_updated.emit(f"Import completed: {imported_count} files imported, {skipped_count} files skipped")
+    
     
     def setup_table(self):
         """Setup table columns."""

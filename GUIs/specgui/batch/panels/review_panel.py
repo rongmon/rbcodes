@@ -196,14 +196,9 @@ class ReviewPanel(QWidget):
             self.results_table.setItem(row, 3, QTableWidgetItem(f"{transition_name} ({item.template.transition:.2f} Å)"))
             
             # Results
-            if item.results.W > 0:
-                ew_text = f"{item.results.W:.3f} ± {item.results.W_e:.3f}"
-                logn_text = f"{item.results.logN:.2f} ± {item.results.logN_e:.2f}"
-                snr_text = f"{item.results.SNR:.1f}" if item.results.SNR > 0 else "-"
-            else:
-                ew_text = "-"
-                logn_text = "-"
-                snr_text = "-"
+            ew_text = f"{item.results.W:.3f} ± {item.results.W_e:.3f}"
+            logn_text = f"{item.results.logN:.2f} ± {item.results.logN_e:.2f}"
+            snr_text = f"{item.results.SNR:.1f}" if item.results.SNR > 0 else "0.0"
             
             self.results_table.setItem(row, 4, QTableWidgetItem(ew_text))
             self.results_table.setItem(row, 5, QTableWidgetItem(logn_text))
@@ -378,14 +373,9 @@ class ReviewPanel(QWidget):
         logn = item.results.logN
         logn_err = item.results.logN_e
         
-        if ew > 0:
-            info_text = f"EW = {ew:.3f} ± {ew_err:.3f} Å\nlog N = {logn:.2f} ± {logn_err:.2f}"
-            
-            # Add SNR if available
-            if item.results.SNR > 0:
-                info_text += f"\nSNR = {item.results.SNR:.1f}"
-        else:
-            info_text = "No measurements available"
+        
+        info_text = f"EW = {ew:.3f} ± {ew_err:.3f} Å\nlog N = {logn:.2f} ± {logn_err:.2f}"
+        info_text += f"\nSNR = {item.results.SNR:.1f}"    
         
         self.spectrum_canvas.axes.text(0.98, 0.05, info_text, 
                                      transform=self.spectrum_canvas.axes.transAxes, 
@@ -408,18 +398,12 @@ class ReviewPanel(QWidget):
         details += f"<b>EW Range:</b> {item.template.ew_vmin} to {item.template.ew_vmax} km/s<br>"
         details += f"<b>Line List:</b> {item.template.linelist}<br>"
         
-        if item.results.W > 0:
-            details += f"<b>Equivalent Width:</b> {item.results.W:.3f} ± {item.results.W_e:.3f} Å<br>"
-            details += f"<b>Column Density (log):</b> {item.results.logN:.2f} ± {item.results.logN_e:.2f}<br>"
-            
-            if item.results.SNR > 0:
-                details += f"<b>SNR:</b> {item.results.SNR:.1f}<br>"
-            
-            if item.results.vel_centroid != 0:
-                details += f"<b>Velocity Centroid:</b> {item.results.vel_centroid:.1f} km/s<br>"
-            
-            if item.results.vel_disp != 0:
-                details += f"<b>Velocity Dispersion:</b> {item.results.vel_disp:.1f} km/s<br>"
+
+        details += f"<b>Equivalent Width:</b> {item.results.W:.3f} ± {item.results.W_e:.3f} Å<br>"
+        details += f"<b>Column Density (log):</b> {item.results.logN:.2f} ± {item.results.logN_e:.2f}<br>"
+        details += f"<b>SNR:</b> {item.results.SNR:.1f}<br>"
+        details += f"<b>Velocity Centroid:</b> {item.results.vel_centroid:.1f} km/s<br>"
+        details += f"<b>Velocity Dispersion:</b> {item.results.vel_disp:.1f} km/s<br>"
         
         details += f"<b>Status:</b> {item.analysis.processing_status.replace('_', ' ').title()}<br>"
         

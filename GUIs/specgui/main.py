@@ -220,11 +220,3 @@ class RbSpecGUI(QMainWindow):
             self.tabs.setCurrentIndex(5)
 
 
-
-    
-    
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = RbSpecGUI()
-    window.show()
-    sys.exit(app.exec_())
