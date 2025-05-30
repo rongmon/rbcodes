@@ -1099,6 +1099,10 @@ class rb_spec(object):
                 min_order = kwargs.get('min_order', 0)           
                 max_order = kwargs.get('max_order', 7)
                 # Fit the region with optimal polynomial order
+                if verbose==False:
+                    run_slient=True
+                else:
+                    run_slient=False
                 result = fit_optimal_polynomial(
                         velo_unmasked, 
                         flux_unmasked, 
@@ -1108,6 +1112,7 @@ class rb_spec(object):
                         maxiter=kwargs.get('maxiter', 25),
                         sigma=n_sigma,
                         use_weights=use_weights,
+                        silent=run_slient,
                         plot=False
                     )
                 # Now unpack each output

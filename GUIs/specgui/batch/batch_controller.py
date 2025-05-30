@@ -289,7 +289,8 @@ class BatchController(QObject):
                     mask=mask if mask else False,
                     Legendre=item.analysis.continuum_order,
                     use_weights=item.analysis.use_weights,
-                    sigma_clip=True  # Use sigma clipping for robustness
+                    optimize_cont=item.analysis.optimize_cont,
+                    sigma_clip=True
                 )
             elif method == 'flat':
                 # Use flat continuum

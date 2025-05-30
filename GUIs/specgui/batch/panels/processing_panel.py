@@ -84,6 +84,12 @@ class ProcessingPanel(QWidget):
         self.use_weights = QCheckBox()
         settings_layout.addRow("Use Weights:", self.use_weights)
         
+        # Optimized continuum fit (NEW)
+        self.optimize_cont = QCheckBox()
+        self.optimize_cont.setChecked(True)  # Default to True
+        self.optimize_cont.setToolTip("Use optimized continuum fitting algorithm for better results")
+        settings_layout.addRow("Optimized Continuum Fit:", self.optimize_cont)
+        
         # Calculate SNR
         self.calc_snr = QCheckBox()
         self.calc_snr.setChecked(True)
@@ -152,9 +158,10 @@ class ProcessingPanel(QWidget):
     
     def on_cont_method_changed(self, method):
         """Handle changes to the continuum fitting method."""
-        # Enable/disable polynomial order based on method
+        # Enable/disable polynomial order and optimize continuum based on method
         is_polynomial = method == "Polynomial"
         self.poly_order.setEnabled(is_polynomial)
+        self.optimize_cont.setEnabled(is_polynomial)  # Only enable for polynomial method
         
         # Mark settings as not applied
         self.settings_status.setText("Settings changed - click 'Apply Settings' to save.")
@@ -174,6 +181,7 @@ class ProcessingPanel(QWidget):
                 'continuum_method': continuum_method,
                 'continuum_order': self.poly_order.value(),
                 'use_weights': self.use_weights.isChecked(),
+                'optimize_cont': self.optimize_cont.isChecked(),  # NEW setting
                 'calculate_snr': self.calc_snr.isChecked(),
                 'binsize': self.binsize.value(),
             }
@@ -191,6 +199,7 @@ class ProcessingPanel(QWidget):
                     continuum_method=settings['continuum_method'],
                     continuum_order=settings['continuum_order'],
                     use_weights=settings['use_weights'],
+                    optimize_cont=settings['optimize_cont'],  # NEW setting
                     calculate_snr=settings['calculate_snr'],
                     binsize=settings['binsize']
                 )
@@ -201,7 +210,8 @@ class ProcessingPanel(QWidget):
             
             # Show summary
             method_name = "Polynomial" if continuum_method == "polynomial" else "Flat"
-            summary = f"Applied: {method_name} continuum, SNR={settings['calculate_snr']}"
+            opt_status = "optimized" if settings['optimize_cont'] and continuum_method == "polynomial" else "standard"
+            summary = f"Applied: {method_name} continuum ({opt_status}), SNR={settings['calculate_snr']}"
             self.controller.status_updated.emit(summary)
             
         except Exception as e:

@@ -38,7 +38,7 @@ class MasterBatchTable(QObject):
             
             # Analysis state
             'continuum_method', 'continuum_order', 'continuum_masks', 'continuum_fit_params',
-            'use_weights', 'calculate_snr', 'binsize', 'processing_status', 'last_modified', 'error_message',
+            'use_weights', 'optimize_cont', 'calculate_snr', 'binsize', 'processing_status', 'last_modified', 'error_message',
             
             # Results
             'W', 'W_e', 'N', 'N_e', 'logN', 'logN_e', 'vel_centroid', 'vel_disp', 'SNR', 'calculation_timestamp'
@@ -97,6 +97,7 @@ class MasterBatchTable(QObject):
             'continuum_masks': '[]',  # Store as JSON string
             'continuum_fit_params': '{}',
             'use_weights': False,
+            'optimize_cont': True,  # NEW: Default to True for optimized continuum fit
             'calculate_snr': True,
             'binsize': 3,
             'processing_status': 'ready',
@@ -157,6 +158,7 @@ class MasterBatchTable(QObject):
                     'continuum_order': row['continuum_order'],
                     'continuum_masks': eval(row['continuum_masks']) if row['continuum_masks'] else [],
                     'use_weights': row['use_weights'],
+                    'optimize_cont': row['optimize_cont'],  # NEW field
                     'calculate_snr': row['calculate_snr'],
                     'binsize': row['binsize'],
                     'error_message': row['error_message'],
@@ -298,6 +300,10 @@ class MasterBatchTable(QObject):
         if 'dataframe' in data and data['dataframe']:
             self.df = pd.DataFrame(data['dataframe'])
             
+            # Add missing columns with defaults for backward compatibility
+            if 'optimize_cont' not in self.df.columns:
+                self.df['optimize_cont'] = True  # Default to True for existing configurations
+            
             # Fix data types after loading from JSON
             if not self.df.empty:
                 # Convert numeric columns that might be loaded as strings/objects
@@ -316,73 +322,7 @@ class MasterBatchTable(QObject):
                         self.df[col] = pd.to_numeric(self.df[col], errors='coerce').fillna(0.0).astype('float64')
                 
                 # Convert boolean columns
-                bool_columns = ['use_weights', 'calculate_snr']
+                bool_columns = ['use_weights', 'calculate_snr', 'optimize_cont']
                 for col in bool_columns:
                     if col in self.df.columns:
                         self.df[col] = self.df[col].astype('bool')
-                               
-        else:
-            print("No dataframe found in configuration file")
-    
-    def export_template_csv(self, filepath: str) -> bool:
-        """Export just the template part as CSV."""
-        try:
-            template_columns = ['filename', 'redshift', 'transition', 'transition_name', 
-                              'slice_vmin', 'slice_vmax', 'ew_vmin', 'ew_vmax', 'linelist', 'method']
-            
-            if self.df.empty:
-                # Create empty template
-                empty_df = pd.DataFrame(columns=template_columns)
-                empty_df.to_csv(filepath, index=False)
-            else:
-                # Export existing template data
-                template_df = self.df[template_columns]
-                template_df.to_csv(filepath, index=False)
-            
-            return True
-        except Exception as e:
-            print(f"Error exporting CSV: {e}")
-            return False
-    
-    def import_template_csv(self, filepath: str) -> Tuple[bool, str]:
-        """Import template from CSV."""
-        try:
-            # Read CSV
-            df = pd.read_csv(filepath)
-            
-            if df.empty:
-                return False, "CSV file is empty"
-            
-            # Check required fields
-            required_fields = ['filename', 'redshift', 'transition', 'slice_vmin', 'slice_vmax', 'ew_vmin', 'ew_vmax']
-            missing_fields = [field for field in required_fields if field not in df.columns]
-            if missing_fields:
-                return False, f"Missing required fields: {', '.join(missing_fields)}"
-            
-            # Add each row
-            items_added = 0
-            for _, row in df.iterrows():
-                try:
-                    template_params = {
-                        'filename': row['filename'],
-                        'redshift': float(row['redshift']),
-                        'transition': float(row['transition']),
-                        'transition_name': row.get('transition_name', f"λ {float(row['transition']):.2f}"),
-                        'slice_vmin': int(row['slice_vmin']),
-                        'slice_vmax': int(row['slice_vmax']),
-                        'ew_vmin': int(row['ew_vmin']),
-                        'ew_vmax': int(row['ew_vmax']),
-                        'linelist': row.get('linelist', 'atom'),
-                        'method': row.get('method', 'closest')
-                    }
-                    
-                    self.add_item(template_params)
-                    items_added += 1
-                    
-                except (ValueError, KeyError) as e:
-                    print(f"Error parsing row: {e}")
-            
-            return True, f"Imported {items_added} items successfully"
-            
-        except Exception as e:
-            return False, f"Error reading CSV file: {str(e)}"
