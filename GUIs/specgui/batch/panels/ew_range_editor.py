@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt5.QtCore import Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+import copy
 
 class MatplotlibCanvas(FigureCanvasQTAgg):
     """Canvas for matplotlib plots in the EW editor."""
@@ -284,7 +285,15 @@ def _update_ew_range_in_master_table(item, new_ew_vmin, new_ew_vmax, calculate_s
             print("ERROR: Failed to get updated item from master table")
             return False
         
-        updated_spec = _generate_spectrum_from_item(updated_item)
+        
+        master_spec = controller.master_table.get_rb_spec_object(item.row_index)
+        if master_spec:
+            updated_spec = copy.deepcopy(master_spec)
+        else:
+            # Fallback - but this shouldn't happen
+            updated_spec = None
+
+
         if not updated_spec:
             print("ERROR: Failed to generate spectrum")
             return False

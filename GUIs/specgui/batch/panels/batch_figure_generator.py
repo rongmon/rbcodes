@@ -30,7 +30,7 @@ plt.rcParams.update({
     'ytick.major.width': 0.5
 })
 
-def create_individual_figures(items, output_directory, file_format='pdf'):
+def create_individual_figures(items, output_directory, file_format='pdf', master_table=None):
     """
     Create individual figure files for each batch item.
     
@@ -42,6 +42,8 @@ def create_individual_figures(items, output_directory, file_format='pdf'):
         Directory to save figures
     file_format : str
         Output format ('pdf' or 'png')
+    master_table : MasterBatchTable
+        Master table containing rb_spec objects
     
     Returns
     -------
@@ -53,10 +55,10 @@ def create_individual_figures(items, output_directory, file_format='pdf'):
     success_count = 0
     error_count = 0
     
-    for item in items:
+    for i, item in enumerate(items):
         try:
-            # Get rb_spec object
-            spec_object = _get_spec_object(item)
+            # Get rb_spec object using row index
+            spec_object = _get_spec_object(item, master_table, i)
             if spec_object is None:
                 print(f"Cannot create figure for {item.template.transition_name}: No rb_spec object")
                 error_count += 1
@@ -89,7 +91,7 @@ def create_individual_figures(items, output_directory, file_format='pdf'):
     
     return success_count, error_count
 
-def create_multipage_pdf(items, output_path):
+def create_multipage_pdf(items, output_path, master_table=None):
     """
     Create a multi-page PDF with 6 transitions per page.
     
@@ -99,6 +101,8 @@ def create_multipage_pdf(items, output_path):
         List of batch items from master table
     output_path : str
         Path for output PDF file
+    master_table : MasterBatchTable
+        Master table containing rb_spec objects
     
     Returns
     -------
@@ -108,8 +112,8 @@ def create_multipage_pdf(items, output_path):
     try:
         # Filter items that have rb_spec objects
         valid_items = []
-        for item in items:
-            spec_object = _get_spec_object(item)
+        for i, item in enumerate(items):
+            spec_object = _get_spec_object(item, master_table, i)
             if spec_object is not None:
                 valid_items.append((item, spec_object))
         
@@ -138,74 +142,79 @@ def create_multipage_pdf(items, output_path):
         print(f"Error creating multi-page PDF: {str(e)}")
         return False
 
-def _get_spec_object(item):
-    """Get rb_spec object for an item, recreating if necessary."""
-    # Try to get existing object first
-    if hasattr(item, 'rb_spec_object') and item.rb_spec_object is not None:
-        return item.rb_spec_object
+def _get_spec_object(item, master_table, row_index):
+    """Get rb_spec object - use existing one from master table."""
     
-    # Try to recreate from parameters
-    return _recreate_spec_object(item)
-
-def _recreate_spec_object(item):
-    """Recreate rb_spec object from item parameters."""
-    try:
-        from rbcodes.GUIs.rb_spec import rb_spec, load_rb_spec_object
-        
-        # Load the spectrum file
-        if item.template.filename.lower().endswith('.json'):
-            spec = load_rb_spec_object(item.template.filename)
-        else:
-            ext = os.path.splitext(item.template.filename)[1].lower()
-            if ext == '.fits':
-                filetype = 'linetools'
-            elif ext in ['.txt', '.dat']:
-                filetype = 'ascii'
-            else:
-                filetype = None
-                
-            spec = rb_spec.from_file(item.template.filename, filetype=filetype)
-        
-        # Apply processing steps
-        spec.shift_spec(item.template.redshift)
-        spec.slice_spec(
-            item.template.transition,
-            item.template.slice_vmin, item.template.slice_vmax,
-            use_vel=True,
-            linelist=item.template.linelist
-        )
-        
-        # Recreate continuum fit
-        method = item.analysis.continuum_method
-        if method == 'polynomial':
-            mask = []
-            for vmin, vmax in item.analysis.continuum_masks:
-                mask.extend([vmin, vmax])
-            
-            spec.fit_continuum(
-                mask=mask if mask else False,
-                Legendre=item.analysis.continuum_order,
-                use_weights=item.analysis.use_weights,
-                sigma_clip=True
-            )
-        elif method == 'flat':
-            spec.cont = np.ones_like(spec.flux_slice)
-            spec.fnorm = spec.flux_slice.copy()
-            spec.enorm = spec.error_slice.copy()
-        
-        # Restore results
-        spec.W = item.results.W
-        spec.W_e = item.results.W_e
-        spec.vmin = item.template.ew_vmin
-        spec.vmax = item.template.ew_vmax
-        spec.trans = item.template.transition_name
-        spec.trans_wave = item.template.transition
-        
-        return spec
-        
-    except Exception as e:
-        print(f"Error recreating rb_spec object: {e}")
+    if master_table is None:
+        print(f"No master table provided for {item.template.transition_name}")
         return None
+    
+    # Get existing object from master table
+    spec_object = master_table.get_rb_spec_object(row_index)
+    
+    if spec_object is not None:
+        return spec_object
+    
+    # If not found, object wasn't processed yet
+    print(f"No rb_spec object found for {item.template.transition_name}")
+    return None
+
+def export_batch_figures(items, output_directory, file_format='pdf', figure_type='individual', master_table=None):
+    """
+    Main function to export batch figures.
+    
+    Parameters
+    ----------
+    items : list
+        List of batch items from master table
+    output_directory : str
+        Directory to save figures
+    file_format : str
+        Output format ('pdf' or 'png')
+    figure_type : str
+        Type of output ('individual' or 'multipage')
+    master_table : MasterBatchTable
+        Master table containing rb_spec objects
+    
+    Returns
+    -------
+    success : bool
+        Whether the export was successful
+    message : str
+        Status message
+    """
+    try:
+        # Create output directory if it doesn't exist
+        if not os.path.exists(output_directory):
+            os.makedirs(output_directory)
+        
+        if figure_type == 'individual':
+            success_count, error_count = create_individual_figures(items, output_directory, file_format, master_table)
+            
+            if error_count == 0:
+                return True, f"Successfully created {success_count} individual figures"
+            else:
+                return False, f"Created {success_count} figures, {error_count} failed"
+        
+        elif figure_type == 'multipage' and file_format == 'pdf':
+            # Generate filename for multi-page PDF
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            pdf_filename = f"batch_results_{timestamp}.pdf"
+            pdf_path = os.path.join(output_directory, pdf_filename)
+            
+            success = create_multipage_pdf(items, pdf_path, master_table)
+            
+            if success:
+                return True, f"Successfully created multi-page PDF: {pdf_filename}"
+            else:
+                return False, "Failed to create multi-page PDF"
+        
+        else:
+            return False, "Multi-page option is only available for PDF format"
+    
+    except Exception as e:
+        return False, f"Error during figure export: {str(e)}"
+
 
 def _get_clean_basename(item):
     """Get clean basename for filename generation."""
@@ -366,56 +375,3 @@ def _plot_normalized_panel(spec_object, item, ax, show_xlabel=True):
     
     ax.grid(True, alpha=0.3)
 
-def export_batch_figures(items, output_directory, file_format='pdf', figure_type='individual'):
-    """
-    Main function to export batch figures.
-    
-    Parameters
-    ----------
-    items : list
-        List of batch items from master table
-    output_directory : str
-        Directory to save figures
-    file_format : str
-        Output format ('pdf' or 'png')
-    figure_type : str
-        Type of output ('individual' or 'multipage')
-    
-    Returns
-    -------
-    success : bool
-        Whether the export was successful
-    message : str
-        Status message
-    """
-    try:
-        # Create output directory if it doesn't exist
-        if not os.path.exists(output_directory):
-            os.makedirs(output_directory)
-        
-        if figure_type == 'individual':
-            success_count, error_count = create_individual_figures(items, output_directory, file_format)
-            
-            if error_count == 0:
-                return True, f"Successfully created {success_count} individual figures"
-            else:
-                return False, f"Created {success_count} figures, {error_count} failed"
-        
-        elif figure_type == 'multipage' and file_format == 'pdf':
-            # Generate filename for multi-page PDF
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            pdf_filename = f"batch_results_{timestamp}.pdf"
-            pdf_path = os.path.join(output_directory, pdf_filename)
-            
-            success = create_multipage_pdf(items, pdf_path)
-            
-            if success:
-                return True, f"Successfully created multi-page PDF: {pdf_filename}"
-            else:
-                return False, "Failed to create multi-page PDF"
-        
-        else:
-            return False, "Multi-page option is only available for PDF format"
-    
-    except Exception as e:
-        return False, f"Error during figure export: {str(e)}"

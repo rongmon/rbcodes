@@ -13,7 +13,7 @@ from matplotlib.figure import Figure
 import numpy as np
 from datetime import datetime    
 from rbcodes.GUIs.rb_spec import rb_spec, load_rb_spec_object
-
+import copy
 class MatplotlibCanvas(FigureCanvasQTAgg):
     """Canvas for matplotlib plots."""
     
@@ -197,72 +197,26 @@ class ReviewPanel(QWidget):
                 self.current_item = selected_item
     
     def display_item_spectrum(self, item):
-        """Generate and display spectrum."""
+        """Get existing spectrum from master table and copy it for editing."""
         try:
-            spec = self._generate_spectrum_from_item(item)
-            if spec:
-                self.current_spec = spec
-                self.update_spectrum_plot(item, spec)
-                self.update_details(item, spec)
+            # Get existing rb_spec object from master table
+            master_spec = self.controller.master_table.get_rb_spec_object(self.current_row_index)
+            
+            if master_spec:
+                # Deep copy for safe editing
+                import copy
+                self.current_spec = copy.deepcopy(master_spec)
+                self.update_spectrum_plot(item, self.current_spec)
+                self.update_details(item, self.current_spec)
             else:
                 self.clear_preview()
+                print(f"No rb_spec object found for {item.template.transition_name}")
         except Exception as e:
             self.clear_preview()
+            print(f"Error getting spectrum: {e}")
 
-    def _generate_spectrum_from_item(self, item):
-        """Generate rb_spec object from item parameters."""
-        try:
-            # Load spectrum file
-            if item.template.filename.lower().endswith('.json'):
-                spec = load_rb_spec_object(item.template.filename)
-            else:
-                ext = os.path.splitext(item.template.filename)[1].lower()
-                filetype = 'linetools' if ext == '.fits' else ('ascii' if ext in ['.txt', '.dat'] else None)
-                spec = rb_spec.from_file(item.template.filename, filetype=filetype)
-            
-            # Apply parameters
-            spec.shift_spec(item.template.redshift)
-            spec.slice_spec(
-                item.template.transition,
-                item.template.slice_vmin, item.template.slice_vmax,
-                use_vel=True,
-                linelist=item.template.linelist
-            )
-            
-            # Apply continuum
-            if item.analysis.continuum_method == 'polynomial':
-                mask = []
-                for vmin, vmax in item.analysis.continuum_masks:
-                    mask.extend([vmin, vmax])
-                spec.fit_continuum(
-                    mask=mask if mask else False,
-                    Legendre=item.analysis.continuum_order,
-                    use_weights=item.analysis.use_weights
-                )
-            else:
-                spec.cont = np.ones_like(spec.flux_slice)
-                spec.fnorm = spec.flux_slice.copy()
-                spec.enorm = spec.error_slice.copy()
-            
-            # Apply EW results
-            if item.results.W > 0:
-                spec.W = item.results.W
-                spec.W_e = item.results.W_e
-                spec.N = item.results.N
-                spec.N_e = item.results.N_e
-                spec.logN = item.results.logN
-                spec.logN_e = item.results.logN_e
-                spec.vel_centroid = item.results.vel_centroid
-                spec.vel_disp = item.results.vel_disp
-                spec.SNR = item.results.SNR
-                spec.vmin = item.template.ew_vmin
-                spec.vmax = item.template.ew_vmax
-                spec.trans = item.template.transition_name
-                spec.trans_wave = item.template.transition
-            
-            return spec
-        except Exception as e:
-            return None
+
+
     
     def update_spectrum_plot(self, item, spec):
         """Update spectrum plot."""
@@ -387,8 +341,8 @@ class ReviewPanel(QWidget):
             if result is None or result.get('cancelled', True):
                 self.controller.status_updated.emit("Continuum fitting cancelled.")
                 return
-            
-            # Update master table using row index
+                        
+            # Process masks
             if 'masks' in result:
                 masks = result['masks']
                 mask_tuples = []
@@ -396,42 +350,74 @@ class ReviewPanel(QWidget):
                     if i + 1 < len(masks):
                         mask_tuples.append((masks[i], masks[i+1]))
                 
-                # Apply continuum to current spectrum
-                if self.current_item.analysis.continuum_method == 'polynomial':
+                # Save variables before any master table operations
+                working_spec = self.current_spec
+                working_item = self.current_item
+                
+                # Apply continuum to working spectrum
+                if result.get('fit_method') == 'polynomial':
+                    # Use polynomial fitting with updated order
                     mask = []
                     for vmin, vmax in mask_tuples:
                         mask.extend([vmin, vmax])
-                    self.current_spec.fit_continuum(
+                    
+                    best_order = result.get('best_order', working_item.analysis.continuum_order)
+                    working_spec.fit_continuum(
                         mask=mask if mask else False,
-                        Legendre=self.current_item.analysis.continuum_order,
-                        use_weights=self.current_item.analysis.use_weights
-                    )
-                
-                # Recalculate EW if we have existing results
-                if hasattr(self.current_item, 'results') and self.current_item.results.W > 0:
-                    self.current_spec.compute_EW(
-                        self.current_item.template.transition,
-                        vmin=self.current_item.template.ew_vmin,
-                        vmax=self.current_item.template.ew_vmax,
-                        SNR=self.current_item.analysis.calculate_snr,
-                        _binsize=self.current_item.analysis.binsize
+                        Legendre=best_order,
+                        use_weights=working_item.analysis.use_weights
                     )
                     
-                    # Update results in master table using row index
-                    self.controller.master_table.update_results(
-                        self.current_row_index,
-                        W=self.current_spec.W,
-                        W_e=self.current_spec.W_e,
-                        N=self.current_spec.N,
-                        N_e=self.current_spec.N_e,
-                        logN=self.current_spec.logN,
-                        logN_e=self.current_spec.logN_e,
-                        vel_centroid=getattr(self.current_spec, 'vel_centroid', 0),
-                        vel_disp=getattr(self.current_spec, 'vel_disp', 0),
-                        SNR=getattr(self.current_spec, 'SNR', 0)
+                    # Store method info for later master table update
+                    continuum_method = "polynomial"
+                    continuum_order = best_order
+
+                
+                
+                elif result.get('fit_method') == 'spline':
+                    # Use pre-fitted spline continuum
+                    cont = result.get('continuum')
+                    working_spec.fit_continuum(prefit_cont=cont)
+                    
+                    # Store method info for later master table update
+                    continuum_method = "polynomial"
+                    continuum_order = result.get('spline_order', working_item.analysis.continuum_order)  # Indicator for spline
+                
+                # Recalculate EW on working spectrum (if we have existing results)
+                if hasattr(working_item, 'results'):
+                    working_spec.compute_EW(
+                        working_item.template.transition,
+                        vmin=working_item.template.ew_vmin,
+                        vmax=working_item.template.ew_vmax,
+                        SNR=working_item.analysis.calculate_snr,
+                        _binsize=working_item.analysis.binsize
                     )
                 
-                # Update analysis in master table using row index
+                # Now update master table with all the results (do this AFTER all rb_spec work is done)
+                
+                # Update method and order
+                self.controller.master_table.update_analysis(
+                    self.current_row_index,
+                    continuum_method=continuum_method,
+                    continuum_order=continuum_order
+                )
+                
+                # Update results (if EW was calculated)
+                if hasattr(working_item, 'results') and working_item.results.W > 0:
+                    self.controller.master_table.update_results(
+                        self.current_row_index,
+                        W=working_spec.W,
+                        W_e=working_spec.W_e,
+                        N=working_spec.N,
+                        N_e=working_spec.N_e,
+                        logN=working_spec.logN,
+                        logN_e=working_spec.logN_e,
+                        vel_centroid=getattr(working_spec, 'vel_centroid', 0),
+                        vel_disp=getattr(working_spec, 'vel_disp', 0),
+                        SNR=getattr(working_spec, 'SNR', 0)
+                    )
+                
+                # Update masks and status
                 self.controller.master_table.update_analysis(
                     self.current_row_index,
                     continuum_masks=mask_tuples,
@@ -439,10 +425,15 @@ class ReviewPanel(QWidget):
                     last_modified=datetime.now().isoformat()
                 )
                 
-                # Update rb_spec object in master table
-                self.controller.master_table.set_rb_spec_object(self.current_row_index, self.current_spec)
+                # Store the working rb_spec object in master table
+                self.controller.master_table.set_rb_spec_object(self.current_row_index, working_spec)
                 
-                # SIMPLE APPROACH: Repopulate table + Update preview
+                # Get fresh copy from master table for continued editing
+                master_spec = self.controller.master_table.get_rb_spec_object(self.current_row_index)
+                if master_spec:
+                    self.current_spec = copy.deepcopy(master_spec)
+                
+                # Refresh UI
                 self.refresh_results_table()
                 
                 # Get fresh item and update preview
@@ -453,7 +444,6 @@ class ReviewPanel(QWidget):
                     self.update_details(self.current_item, self.current_spec)
                 
                 self.controller.status_updated.emit("Continuum updated successfully!")
-                
         except Exception as e:
             self.controller.status_updated.emit(f"Error editing continuum: {str(e)}")    
     
@@ -486,8 +476,14 @@ class ReviewPanel(QWidget):
                 updated_item = self.controller.master_table.get_item(self.current_row_index)
                 
                 if updated_item:
-                    # Generate fresh spectrum from updated item
-                    updated_spec = self._generate_spectrum_from_item(updated_item)
+                    
+                    master_spec = self.controller.master_table.get_rb_spec_object(self.current_row_index)
+                    if master_spec:
+                        updated_spec = copy.deepcopy(master_spec)
+                        self.current_spec = updated_spec
+                    else:
+                        updated_spec = None
+                        self.controller.status_updated.emit("Failed to get rb_spec object from master table.")
                     
                     if updated_spec:
                         # Update current references to the fresh data

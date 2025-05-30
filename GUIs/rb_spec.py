@@ -1004,6 +1004,7 @@ class rb_spec(object):
             self.cont = result.get('continuum')
             self.continuum_fit_params = result.get('fit_params', {})
             self.continuum_fit_params['method'] = 'interactive'
+            self.continuum_fit_params['legendre_order'] = result.get('best_order', Legendre)
             
             # Calculate normalized flux and error
             if self.cont is not None:
@@ -1113,6 +1114,8 @@ class rb_spec(object):
                 fit_error = result['fit_error']
                 fit_model = result['model']
                 fitter = result['fitter']
+                self.continuum_fit_params['legendre_order'] = result.get('best_order', Legendre)
+
             else: 
                 # Call rb_iter_contfit with only unmasked points
                 result = rb_iter_contfit(
@@ -1129,7 +1132,8 @@ class rb_spec(object):
                 fit_error = result['fit_error']
                 fit_model = result['model']
                 fitter = result['fitter']
-            
+                self.continuum_fit_params['legendre_order'] = order
+
             # Generate continuum over the full range
             cont = fit_model(self.velo)
             
@@ -1615,7 +1619,7 @@ class rb_spec(object):
             data_out['metadata'] = {
                 'field_descriptions': field_descriptions,
                 'timestamp': datetime.datetime.now().isoformat(),
-                'rbcodes_version': '1.0.0'  # Replace with actual version
+                'rbcodes_version': __version__
             }
         
 

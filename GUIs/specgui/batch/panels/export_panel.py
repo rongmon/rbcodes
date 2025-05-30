@@ -519,14 +519,10 @@ class ExportPanel(QWidget):
         success_count = 0
         error_count = 0
         
-        for item in items:
+        for row_index, item in enumerate(items):
             try:
-                # Get or recreate rb_spec object
-                spec_object = self.controller.master_table.get_rb_spec_object(item.id)
-                
-                if spec_object is None:
-                    # Try to recreate the rb_spec object
-                    spec_object = self._recreate_rb_spec_object(item)
+                # Get rb_spec object from master table using row index
+                spec_object = self.controller.master_table.get_rb_spec_object(row_index)
                 
                 if spec_object is None:
                     print(f"Cannot export {item.template.transition_name}: No rb_spec object available")
@@ -561,79 +557,8 @@ class ExportPanel(QWidget):
             f"JSON export completed: {success_count} successful, {error_count} failed"
         )
         
-        return success_count, error_count
-    
-    def _recreate_rb_spec_object(self, item):
-        """Recreate rb_spec object for export if not available."""
-        try:
-            # Use the same logic as in batch_controller._recreate_single_rb_spec
-            from rbcodes.GUIs.rb_spec import rb_spec, load_rb_spec_object
-            import numpy as np
-            
-            # Load the spectrum file
-            if item.template.filename.lower().endswith('.json'):
-                spec = load_rb_spec_object(item.template.filename)
-            else:
-                ext = os.path.splitext(item.template.filename)[1].lower()
-                if ext == '.fits':
-                    filetype = 'linetools'
-                elif ext in ['.txt', '.dat']:
-                    filetype = 'ascii'
-                else:
-                    filetype = None
-                    
-                spec = rb_spec.from_file(item.template.filename, filetype=filetype)
-            
-            # Apply redshift
-            spec.shift_spec(item.template.redshift)
-            
-            # Slice spectrum
-            spec.slice_spec(
-                item.template.transition,
-                item.template.slice_vmin, item.template.slice_vmax,
-                use_vel=True,
-                linelist=item.template.linelist
-            )
-            
-            # Recreate continuum fit
-            method = item.analysis.continuum_method
-            if method == 'polynomial':
-                mask = []
-                for vmin, vmax in item.analysis.continuum_masks:
-                    mask.extend([vmin, vmax])
-                
-                spec.fit_continuum(
-                    mask=mask if mask else False,
-                    Legendre=item.analysis.continuum_order,
-                    use_weights=item.analysis.use_weights,
-                    sigma_clip=True
-                )
-            elif method == 'flat':
-                spec.cont = np.ones_like(spec.flux_slice)
-                spec.fnorm = spec.flux_slice.copy()
-                spec.enorm = spec.error_slice.copy()
-            
-            # Restore the EW calculation results
-            spec.W = item.results.W
-            spec.W_e = item.results.W_e
-            spec.N = item.results.N
-            spec.N_e = item.results.N_e
-            spec.logN = item.results.logN
-            spec.logN_e = item.results.logN_e
-            spec.vel_centroid = item.results.vel_centroid
-            spec.vel_disp = item.results.vel_disp
-            spec.SNR = item.results.SNR
-            spec.vmin = item.template.ew_vmin
-            spec.vmax = item.template.ew_vmax
-            spec.trans = item.template.transition_name
-            spec.trans_wave = item.template.transition
-            
-            return spec
-            
-        except Exception as e:
-            print(f"Error recreating rb_spec object: {e}")
-            return None
-    
+        return success_count, error_count    
+
     def _resolve_filename_conflict(self, filepath):
         """Resolve filename conflicts by appending numbers."""
         if not os.path.exists(filepath):
@@ -696,14 +621,15 @@ class ExportPanel(QWidget):
         
         # Import and use the figure generator
         try:
-            from .batch_figure_generator import export_batch_figures
+            from rbcodes.GUIs.specgui.batch.panels.batch_figure_generator import export_batch_figures
             
             success, message = export_batch_figures(
-                completed_items, 
-                directory, 
-                file_format, 
-                figure_type
-            )
+                    completed_items, 
+                    directory, 
+                    file_format, 
+                    figure_type,
+                    master_table=self.controller.master_table  # Add this
+                )
             
             if success:
                 # Send status message instead of popup

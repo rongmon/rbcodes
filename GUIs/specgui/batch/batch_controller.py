@@ -23,16 +23,6 @@ class BatchController(QObject):
         self.master_table = MasterBatchTable()
         self.error_log = []  # List of errors during processing
         self.config_load_directory = None  # Track where config was loaded from
-
-        
-        # Default batch settings
-        self.batch_settings = {
-            'continuum_method': 'polynomial',  # 'polynomial', 'flat'
-            'polynomial_order': 3,
-            'use_weights': False,
-            'calculate_snr': True,
-            'binsize': 3,
-        }
         
         # Connect master table signals
         self.master_table.item_added.connect(lambda: self.table_changed.emit())
@@ -40,20 +30,14 @@ class BatchController(QObject):
         self.master_table.item_updated.connect(self._on_item_updated)
         self.master_table.table_cleared.connect(lambda: self.table_changed.emit())
 
-
     def load_batch_configuration(self, filepath: str) -> bool:
         """Load a batch configuration using hybrid format."""
         try:        
             with open(filepath, 'r') as f:
                 data = json.load(f)
             
-            
             # Load master table
             self.master_table.from_dict(data)
-            
-            # Load batch settings if available
-            if 'batch_settings' in data:
-                self.batch_settings.update(data['batch_settings'])
             
             # Store the directory where config was loaded from
             self.config_load_directory = os.path.dirname(filepath)
@@ -68,7 +52,6 @@ class BatchController(QObject):
             error_msg = f"Error loading batch configuration: {str(e)}"
             self.status_updated.emit(error_msg)
             return False
-        
 
     def _on_item_updated(self, row_index: int, what_changed: str):
         """Handle item updates from master table."""
@@ -84,8 +67,6 @@ class BatchController(QObject):
             elif what_changed == 'ew_range':
                 self.status_updated.emit(f"EW range updated - will need recalculation")
 
-
-    
     # Properties for backward compatibility
     @property
     def batch_items(self):
@@ -122,11 +103,6 @@ class BatchController(QObject):
         self.master_table.clear_all()
         self.error_log.clear()
     
-    def update_batch_settings(self, settings):
-        """Update the batch processing settings."""
-        self.batch_settings.update(settings)
-        self.status_updated.emit("Batch settings updated.")
-    
     def validate_all_items(self):
         """Validate all items in the master table."""
         valid_ids, invalid_items = self.master_table.validate_all()
@@ -141,7 +117,6 @@ class BatchController(QObject):
         
         self.status_updated.emit(f"All {len(valid_ids)} batch items are valid.")
         return True, f"All {len(valid_ids)} items valid"
-    
 
     def process_batch(self, selected_row_indices=None):
         """
@@ -177,19 +152,6 @@ class BatchController(QObject):
         
         self.status_updated.emit(f"Starting batch processing of {len(items_to_process)} items...")
         self.error_log.clear()
-        
-        # Create output directory if needed
-        if self.batch_settings['save_individual_json'] and self.batch_settings['output_directory']:
-            output_dir = self.batch_settings['output_directory']
-            if not os.path.exists(output_dir):
-                try:
-                    os.makedirs(output_dir)
-                    self.status_updated.emit(f"Created output directory: {output_dir}")
-                except Exception as e:
-                    error_msg = f"Failed to create output directory: {str(e)}"
-                    self.status_updated.emit(error_msg)
-                    self.error_log.append(error_msg)
-                    return False, []
         
         # Process each item
         results_old_format = []  # For backward compatibility
@@ -273,9 +235,8 @@ class BatchController(QObject):
         else:
             self.status_updated.emit("Batch processing completed successfully.")
         
-        return len(self.error_log) == 0, results_old_format    
+        return len(self.error_log) == 0, results_old_format
 
-    
     def _process_single_item(self, row_index: int) -> bool:
         """Process a single batch item using the master table."""
         try:
@@ -315,7 +276,7 @@ class BatchController(QObject):
                 linelist=item.template.linelist
             )
             
-            # Fit continuum based on settings
+            # Fit continuum based on settings from master table
             method = item.analysis.continuum_method
             if method == 'polynomial':
                 # Build mask from continuum_masks
@@ -373,128 +334,12 @@ class BatchController(QObject):
             self.master_table.update_analysis(row_index, 
                                             processing_status="error", 
                                             error_message=error_msg)
-            return False    
-
-
-    
-    def recalculate_item(self, item_id: str, what_changed: str) -> bool:
-        """Recalculate a specific item based on what changed."""
-        
-        item = self.master_table.get_item(item_id)
-        if not item:
             return False
-        
-        if not item.rb_spec_object:
-            return False
-        
-            
-        item = self.master_table.get_item(item_id)
-        if not item or not item.rb_spec_object:
-            return False
-        
-        try:
-            spec = item.rb_spec_object
-            
-            recalc_needed = item.needs_recalculation(what_changed)
-            
-            if 'slice' in recalc_needed:
-                # Need to re-slice spectrum
-                spec.shift_spec(item.template.redshift)
-                spec.slice_spec(
-                    item.template.transition,
-                    item.template.slice_vmin, item.template.slice_vmax,
-                    use_vel=True,
-                    linelist=item.template.linelist
-                )
-            
-            if 'continuum' in recalc_needed:
-                # Need to refit continuum
-                method = item.analysis.continuum_method
-                if method == 'polynomial':
-                    # Build mask from continuum_masks
-                    mask = []
-                    for vmin, vmax in item.analysis.continuum_masks:
-                        mask.extend([vmin, vmax])
-                    
-                    spec.fit_continuum(
-                        mask=mask if mask else False,
-                        Legendre=item.analysis.continuum_order,
-                        use_weights=item.analysis.use_weights,
-                        sigma_clip=True
-                    )
-                elif method == 'flat':
-                    spec.cont = np.ones_like(spec.flux_slice)
-                    spec.fnorm = spec.flux_slice.copy()
-                    spec.enorm = spec.error_slice.copy()
-            
-            if 'ew' in recalc_needed:
-                # Need to recalculate EW
-                spec.compute_EW(
-                    item.template.transition,
-                    vmin=item.template.ew_vmin,
-                    vmax=item.template.ew_vmax,
-                    SNR=item.analysis.calculate_snr,
-                    _binsize=item.analysis.binsize
-                )
-                
-                # Update results in master table
-                self.master_table.update_results(item.id,
-                    W=spec.W,
-                    W_e=spec.W_e,
-                    N=spec.N,
-                    N_e=spec.N_e,
-                    logN=spec.logN,
-                    logN_e=spec.logN_e,
-                    vel_centroid=getattr(spec, 'vel_centroid', 0),
-                    vel_disp=getattr(spec, 'vel_disp', 0),
-                    SNR=getattr(spec, 'SNR', 0)
-                )
-            
-            # Update processing status
-            self.master_table.update_analysis(item.id, processing_status="complete")
-            
-            return True
-            
-        except Exception as e:
-            self.master_table.update_analysis(item.id, 
-                                            processing_status="error", 
-                                            error_message=str(e))
-            return False
-    
-    def update_continuum_masks(self, item_id: str, masks: list) -> bool:
-        """Update continuum masks for an item and trigger recalculation."""
-        # Convert masks to list of tuples
-        mask_tuples = []
-        for i in range(0, len(masks), 2):
-            if i + 1 < len(masks):
-                mask_tuples.append((masks[i], masks[i+1]))
-        
-        # Update in master table
-        success = self.master_table.update_analysis(item_id, continuum_masks=mask_tuples)
-        
-        if success:
-            # Trigger recalculation
-            return self.recalculate_item(item_id, 'continuum_masks')
-        
-        return False
-    
 
-    def update_ew_range(self, item_id: str, ew_vmin: int, ew_vmax: int) -> bool:
-        
-        success = self.master_table.update_template(item_id, ew_vmin=ew_vmin, ew_vmax=ew_vmax)
-        
-        if success:
-            result = self.recalculate_item(item_id, 'ew_range')
-            return result
-        
-        return False
-
-    
     def save_batch_configuration(self, filepath: str) -> bool:
         """Save the current batch configuration using hybrid format."""
         try:
             data = self.master_table.to_dict()
-            data['batch_settings'] = self.batch_settings
             
             with open(filepath, 'w') as f:
                 json.dump(data, f, indent=2)
@@ -504,7 +349,6 @@ class BatchController(QObject):
         except Exception as e:
             self.status_updated.emit(f"Error saving batch configuration: {str(e)}")
             return False
-    
 
     def load_batch_configuration(self, filepath: str) -> bool:
         """Load a batch configuration using hybrid format."""
@@ -515,9 +359,8 @@ class BatchController(QObject):
             # Load master table
             self.master_table.from_dict(data)
             
-            # Load batch settings if available
-            if 'batch_settings' in data:
-                self.batch_settings.update(data['batch_settings'])
+            # Store the directory where config was loaded from
+            self.config_load_directory = os.path.dirname(filepath)
             
             # RECREATE rb_spec objects for completed items
             self._recreate_rb_spec_objects()
@@ -630,7 +473,7 @@ class BatchController(QObject):
             
         except Exception as e:
             print(f"Error recreating rb_spec object: {e}")
-            return False    
+            return False
     
     def export_template_csv(self, filepath: str) -> bool:
         """Export just the template part as CSV."""
@@ -639,7 +482,6 @@ class BatchController(QObject):
     def import_template_csv(self, filepath: str) -> Tuple[bool, str]:
         """Import template from CSV."""
         return self.master_table.import_template_csv(filepath)
-    
 
     def export_results_csv(self, filepath: str) -> bool:
         """Export batch results to a CSV file with enhanced fields including velocity centroid and dispersion."""
