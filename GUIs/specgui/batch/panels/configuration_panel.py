@@ -11,7 +11,6 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QColor
 
-from ..master_batch_table import TemplateParams
 
 class ConfigurationPanel(QWidget):
     """Panel for configuring batch processing items using master table."""
@@ -113,9 +112,6 @@ class ConfigurationPanel(QWidget):
 
     def import_multiple_json_files(self):
         """Import multiple rb_spec JSON files to create batch items."""
-
-        
-
         # Select multiple JSON files
         options = QFileDialog.Options()
         filepaths, _ = QFileDialog.getOpenFileNames(
@@ -126,6 +122,7 @@ class ConfigurationPanel(QWidget):
         
         if not filepaths:
             return
+        
         imported_count = 0
         skipped_count = 0
         
@@ -160,19 +157,19 @@ class ConfigurationPanel(QWidget):
                 ew_vmin = data.get('vmin', -200)
                 ew_vmax = data.get('vmax', 200)
                 
-                # Create template parameters
-                template_params = TemplateParams(
-                    filename=filepath,
-                    redshift=redshift,
-                    transition=transition,
-                    transition_name=transition_name,
-                    slice_vmin=slice_vmin,
-                    slice_vmax=slice_vmax,
-                    ew_vmin=int(ew_vmin),
-                    ew_vmax=int(ew_vmax),
-                    linelist=linelist,
-                    method='closest'
-                )
+                # Create template parameters as dict
+                template_params = {
+                    'filename': filepath,
+                    'redshift': redshift,
+                    'transition': transition,
+                    'transition_name': transition_name,
+                    'slice_vmin': slice_vmin,
+                    'slice_vmax': slice_vmax,
+                    'ew_vmin': int(ew_vmin),
+                    'ew_vmax': int(ew_vmax),
+                    'linelist': linelist,
+                    'method': 'closest'
+                }
                 
                 # Add to master table
                 self.controller.master_table.add_item(template_params)
@@ -187,8 +184,7 @@ class ConfigurationPanel(QWidget):
         self.configuration_changed.emit()
         
         # Show summary message
-        self.controller.status_updated.emit(f"Import completed: {imported_count} files imported, {skipped_count} files skipped")
-    
+        self.controller.status_updated.emit(f"Import completed: {imported_count} files imported, {skipped_count} files skipped")        
     
     def setup_table(self):
         """Setup table columns."""
@@ -397,6 +393,7 @@ class ConfigurationPanel(QWidget):
         button_box.rejected.connect(dialog.reject)
         layout.addWidget(button_box)
         
+
         # Show dialog
         if dialog.exec_() == QDialog.Accepted:
             # Get values
@@ -427,9 +424,6 @@ class ConfigurationPanel(QWidget):
                 
                 print(f"Input wavelength {trans_wavelength:.2f} Å matched to: {trans_name} ({actual_wavelength:.2f} Å)")
                 
-                # Optionally use the exact database wavelength instead of user input
-                # trans_wavelength = actual_wavelength
-                
             except Exception as e:
                 print(f"Warning: Could not find transition in database: {e}")
                 # Fallback to generic name if rb_setline fails
@@ -438,34 +432,31 @@ class ConfigurationPanel(QWidget):
                 else:
                     trans_name = trans_text.split(" (")[0]
             
-            # Get line list
-            linelist = linelist_combo.currentText()
-            
             # Get velocity ranges
             slice_min, slice_max = slice_vmin.value(), slice_vmax.value()
             ew_min, ew_max = ew_vmin.value(), ew_vmax.value()
             
-            # Create template parameters
-            template_params = TemplateParams(
-                filename=file_path,
-                redshift=z,
-                transition=trans_wavelength,
-                transition_name=trans_name,
-                slice_vmin=slice_min,
-                slice_vmax=slice_max,
-                ew_vmin=ew_min,
-                ew_vmax=ew_max,
-                linelist=linelist,
-                method='closest'
-            )
+            # Create template parameters as dict (not object)
+            template_params = {
+                'filename': file_path,
+                'redshift': z,
+                'transition': trans_wavelength,
+                'transition_name': trans_name,
+                'slice_vmin': slice_min,
+                'slice_vmax': slice_max,
+                'ew_vmin': ew_min,
+                'ew_vmax': ew_max,
+                'linelist': linelist,
+                'method': 'closest'
+            }
             
-            # Add to master table
-            self.controller.master_table.add_item(template_params)
+            # Add to master table (returns row index)
+            row_index = self.controller.master_table.add_item(template_params)
             
             # Refresh display
             self.refresh_table()
             self.configuration_changed.emit()
-    
+
     def _get_smart_defaults(self):
         """Get smart default values from existing table entries."""
         # Default values (used if no existing entries)
@@ -480,26 +471,27 @@ class ConfigurationPanel(QWidget):
         }
         
         # Get existing items from master table
-        items = self.controller.master_table.get_all_items()
+        item_count = self.controller.master_table.get_item_count()
         
-        if items:
+        if item_count > 0:
             # Use the last added item as template
-            last_item = items[-1]
-            defaults.update({
-                'filename': last_item.template.filename,
-                'redshift': last_item.template.redshift,
-                'linelist': last_item.template.linelist,
-                'slice_vmin': last_item.template.slice_vmin,
-                'slice_vmax': last_item.template.slice_vmax,
-                'ew_vmin': last_item.template.ew_vmin,
-                'ew_vmax': last_item.template.ew_vmax
-            })
-            
-            print(f"Using smart defaults from: {last_item.template.transition_name}")
-            print(f"  File: {os.path.basename(last_item.template.filename)}")
-            print(f"  Redshift: {last_item.template.redshift}")
+            last_item = self.controller.master_table.get_item(item_count - 1)
+            if last_item:
+                defaults.update({
+                    'filename': last_item.template.filename,
+                    'redshift': last_item.template.redshift,
+                    'linelist': last_item.template.linelist,
+                    'slice_vmin': last_item.template.slice_vmin,
+                    'slice_vmax': last_item.template.slice_vmax,
+                    'ew_vmin': last_item.template.ew_vmin,
+                    'ew_vmax': last_item.template.ew_vmax
+                })
+                
+                print(f"Using smart defaults from: {last_item.template.transition_name}")
+                print(f"  File: {os.path.basename(last_item.template.filename)}")
+                print(f"  Redshift: {last_item.template.redshift}")
         
-        return defaults    
+        return defaults  
     
     def refresh_table(self):
         """Refresh the table display from the master table."""
@@ -547,15 +539,11 @@ class ConfigurationPanel(QWidget):
             QMessageBox.warning(self, "No Selection", "Please select items to remove.")
             return
         
-        # Get items in order (from master table)
-        items = self.controller.master_table.get_all_items()
         
         # Remove from bottom to top to avoid index shifting
         for row in sorted(selected_rows, reverse=True):
-            if 0 <= row < len(items):
-                item_id = items[row].id
-                self.controller.master_table.remove_item(item_id)
-        
+            if 0 <= row < self.controller.master_table.get_item_count():
+                success = self.controller.master_table.remove_item(row)        
         self.refresh_table()
         self.configuration_changed.emit()
     
@@ -675,7 +663,6 @@ class ConfigurationPanel(QWidget):
             main_window = self.window()  # Get the top-level window
             if hasattr(main_window, 'review_panel'):
                 main_window.review_panel.refresh_results_table()
-                print("DEBUG: Forced review panel refresh")
             
             QMessageBox.information(
                 self, "Load Successful", 

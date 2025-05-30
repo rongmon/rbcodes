@@ -87,22 +87,6 @@ class ProcessingPanel(QWidget):
         self.binsize.setValue(3)
         settings_layout.addRow("SNR Bin Size:", self.binsize)
         
-        # Save individual JSON files
-        self.save_json = QCheckBox()
-        self.save_json.setChecked(True)
-        settings_layout.addRow("Save Individual JSON Files:", self.save_json)
-        
-        # Output directory
-        dir_layout = QHBoxLayout()
-        self.output_dir = QLabel("Not set")
-        self.browse_dir_btn = QPushButton("Browse")
-        self.browse_dir_btn.clicked.connect(self.browse_output_dir)
-        
-        dir_layout.addWidget(self.output_dir)
-        dir_layout.addWidget(self.browse_dir_btn)
-        
-        settings_layout.addRow("Output Directory:", dir_layout)
-        
 
         
         settings_group.setLayout(settings_layout)
@@ -155,16 +139,7 @@ class ProcessingPanel(QWidget):
         is_polynomial = method == "Polynomial"
         self.poly_order.setEnabled(is_polynomial)
     
-    def browse_output_dir(self):
-        """Browse for output directory."""
-        directory = QFileDialog.getExistingDirectory(
-            self, "Select Output Directory", "", 
-            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
-        )
-        
-        if directory:
-            self.output_dir.setText(directory)
-    
+
 
     def run_batch(self):
         """Run batch processing on all items."""
@@ -172,12 +147,6 @@ class ProcessingPanel(QWidget):
     
     def _start_processing(self):
         """Start the batch processing thread."""
-        # Check if output directory is set if saving JSON files
-        if (self.save_json.isChecked() and 
-            (self.output_dir.text() == "Not set" or not os.path.isdir(self.output_dir.text()))):
-            # Send status message instead of popup
-            self.controller.status_updated.emit("Please set a valid output directory for saving JSON files.")
-            return
         
         # Apply current settings directly (without popup)
         method = self.cont_method.currentText().lower()
@@ -194,8 +163,6 @@ class ProcessingPanel(QWidget):
             'use_weights': self.use_weights.isChecked(),
             'calculate_snr': self.calc_snr.isChecked(),
             'binsize': self.binsize.value(),
-            'save_individual_json': self.save_json.isChecked(),
-            'output_directory': self.output_dir.text() if self.output_dir.text() != "Not set" else ""
         }
 
         self.controller.update_batch_settings(settings)
@@ -249,4 +216,4 @@ class ProcessingPanel(QWidget):
     def on_item_failed(self, index, error):
         """Handle item failed signal."""
         # Add to error log
-        self.error_log.append(f"Error processing item {index+1}: {error}")
+        self.error_log.append(f"Error processing item {index}: {error}")

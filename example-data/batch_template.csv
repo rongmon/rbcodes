@@ -1,5 +1,0 @@
-filename,redshift,transition,transition_name,slice_vmin,slice_vmax,ew_vmin,ew_vmax,linelist,method
-/Users/bordoloi/WORK/python/rbcodes/example-data/test.fits,0.0,1550.78,CIV,-1500,1500,-200,200,atom,closest
-/Users/bordoloi/WORK/python/rbcodes/example-data/test.fits,0.0,1548.2,CIV,-1500,1500,-200,200,atom,closest
-/Users/bordoloi/WORK/python/rbcodes/example-data/test.fits,0.0,1393.76,SiIV,-1500,1500,-200,200,atom,closest
-/Users/bordoloi/WORK/python/rbcodes/example-data/test.fits,0.0,1402.77,SiIV,-1500,1500,-200,200,atom,closest

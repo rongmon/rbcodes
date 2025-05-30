@@ -164,15 +164,9 @@ class ExportPanel(QWidget):
         self.controller.table_changed.connect(self._update_defaults_on_change)
     
     def _update_defaults_on_change(self):
-        """Update default directories and filenames when batch configuration changes."""
-        # Only update if the fields are still at their default values (not user-modified)
-        if self._is_csv_path_default():
-            # Update CSV filename if it looks like our generated name
-            self._update_csv_filename()
-        
-        if self._are_directories_default():
-            # Update directories if they haven't been manually changed
-            self._update_default_directories()
+        """Update default directories when batch configuration changes - simplified."""
+        # Always update all defaults to be consistent
+        self._set_default_directories()
     
     def _is_csv_path_default(self):
         """Check if CSV path looks like our auto-generated name."""
@@ -196,18 +190,11 @@ class ExportPanel(QWidget):
         return json_dir == figure_dir  # Same directory suggests they're defaults
     
     def _update_csv_filename(self):
-        """Update just the CSV filename, keeping the directory."""
-        current_path = self.csv_path.text()
-        if current_path:
-            directory = os.path.dirname(current_path)
-            new_filename = self._generate_smart_csv_filename()
-            new_path = os.path.join(directory, new_filename)
-            self.csv_path.setText(new_path)
-        else:
-            # No current path, set full default
-            default_dir = self._get_default_directory()
-            csv_filename = self._generate_smart_csv_filename()
-            self.csv_path.setText(os.path.join(default_dir, csv_filename))
+        """Update just the CSV filename, keeping the consistent directory."""
+        # Get the consistent default directory
+        default_dir = self._get_default_directory()
+        csv_filename = self._generate_smart_csv_filename()
+        self.csv_path.setText(os.path.join(default_dir, csv_filename))
     
     def _update_default_directories(self):
         """Update the directory fields only."""
@@ -224,9 +211,9 @@ class ExportPanel(QWidget):
         self.error_path.setText(os.path.join(default_dir, error_filename))
     
     def _set_default_directories(self):
-        """Set default output directories and filenames based on batch content."""
+        """Set default output directories and filenames - all use same directory."""
         try:
-            # Get default directory using priority order
+            # Get the consistent default directory
             default_dir = self._get_default_directory()
             
             # Set smart CSV filename
@@ -239,42 +226,24 @@ class ExportPanel(QWidget):
             error_filename = f"batch_errors_{timestamp}.txt"
             error_path = os.path.join(default_dir, error_filename)
             
-            # Update UI with smart defaults
+            # Update ALL UI fields with the SAME directory
             self.csv_path.setText(csv_path)
             self.json_dir.setText(default_dir)
             self.figure_dir.setText(default_dir)
             self.error_path.setText(error_path)
-            
+                        
         except Exception as e:
             print(f"Could not set default directories: {e}")
+
     
     def _get_default_directory(self):
-        """Get the best default directory using priority order."""
+        """Get the best default directory - simplified for consistency."""
         # Priority 1: Configuration loading directory (where batch config was loaded from)
         if hasattr(self.controller, 'config_load_directory') and self.controller.config_load_directory:
             if os.path.exists(self.controller.config_load_directory):
                 return self.controller.config_load_directory
         
-        # Priority 2: Processing panel output directory (if available)
-        if hasattr(self.controller, 'batch_settings') and self.controller.batch_settings.get('output_directory'):
-            processing_dir = self.controller.batch_settings['output_directory']
-            if os.path.exists(processing_dir):
-                return processing_dir
-        
-        # Priority 3: Most common input file directory
-        items = self.controller.master_table.get_all_items()
-        if items:
-            directories = []
-            for item in items:
-                if os.path.exists(item.template.filename):
-                    directories.append(os.path.dirname(item.template.filename))
-            
-            if directories:
-                # Use most common directory
-                most_common_dir = max(set(directories), key=directories.count)
-                return most_common_dir
-        
-        # Priority 4: Current working directory
+        # Priority 2: Current working directory (fallback)
         return os.getcwd()
     
     def _generate_smart_csv_filename(self):

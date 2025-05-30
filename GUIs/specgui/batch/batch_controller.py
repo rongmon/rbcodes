@@ -6,8 +6,7 @@ from typing import Tuple
 from PyQt5.QtCore import QObject, pyqtSignal
 
 from rbcodes.GUIs.rb_spec import rb_spec, load_rb_spec_object
-from .master_batch_table import MasterBatchTable, TemplateParams
-
+from rbcodes.GUIs.specgui.batch.master_batch_table import MasterBatchTable
 
 class BatchController(QObject):
     """Controller for managing batch processing using master batch table."""
@@ -15,8 +14,8 @@ class BatchController(QObject):
     # Signals
     status_updated = pyqtSignal(str)  # For status updates
     batch_progress = pyqtSignal(int, int)  # current, total
-    batch_item_completed = pyqtSignal(str, dict)  # item_id, results
-    batch_item_failed = pyqtSignal(str, str)  # item_id, error message
+    batch_item_completed = pyqtSignal(int, dict)  # row_index, results
+    batch_item_failed = pyqtSignal(int, str)  # row_index, error message
     table_changed = pyqtSignal()  # When table structure changes
     
     def __init__(self):
@@ -33,8 +32,6 @@ class BatchController(QObject):
             'use_weights': False,
             'calculate_snr': True,
             'binsize': 3,
-            'save_individual_json': True,
-            'output_directory': '',
         }
         
         # Connect master table signals
@@ -46,9 +43,10 @@ class BatchController(QObject):
 
     def load_batch_configuration(self, filepath: str) -> bool:
         """Load a batch configuration using hybrid format."""
-        try:
+        try:        
             with open(filepath, 'r') as f:
                 data = json.load(f)
+            
             
             # Load master table
             self.master_table.from_dict(data)
@@ -65,16 +63,19 @@ class BatchController(QObject):
             
             self.status_updated.emit(f"Batch configuration loaded from {filepath}")
             return True
+            
         except Exception as e:
-            self.status_updated.emit(f"Error loading batch configuration: {str(e)}")
+            error_msg = f"Error loading batch configuration: {str(e)}"
+            self.status_updated.emit(error_msg)
             return False
-    
-    def _on_item_updated(self, item_id: str, what_changed: str):
+        
+
+    def _on_item_updated(self, row_index: int, what_changed: str):
         """Handle item updates from master table."""
         self.table_changed.emit()
         
         # Update status based on what changed
-        item = self.master_table.get_item(item_id)
+        item = self.master_table.get_item(row_index)
         if item:
             if what_changed in ['slice_range', 'major_change']:
                 self.status_updated.emit(f"Item updated - will need reprocessing")
@@ -82,6 +83,8 @@ class BatchController(QObject):
                 self.status_updated.emit(f"Continuum settings updated - will need refitting")
             elif what_changed == 'ew_range':
                 self.status_updated.emit(f"EW range updated - will need recalculation")
+
+
     
     # Properties for backward compatibility
     @property
@@ -106,25 +109,13 @@ class BatchController(QObject):
             items.append(old_format)
         return items
     
-    def add_batch_item(self, template_params: dict) -> str:
+    def add_batch_item(self, template_params: dict) -> int:
         """Add a batch item from dictionary (for backward compatibility)."""
-        params = TemplateParams(
-            filename=template_params['filename'],
-            redshift=template_params['redshift'],
-            transition=template_params['transition'],
-            transition_name=template_params.get('transition_name', 'Unknown'),
-            slice_vmin=template_params['slice_vmin'],
-            slice_vmax=template_params['slice_vmax'],
-            ew_vmin=template_params['ew_vmin'],
-            ew_vmax=template_params['ew_vmax'],
-            linelist=template_params.get('linelist', 'atom'),
-            method=template_params.get('method', 'closest')
-        )
-        return self.master_table.add_item(params)
+        return self.master_table.add_item(template_params)
     
-    def remove_batch_item(self, item_id: str) -> bool:
-        """Remove a batch item."""
-        return self.master_table.remove_item(item_id)
+    def remove_batch_item(self, row_index: int) -> bool:
+        """Remove a batch item by row index."""
+        return self.master_table.remove_item(row_index)
     
     def clear_all_items(self):
         """Clear all batch items."""
@@ -151,14 +142,15 @@ class BatchController(QObject):
         self.status_updated.emit(f"All {len(valid_ids)} batch items are valid.")
         return True, f"All {len(valid_ids)} items valid"
     
-    def process_batch(self, selected_item_ids=None):
+
+    def process_batch(self, selected_row_indices=None):
         """
         Process batch items using the master table.
         
         Parameters:
         -----------
-        selected_item_ids : list or None
-            If provided, only process these item IDs. If None, process all items.
+        selected_row_indices : list or None
+            If provided, only process these row indices. If None, process all items.
         
         Returns:
         --------
@@ -167,24 +159,23 @@ class BatchController(QObject):
         results : list
             List of processing results in old format for backward compatibility.
         """
-        all_items = self.master_table.get_all_items()
+        total_items = self.master_table.get_item_count()
         
-        if not all_items:
+        if total_items == 0:
             self.status_updated.emit("No batch items to process.")
             return False, []
         
         # Determine which items to process
-        if selected_item_ids is not None:
-            items_to_process = [item for item in all_items if item.id in selected_item_ids]
+        if selected_row_indices is not None:
+            items_to_process = selected_row_indices
         else:
-            items_to_process = all_items
+            items_to_process = list(range(total_items))
         
-        total_items = len(items_to_process)
-        if total_items == 0:
+        if not items_to_process:
             self.status_updated.emit("No valid items to process.")
             return False, []
         
-        self.status_updated.emit(f"Starting batch processing of {total_items} items...")
+        self.status_updated.emit(f"Starting batch processing of {len(items_to_process)} items...")
         self.error_log.clear()
         
         # Create output directory if needed
@@ -203,98 +194,78 @@ class BatchController(QObject):
         # Process each item
         results_old_format = []  # For backward compatibility
         
-        for i, item in enumerate(items_to_process):
+        for i, row_index in enumerate(items_to_process):
             try:
-                self.status_updated.emit(f"Processing item {i+1}/{total_items}: {item.template.transition_name}")
-                self.batch_progress.emit(i+1, total_items)
+                item = self.master_table.get_item(row_index)
+                if not item:
+                    continue
+                    
+                self.status_updated.emit(f"Processing item {i+1}/{len(items_to_process)}: {item.template.transition_name}")
+                self.batch_progress.emit(i+1, len(items_to_process))
                 
                 # Process the item
-                success = self._process_single_item(item)
+                success = self._process_single_item(row_index)
                 
                 if success:
+                    # Get updated item data
+                    updated_item = self.master_table.get_item(row_index)
+                    
                     # Create result in old format for backward compatibility
                     result_old_format = {
                         'type': 'multiple_transitions',
-                        'filename': item.template.filename,
-                        'redshift': item.template.redshift,
-                        'transition': item.template.transition,
-                        'transition_name': item.template.transition_name,
-                        'slice_vmin': item.template.slice_vmin,
-                        'slice_vmax': item.template.slice_vmax,
-                        'ew_vmin': item.template.ew_vmin,
-                        'ew_vmax': item.template.ew_vmax,
-                        'W': item.results.W,
-                        'W_e': item.results.W_e,
-                        'logN': item.results.logN,
-                        'logN_e': item.results.logN_e,
-                        'vel_centroid': item.results.vel_centroid,
-                        'SNR': item.results.SNR,
+                        'filename': updated_item.template.filename,
+                        'redshift': updated_item.template.redshift,
+                        'transition': updated_item.template.transition,
+                        'transition_name': updated_item.template.transition_name,
+                        'slice_vmin': updated_item.template.slice_vmin,
+                        'slice_vmax': updated_item.template.slice_vmax,
+                        'ew_vmin': updated_item.template.ew_vmin,
+                        'ew_vmax': updated_item.template.ew_vmax,
+                        'W': updated_item.results.W,
+                        'W_e': updated_item.results.W_e,
+                        'logN': updated_item.results.logN,
+                        'logN_e': updated_item.results.logN_e,
+                        'vel_centroid': updated_item.results.vel_centroid,
+                        'SNR': updated_item.results.SNR,
                         'status': 'success',
-                        'spec_object': item.rb_spec_object
+                        'spec_object': self.master_table.get_rb_spec_object(row_index)
                     }
                     results_old_format.append(result_old_format)
                     
                     # Emit signal for item completion
-                    self.batch_item_completed.emit(item.id, result_old_format)
+                    self.batch_item_completed.emit(row_index, result_old_format)
                     
                 else:
+                    # Get error info
+                    item = self.master_table.get_item(row_index)
+                    error_message = item.analysis.error_message if item else "Unknown error"
+                    
                     # Create error result
                     error_result = {
                         'type': 'multiple_transitions',
-                        'filename': item.template.filename,
-                        'redshift': item.template.redshift,
-                        'transition': item.template.transition,
-                        'transition_name': item.template.transition_name,
-                        'slice_vmin': item.template.slice_vmin,
-                        'slice_vmax': item.template.slice_vmax,
-                        'ew_vmin': item.template.ew_vmin,
-                        'ew_vmax': item.template.ew_vmax,
-                        'W': 0.0,
-                        'W_e': 0.0,
-                        'logN': 0.0,
-                        'logN_e': 0.0,
+                        'filename': item.template.filename if item else '',
+                        'transition_name': item.template.transition_name if item else '',
                         'status': 'error',
-                        'error': item.analysis.error_message,
+                        'error': error_message,
                         'spec_object': None
                     }
                     results_old_format.append(error_result)
                     
                     # Emit signal for item failure
-                    self.batch_item_failed.emit(item.id, item.analysis.error_message)
+                    self.batch_item_failed.emit(row_index, error_message)
                 
             except Exception as e:
-                error_msg = f"Error processing item {i+1}/{total_items}: {str(e)}"
+                error_msg = f"Error processing item {i+1}/{len(items_to_process)}: {str(e)}"
                 self.status_updated.emit(error_msg)
                 self.error_log.append(error_msg)
                 
                 # Update item status
-                self.master_table.update_analysis(item.id, 
+                self.master_table.update_analysis(row_index, 
                                                 processing_status="error", 
                                                 error_message=str(e))
                 
-                # Create error result for backward compatibility
-                error_result = {
-                    'type': 'multiple_transitions',
-                    'filename': item.template.filename,
-                    'redshift': item.template.redshift,
-                    'transition': item.template.transition,
-                    'transition_name': item.template.transition_name,
-                    'slice_vmin': item.template.slice_vmin,
-                    'slice_vmax': item.template.slice_vmax,
-                    'ew_vmin': item.template.ew_vmin,
-                    'ew_vmax': item.template.ew_vmax,
-                    'W': 0.0,
-                    'W_e': 0.0,
-                    'logN': 0.0,
-                    'logN_e': 0.0,
-                    'status': 'error',
-                    'error': str(e),
-                    'spec_object': None
-                }
-                results_old_format.append(error_result)
-                
                 # Emit failure signal
-                self.batch_item_failed.emit(item.id, str(e))
+                self.batch_item_failed.emit(row_index, str(e))
         
         # Batch processing complete
         if self.error_log:
@@ -302,13 +273,19 @@ class BatchController(QObject):
         else:
             self.status_updated.emit("Batch processing completed successfully.")
         
-        return len(self.error_log) == 0, results_old_format
+        return len(self.error_log) == 0, results_old_format    
+
     
-    def _process_single_item(self, item) -> bool:
+    def _process_single_item(self, row_index: int) -> bool:
         """Process a single batch item using the master table."""
         try:
+            # Get item data from DataFrame
+            item = self.master_table.get_item(row_index)
+            if not item:
+                return False
+            
             # Update status
-            self.master_table.update_analysis(item.id, processing_status="processing")
+            self.master_table.update_analysis(row_index, processing_status="processing")
             
             # Load the spectrum file
             if item.template.filename.lower().endswith('.json'):
@@ -360,7 +337,7 @@ class BatchController(QObject):
                 spec.enorm = spec.error_slice.copy()
             
             # Store the rb_spec object
-            self.master_table.set_rb_spec_object(item.id, spec)
+            self.master_table.set_rb_spec_object(row_index, spec)
             
             # Compute EW using EW velocity range (different from slice range!)
             spec.compute_EW(
@@ -372,7 +349,7 @@ class BatchController(QObject):
             )
             
             # Update results in master table
-            self.master_table.update_results(item.id,
+            self.master_table.update_results(row_index,
                 W=spec.W,
                 W_e=spec.W_e,
                 N=spec.N,
@@ -385,45 +362,31 @@ class BatchController(QObject):
             )
             
             # Update analysis status
-            self.master_table.update_analysis(item.id, processing_status="complete")
-            
-            # Save results as JSON if enabled
-            if self.batch_settings['save_individual_json'] and self.batch_settings['output_directory']:
-                output_dir = self.batch_settings['output_directory']
-                basename = os.path.splitext(os.path.basename(item.template.filename))[0]
-                
-                # Create a more descriptive transition identifier
-                transition_id = f"{item.template.transition_name}_{item.template.transition:.0f}"
-                output_file = f"{basename}_{transition_id}_z{item.template.redshift:.3f}.json"
-                output_path = os.path.join(output_dir, output_file)
-                
-                # Save the rb_spec object
-                spec.save_slice(output_path, file_format='json')            
+            self.master_table.update_analysis(row_index, processing_status="complete")
+              
             return True
             
         except Exception as e:
+            error_msg = str(e) if str(e) else f"Unknown error: {type(e).__name__}"
+            
             # Update item with error status
-            self.master_table.update_analysis(item.id, 
+            self.master_table.update_analysis(row_index, 
                                             processing_status="error", 
-                                            error_message=str(e))
-            return False
+                                            error_message=error_msg)
+            return False    
+
+
     
     def recalculate_item(self, item_id: str, what_changed: str) -> bool:
         """Recalculate a specific item based on what changed."""
-
-
-        print(f"DEBUG: recalculate_item called for {item_id}, changed: {what_changed}")
         
         item = self.master_table.get_item(item_id)
         if not item:
-            print(f"DEBUG: Item not found!")
             return False
         
         if not item.rb_spec_object:
-            print(f"DEBUG: rb_spec_object is None!")
             return False
         
-        print(f"DEBUG: rb_spec_object exists, proceeding with recalculation")
             
         item = self.master_table.get_item(item_id)
         if not item or not item.rb_spec_object:
@@ -517,14 +480,11 @@ class BatchController(QObject):
     
 
     def update_ew_range(self, item_id: str, ew_vmin: int, ew_vmax: int) -> bool:
-        print(f"DEBUG: update_ew_range called for {item_id}")
         
         success = self.master_table.update_template(item_id, ew_vmin=ew_vmin, ew_vmax=ew_vmax)
-        print(f"DEBUG: master_table update_template returned: {success}")
         
         if success:
             result = self.recalculate_item(item_id, 'ew_range')
-            print(f"DEBUG: recalculate_item returned: {result}")
             return result
         
         return False
@@ -570,30 +530,34 @@ class BatchController(QObject):
     
     def _recreate_rb_spec_objects(self):
         """Recreate rb_spec objects for items that have been processed."""
-        completed_items = self.master_table.get_items_by_status("complete")
+        completed_indices = self.master_table.get_items_by_status("complete")
         
         recreated_count = 0
-        for item_id in completed_items:
-            item = self.master_table.get_item(item_id)
-            if item and not item.rb_spec_object:
-                try:
-                    success = self._recreate_single_rb_spec(item)
-                    if success:
-                        recreated_count += 1
-                        print(f"Recreated rb_spec object for {item.template.transition_name}")
-                    else:
-                        print(f"Failed to recreate rb_spec object for {item.template.transition_name}")
-                except Exception as e:
-                    print(f"Error recreating rb_spec for {item.template.transition_name}: {e}")
+        for row_index in completed_indices:
+            item = self.master_table.get_item(row_index)
+            if item:
+                # Check if rb_spec object already exists
+                existing_spec = self.master_table.get_rb_spec_object(row_index)
+                if not existing_spec:
+                    try:
+                        success = self._recreate_single_rb_spec(item, row_index)
+                        if success:
+                            recreated_count += 1
+                            print(f"Recreated rb_spec object for {item.template.transition_name}")
+                        else:
+                            print(f"Failed to recreate rb_spec object for {item.template.transition_name}")
+                    except Exception as e:
+                        print(f"Error recreating rb_spec for {item.template.transition_name}: {e}")
         
-        # EMIT SIGNAL TO REFRESH UI - ADD THIS
+        # EMIT SIGNAL TO REFRESH UI
         if recreated_count > 0:
             self.table_changed.emit()
-            print(f"DEBUG: Recreated {recreated_count} rb_spec objects, emitted table_changed signal")
     
-    def _recreate_single_rb_spec(self, item) -> bool:
+    def _recreate_single_rb_spec(self, item, row_index) -> bool:
         """Recreate a single rb_spec object from saved parameters."""
         try:
+            from rbcodes.GUIs.rb_spec import rb_spec, load_rb_spec_object
+            
             # Load the spectrum file (same as in _process_single_item)
             if item.template.filename.lower().endswith('.json'):
                 spec = load_rb_spec_object(item.template.filename)
@@ -622,8 +586,15 @@ class BatchController(QObject):
             # Recreate continuum fit
             method = item.analysis.continuum_method
             if method == 'polynomial':
+                # Parse continuum_masks from JSON string
+                import json
+                try:
+                    continuum_masks = json.loads(item.analysis.continuum_masks) if item.analysis.continuum_masks else []
+                except:
+                    continuum_masks = []
+                
                 mask = []
-                for vmin, vmax in item.analysis.continuum_masks:
+                for vmin, vmax in continuum_masks:
                     mask.extend([vmin, vmax])
                 
                 spec.fit_continuum(
@@ -652,14 +623,14 @@ class BatchController(QObject):
             spec.trans = item.template.transition_name
             spec.trans_wave = item.template.transition
             
-            # Store the recreated object
-            self.master_table.set_rb_spec_object(item.id, spec)
+            # Store the recreated object using row_index
+            self.master_table.set_rb_spec_object(row_index, spec)
             
             return True
             
         except Exception as e:
             print(f"Error recreating rb_spec object: {e}")
-            return False
+            return False    
     
     def export_template_csv(self, filepath: str) -> bool:
         """Export just the template part as CSV."""
@@ -736,12 +707,12 @@ class BatchController(QObject):
     # Convenience methods for UI
     def get_item_count(self) -> int:
         """Get total number of items."""
-        return len(self.master_table.items)
+        return self.master_table.get_item_count()
     
     def get_valid_item_count(self) -> int:
         """Get number of valid items."""
-        valid_ids, _ = self.master_table.validate_all()
-        return len(valid_ids)
+        valid_indices, _ = self.master_table.validate_all()
+        return len(valid_indices)
     
     def get_completed_item_count(self) -> int:
         """Get number of completed items."""

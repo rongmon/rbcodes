@@ -26,7 +26,7 @@ Version History:
     last_updated=__last_updated__
 )
 
-
+import numpy as np
 from scipy.interpolate import splrep,splev
 from numpy.polynomial.legendre import Legendre
 import sys

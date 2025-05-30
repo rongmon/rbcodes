@@ -179,19 +179,22 @@ class ReviewPanel(QWidget):
                 status_item.setBackground(QColor(255, 240, 200))
             
             self.results_table.setItem(row, 7, status_item)
-            self.results_table.setItem(row, 8, QTableWidgetItem(""))
+            self.results_table.setItem(row, 8, QTableWidgetItem(""))    
     
     def on_table_item_clicked(self, item):
         """Handle table clicks."""
         row = item.row()
-        items = self.controller.master_table.get_all_items()
+        item_count = self.controller.master_table.get_item_count()
         
-        if row < len(items):
-            selected_item = items[row]
-            self.display_item_spectrum(selected_item)
-            self.edit_continuum_btn.setEnabled(True)
-            self.edit_ew_btn.setEnabled(True)
-            self.current_item = selected_item
+        if row < item_count:
+            selected_item = self.controller.master_table.get_item(row)
+            if selected_item:
+                # Store the row index for later use
+                self.current_row_index = row
+                self.display_item_spectrum(selected_item)
+                self.edit_continuum_btn.setEnabled(True)
+                self.edit_ew_btn.setEnabled(True)
+                self.current_item = selected_item
     
     def display_item_spectrum(self, item):
         """Generate and display spectrum."""
@@ -354,7 +357,7 @@ class ReviewPanel(QWidget):
     
     def edit_continuum(self):
         """Launch continuum editor - SIMPLE APPROACH."""
-        if not self.current_item or not self.current_spec:
+        if not self.current_item or not self.current_spec or not hasattr(self, 'current_row_index'):
             self.controller.status_updated.emit("Please select an item first.")
             return
         
@@ -385,7 +388,7 @@ class ReviewPanel(QWidget):
                 self.controller.status_updated.emit("Continuum fitting cancelled.")
                 return
             
-            # Update master table
+            # Update master table using row index
             if 'masks' in result:
                 masks = result['masks']
                 mask_tuples = []
@@ -393,12 +396,7 @@ class ReviewPanel(QWidget):
                     if i + 1 < len(masks):
                         mask_tuples.append((masks[i], masks[i+1]))
                 
-                # Update item
-                self.current_item.analysis.continuum_masks = mask_tuples
-                self.current_item.analysis.last_modified = datetime.now().isoformat()
-                self.current_item.analysis.processing_status = "complete"
-                
-                # Apply continuum
+                # Apply continuum to current spectrum
                 if self.current_item.analysis.continuum_method == 'polynomial':
                     mask = []
                     for vmin, vmax in mask_tuples:
@@ -409,7 +407,7 @@ class ReviewPanel(QWidget):
                         use_weights=self.current_item.analysis.use_weights
                     )
                 
-                # Recalculate EW
+                # Recalculate EW if we have existing results
                 if hasattr(self.current_item, 'results') and self.current_item.results.W > 0:
                     self.current_spec.compute_EW(
                         self.current_item.template.transition,
@@ -419,72 +417,76 @@ class ReviewPanel(QWidget):
                         _binsize=self.current_item.analysis.binsize
                     )
                     
-                    # Update results
-                    self.current_item.results.W = self.current_spec.W
-                    self.current_item.results.W_e = self.current_spec.W_e
-                    self.current_item.results.N = self.current_spec.N
-                    self.current_item.results.N_e = self.current_spec.N_e
-                    self.current_item.results.logN = self.current_spec.logN
-                    self.current_item.results.logN_e = self.current_spec.logN_e
-                    self.current_item.results.vel_centroid = getattr(self.current_spec, 'vel_centroid', 0)
-                    self.current_item.results.vel_disp = getattr(self.current_spec, 'vel_disp', 0)
-                    self.current_item.results.SNR = getattr(self.current_spec, 'SNR', 0)
-                    self.current_item.results.calculation_timestamp = datetime.now().isoformat()
-                
-                # Update master table
-                self.controller.master_table.set_rb_spec_object(self.current_item.id, self.current_spec)
-                self.controller.master_table.update_analysis(
-                    self.current_item.id,
-                    continuum_masks=mask_tuples,
-                    processing_status="complete"
-                )
-                
-                if hasattr(self.current_item, 'results') and self.current_item.results.W > 0:
+                    # Update results in master table using row index
                     self.controller.master_table.update_results(
-                        self.current_item.id,
+                        self.current_row_index,
                         W=self.current_spec.W,
                         W_e=self.current_spec.W_e,
                         N=self.current_spec.N,
                         N_e=self.current_spec.N_e,
                         logN=self.current_spec.logN,
                         logN_e=self.current_spec.logN_e,
-                        vel_centroid=self.current_item.results.vel_centroid,
-                        vel_disp=self.current_item.results.vel_disp,
-                        SNR=self.current_item.results.SNR
+                        vel_centroid=getattr(self.current_spec, 'vel_centroid', 0),
+                        vel_disp=getattr(self.current_spec, 'vel_disp', 0),
+                        SNR=getattr(self.current_spec, 'SNR', 0)
                     )
+                
+                # Update analysis in master table using row index
+                self.controller.master_table.update_analysis(
+                    self.current_row_index,
+                    continuum_masks=mask_tuples,
+                    processing_status="complete",
+                    last_modified=datetime.now().isoformat()
+                )
+                
+                # Update rb_spec object in master table
+                self.controller.master_table.set_rb_spec_object(self.current_row_index, self.current_spec)
                 
                 # SIMPLE APPROACH: Repopulate table + Update preview
                 self.refresh_results_table()
-                self.update_spectrum_plot(self.current_item, self.current_spec)
-                self.update_details(self.current_item, self.current_spec)
+                
+                # Get fresh item and update preview
+                updated_item = self.controller.master_table.get_item(self.current_row_index)
+                if updated_item:
+                    self.current_item = updated_item
+                    self.update_spectrum_plot(self.current_item, self.current_spec)
+                    self.update_details(self.current_item, self.current_spec)
                 
                 self.controller.status_updated.emit("Continuum updated successfully!")
                 
         except Exception as e:
-            self.controller.status_updated.emit(f"Error editing continuum: {str(e)}")
+            self.controller.status_updated.emit(f"Error editing continuum: {str(e)}")    
     
     def edit_ew_range(self):
         """Launch EW range editor - SIMPLE APPROACH."""
-        if not self.current_item:
+        if not self.current_item or not hasattr(self, 'current_row_index'):
             self.controller.status_updated.emit("Please select an item first.")
             return
         
         try:
             from rbcodes.GUIs.specgui.batch.panels.ew_range_editor import edit_ew_range_dialog
             
+            # Create a simple object that mimics the old BatchItem structure for the editor
+            editor_item = type('EditorItem', (), {
+                'template': self.current_item.template,
+                'analysis': self.current_item.analysis,
+                'results': self.current_item.results,
+                'row_index': self.current_row_index  # Pass row index for updates
+            })()
+            
             success = edit_ew_range_dialog(
-                self.current_item, 
+                editor_item, 
                 self.current_spec, 
                 self.controller,
                 parent=self
             )
             
             if success:
-                # Get FRESH item from master table (has new EW values)
-                updated_item = self.controller.master_table.get_item(self.current_item.id)
+                # Get fresh item from master table using row index
+                updated_item = self.controller.master_table.get_item(self.current_row_index)
                 
                 if updated_item:
-                    # Generate FRESH spectrum from updated item
+                    # Generate fresh spectrum from updated item
                     updated_spec = self._generate_spectrum_from_item(updated_item)
                     
                     if updated_spec:
@@ -505,7 +507,8 @@ class ReviewPanel(QWidget):
         except ImportError as e:
             self.controller.status_updated.emit(f"EW range editor not available: {str(e)}")
         except Exception as e:
-            self.controller.status_updated.emit(f"Error editing EW range: {str(e)}")
+            self.controller.status_updated.emit(f"Error editing EW range: {str(e)}")    
+
     
     def select_all_items(self):
         """Select all items."""
@@ -538,34 +541,30 @@ class ReviewPanel(QWidget):
         self.emit_selected_indices()
     
     def emit_selected_indices(self):
-        """Emit selected item IDs."""
-        selected_ids = []
-        items = self.controller.master_table.get_all_items()
+        """Emit selected row indices."""
+        selected_indices = []
         
         for row in range(self.results_table.rowCount()):
             checkbox_item = self.results_table.item(row, 0)
             if checkbox_item and checkbox_item.checkState() == Qt.Checked:
-                if row < len(items):
-                    selected_ids.append(items[row].id)
+                selected_indices.append(row)  # Use row index directly
         
-        self.items_selected.emit(selected_ids)
+        self.items_selected.emit(selected_indices)
     
     def process_selected_items(self):
         """Process selected items."""
-        selected_ids = []
-        items = self.controller.master_table.get_all_items()
+        selected_indices = []
         
         for row in range(self.results_table.rowCount()):
             checkbox_item = self.results_table.item(row, 0)
             if checkbox_item and checkbox_item.checkState() == Qt.Checked:
-                if row < len(items):
-                    selected_ids.append(items[row].id)
+                selected_indices.append(row)  # Use row index directly
         
-        if not selected_ids:
+        if not selected_indices:
             self.controller.status_updated.emit("Please select items to process.")
             return
         
-        self.items_selected.emit(selected_ids)
+        self.items_selected.emit(selected_indices)
         
         # Switch to processing tab
         parent = self.parentWidget()
@@ -573,4 +572,4 @@ class ReviewPanel(QWidget):
             for i in range(parent.count()):
                 if "Processing" in parent.tabText(i):
                     parent.setCurrentIndex(i)
-                    break
+                    break    

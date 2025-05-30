@@ -26,8 +26,8 @@ def edit_ew_range_dialog(item, current_spec, controller, parent=None):
     
     Parameters
     ----------
-    item : BatchItem
-        The batch item to edit
+    item : object with template, analysis, results attributes
+        The batch item to edit (now includes row_index)
     current_spec : rb_spec
         The current spectrum object
     controller : BatchController
@@ -169,13 +169,11 @@ def edit_ew_range_dialog(item, current_spec, controller, parent=None):
             
             # Add markers at vmin and vmax if interactive selection is enabled
             if interactive_selection.isChecked():
-                # Add circle markers at vmin and vmax with labels
                 vmin_val = ew_vmin_spin.value()
                 vmax_val = ew_vmax_spin.value()
                 canvas.axes.plot([vmin_val], [1.0], 'bo', ms=6, zorder=10)
                 canvas.axes.plot([vmax_val], [1.0], 'bo', ms=6, zorder=10)
                 
-                # Add labels
                 canvas.axes.text(vmin_val, 1.05, f'vmin: {vmin_val}', 
                                 ha='center', va='bottom', fontsize=8, color='blue')
                 canvas.axes.text(vmax_val, 1.05, f'vmax: {vmax_val}', 
@@ -185,55 +183,40 @@ def edit_ew_range_dialog(item, current_spec, controller, parent=None):
         
         # Interactive selection event handlers
         def on_canvas_click(event):
-            """Handle mouse clicks on the plot for setting vmin/vmax."""
             if not event.inaxes or not interactive_selection.isChecked():
                 return
                 
-            # Get the x-coordinate (velocity)
             velocity = event.xdata
-            
-            # Determine whether to set vmin or vmax based on which is closer
             current_vmin = ew_vmin_spin.value()
             current_vmax = ew_vmax_spin.value()
             
-            # If velocity is outside current range, set the closest endpoint
             if velocity < current_vmin:
                 ew_vmin_spin.setValue(int(velocity))
             elif velocity > current_vmax:
                 ew_vmax_spin.setValue(int(velocity))
             else:
-                # If inside current range, set whichever endpoint is closer
                 if abs(velocity - current_vmin) < abs(velocity - current_vmax):
                     ew_vmin_spin.setValue(int(velocity))
                 else:
                     ew_vmax_spin.setValue(int(velocity))
         
         def on_canvas_key_press(event):
-            """Handle key presses on the plot."""
             if not interactive_selection.isChecked():
                 return
-                
             if event.key == 'r':
-                # Reset velocity limits to current values
                 ew_vmin_spin.setValue(current_ew_vmin)
                 ew_vmax_spin.setValue(current_ew_vmax)
         
         def toggle_interactive_mode(enabled):
-            """Enable or disable interactive selection."""
             if enabled:
-                # Connect events
                 canvas.mpl_connect('button_press_event', on_canvas_click)
                 canvas.mpl_connect('key_press_event', on_canvas_key_press)
                 canvas.setFocus()
-                update_preview()  # Refresh to show markers
+                update_preview()
             else:
-                # Events will be automatically disconnected when canvas is destroyed
-                update_preview()  # Refresh to hide markers
+                update_preview()
         
-        # Connect interactive selection toggle
         interactive_selection.toggled.connect(toggle_interactive_mode)
-        
-        # Connect value changes to update preview
         ew_vmin_spin.valueChanged.connect(update_preview)
         ew_vmax_spin.valueChanged.connect(update_preview)
         
@@ -260,7 +243,7 @@ def edit_ew_range_dialog(item, current_spec, controller, parent=None):
         new_calculate_snr = snr_check.isChecked()
         new_binsize = binsize_spin.value()
         
-        # Update EW range using the internal update function
+        # Update EW range using row index
         success = _update_ew_range_in_master_table(
             item, 
             new_ew_vmin, 
@@ -277,58 +260,48 @@ def edit_ew_range_dialog(item, current_spec, controller, parent=None):
 def _update_ew_range_in_master_table(item, new_ew_vmin, new_ew_vmax, calculate_snr, binsize, controller):
     """Update EW range and recalculate measurements, ensuring master table consistency."""
     try:
-        print(f"DEBUG: Updating EW range for {item.template.transition_name}")
-        print(f"DEBUG: Old EW range: [{item.template.ew_vmin}, {item.template.ew_vmax}]")
-        print(f"DEBUG: New EW range: [{new_ew_vmin}, {new_ew_vmax}]")
+        # Get row index from item
+        row_index = getattr(item, 'row_index', None)
+        if row_index is None:
+            print("ERROR: No row_index found in item")
+            return False
         
-        # Update template parameters directly
-        item.template.ew_vmin = new_ew_vmin
-        item.template.ew_vmax = new_ew_vmax
         
-        # Update analysis settings directly
-        item.analysis.calculate_snr = calculate_snr
-        item.analysis.binsize = binsize
-        item.analysis.last_modified = datetime.now().isoformat()
+        # Update template parameters in master table
+        controller.master_table.update_template(row_index, 
+                                               ew_vmin=new_ew_vmin, 
+                                               ew_vmax=new_ew_vmax)
+        
+        # Update analysis settings in master table
+        controller.master_table.update_analysis(row_index,
+                                               calculate_snr=calculate_snr,
+                                               binsize=binsize,
+                                               last_modified=datetime.now().isoformat())
         
         # Generate fresh spectrum with new parameters
-        updated_spec = _generate_spectrum_from_item(item)
+        updated_item = controller.master_table.get_item(row_index)
+        if not updated_item:
+            print("ERROR: Failed to get updated item from master table")
+            return False
         
+        updated_spec = _generate_spectrum_from_item(updated_item)
         if not updated_spec:
             print("ERROR: Failed to generate spectrum")
             return False
         
         # Recalculate EW with new range
         updated_spec.compute_EW(
-            item.template.transition,
+            updated_item.template.transition,
             vmin=new_ew_vmin,
             vmax=new_ew_vmax,
             SNR=calculate_snr,
             _binsize=binsize
         )
         
-        print(f"DEBUG: New EW: {updated_spec.W:.3f} ± {updated_spec.W_e:.3f} Å")
         
-        # Update results directly on the item
-        item.results.W = updated_spec.W
-        item.results.W_e = updated_spec.W_e
-        item.results.N = updated_spec.N
-        item.results.N_e = updated_spec.N_e
-        item.results.logN = updated_spec.logN
-        item.results.logN_e = updated_spec.logN_e
-        item.results.vel_centroid = getattr(updated_spec, 'vel_centroid', 0)
-        item.results.vel_disp = getattr(updated_spec, 'vel_disp', 0)
-        item.results.SNR = getattr(updated_spec, 'SNR', 0)
-        item.results.calculation_timestamp = datetime.now().isoformat()
-        
-        # Mark as complete
-        item.analysis.processing_status = "complete"
-        
-        # Store the updated rb_spec object in master table
-        controller.master_table.set_rb_spec_object(item.id, updated_spec)
-        
-        # Update master table with new results
+        # Update results in master table
         controller.master_table.update_results(
-            item.id,
+            row_index,
             W=updated_spec.W,
             W_e=updated_spec.W_e,
             N=updated_spec.N,
@@ -337,25 +310,16 @@ def _update_ew_range_in_master_table(item, new_ew_vmin, new_ew_vmax, calculate_s
             logN_e=updated_spec.logN_e,
             vel_centroid=getattr(updated_spec, 'vel_centroid', 0),
             vel_disp=getattr(updated_spec, 'vel_disp', 0),
-            SNR=getattr(updated_spec, 'SNR', 0)
+            SNR=getattr(updated_spec, 'SNR', 0),
+            calculation_timestamp=datetime.now().isoformat()
         )
         
-        # Update template in master table
-        controller.master_table.update_template(
-            item.id,
-            ew_vmin=new_ew_vmin,
-            ew_vmax=new_ew_vmax
-        )
+        # Mark as complete
+        controller.master_table.update_analysis(row_index, processing_status="complete")
         
-        # Update analysis settings in master table
-        controller.master_table.update_analysis(
-            item.id,
-            calculate_snr=calculate_snr,
-            binsize=binsize,
-            processing_status="complete"
-        )
+        # Store the updated rb_spec object in master table
+        controller.master_table.set_rb_spec_object(row_index, updated_spec)
         
-        print(f"DEBUG: EW range update completed successfully")
         return True
         
     except Exception as e:
@@ -368,6 +332,8 @@ def _generate_spectrum_from_item(item):
     """Generate rb_spec object from item parameters (local copy of the function)."""
     try:
         from rbcodes.GUIs.rb_spec import rb_spec, load_rb_spec_object
+        import numpy as np
+        import os
         
         # Load spectrum file
         if item.template.filename.lower().endswith('.json'):
