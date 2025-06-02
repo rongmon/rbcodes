@@ -325,7 +325,6 @@ class MeasurementPanel(QWidget):
         
         if N_val < 0 and results.get('N_e', 0) > 0:
             # For negative N, show logN = 0 ± log10(N_e)
-            import numpy as np
             logN_display = 0.0
             logN_e_display = np.log10(results.get('N_e', 1))
  

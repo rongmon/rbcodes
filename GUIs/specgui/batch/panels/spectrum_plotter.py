@@ -182,6 +182,13 @@ def _add_results_text_box(results, ax):
     logn_err = results.logN_e
     
     info_text = f"EW = {ew:.3f} ± {ew_err:.3f} Å\n"
+    
+
+    # Handle negative N case for display
+    if hasattr(results, 'N') and results.N < 0 and results.N_e > 0:
+        logn = 0.0
+        logn_err = np.log10(results.N_e)
+
     info_text += f"log N = {logn:.2f} ± {logn_err:.2f}"
     
     # Add SNR if available

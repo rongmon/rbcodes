@@ -348,6 +348,12 @@ def _plot_normalized_panel(spec_object, item, ax, show_xlabel=True):
     logn = item.results.logN
     logn_err = item.results.logN_e
     snr = item.results.SNR
+
+    # Handle negative N case for figure display
+    if item.results.N < 0 and item.results.N_e > 0:
+        import numpy as np
+        logn = 0.0
+        logn_err = np.log10(item.results.N_e)
     
     results_text = f"EW = {ew:.3f} ± {ew_err:.3f} Å\nlog N = {logn:.2f} ± {logn_err:.2f}\nSNR = {snr:.1f}"
     

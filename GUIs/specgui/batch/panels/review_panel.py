@@ -362,13 +362,18 @@ class ReviewPanel(QWidget):
             details_parts.append(f"Masks: {mask_count}")
         
         # 7. Additional useful info if available
-        if hasattr(item.results, 'W') and item.results.W > 0:
+        if hasattr(item.results, 'W') and  not np.isnan(item.results.W):
             ew_value = item.results.W
             ew_error = item.results.W_e
             details_parts.append(f"EW: {ew_value:.3f}±{ew_error:.3f} Å")
             
+            # Handle negative N case for display
             logn_value = item.results.logN
             logn_error = item.results.logN_e
+            if hasattr(item.results, 'N') and item.results.N < 0 and item.results.N_e > 0:
+                logn_value = 0.0
+                logn_error = np.log10(item.results.N_e)
+            
             details_parts.append(f"log N: {logn_value:.2f}±{logn_error:.2f}")
         
         # Join all parts with separators

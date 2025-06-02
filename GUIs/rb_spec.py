@@ -1,6 +1,6 @@
-__version__ = "2.3.2"
+__version__ = "2.3.3"
 __author__ = "Rongmon Bordoloi"
-__last_updated__ = "May 2025"
+__last_updated__ = "June 2025"
 
 """
 rb_spec.py - Comprehensive Absorption Line Analysis Pipeline
@@ -20,6 +20,8 @@ Version History:
 - v2.3.0 (2025): Continuum mask added to output, display_field_info module added 
 - v2.3.1 (2025): Fixed logN text in plot_continuum routine
 - v2.3.2 (2025): Unified version declaration, minor cleanup
+- v2.3.3 (2025): logN_e for non detector now gives 1\sigma limit and logN=0 for non detection
+
 """.format(
     version=__version__,
     author=__author__,
@@ -1452,8 +1454,15 @@ class rb_spec(object):
         # Convert to log10 units
         self.N = out['col']
         self.N_e = out['colerr']
-        self.logN=np.log10(self.N) if self.N > 0 else 0
-        self.logN_e=0.434 *self.N_e/self.N if self.N > 0 else 0
+        
+        if self.N > 0:
+            self.logN = np.log10(self.N)
+            self.logN_e = 0.434 * self.N_e / self.N
+        else:
+            self.logN = 0
+            self.logN_e = np.log10(self.N_e) if self.N_e > 0 else 0        
+
+
 
         self.Tau=out['Tau_a']
         self.vel_centroid=out['med_vel']
