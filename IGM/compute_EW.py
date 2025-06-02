@@ -394,7 +394,18 @@ def compute_EW(
                              marker='x', s=50, label='Saturated Pixels')
             # Add total column density annotation
             if not np.isnan(col):
-                ax2.annotate(f'log N = {np.log10(col):.3f} ± {np.log10(col + colerr) - np.log10(col):.3f}', 
+        
+                if col < 0 and colerr > 0:
+                    # For negative N, show logN = 0 ± log10(N_e)
+                    logN_display = 0.0
+                    logN_e_display = np.log10(colerr)
+                else:
+                    logN_display=np.log10(col)
+                    logN_e_display=np.log10(col + colerr) - np.log10(col)
+
+
+
+                ax2.annotate(f'log N = {logN_display:.3f} ± {logN_e_display:.3f}', 
                            xy=(0.02, 0.85), xycoords='axes fraction',
                            bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.8))
             ax2.set_ylabel(' AOD Column Density (cm$^{-2}$ km$^{-1}$ s)')

@@ -385,12 +385,22 @@ class SpectrumController(QObject):
                 'error': self.spec.W_e
             }
         
-        # Get column density
+        # Get column density - handle negative N case
         col_dens = None
         if hasattr(self.spec, 'logN') and hasattr(self.spec, 'logN_e'):
+            logN_display = self.spec.logN
+            logN_e_display = self.spec.logN_e
+            
+            # Handle negative N case for display
+            if hasattr(self.spec, 'N') and hasattr(self.spec, 'N_e'):
+                if self.spec.N < 0 and self.spec.N_e > 0:
+                    import numpy as np
+                    logN_display = 0.0
+                    logN_e_display = np.log10(self.spec.N_e)
+            
             col_dens = {
-                'value': self.spec.logN,
-                'error': self.spec.logN_e
+                'value': logN_display,
+                'error': logN_e_display
             }
         
         return zabs, transition, name, ew, col_dens

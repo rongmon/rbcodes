@@ -317,6 +317,18 @@ class MeasurementPanel(QWidget):
         """Update the results table with the computation results."""
         # Clear existing rows
         self.results_table.setRowCount(0)
+
+        # Handle negative N case for display
+        N_val = results.get('N', 0)
+        logN_display = results.get('logN', 0)
+        logN_e_display = results.get('logN_e', 0)
+        
+        if N_val < 0 and results.get('N_e', 0) > 0:
+            # For negative N, show logN = 0 ± log10(N_e)
+            import numpy as np
+            logN_display = 0.0
+            logN_e_display = np.log10(results.get('N_e', 1))
+ 
         
         # Define the measurements to display
         measurements = [
@@ -324,7 +336,7 @@ class MeasurementPanel(QWidget):
             ("Wavelength", f"{results.get('transition_wave', 0):.2f} Å"),
             ("Velocity Range", f"{results.get('vmin', 0):.1f} to {results.get('vmax', 0):.1f} km/s"),
             ("Equivalent Width", f"{results.get('W', 0):.3f} ± {results.get('W_e', 0):.3f} Å"),
-            ("Column Density (log)", f"{results.get('logN', 0):.2f} ± {results.get('logN_e', 0):.2f}"),
+            ("Column Density (log)", f"{logN_display:.2f} ± {logN_e_display:.2f}"),
             ("Velocity Centroid", f"{results.get('vel_centroid', 0):.1f} km/s"),
             ("Velocity Dispersion", f"{results.get('vel_disp', 0):.1f} km/s"),
         ]
@@ -392,7 +404,20 @@ class MeasurementPanel(QWidget):
                 # Construct measurement text
                 measurement_text = ""
                 measurement_text = f"EW = {self.measurement_results.get('W', 0):.3f} ± {self.measurement_results.get('W_e', 0):.3f} Å\n"
-                measurement_text += f"log N = {self.measurement_results.get('logN', 0):.2f} ± {self.measurement_results.get('logN_e', 0):.2f}"                
+                
+                # Handle negative N case for plot display
+                N_val = self.measurement_results.get('N', 0)
+                logN_display = self.measurement_results.get('logN', 0)
+                logN_e_display = self.measurement_results.get('logN_e', 0)
+                
+                if N_val < 0 and self.measurement_results.get('N_e', 0) > 0:
+                    import numpy as np
+                    logN_display = 0.0
+                    logN_e_display = np.log10(self.measurement_results.get('N_e', 1))
+                
+                measurement_text += f"log N = {logN_display:.2f} ± {logN_e_display:.2f}"
+
+
                 if measurement_text:
                     # Add title with transition name
                     transition_name = self.measurement_results.get('transition_name', 'Unknown')
