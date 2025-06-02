@@ -501,7 +501,7 @@ class ConfigurationPanel(QWidget):
                 
                 # Check if this rb_spec object has EW results (already analyzed)
                 if (hasattr(spec_object, 'W') and hasattr(spec_object, 'W_e') and 
-                    spec_object.W > 0 and spec_object.W_e > 0):
+                    not np.isnan(spec_object.W) and not np.isnan(spec_object.W_e)):
                     
                     # Extract all results from the rb_spec object
                     results = {

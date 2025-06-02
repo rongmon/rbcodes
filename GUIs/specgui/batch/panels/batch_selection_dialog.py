@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                            QMessageBox, QLineEdit, QSplitter)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
-
+import numpy as np
 
 class BatchSelectionDialog(QDialog):
     """Dialog for selecting multiple systems for batch processing."""
@@ -198,7 +198,7 @@ class BatchSelectionDialog(QDialog):
             self.systems_table.setItem(row, 6, status_item)
             
             # Results
-            if hasattr(item.results, 'W') and item.results.W > 0:
+            if hasattr(item.results, 'W') and not np.isnan(item.results.W):
                 ew_value = item.results.W
                 ew_error = item.results.W_e
                 results_text = f"EW: {ew_value:.3f}±{ew_error:.3f}"

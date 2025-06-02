@@ -1,15 +1,15 @@
-# rbcodes/GUIs/specgui/batch/panels/review_panel.py - PHASE 2: NAVIGATION CONTROLS
+# rbcodes/GUIs/specgui/batch/panels/review_panel.py - PHASE 2: NAVIGATION + FILTERING
 import os
+import numpy as np
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                            QPushButton, QComboBox, QGroupBox, QSplitter,
                            QMessageBox, QFileDialog, QDialog, QDialogButtonBox, 
-                           QFormLayout, QSpinBox)
+                           QFormLayout, QSpinBox, QRadioButton, QProgressBar)
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QColor
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
-import numpy as np
 from datetime import datetime    
 from rbcodes.GUIs.rb_spec import rb_spec, load_rb_spec_object
 import copy
@@ -26,7 +26,7 @@ class MatplotlibCanvas(FigureCanvasQTAgg):
         super(MatplotlibCanvas, self).__init__(self.fig)
 
 class ReviewPanel(QWidget):
-    """Panel for reviewing batch processing results - with navigation controls."""
+    """Panel for reviewing batch processing results - with navigation and filtering."""
     
     items_selected = pyqtSignal(list)
     
@@ -36,12 +36,14 @@ class ReviewPanel(QWidget):
         self.current_item = None
         self.current_spec = None
         self.current_index = -1  # Track current system index
+        self.current_filter = "all"  # Track current filter
+        self.filtered_items = []     # Cache filtered items
         self.init_ui()
         
         self.controller.table_changed.connect(self.refresh_results_table)
     
     def init_ui(self):
-        """Initialize UI with navigation controls."""
+        """Initialize UI with navigation controls and filtering."""
         main_layout = QVBoxLayout(self)
         
         # Top navigation bar
@@ -95,11 +97,38 @@ class ReviewPanel(QWidget):
         # Selection actions
         self.select_for_processing_btn = QPushButton("Select for Processing")
         self.select_for_processing_btn.clicked.connect(self.open_batch_selection_dialog)
-        self.select_for_processing_btn.setEnabled(True)  # Always enabled if we have systems
+        self.select_for_processing_btn.setEnabled(True)
         
         button_layout.addWidget(self.select_for_processing_btn)
         
         nav_layout.addLayout(button_layout)
+        
+        # Status filter radio buttons
+        filter_group = QGroupBox("Filter by Status")
+        filter_layout = QHBoxLayout()
+        
+        self.filter_all = QRadioButton("All")
+        self.filter_complete = QRadioButton("Complete") 
+        self.filter_failed = QRadioButton("Failed")
+        self.filter_pending = QRadioButton("Pending")
+        
+        # Set "All" as default
+        self.filter_all.setChecked(True)
+        
+        # Connect radio button changes
+        self.filter_all.toggled.connect(lambda: self.on_filter_changed("all"))
+        self.filter_complete.toggled.connect(lambda: self.on_filter_changed("complete"))
+        self.filter_failed.toggled.connect(lambda: self.on_filter_changed("failed"))
+        self.filter_pending.toggled.connect(lambda: self.on_filter_changed("pending"))
+        
+        filter_layout.addWidget(self.filter_all)
+        filter_layout.addWidget(self.filter_complete)
+        filter_layout.addWidget(self.filter_failed)
+        filter_layout.addWidget(self.filter_pending)
+        
+        filter_group.setLayout(filter_layout)
+        nav_layout.addWidget(filter_group)
+        
         nav_group.setLayout(nav_layout)
         main_layout.addWidget(nav_group)
         
@@ -117,39 +146,149 @@ class ReviewPanel(QWidget):
         # Details display
         self.details_label = QLabel("Select a system to view details.")
         self.details_label.setWordWrap(True)
-        self.details_label.setMaximumHeight(60)
-        self.details_label.setStyleSheet("QLabel { font-size: 9pt; padding: 5px; background-color: #f0f0f0; border: 1px solid #ccc; }")
+        self.details_label.setMaximumHeight(40)  # Reduced from 60
+        self.details_label.setStyleSheet("QLabel { font-size: 8pt; padding: 3px; background-color: #f0f0f0; border: 1px solid #ccc; }")
         preview_layout.addWidget(self.details_label)
         
-        # Edit buttons
+        
+
+        # Compact edit buttons row
         edit_buttons = QHBoxLayout()
+        edit_buttons.setContentsMargins(0, 0, 0, 0)  # Remove margins for compactness
         
         self.edit_continuum_btn = QPushButton("Edit Continuum")
         self.edit_continuum_btn.clicked.connect(self.edit_continuum)
         self.edit_continuum_btn.setEnabled(False)
+        self.edit_continuum_btn.setMaximumWidth(120)
+        self.edit_continuum_btn.setMaximumHeight(25)  # Make buttons smaller
         
         self.edit_ew_btn = QPushButton("Edit EW Range")
         self.edit_ew_btn.clicked.connect(self.edit_ew_range)
         self.edit_ew_btn.setEnabled(False)
+        self.edit_ew_btn.setMaximumWidth(120)
+        self.edit_ew_btn.setMaximumHeight(25)
         
         edit_buttons.addWidget(self.edit_continuum_btn)
         edit_buttons.addWidget(self.edit_ew_btn)
         edit_buttons.addStretch()
-        preview_layout.addLayout(edit_buttons)
         
+        preview_layout.addLayout(edit_buttons)
+
+
+
         preview_group.setLayout(preview_layout)
         main_layout.addWidget(preview_group)
+        
+        
+    
+
+    def update_status_bar_info(self):
+        """Send comprehensive info to main window status bar."""
+        total_count, complete_count, failed_count = self.get_overall_statistics()
+        filtered_count = len(self.filtered_items)
+        current_pos = self.get_current_position_in_filter()
+        
+        # Build comprehensive status message
+        if filtered_count > 0:
+            filter_name = self.current_filter.title()
+            progress_percent = int((complete_count / total_count) * 100) if total_count > 0 else 0
+            
+            status_msg = (f"Progress: {progress_percent}% | "
+                         f"Overall: {complete_count}/{total_count} complete, {failed_count} failed | "
+                         f"{filter_name} Filter: System {current_pos} of {filtered_count}")
+        else:
+            progress_percent = int((complete_count / total_count) * 100) if total_count > 0 else 0
+            status_msg = f"Progress: {progress_percent}% | Overall: {complete_count}/{total_count} complete, {failed_count} failed | No systems match filter"
+        
+        # Send to main window status bar
+        self.controller.status_updated.emit(status_msg)
+
+
+    def on_filter_changed(self, filter_type):
+        """Handle filter radio button changes."""
+        if not self.sender().isChecked():  # Only respond to the selected radio button
+            return
+            
+        self.current_filter = filter_type
+        self.refresh_results_table()  # This will repopulate with filtered items
+    
+    def get_filtered_items(self):
+        """Get items based on current filter."""
+        all_items = self.controller.master_table.get_all_items()
+        
+        if self.current_filter == "all":
+            return list(enumerate(all_items))  # Return (index, item) pairs
+        
+        filtered = []
+        for i, item in enumerate(all_items):
+            if self.current_filter == "complete":
+                # Complete: status complete AND valid W/W_e
+                if (item.analysis.processing_status == "complete" and 
+                    hasattr(item.results, 'W') and hasattr(item.results, 'W_e') and
+                    not np.isnan(item.results.W) and not np.isnan(item.results.W_e)):
+                    filtered.append((i, item))
+                    
+            elif self.current_filter == "failed":
+                # Failed: status error OR NaN W/W_e
+                is_error_status = item.analysis.processing_status == "error"
+                has_nan_results = (hasattr(item.results, 'W') and hasattr(item.results, 'W_e') and
+                                 (np.isnan(item.results.W) or np.isnan(item.results.W_e)))
+                if is_error_status or has_nan_results:
+                    filtered.append((i, item))
+                    
+            elif self.current_filter == "pending":
+                # Pending: ready, needs_processing, etc.
+                if item.analysis.processing_status in ["ready", "needs_processing", "needs_ew_recalc"]:
+                    filtered.append((i, item))
+        
+        return filtered
+    
+    def get_overall_statistics(self):
+        """Calculate overall statistics for all items."""
+        all_items = self.controller.master_table.get_all_items()
+        
+        total_count = len(all_items)
+        complete_count = 0
+        failed_count = 0
+        
+        for item in all_items:
+            # Complete: status complete AND valid W/W_e
+            if (item.analysis.processing_status == "complete" and 
+                hasattr(item.results, 'W') and hasattr(item.results, 'W_e') and
+                not np.isnan(item.results.W) and not np.isnan(item.results.W_e)):
+                complete_count += 1
+            
+            # Failed: status error OR NaN W/W_e
+            is_error_status = item.analysis.processing_status == "error"
+            has_nan_results = (hasattr(item.results, 'W') and hasattr(item.results, 'W_e') and
+                             (np.isnan(item.results.W) or np.isnan(item.results.W_e)))
+            if is_error_status or has_nan_results:
+                failed_count += 1
+        
+        return total_count, complete_count, failed_count
+    
+
+    
+    def get_current_position_in_filter(self):
+        """Get the current position within the filtered items."""
+        if self.current_index < 0 or not self.filtered_items:
+            return 0
+        
+        # Find position of current_index in filtered items
+        for pos, (original_index, item) in enumerate(self.filtered_items):
+            if original_index == self.current_index:
+                return pos + 1  # 1-based position
+        
+        return 0
     
     def refresh_results_table(self):
-        """
-        Populate system dropdown from master table.
+        """Populate system dropdown from master table with current filter."""
+        # Get filtered items
+        self.filtered_items = self.get_filtered_items()
         
-        Note: Despite the name 'refresh_results_table', this method now populates
-        the navigation dropdown instead of a table (Phase 2 enhancement). The name
-        is preserved for interface compatibility with existing code.
-        """
-        # Preserve current selection to avoid jumping back to first item
+        # Preserve current selection if possible
         current_selection = self.current_index
+        
         # Clear current state
         self.system_combo.clear()
         self.current_item = None
@@ -158,15 +297,13 @@ class ReviewPanel(QWidget):
         self.update_navigation_state()
         self.clear_preview()
         
-        # Get all items from master table
-        items = self.controller.master_table.get_all_items()
-        
-        if not items:
-            self.position_label.setText("No systems loaded")
+        if not self.filtered_items:
+            self.position_label.setText("No systems match filter")
+            self.update_status_bar_info()
             return
         
-        # Populate dropdown
-        for i, item in enumerate(items):
+        # Populate dropdown with filtered items
+        for i, (original_index, item) in enumerate(self.filtered_items):
             # Create descriptive label
             filename = os.path.basename(item.template.filename)
             transition_name = item.template.transition_name
@@ -175,7 +312,12 @@ class ReviewPanel(QWidget):
             
             # Status indicator
             if status == 'complete':
-                status_icon = "✓"
+                # Check if results are valid
+                if (hasattr(item.results, 'W') and hasattr(item.results, 'W_e') and
+                    not np.isnan(item.results.W) and not np.isnan(item.results.W_e)):
+                    status_icon = "✓"
+                else:
+                    status_icon = "✗"  # Complete but invalid results
             elif status == 'error':
                 status_icon = "✗"
             elif 'processing' in status:
@@ -183,86 +325,90 @@ class ReviewPanel(QWidget):
             else:
                 status_icon = "⚠️"
             
-            label = f"{status_icon} System {i+1}: {filename} | {transition_name} | z={redshift:.4f}"
+            label = f"{status_icon} System {original_index+1}: {filename} | {transition_name} | z={redshift:.4f}"
             self.system_combo.addItem(label)
         
         # Update position indicator
-        total_count = len(items)
-        self.position_label.setText(f"Total: {total_count} systems")
+        filter_name = self.current_filter.title()
+        filtered_count = len(self.filtered_items)
+        self.position_label.setText(f"{filter_name}: {filtered_count} systems")
         
         # Enable navigation and selection if we have items
-        if total_count > 0:
+        if filtered_count > 0:
             self.update_navigation_state()
             self.select_for_processing_btn.setEnabled(True)
             
-            # Restore previous selection if valid, otherwise select first
-            if current_selection >= 0 and current_selection < total_count:
-                self.system_combo.setCurrentIndex(current_selection)
-            else:
+            # Try to restore selection or select first
+            restored = False
+            if current_selection >= 0:
+                # Look for the same original index in filtered items
+                for combo_index, (original_index, item) in enumerate(self.filtered_items):
+                    if original_index == current_selection:
+                        self.system_combo.setCurrentIndex(combo_index)
+                        restored = True
+                        break
+            
+            if not restored:
                 self.system_combo.setCurrentIndex(0)
         else:
             self.select_for_processing_btn.setEnabled(False)
-    
-    def on_system_selected(self, index):
-        """Handle system selection from dropdown."""
-        if index < 0:
-            return
-            
-        item_count = self.controller.master_table.get_item_count()
-        if index >= item_count:
-            return
-            
-        # Update current tracking
-        self.current_index = index
         
-        # Get selected item
-        selected_item = self.controller.master_table.get_item(index)
-        if selected_item:
-            self.current_item = selected_item
-            self.display_item_spectrum(selected_item)
-            self.edit_continuum_btn.setEnabled(True)
-            self.edit_ew_btn.setEnabled(True)
-            self.select_for_processing_btn.setEnabled(True)
+        # Update progress display
+        self.update_status_bar_info()
+    
+    def on_system_selected(self, combo_index):
+        """Handle system selection from dropdown."""
+        if combo_index < 0 or combo_index >= len(self.filtered_items):
+            return
+            
+        # Get the original index and item from filtered list
+        original_index, selected_item = self.filtered_items[combo_index]
+        
+        # Update current tracking
+        self.current_index = original_index
+        self.current_item = selected_item
+        
+        self.display_item_spectrum(selected_item)
+        self.edit_continuum_btn.setEnabled(True)
+        self.edit_ew_btn.setEnabled(True)
+        self.select_for_processing_btn.setEnabled(True)
         
         # Update navigation state
         self.update_navigation_state()
-        
-        # Update position indicator
-        total_count = self.controller.master_table.get_item_count()
-        self.position_label.setText(f"System {index + 1} of {total_count}")
+        self.update_status_bar_info()
     
     def update_navigation_state(self):
         """Update navigation button enabled states."""
-        total_count = self.controller.master_table.get_item_count()
-        current_index = self.current_index
+        filtered_count = len(self.filtered_items)
+        current_combo_index = self.system_combo.currentIndex()
         
-        # Enable/disable buttons based on position
-        self.first_btn.setEnabled(total_count > 0 and current_index > 0)
-        self.prev_btn.setEnabled(total_count > 0 and current_index > 0)
-        self.next_btn.setEnabled(total_count > 0 and current_index < total_count - 1)
-        self.last_btn.setEnabled(total_count > 0 and current_index < total_count - 1)
+        # Enable/disable buttons based on position in filtered list
+        self.first_btn.setEnabled(filtered_count > 0 and current_combo_index > 0)
+        self.prev_btn.setEnabled(filtered_count > 0 and current_combo_index > 0)
+        self.next_btn.setEnabled(filtered_count > 0 and current_combo_index < filtered_count - 1)
+        self.last_btn.setEnabled(filtered_count > 0 and current_combo_index < filtered_count - 1)
     
     def navigate_to_first(self):
-        """Navigate to first system."""
-        if self.controller.master_table.get_item_count() > 0:
+        """Navigate to first system in current filter."""
+        if len(self.filtered_items) > 0:
             self.system_combo.setCurrentIndex(0)
     
     def navigate_to_previous(self):
-        """Navigate to previous system."""
-        if self.current_index > 0:
-            self.system_combo.setCurrentIndex(self.current_index - 1)
+        """Navigate to previous system in current filter."""
+        current_index = self.system_combo.currentIndex()
+        if current_index > 0:
+            self.system_combo.setCurrentIndex(current_index - 1)
     
     def navigate_to_next(self):
-        """Navigate to next system."""
-        total_count = self.controller.master_table.get_item_count()
-        if self.current_index < total_count - 1:
-            self.system_combo.setCurrentIndex(self.current_index + 1)
+        """Navigate to next system in current filter."""
+        current_index = self.system_combo.currentIndex()
+        if current_index < len(self.filtered_items) - 1:
+            self.system_combo.setCurrentIndex(current_index + 1)
     
     def navigate_to_last(self):
-        """Navigate to last system."""
-        total_count = self.controller.master_table.get_item_count()
-        if total_count > 0:
-            self.system_combo.setCurrentIndex(total_count - 1)
+        """Navigate to last system in current filter."""
+        if len(self.filtered_items) > 0:
+            self.system_combo.setCurrentIndex(len(self.filtered_items) - 1)
     
     def open_batch_selection_dialog(self):
         """Open the batch selection dialog for choosing systems to process."""
@@ -306,10 +452,7 @@ class ReviewPanel(QWidget):
             print(f"Error getting spectrum: {e}")
 
     def update_spectrum_plot(self, item, spec):
-        """
-        Updated plotting method using the new plotting module.
-        This completely redraws the figure from the rb_spec object.
-        """
+        """Updated plotting method using the new plotting module."""
         try:
             # Use the new plotting module to generate the complete figure
             plot_spectrum_overview(spec, item, figure=self.spectrum_canvas.fig, clear_figure=True)
@@ -362,7 +505,7 @@ class ReviewPanel(QWidget):
             details_parts.append(f"Masks: {mask_count}")
         
         # 7. Additional useful info if available
-        if hasattr(item.results, 'W') and  not np.isnan(item.results.W):
+        if hasattr(item.results, 'W') and not np.isnan(item.results.W):  # Fixed condition
             ew_value = item.results.W
             ew_error = item.results.W_e
             details_parts.append(f"EW: {ew_value:.3f}±{ew_error:.3f} Å")
