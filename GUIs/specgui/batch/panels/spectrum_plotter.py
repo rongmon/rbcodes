@@ -65,15 +65,15 @@ def _plot_flux_continuum_panel(rb_spec, item, ax, show_xlabel=False):
     
     # Plot flux and error
     ax.step(rb_spec.velo, rb_spec.flux_slice, 'k-', where='mid', 
-           linewidth=0.8, label='Flux', alpha=0.8)
+           linewidth=0.5, label='Flux', alpha=0.8)
     
     if hasattr(rb_spec, 'error_slice'):
         ax.step(rb_spec.velo, rb_spec.error_slice, 'r-', where='mid', 
-               alpha=0.6, linewidth=0.6, label='Error')
+               alpha=0.6, linewidth=0.5, label='Error')
     
     # Plot continuum
     if hasattr(rb_spec, 'cont'):
-        ax.plot(rb_spec.velo, rb_spec.cont, 'g-', linewidth=2, 
+        ax.plot(rb_spec.velo, rb_spec.cont, 'g-', linewidth=0.75, 
                label='Continuum', alpha=0.9)
     
     # Add continuum masks if available
@@ -113,7 +113,7 @@ def _plot_flux_continuum_panel(rb_spec, item, ax, show_xlabel=False):
     ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
     
     # Smaller legend
-    ax.legend(loc='upper right', fontsize=8)
+    #ax.legend(loc='upper right', fontsize=8)
 
 
 def _plot_normalized_panel(rb_spec, item, ax, show_xlabel=True):
@@ -124,11 +124,11 @@ def _plot_normalized_panel(rb_spec, item, ax, show_xlabel=True):
     # Plot normalized flux and error
     if hasattr(rb_spec, 'fnorm'):
         ax.step(rb_spec.velo, rb_spec.fnorm, 'k-', where='mid', 
-               linewidth=0.8, label='Normalized Flux')
+               linewidth=0.5, label='Normalized Flux')
     
     if hasattr(rb_spec, 'enorm'):
         ax.step(rb_spec.velo, rb_spec.enorm, 'r-', where='mid', 
-               alpha=0.6, linewidth=0.6, label='Error')
+               alpha=0.6, linewidth=0.5, label='Error')
     
     # Reference lines
     ax.axhline(y=1.0, color='g', linestyle='--', alpha=0.7, linewidth=1)
@@ -170,7 +170,7 @@ def _plot_normalized_panel(rb_spec, item, ax, show_xlabel=True):
     ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
     
     # Smaller legend
-    ax.legend(loc='upper left', fontsize=8)
+    #ax.legend(loc='upper left', fontsize=8)
 
 
 def _add_results_text_box(results, ax):
