@@ -253,6 +253,9 @@ class BatchSpecGUI(QMainWindow):
         
         # Tab change signal
         self.tabs.currentChanged.connect(self.on_tab_changed)
+
+        #Connect review panel selections to processing panel
+        self.review_panel.items_selected.connect(self.processing_panel.set_selected_from_review)
     
     def update_tab_states(self):
         """Update which tabs are enabled based on current state."""

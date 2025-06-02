@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                            QAbstractItemView)
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QColor
-
+from datetime import datetime
 
 class ConfigurationPanel(QWidget):
     """Panel for configuring batch processing items using master table."""
@@ -110,6 +110,8 @@ class ConfigurationPanel(QWidget):
         config_group.setLayout(config_layout)
         main_layout.addWidget(config_group)    
 
+
+
     def import_multiple_json_files(self):
         """Import multiple rb_spec JSON files to create batch items."""
         # Select multiple JSON files
@@ -124,40 +126,41 @@ class ConfigurationPanel(QWidget):
             return
         
         imported_count = 0
+        completed_count = 0  # Track how many were already analyzed
         skipped_count = 0
         
         for filepath in filepaths:
             try:
-                # Load JSON data
-                with open(filepath, 'r') as f:
-                    data = json.load(f)
+                # Load the complete rb_spec object
+                from rbcodes.GUIs.rb_spec import load_rb_spec_object
+                spec_object = load_rb_spec_object(filepath)
                 
-                # Simple check - does it have key rb_spec attributes?
-                if not all(key in data for key in ['zabs', 'trans_wave']):
-                    print(f"Skipping {os.path.basename(filepath)} - not an rb_spec file")
+                # Extract basic parameters from rb_spec object
+                if not all(hasattr(spec_object, attr) for attr in ['zabs', 'trans_wave']):
+                    print(f"Skipping {os.path.basename(filepath)} - missing required rb_spec attributes")
                     skipped_count += 1
                     continue
                 
-                # Extract parameters from rb_spec JSON
-                redshift = data['zabs']
-                transition = data['trans_wave']
-                transition_name = data.get('trans', f"λ {transition:.2f}")
-                linelist = data.get('linelist', 'atom')
+                # Extract template parameters from the loaded rb_spec object
+                redshift = spec_object.zabs
+                transition = spec_object.trans_wave
+                transition_name = getattr(spec_object, 'trans', f"λ {transition:.2f}")
+                linelist = getattr(spec_object, 'linelist', 'atom')
                 
                 # Get slice ranges from velocity array if available
-                if 'velo' in data and len(data['velo']) > 0:
-                    slice_vmin = int(min(data['velo']))
-                    slice_vmax = int(max(data['velo']))
+                if hasattr(spec_object, 'velo') and len(spec_object.velo) > 0:
+                    slice_vmin = int(min(spec_object.velo))
+                    slice_vmax = int(max(spec_object.velo))
                 else:
                     # Default slice ranges
                     slice_vmin = -1500
                     slice_vmax = 1500
                 
                 # Get EW ranges if available, otherwise use defaults
-                ew_vmin = data.get('vmin', -200)
-                ew_vmax = data.get('vmax', 200)
+                ew_vmin = getattr(spec_object, 'vmin', -200)
+                ew_vmax = getattr(spec_object, 'vmax', 200)
                 
-                # Create template parameters as dict
+                # Create template parameters
                 template_params = {
                     'filename': filepath,
                     'redshift': redshift,
@@ -172,20 +175,104 @@ class ConfigurationPanel(QWidget):
                 }
                 
                 # Add to master table
-                self.controller.master_table.add_item(template_params)
+                row_index = self.controller.master_table.add_item(template_params)
+                
+                # Check if this rb_spec object has EW results (already analyzed)
+                if (hasattr(spec_object, 'W') and hasattr(spec_object, 'W_e') and 
+                    spec_object.W > 0 and spec_object.W_e > 0):
+                    
+                    # Extract all results from the rb_spec object
+                    results = {
+                        'W': spec_object.W,
+                        'W_e': spec_object.W_e,
+                        'N': getattr(spec_object, 'N', 0.0),
+                        'N_e': getattr(spec_object, 'N_e', 0.0),
+                        'logN': getattr(spec_object, 'logN', 0.0),
+                        'logN_e': getattr(spec_object, 'logN_e', 0.0),
+                        'vel_centroid': getattr(spec_object, 'vel_centroid', 0.0),
+                        'vel_disp': getattr(spec_object, 'vel_disp', 0.0),
+                        'SNR': getattr(spec_object, 'SNR', 0.0)
+                    }
+                    
+                    # Update results in master table
+                    self.controller.master_table.update_results(row_index, **results)
+                    
+                    # Extract continuum parameters if available
+                    continuum_method = "polynomial"  # Default
+                    continuum_order = 3  # Default
+                    continuum_masks = []  # Default
+                    
+                    # Try to extract continuum fitting parameters from rb_spec object
+                    if hasattr(spec_object, 'fit_params') and spec_object.fit_params:
+                        fit_params = spec_object.fit_params
+                        if 'Legendre' in fit_params:
+                            continuum_order = fit_params['Legendre']
+                        if 'mask' in fit_params and fit_params['mask']:
+                            # Convert flat mask list to tuples: [v1,v2,v3,v4] -> [(v1,v2), (v3,v4)]
+                            mask_list = fit_params['mask']
+                            for i in range(0, len(mask_list), 2):
+                                if i + 1 < len(mask_list):
+                                    continuum_masks.append((mask_list[i], mask_list[i+1]))
+                    
+                    # Check if flat continuum was used (continuum is all 1s)
+                    if hasattr(spec_object, 'cont') and len(spec_object.cont) > 0:
+                        if abs(spec_object.cont.mean() - 1.0) < 0.01 and spec_object.cont.std() < 0.01:
+                            continuum_method = "flat"
+                    
+                    # Update analysis parameters
+                    self.controller.master_table.update_analysis(
+                        row_index,
+                        continuum_method=continuum_method,
+                        continuum_order=continuum_order,
+                        continuum_masks=continuum_masks,
+                        processing_status="complete",
+                        calculate_snr=True,  # Assume SNR was calculated if results exist
+                        binsize=3,  # Default
+                        use_weights=False,  # Default
+                        last_modified=datetime.now().isoformat()
+                    )
+                    
+                    # Store the rb_spec object
+                    self.controller.master_table.set_rb_spec_object(row_index, spec_object)
+                    
+                    completed_count += 1
+                    print(f"Imported complete analysis: {os.path.basename(filepath)}")
+                    
+                else:
+                    # No EW results - mark as ready for processing
+                    self.controller.master_table.update_analysis(
+                        row_index,
+                        processing_status="ready"
+                    )
+                    print(f"Imported for processing: {os.path.basename(filepath)}")
+                
                 imported_count += 1
                 
             except Exception as e:
                 print(f"Error importing {os.path.basename(filepath)}: {e}")
                 skipped_count += 1
         
-        # Refresh UI and show results
+        # Refresh UI
         self.refresh_table()
         self.configuration_changed.emit()
         
         # Show summary message
-        self.controller.status_updated.emit(f"Import completed: {imported_count} files imported, {skipped_count} files skipped")        
+        if completed_count > 0:
+            summary = f"Import completed: {imported_count} files imported ({completed_count} already analyzed), {skipped_count} files skipped"
+            
+            # Auto-navigate to Review panel if we have completed analyses
+            main_window = self.window()  # Get the top-level window
+            if hasattr(main_window, 'tabs') and completed_count > 0:
+                # Enable and switch to Review tab (index 2)
+                main_window.update_tab_states()  # This will enable review tab
+                main_window.tabs.setCurrentIndex(2)  # Switch to review panel
+                summary += " - Switched to Review panel"
+        else:
+            summary = f"Import completed: {imported_count} files imported, {skipped_count} files skipped"
+        
+        self.controller.status_updated.emit(summary)
     
+
     def setup_table(self):
         """Setup table columns."""
         self.batch_table.setColumnCount(7)
