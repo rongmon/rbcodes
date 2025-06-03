@@ -38,6 +38,8 @@ class ReviewPanel(QWidget):
         self.current_index = -1  # Track current system index
         self.current_filter = "all"  # Track current filter
         self.filtered_items = []     # Cache filtered items
+        self.importing_in_progress = False  # Flag to suppress warnings during import
+
         self.init_ui()
         
         self.controller.table_changed.connect(self.refresh_results_table)
@@ -436,6 +438,9 @@ class ReviewPanel(QWidget):
     def display_item_spectrum(self, item):
         """Get existing spectrum from master table and copy it for editing."""
         try:
+            # Skip if import is in progress to avoid warnings
+            if self.importing_in_progress:
+                return
             # Get existing rb_spec object from master table
             master_spec = self.controller.master_table.get_rb_spec_object(self.current_index)
             

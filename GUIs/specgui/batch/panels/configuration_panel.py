@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QColor
 from datetime import datetime
-
+import numpy as np
 class ConfigurationPanel(QWidget):
     """Panel for configuring batch processing items using master table."""
     
@@ -584,6 +584,9 @@ class ConfigurationPanel(QWidget):
             
             # Auto-navigate to Review panel if we have completed analyses
             main_window = self.window()  # Get the top-level window
+
+            if hasattr(main_window, 'review_panel'):
+                main_window.review_panel.importing_in_progress = True
             if hasattr(main_window, 'tabs') and completed_count > 0:
                 # Enable and switch to Review tab (index 2)
                 main_window.update_tab_states()  # This will enable review tab
@@ -1070,7 +1073,11 @@ class ConfigurationPanel(QWidget):
             # FORCE REVIEW PANEL REFRESH - ADD THIS
             # Get the main window and refresh review panel
             main_window = self.window()  # Get the top-level window
+            
+            # Clear import flag
             if hasattr(main_window, 'review_panel'):
+                main_window.review_panel.importing_in_progress = False
+                # Force a final refresh now that import is complete
                 main_window.review_panel.refresh_results_table()
             
             QMessageBox.information(
