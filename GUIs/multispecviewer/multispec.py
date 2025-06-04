@@ -24,7 +24,6 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 
 # Spectral data handling
-from linetools.spectra.xspectrum1d import XSpectrum1D
 import astropy.units as u
 
 # Convolution and data processing
@@ -40,7 +39,6 @@ from rbcodes.GUIs.multispecviewer.io_manager import IOManager
 from rbcodes.IGM import rb_setline as rb_setline
 from rbcodes.utils import rb_utility as rt
 from rbcodes.GUIs.multispecviewer.LineSelectionDialog import LineSelectionDialog
-
 
 
 

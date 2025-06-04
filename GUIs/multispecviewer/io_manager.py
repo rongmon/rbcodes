@@ -61,21 +61,18 @@ class IOManager:
     
     def load_fits_files(self, file_paths=None):
         """
-        Load FITS files into XSpectrum1D objects.
+        Load FITS files with rb_spectrum fallback to XSpectrum1D.
         
         Args:
-            file_paths (list, optional): List of file paths to load. If None, open file dialog.
+            file_paths (list, optional): List of file paths to load.
             
         Returns:
-            list: List of XSpectrum1D objects
+            list: List of spectrum objects (rb_spectrum or XSpectrum1D)
         """
         try:
-            # Import here to avoid circular imports
-            from linetools.spectra.xspectrum1d import XSpectrum1D
-            import numpy as np
+            from rbcodes.utils.rb_spectrum import rb_spectrum
             
             if file_paths is None:
-                # This would be handled by the calling code that has access to the UI
                 return [], "No files specified"
             
             spectra = []
@@ -91,26 +88,32 @@ class IOManager:
                     # Update last directory
                     self.last_directories['fits'] = os.path.dirname(file_path)
                     
-                    # Load the spectrum
-                    temp_spec = XSpectrum1D.from_file(file_path)
-                    wave = temp_spec.wavelength.value
-                    flux = temp_spec.flux.value
+                    # Try rb_spectrum first
+                    spec = rb_spectrum.from_file(file_path)
                     
-                    # Check if the original spectrum has an error array
-                    if temp_spec.sig_is_set:
-                        # Use the existing error array
-                        sig = temp_spec.sig.value
-                        spec = XSpectrum1D.from_tuple((wave, flux, sig), verbose=False)
+                    # Fall back to linetools if rb_spectrum failed
+                    if hasattr(spec, '_read_failed') and spec._read_failed:
+                        from linetools.spectra.xspectrum1d import XSpectrum1D
+                        spec = XSpectrum1D.from_file(file_path)
+                        
+                        # Add error array if missing from XSpectrum1D
+                        if not spec.sig_is_set:
+                            sig_array = 0.05 * spec.flux.value
+                            spec = XSpectrum1D.from_tuple(
+                                (spec.wavelength, spec.flux, sig_array), verbose=False)
+                            spec.filename = file_path
+                            self.show_message(
+                                f"No error spectrum found for {os.path.basename(file_path)}. " 
+                                f"Using 5% of flux values as error.", "#FFA500")
                     else:
-                        # Create error array as 5% of flux values
-                        sig_array = 0.05 * flux
-                        spec = XSpectrum1D.from_tuple((wave, flux, sig_array), verbose=False)
-                        self.show_message(
-                            f"No error spectrum found for {os.path.basename(file_path)}. " 
-                            f"Using 5% of flux values as error.", "#FFA500")
-                    
-                    # Set the filename attribute to match the original
-                    spec.filename = file_path
+                        # rb_spectrum succeeded, add error array if missing
+                        if not spec.sig_is_set:
+                            sig_array = 0.05 * spec.flux.value
+                            spec = rb_spectrum.from_tuple(
+                                (spec.wavelength, spec.flux, sig_array), filename=file_path)
+                            self.show_message(
+                                f"No error spectrum found for {os.path.basename(file_path)}. " 
+                                f"Using 5% of flux values as error.", "#FFA500")
                     
                     spectra.append(spec)
                     loaded_files.append(os.path.basename(file_path))
@@ -133,6 +136,7 @@ class IOManager:
             self.show_message(error_message, "#FF0000")
             return [], error_message
     
+        
     # ===== Line List Operations =====   
     def save_line_list(self, line_list, file_path=None, format=None):
         """
