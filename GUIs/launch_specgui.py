@@ -18,6 +18,7 @@ Examples:
     python launch_specgui.py analysis.json                    # Load saved analysis
     python launch_specgui.py -b                               # Launch batch processor
     python launch_specgui.py -b batch_config.json             # Load batch configuration
+    python launch_specgui.py -b batch_items.csv               # Import batch items from CSV
 """
 
 import sys
@@ -103,24 +104,40 @@ def launch_batch_gui(args):
     window = BatchSpecGUI()
     window.show()
     
-    # Load configuration file if specified
+    # Handle config/CSV file if specified
     if args.config and os.path.exists(args.config):
-        def load_config():
-            success = window.controller.load_batch_configuration(args.config)
-            if success:
-                window.config_panel.refresh_table()
-                window.current_config_file = args.config
-                window.has_unsaved_changes = False
-                window.update_window_title()
-                window.update_tab_states()
-                window.update_status(f"Loaded configuration from {args.config}")
+        def load_file():
+            # Check file extension to determine import method
+            if args.config.lower().endswith('.csv'):
+                # Import from CSV
+                print(f"Importing batch items from CSV: {args.config}")
+                success, message = window.controller.master_table.import_template_csv(args.config)
+                if success:
+                    window.config_panel.refresh_table()
+                    window.config_panel.configuration_changed.emit()
+                    window.update_status(f"Imported batch items from {args.config}")
+                    print(f"Success: {message}")
+                else:
+                    window.update_status(f"Failed to import from {args.config}: {message}")
+                    print(f"Error: {message}")
             else:
-                window.update_status(f"Failed to load configuration from {args.config}")
+                # Load as JSON configuration
+                print(f"Loading configuration: {args.config}")
+                success = window.controller.load_batch_configuration(args.config)
+                if success:
+                    window.config_panel.refresh_table()
+                    window.current_config_file = args.config
+                    window.has_unsaved_changes = False
+                    window.update_window_title()
+                    window.update_tab_states()
+                    window.update_status(f"Loaded configuration from {args.config}")
+                else:
+                    window.update_status(f"Failed to load configuration from {args.config}")
         
-        # Schedule config loading after GUI is fully initialized
-        QTimer.singleShot(100, load_config)
+        # Schedule file loading after GUI is fully initialized
+        QTimer.singleShot(100, load_file)
     elif args.config:
-        print(f"Warning: Configuration file '{args.config}' does not exist.")
+        print(f"Warning: File '{args.config}' does not exist.")
     
     return app.exec_()
 
@@ -138,6 +155,7 @@ Examples:
   %(prog)s analysis.json                    Load saved analysis
   %(prog)s -b                               Launch batch processor
   %(prog)s -b batch_config.json             Load batch configuration
+  %(prog)s -b batch_items.csv               Import batch items from CSV
   %(prog)s -v                               Show version information
 
 For more information, visit: https://github.com/rongmon/rbcodes
@@ -152,9 +170,9 @@ For more information, visit: https://github.com/rongmon/rbcodes
     parser.add_argument('-b', '--batch', action='store_true',
                        help='Launch batch processing GUI')
     
-    # Positional argument (filename for single mode, config for batch mode)
+    # Positional argument (filename for single mode, config/csv for batch mode)
     parser.add_argument('filename', nargs='?', 
-                       help='Spectrum file (single mode) or config file (batch mode)')
+                       help='Spectrum file (single mode) or config/CSV file (batch mode)')
     
     # Single mode specific arguments
     parser.add_argument('-t', '--filetype', 
@@ -183,7 +201,10 @@ For more information, visit: https://github.com/rongmon/rbcodes
         
         print(f"Launching rb_spec Batch Processing GUI v{__version__}")
         if args.config:
-            print(f"Loading configuration: {args.config}")
+            if args.config.lower().endswith('.csv'):
+                print(f"Will import batch items from CSV: {args.config}")
+            else:
+                print(f"Loading configuration: {args.config}")
         
         return launch_batch_gui(args)
     
