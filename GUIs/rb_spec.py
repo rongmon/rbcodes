@@ -1,4 +1,4 @@
-__version__ = "2.3.3"
+__version__ = "2.4.0"
 __author__ = "Rongmon Bordoloi"
 __last_updated__ = "June 2025"
 
@@ -21,6 +21,7 @@ Version History:
 - v2.3.1 (2025): Fixed logN text in plot_continuum routine
 - v2.3.2 (2025): Unified version declaration, minor cleanup
 - v2.3.3 (2025): logN_e for non detector now gives 1\sigma limit and logN=0 for non detection
+- v2.4.0 (2025): updated from_file routine, now uses rb_spectrum to load fits file by default, supports .fits.gz file format.
 
 """.format(
     version=__version__,
@@ -346,7 +347,7 @@ class rb_spec(object):
         """Return the rb_spec version."""
         return __version__
     
-    
+
     @classmethod
     def from_file(cls, filename, filetype=False, efil=None, **kwargs):
         """
@@ -379,7 +380,14 @@ class rb_spec(object):
         
         # Infer filetype if not specified
         if filetype is False:
-            ext = os.path.splitext(filename)[1].lower()
+            # Handle .gz files by looking at the underlying extension
+            if filename.endswith('.gz'):
+                # Remove .gz and check the underlying extension
+                base_filename = filename[:-3]
+                ext = os.path.splitext(base_filename)[1].lower()
+            else:
+                ext = os.path.splitext(filename)[1].lower()
+            
             if ext in ['.txt', '.dat']:
                 filetype = 'ascii'
             elif ext == '.fits':
@@ -404,7 +412,7 @@ class rb_spec(object):
                     
                     keys = data.keys()
                     if len(keys) < 2:
-                        raise ValueError(f"Not enough columns in file: {filename}. Need at least wavelength and     flux.")
+                        raise ValueError(f"Not enough columns in file: {filename}. Need at least wavelength and flux.")
                     
                     wave = np.array(data[keys[0]])
                     flux = np.array(data[keys[1]])
@@ -413,81 +421,115 @@ class rb_spec(object):
                     if len(keys) >= 3:
                         error = np.array(data[keys[2]])
                     else:
-                        #print("Warning: No error column found. Assuming 10% error.")
                         warnings.warn(f"⚠️ Warning: No error column found. Assuming 10% error.", category=UserWarning)
-
                         error = 0.1 * np.abs(flux)
                 except Exception as e:
                     raise IOError(f"Error reading ASCII file: {e}")
             
             elif filetype in ['fits', 'HSLA']:
+                # Try rb_spectrum first for standard FITS (handles .fits.gz automatically)
                 try:
-                    from astropy.io import fits
-                except ImportError:
-                    raise ImportError("astropy.io.fits is required to read FITS files")
-                
-                try:
-                    with fits.open(filename) as file:
-                        if len(file) < 2:
-                            raise ValueError(f"FITS file does not have expected HDU structure: {filename}")
-                        
-                        data = file[1].data
-                        if data is None or len(data) == 0:
-                            raise ValueError(f"Empty data in FITS file: {filename}")
-                        
-                        # Check for required columns
-                        if 'WAVE' not in data.names and 'wave' not in data.names:
-                            raise ValueError(f"Wavelength column not found in FITS file: {filename}")
-                        if 'FLUX' not in data.names and 'flux' not in data.names:
-                            raise ValueError(f"Flux column not found in FITS file: {filename}")
-                        
-                        # Get column names with case insensitivity
-                        wave_col = 'WAVE' if 'WAVE' in data.names else 'wave'
-                        flux_col = 'FLUX' if 'FLUX' in data.names else 'flux'
-                        error_col = None
-                        for col in ['ERROR', 'error', 'ERR', 'err']:
-                            if col in data.names:
-                                error_col = col
-                                break
-                        
-                        wave = np.array(data[wave_col])
-                        flux = np.array(data[flux_col])
-                        
-                        if error_col:
-                            error = np.array(data[error_col])
-                        else:
-                            #print("Warning: No error column found in FITS file. Assuming 10% error.")
-                            warnings.warn(f"⚠️ Warning: No error column found. Assuming 10% error.", category=UserWarning)
-
-                            error = 0.1 * np.abs(flux)
-                except Exception as e:
-                    raise IOError(f"Error reading FITS file: {e}")
+                    from rbcodes.utils.rb_spectrum import rb_spectrum
+                    spec = rb_spectrum.from_file(filename)
+                    if hasattr(spec, '_read_failed') and spec._read_failed:
+                        raise Exception("rb_spectrum failed")
+                    
+                    wave = spec.wavelength.value
+                    flux = spec.flux.value
+                    error = spec.sig.value if spec.sig_is_set else 0.1 * np.abs(flux)
+                    
+                    if not spec.sig_is_set:
+                        warnings.warn(f"⚠️ Warning: No error column found in FITS file. Assuming 10% error.", category=UserWarning)
+                    
+                except:
+                    # Fall back to current astropy.io.fits method
+                    try:
+                        from astropy.io import fits
+                    except ImportError:
+                        raise ImportError("astropy.io.fits is required to read FITS files")
+                    
+                    try:
+                        with fits.open(filename) as file:
+                            if len(file) < 2:
+                                raise ValueError(f"FITS file does not have expected HDU structure: {filename}")
+                            
+                            data = file[1].data
+                            if data is None or len(data) == 0:
+                                raise ValueError(f"Empty data in FITS file: {filename}")
+                            
+                            # Check for required columns
+                            if 'WAVE' not in data.names and 'wave' not in data.names:
+                                raise ValueError(f"Wavelength column not found in FITS file: {filename}")
+                            if 'FLUX' not in data.names and 'flux' not in data.names:
+                                raise ValueError(f"Flux column not found in FITS file: {filename}")
+                            
+                            # Get column names with case insensitivity
+                            wave_col = 'WAVE' if 'WAVE' in data.names else 'wave'
+                            flux_col = 'FLUX' if 'FLUX' in data.names else 'flux'
+                            error_col = None
+                            for col in ['ERROR', 'error', 'ERR', 'err']:
+                                if col in data.names:
+                                    error_col = col
+                                    break
+                            
+                            wave = np.array(data[wave_col])
+                            flux = np.array(data[flux_col])
+                            
+                            if error_col:
+                                error = np.array(data[error_col])
+                            else:
+                                warnings.warn(f"⚠️ Warning: No error column found in FITS file. Assuming 10% error.", category=UserWarning)
+                                error = 0.1 * np.abs(flux)
+                    except Exception as e:
+                        raise IOError(f"Error reading FITS file: {e}")
             
             elif filetype == 'xfits':
+                # Try rb_spectrum first
                 try:
-                    from linetools.spectra.xspectrum1d import XSpectrum1D
-                except ImportError:
-                    raise ImportError("linetools is required to read XFITS files")
-                
-                try:
-                    sp = XSpectrum1D.from_file(filename)
-                    wave = sp.wavelength.value
-                    flux = sp.flux.value
+                    from rbcodes.utils.rb_spectrum import rb_spectrum
+                    spec = rb_spectrum.from_file(filename)
+                    if hasattr(spec, '_read_failed') and spec._read_failed:
+                        raise Exception("rb_spectrum failed")
                     
-                    if sp.sig_is_set:
-                        error = sp.sig.value
+                    wave = spec.wavelength.value
+                    flux = spec.flux.value
+                    
+                    if spec.sig_is_set:
+                        error = spec.sig.value
                     else:
-                        #print("Warning: No error information in XSpectrum. Assuming 10% error.")
-                        warnings.warn(f"⚠️ Warning: No error information in XSpectrum. Assuming 10% error.", category=UserWarning)
-
+                        warnings.warn(f"⚠️ Warning: No error information in spectrum. Assuming 10% error.", category=UserWarning)
                         error = 0.1 * np.abs(flux)
                     
-                    if sp.co_is_set:
+                    # Check for continuum and normalize if present
+                    if spec.co_is_set:
                         print("Normalizing by continuum from file")
-                        flux /= sp.co.value
-                        error /= sp.co.value
-                except Exception as e:
-                    raise IOError(f"Error reading XFITS file: {e}")
+                        flux /= spec.co.value
+                        error /= spec.co.value
+                        
+                except:
+                    # Fall back to linetools (original logic)
+                    try:
+                        from linetools.spectra.xspectrum1d import XSpectrum1D
+                    except ImportError:
+                        raise ImportError("linetools is required to read XFITS files")
+                    
+                    try:
+                        sp = XSpectrum1D.from_file(filename)
+                        wave = sp.wavelength.value
+                        flux = sp.flux.value
+                        
+                        if sp.sig_is_set:
+                            error = sp.sig.value
+                        else:
+                            warnings.warn(f"⚠️ Warning: No error information in XSpectrum. Assuming 10% error.", category=UserWarning)
+                            error = 0.1 * np.abs(flux)
+                        
+                        if sp.co_is_set:
+                            print("Normalizing by continuum from file")
+                            flux /= sp.co.value
+                            error /= sp.co.value
+                    except Exception as e:
+                        raise IOError(f"Error reading XFITS file: {e}")
             
             elif filetype == 'p':
                 try:
@@ -513,9 +555,7 @@ class rb_spec(object):
                     if 'error' in data:
                         error = np.array(data['error'])
                     else:
-                        #print("Warning: No 'error' key found in pickle file. Assuming 10% error.")
                         warnings.warn(f"⚠️ Warning: No 'error' key found in pickle file. Assuming 10% error.", category=UserWarning)
-
                         error = 0.1 * np.abs(flux)
                 except Exception as e:
                     raise IOError(f"Error reading pickle file: {e}")
@@ -554,7 +594,6 @@ class rb_spec(object):
                     if sp.sig_is_set:
                         error = sp.sig.value
                     else:
-                        #print("Warning: No error information. Assuming 10% error.")
                         warnings.warn(f"⚠️ Warning: No error information. Assuming 10% error.", category=UserWarning)
                         error = 0.1 * flux
                 except Exception as e:
@@ -569,16 +608,13 @@ class rb_spec(object):
             
             # Check for NaN or Inf values
             if np.any(np.isnan(wave)) or np.any(np.isinf(wave)):
-                #print("Warning: Wavelength array contains NaN or infinity values")
                 warnings.warn(f"⚠️ Warning: Wavelength array contains NaN or infinity values", category=UserWarning)
             
             if np.any(np.isnan(flux)) or np.any(np.isinf(flux)):
-                #print("Warning: Flux array contains NaN or infinity values")
                 warnings.warn(f"⚠️ Warning: Flux array contains NaN or infinity values", category=UserWarning)
                 # Replace NaN/Inf with interpolated or zero values
                 bad_indices = np.isnan(flux) | np.isinf(flux)
                 if np.all(bad_indices):
-                    #print("All flux values are NaN or Inf. Replacing with zeros.")
                     warnings.warn(f"⚠️ Warning: Either Check original spectrum or proceed as stated below!", category=UserWarning)
                     warnings.warn(f"⚠️ All flux values are NaN or Inf. Replacing with zeros.", category=UserWarning)
                     flux = np.zeros_like(flux)
@@ -598,28 +634,24 @@ class rb_spec(object):
             
             if np.any(np.isnan(error)) or np.any(np.isinf(error)):
                 warnings.warn(f"⚠️ Warning: Either Check original spectrum or proceed as stated below!", category=UserWarning)
-
-                #print("Warning: Error array contains NaN or infinity values")
                 warnings.warn(f"⚠️ Warning: Error array contains NaN or infinity values.", category=UserWarning)
                 # Replace NaN/Inf with median or percentage values
                 bad_indices = np.isnan(error) | np.isinf(error) | (error <= 0)
                 if np.all(bad_indices):
-                    #print("All error values are invalid. Using 10% of flux as error.")
                     warnings.warn(f"⚠️ All error values are invalid. Using 10% of flux as error.", category=UserWarning)
                     error = 0.1 * np.abs(flux)
                 else:
                     good_indices = ~bad_indices
                     if np.any(good_indices):
                         median_error = np.median(error[good_indices])
-                        error[bad_indices] = median_error if median_error > 0 else 0.1 * np.abs(flux[    bad_indices])
-                        #print(f"Replaced {np.sum(bad_indices)} invalid error values with {median_error:.2e}")
+                        error[bad_indices] = median_error if median_error > 0 else 0.1 * np.abs(flux[bad_indices])
                         warnings.warn(f"⚠️ Replaced {np.sum(bad_indices)} invalid error values with {median_error:.2e}", UserWarning)
-
+    
             return cls(wave, flux, error, filename=filename)
         
         except Exception as e:
             # Re-raise the exception with additional context
-            raise type(e)(f"{str(e)} while processing file: {filename}").with_traceback(sys.exc_info()[2])
+            raise type(e)(f"{str(e)} while processing file: {filename}").with_traceback(sys.exc_info()[2])        
     
     @classmethod
     def from_data(cls, wave, flux, error):

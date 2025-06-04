@@ -677,36 +677,59 @@ def _rb_parse_rbspectrum_json(data, filename=None, **kwargs):
 # =============================================================================
 
 def _rb_parse_fits_binary_table(hdulist, filename=None, **kwargs):
-    """Parse binary FITS table"""
+    """Parse binary FITS table with flexible column detection"""
     try:
-        # Try to find columns using common names
-        flux, flux_tag = _rb_get_table_column(['SPEC', 'FLUX', 'FLAM', 'FX', 'flux'], hdulist)
-        if flux is None:
-            raise ValueError("No flux column found in binary table")
-            
-        wave, wave_tag = _rb_get_table_column(['WAVE', 'WAVELENGTH', 'LAMBDA', 'loglam'], hdulist)
-        if wave is None:
-            raise ValueError("No wavelength column found in binary table")
-            
+        table = Table(hdulist[1].data)
+        
+        # Check for required columns with case insensitivity
+        if not any(col in table.colnames for col in ['WAVE', 'wave', 'WAVELENGTH', 'wavelength']):
+            raise ValueError(f"Wavelength column not found in FITS file: {filename}")
+        if not any(col in table.colnames for col in ['FLUX', 'flux', 'SPEC', 'spec']):
+            raise ValueError(f"Flux column not found in FITS file: {filename}")
+        
+        # Get column names with case insensitivity
+        wave_col = None
+        for col in ['WAVE', 'wave', 'WAVELENGTH', 'wavelength', 'loglam']:
+            if col in table.colnames:
+                wave_col = col
+                break
+                
+        flux_col = None  
+        for col in ['FLUX', 'flux', 'SPEC', 'spec']:
+            if col in table.colnames:
+                flux_col = col
+                break
+                
+        error_col = None
+        for col in ['ERROR', 'error', 'ERR', 'err', 'SIGMA', 'sigma']:
+            if col in table.colnames:
+                error_col = col
+                break
+        
+        # Extract arrays (handles both single-row arrays and multi-row scalars)
+        wave = np.array(table[wave_col]).flatten()
+        flux = np.array(table[flux_col]).flatten()
+        
         # Handle log wavelength
-        if wave_tag in ['LOGLAM', 'loglam']:
+        if wave_col in ['loglam', 'LOGLAM']:
             wave = 10**wave
             
-        # Optional columns - try multiple common names
-        sig, sig_tag = _rb_get_table_column(['ERROR', 'ERR', 'SIGMA', 'SIGMA_FLUX'], hdulist)
+        if error_col:
+            error = np.array(table[error_col]).flatten()
+        else:
+            warnings.warn(f"⚠️ Warning: No error column found. Assuming 10% error.", 
+                         category=UserWarning)
+            error = 0.1 * np.abs(flux)
         
-        # Handle inverse variance
-        if sig is None:
-            ivar, ivar_tag = _rb_get_table_column(['IVAR', 'IVAR_OPT', 'ivar', 'FLUX_IVAR'], hdulist)
-            if ivar is not None:
-                sig = np.zeros_like(ivar)
-                good = ivar > 0
-                sig[good] = 1.0 / np.sqrt(ivar[good])
+        # Handle inverse variance if needed
+        if error_col in ['ivar', 'IVAR']:
+            sig = np.zeros_like(error)
+            good = error > 0
+            sig[good] = 1.0 / np.sqrt(error[good])
+            error = sig
         
-        co, _ = _rb_get_table_column(['CONT', 'CO', 'CONTINUUM', 'model'], hdulist)
+        return rb_spectrum(wave, flux, error, filename=filename)
         
-        return rb_spectrum(wave, flux, sig, co, filename=filename)
-    
     except Exception as e:
         print(f"rb_spectrum binary table parsing failed: {str(e)}")
         return rb_spectrum(None, None, _read_failed=True, filename=filename)
