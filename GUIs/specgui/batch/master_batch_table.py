@@ -326,3 +326,92 @@ class MasterBatchTable(QObject):
                 for col in bool_columns:
                     if col in self.df.columns:
                         self.df[col] = self.df[col].astype('bool')
+
+
+    def import_template_csv(self, filepath: str) -> Tuple[bool, str]:
+        """Import template from CSV file."""
+        try:
+            import pandas as pd
+            
+            # Read CSV file
+            df = pd.read_csv(filepath)
+            
+            # Validate required columns
+            required_columns = ['filename', 'redshift', 'transition', 'slice_vmin', 'slice_vmax', 'ew_vmin', 'ew_vmax']
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            
+            if missing_columns:
+                return False, f"Missing required columns: {missing_columns}"
+            
+            # Clear existing items
+            self.clear_all()
+            
+            imported_count = 0
+            for _, row in df.iterrows():
+                try:
+                    # Create template parameters from CSV row
+                    template_params = {
+                        'filename': str(row['filename']),
+                        'redshift': float(row['redshift']),
+                        'transition': float(row['transition']),
+                        'transition_name': str(row.get('transition_name', f"λ {row['transition']:.2f}")),
+                        'slice_vmin': int(row['slice_vmin']),
+                        'slice_vmax': int(row['slice_vmax']),
+                        'ew_vmin': int(row['ew_vmin']),
+                        'ew_vmax': int(row['ew_vmax']),
+                        'linelist': str(row.get('linelist', 'atom')),
+                        'method': str(row.get('method', 'closest'))
+                    }
+                    
+                    # Validate file exists
+                    if not os.path.exists(template_params['filename']):
+                        print(f"Warning: File does not exist: {template_params['filename']}")
+                    
+                    # Add item to master table
+                    self.add_item(template_params)
+                    imported_count += 1
+                    
+                except Exception as e:
+                    print(f"Error importing row {imported_count + 1}: {str(e)}")
+                    continue
+            
+            return True, f"Successfully imported {imported_count} items from CSV"
+            
+        except Exception as e:
+            return False, f"Error reading CSV file: {str(e)}"
+    
+    def export_template_csv(self, filepath: str) -> bool:
+        """Export just the template part as CSV."""
+        try:
+            import csv
+            
+            items = self.get_all_items()
+            if not items:
+                return False
+            
+            with open(filepath, 'w', newline='') as csvfile:
+                fieldnames = ['filename', 'redshift', 'transition', 'transition_name', 
+                             'slice_vmin', 'slice_vmax', 'ew_vmin', 'ew_vmax', 'linelist', 'method']
+                
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                
+                for item in items:
+                    row = {
+                        'filename': item.template.filename,
+                        'redshift': item.template.redshift,
+                        'transition': item.template.transition,
+                        'transition_name': item.template.transition_name,
+                        'slice_vmin': item.template.slice_vmin,
+                        'slice_vmax': item.template.slice_vmax,
+                        'ew_vmin': item.template.ew_vmin,
+                        'ew_vmax': item.template.ew_vmax,
+                        'linelist': item.template.linelist,
+                        'method': item.template.method
+                    }
+                    writer.writerow(row)
+            
+            return True
+        except Exception as e:
+            print(f"Error exporting template CSV: {str(e)}")
+            return False    

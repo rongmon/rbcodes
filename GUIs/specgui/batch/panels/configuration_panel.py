@@ -596,6 +596,9 @@ class ConfigurationPanel(QWidget):
             summary = f"Import completed: {imported_count} files imported, {skipped_count} files skipped"
         
         self.controller.status_updated.emit(summary)
+        # At the very end of import_multiple_json_files(), after the status message:
+        if hasattr(main_window, 'review_panel'):
+            main_window.review_panel.importing_in_progress = False
     
 
     def setup_table(self):

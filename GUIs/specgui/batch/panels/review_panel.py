@@ -1,10 +1,11 @@
-# rbcodes/GUIs/specgui/batch/panels/review_panel.py - PHASE 2: NAVIGATION + FILTERING
+# rbcodes/GUIs/specgui/batch/panels/review_panel.py - COMPLETE IMPLEMENTATION
 import os
 import numpy as np
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                            QPushButton, QComboBox, QGroupBox, QSplitter,
                            QMessageBox, QFileDialog, QDialog, QDialogButtonBox, 
-                           QFormLayout, QSpinBox, QRadioButton, QProgressBar)
+                           QFormLayout, QSpinBox, QRadioButton, QProgressBar,
+                           QCheckBox, QDoubleSpinBox)
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QColor
 import matplotlib.pyplot as plt
@@ -25,6 +26,165 @@ class MatplotlibCanvas(FigureCanvasQTAgg):
         self.axes = self.fig.add_subplot(111)
         super(MatplotlibCanvas, self).__init__(self.fig)
 
+class AxisLimitsDialog(QDialog):
+    """Dialog for setting custom X/Y axis limits and analysis settings."""
+    
+    def __init__(self, current_xlim, current_ylim_upper, current_ylim_lower, current_snr_settings, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Plot & Analysis Settings")
+        self.setMinimumSize(450, 300)
+        
+        layout = QVBoxLayout(self)
+        
+        # Form layout
+        form = QFormLayout()
+        
+        # X-axis range (applies to both panels)
+        x_layout = QHBoxLayout()
+        self.x_min = QDoubleSpinBox()
+        self.x_min.setRange(-10000, 10000)
+        self.x_min.setValue(current_xlim[0])
+        self.x_min.setDecimals(1)
+        self.x_min.setSuffix(" km/s")
+        
+        self.x_max = QDoubleSpinBox()
+        self.x_max.setRange(-10000, 10000)
+        self.x_max.setValue(current_xlim[1])
+        self.x_max.setDecimals(1)
+        self.x_max.setSuffix(" km/s")
+        
+        self.x_auto = QCheckBox("Auto")
+        self.x_auto.toggled.connect(self.toggle_x_auto)
+        
+        x_layout.addWidget(QLabel("Min:"))
+        x_layout.addWidget(self.x_min)
+        x_layout.addWidget(QLabel("Max:"))
+        x_layout.addWidget(self.x_max)
+        x_layout.addWidget(self.x_auto)
+        
+        form.addRow("X-axis (Velocity):", x_layout)
+        
+        # Y-axis range for upper panel (flux + continuum)
+        y_upper_layout = QHBoxLayout()
+        self.y_upper_min = QDoubleSpinBox()
+        self.y_upper_min.setRange(-10.0, 20.0)
+        self.y_upper_min.setValue(current_ylim_upper[0])
+        self.y_upper_min.setDecimals(2)
+        
+        self.y_upper_max = QDoubleSpinBox()
+        self.y_upper_max.setRange(-10.0, 20.0)
+        self.y_upper_max.setValue(current_ylim_upper[1])
+        self.y_upper_max.setDecimals(2)
+        
+        self.y_upper_auto = QCheckBox("Auto")
+        self.y_upper_auto.toggled.connect(self.toggle_y_upper_auto)
+        
+        y_upper_layout.addWidget(QLabel("Min:"))
+        y_upper_layout.addWidget(self.y_upper_min)
+        y_upper_layout.addWidget(QLabel("Max:"))
+        y_upper_layout.addWidget(self.y_upper_max)
+        y_upper_layout.addWidget(self.y_upper_auto)
+        
+        form.addRow("Y-axis Upper (Flux):", y_upper_layout)
+        
+        # Y-axis range for lower panel (normalized flux)
+        y_lower_layout = QHBoxLayout()
+        self.y_lower_min = QDoubleSpinBox()
+        self.y_lower_min.setRange(-2.0, 5.0)
+        self.y_lower_min.setValue(current_ylim_lower[0])
+        self.y_lower_min.setDecimals(2)
+        
+        self.y_lower_max = QDoubleSpinBox()
+        self.y_lower_max.setRange(-2.0, 5.0)
+        self.y_lower_max.setValue(current_ylim_lower[1])
+        self.y_lower_max.setDecimals(2)
+        
+        self.y_lower_auto = QCheckBox("Auto")
+        self.y_lower_auto.toggled.connect(self.toggle_y_lower_auto)
+        
+        y_lower_layout.addWidget(QLabel("Min:"))
+        y_lower_layout.addWidget(self.y_lower_min)
+        y_lower_layout.addWidget(QLabel("Max:"))
+        y_lower_layout.addWidget(self.y_lower_max)
+        y_lower_layout.addWidget(self.y_lower_auto)
+        
+        form.addRow("Y-axis Lower (Normalized):", y_lower_layout)
+        
+        # Separator
+        separator = QLabel()
+        separator.setStyleSheet("QLabel { border-bottom: 1px solid gray; margin: 10px 0; }")
+        form.addRow(separator)
+        
+        # SNR Analysis Settings
+        snr_layout = QHBoxLayout()
+        
+        self.snr_enabled = QCheckBox("Calculate SNR")
+        self.snr_enabled.setChecked(current_snr_settings.get('calculate_snr', True))
+        self.snr_enabled.toggled.connect(self.toggle_snr_controls)
+        
+        self.binsize_spin = QSpinBox()
+        self.binsize_spin.setRange(1, 10)
+        self.binsize_spin.setValue(current_snr_settings.get('binsize', 3))
+        self.binsize_spin.setEnabled(self.snr_enabled.isChecked())
+        
+        snr_layout.addWidget(self.snr_enabled)
+        snr_layout.addWidget(QLabel("Bin size:"))
+        snr_layout.addWidget(self.binsize_spin)
+        snr_layout.addStretch()
+        
+        form.addRow("SNR Settings:", snr_layout)
+        
+        layout.addLayout(form)
+        
+        # Buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+    
+    def toggle_x_auto(self, enabled):
+        """Toggle X-axis manual controls."""
+        self.x_min.setEnabled(not enabled)
+        self.x_max.setEnabled(not enabled)
+    
+    def toggle_y_upper_auto(self, enabled):
+        """Toggle upper Y-axis manual controls."""
+        self.y_upper_min.setEnabled(not enabled)
+        self.y_upper_max.setEnabled(not enabled)
+    
+    def toggle_y_lower_auto(self, enabled):
+        """Toggle lower Y-axis manual controls."""
+        self.y_lower_min.setEnabled(not enabled)
+        self.y_lower_max.setEnabled(not enabled)
+    
+    def toggle_snr_controls(self, enabled):
+        """Toggle SNR bin size control."""
+        self.binsize_spin.setEnabled(enabled)
+    
+    def get_limits_and_settings(self):
+        """Get the selected limits and analysis settings."""
+        if self.x_auto.isChecked():
+            xlim = None  # Auto
+        else:
+            xlim = (self.x_min.value(), self.x_max.value())
+        
+        if self.y_upper_auto.isChecked():
+            ylim_upper = None  # Auto
+        else:
+            ylim_upper = (self.y_upper_min.value(), self.y_upper_max.value())
+        
+        if self.y_lower_auto.isChecked():
+            ylim_lower = None  # Auto
+        else:
+            ylim_lower = (self.y_lower_min.value(), self.y_lower_max.value())
+        
+        snr_settings = {
+            'calculate_snr': self.snr_enabled.isChecked(),
+            'binsize': self.binsize_spin.value()
+        }
+        
+        return xlim, ylim_upper, ylim_lower, snr_settings
+
 class ReviewPanel(QWidget):
     """Panel for reviewing batch processing results - with navigation and filtering."""
     
@@ -39,6 +199,16 @@ class ReviewPanel(QWidget):
         self.current_filter = "all"  # Track current filter
         self.filtered_items = []     # Cache filtered items
         self.importing_in_progress = False  # Flag to suppress warnings during import
+        
+        # Interactive EW selection state
+        self.interactive_ew_mode = False
+        self.ew_click_connections = []
+        self.ew_click_count = 0  # Track two-click sequence
+        
+        # Custom axis limits
+        self.custom_xlim = None
+        self.custom_ylim_upper = None
+        self.custom_ylim_lower = None
 
         self.init_ui()
         
@@ -68,6 +238,12 @@ class ReviewPanel(QWidget):
         self.position_label = QLabel("No systems loaded")
         selector_layout.addWidget(self.position_label)
         
+        # Selection actions
+        self.select_for_processing_btn = QPushButton("Select for Processing")
+        self.select_for_processing_btn.clicked.connect(self.open_batch_selection_dialog)
+        self.select_for_processing_btn.setEnabled(True)
+        selector_layout.addWidget(self.select_for_processing_btn)
+        
         nav_layout.addLayout(selector_layout)
         
         # Navigation buttons row
@@ -93,21 +269,20 @@ class ReviewPanel(QWidget):
         button_layout.addWidget(self.prev_btn)
         button_layout.addWidget(self.next_btn)
         button_layout.addWidget(self.last_btn)
-        
         button_layout.addStretch()
         
-        # Selection actions
-        self.select_for_processing_btn = QPushButton("Select for Processing")
-        self.select_for_processing_btn.clicked.connect(self.open_batch_selection_dialog)
-        self.select_for_processing_btn.setEnabled(True)
-        
-        button_layout.addWidget(self.select_for_processing_btn)
+        # Edit Continuum button in navigation row for more space
+        self.edit_continuum_btn = QPushButton("Edit Continuum")
+        self.edit_continuum_btn.clicked.connect(self.edit_continuum)
+        self.edit_continuum_btn.setEnabled(False)
+        button_layout.addWidget(self.edit_continuum_btn)
         
         nav_layout.addLayout(button_layout)
         
-        # Status filter radio buttons
-        filter_group = QGroupBox("Filter by Status")
+        # Status filter radio buttons + EW controls (Edit Continuum moved to navigation row)
         filter_layout = QHBoxLayout()
+        
+        filter_layout.addWidget(QLabel("Filter:"))
         
         self.filter_all = QRadioButton("All")
         self.filter_complete = QRadioButton("Complete") 
@@ -128,13 +303,47 @@ class ReviewPanel(QWidget):
         filter_layout.addWidget(self.filter_failed)
         filter_layout.addWidget(self.filter_pending)
         
-        filter_group.setLayout(filter_layout)
-        nav_layout.addWidget(filter_group)
+        filter_layout.addStretch()
+        
+        # EW Range controls - now with more space for larger Update button
+        filter_layout.addWidget(QLabel("EW:"))
+        
+        filter_layout.addWidget(QLabel("vmin"))
+        self.ew_vmin_spin = QSpinBox()
+        self.ew_vmin_spin.setRange(-2000, 0)
+        self.ew_vmin_spin.setValue(-200)
+        self.ew_vmin_spin.setSuffix(" km/s")
+        self.ew_vmin_spin.setMaximumWidth(70)
+        filter_layout.addWidget(self.ew_vmin_spin)
+        
+        filter_layout.addWidget(QLabel("vmax"))
+        self.ew_vmax_spin = QSpinBox()
+        self.ew_vmax_spin.setRange(0, 2000)
+        self.ew_vmax_spin.setValue(200)
+        self.ew_vmax_spin.setSuffix(" km/s")
+        self.ew_vmax_spin.setMaximumWidth(70)
+        filter_layout.addWidget(self.ew_vmax_spin)
+        
+        self.update_ew_btn = QPushButton("UPDATE")
+        self.update_ew_btn.clicked.connect(self.update_ew_range)
+        self.update_ew_btn.setEnabled(False)
+        self.update_ew_btn.setMaximumWidth(80)  # Larger button
+        self.update_ew_btn.setStyleSheet("QPushButton { font-weight: bold; }")
+        filter_layout.addWidget(self.update_ew_btn)
+        
+        self.interactive_ew_checkbox = QCheckBox("Interactive")
+        self.interactive_ew_checkbox.toggled.connect(self.toggle_interactive_ew)
+        self.interactive_ew_checkbox.setEnabled(False)
+        filter_layout.addWidget(self.interactive_ew_checkbox)
+        
+        filter_layout.addStretch()
+        
+        nav_layout.addLayout(filter_layout)
         
         nav_group.setLayout(nav_layout)
         main_layout.addWidget(nav_group)
         
-        # Preview area (large)
+        # Large preview area (85% of space)
         preview_group = QGroupBox("System Preview")
         preview_layout = QVBoxLayout()
         
@@ -145,44 +354,244 @@ class ReviewPanel(QWidget):
         preview_layout.addWidget(self.spectrum_toolbar)
         preview_layout.addWidget(self.spectrum_canvas)
         
-        # Details display
-        self.details_label = QLabel("Select a system to view details.")
-        self.details_label.setWordWrap(True)
-        self.details_label.setMaximumHeight(40)  # Reduced from 60
-        self.details_label.setStyleSheet("QLabel { font-size: 8pt; padding: 3px; background-color: #f0f0f0; border: 1px solid #ccc; }")
-        preview_layout.addWidget(self.details_label)
-        
-        
-
-        # Compact edit buttons row
-        edit_buttons = QHBoxLayout()
-        edit_buttons.setContentsMargins(0, 0, 0, 0)  # Remove margins for compactness
-        
-        self.edit_continuum_btn = QPushButton("Edit Continuum")
-        self.edit_continuum_btn.clicked.connect(self.edit_continuum)
-        self.edit_continuum_btn.setEnabled(False)
-        self.edit_continuum_btn.setMaximumWidth(120)
-        self.edit_continuum_btn.setMaximumHeight(25)  # Make buttons smaller
-        
-        self.edit_ew_btn = QPushButton("Edit EW Range")
-        self.edit_ew_btn.clicked.connect(self.edit_ew_range)
-        self.edit_ew_btn.setEnabled(False)
-        self.edit_ew_btn.setMaximumWidth(120)
-        self.edit_ew_btn.setMaximumHeight(25)
-        
-        edit_buttons.addWidget(self.edit_continuum_btn)
-        edit_buttons.addWidget(self.edit_ew_btn)
-        edit_buttons.addStretch()
-        
-        preview_layout.addLayout(edit_buttons)
-
-
-
         preview_group.setLayout(preview_layout)
         main_layout.addWidget(preview_group)
         
+        # Compact details at bottom (single line)
+        self.details_label = QLabel("Select a system to view details.")
+        self.details_label.setWordWrap(True)
+        self.details_label.setMaximumHeight(25)  # Single line height
+        self.details_label.setStyleSheet("QLabel { font-size: 8pt; padding: 3px; background-color: #f0f0f0; border: 1px solid #ccc; }")
+        main_layout.addWidget(self.details_label)
         
+        # Set up keyboard shortcuts
+        self.setFocusPolicy(Qt.StrongFocus)
     
+    def keyPressEvent(self, event):
+        """Handle keyboard shortcuts."""
+        if event.key() == Qt.Key_R and event.modifiers() == Qt.ShiftModifier:
+            self.open_axis_limits_dialog()
+        else:
+            super().keyPressEvent(event)
+    
+    def open_axis_limits_dialog(self):
+        """Open dialog for setting custom axis limits and analysis settings."""
+        if not self.current_spec:
+            self.controller.status_updated.emit("Please select a system first.")
+            return
+        
+        # Get current axis limits from both panels
+        axes = self.spectrum_canvas.fig.axes
+        if len(axes) >= 2:
+            # Two-panel plot
+            upper_ax = axes[0]  # Flux panel
+            lower_ax = axes[1]  # Normalized panel
+            current_xlim = upper_ax.get_xlim()
+            current_ylim_upper = upper_ax.get_ylim()
+            current_ylim_lower = lower_ax.get_ylim()
+        elif len(axes) == 1:
+            # Single panel
+            ax = axes[0]
+            current_xlim = ax.get_xlim()
+            current_ylim_upper = ax.get_ylim()
+            current_ylim_lower = (0, 2)  # Default for normalized
+        else:
+            # No axes
+            current_xlim = (-1500, 1500)
+            current_ylim_upper = (0, 2)
+            current_ylim_lower = (0, 2)
+        
+        # Get current SNR settings from current item or defaults
+        if self.current_item:
+            current_snr_settings = {
+                'calculate_snr': self.current_item.analysis.calculate_snr,
+                'binsize': self.current_item.analysis.binsize
+            }
+        else:
+            current_snr_settings = {
+                'calculate_snr': True,
+                'binsize': 3
+            }
+        
+        # Open dialog
+        dialog = AxisLimitsDialog(current_xlim, current_ylim_upper, current_ylim_lower, current_snr_settings, self)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            xlim, ylim_upper, ylim_lower, snr_settings = dialog.get_limits_and_settings()
+            
+            # Store custom limits
+            self.custom_xlim = xlim
+            self.custom_ylim_upper = ylim_upper
+            self.custom_ylim_lower = ylim_lower
+            
+            # Apply to current plot
+            self.apply_custom_limits()
+            
+            # Update SNR settings in master table if we have a current item
+            if self.current_item and self.current_index >= 0:
+                self.controller.master_table.update_analysis(
+                    self.current_index,
+                    calculate_snr=snr_settings['calculate_snr'],
+                    binsize=snr_settings['binsize']
+                )
+            
+            self.controller.status_updated.emit("Settings applied. Use Shift+R to modify.")
+    
+    def apply_custom_limits(self):
+        """Apply custom axis limits to the current plot."""
+        axes = self.spectrum_canvas.fig.axes
+        if not axes:
+            return
+        
+        # Apply limits based on number of panels
+        if len(axes) >= 2:
+            # Two-panel plot
+            upper_ax = axes[0]  # Flux + continuum panel
+            lower_ax = axes[1]  # Normalized flux panel
+            
+            # Apply X limits to both panels
+            if self.custom_xlim:
+                upper_ax.set_xlim(self.custom_xlim)
+                lower_ax.set_xlim(self.custom_xlim)
+            
+            # Apply Y limits to respective panels
+            if self.custom_ylim_upper:
+                upper_ax.set_ylim(self.custom_ylim_upper)
+            
+            if self.custom_ylim_lower:
+                lower_ax.set_ylim(self.custom_ylim_lower)
+                
+        elif len(axes) == 1:
+            # Single panel
+            ax = axes[0]
+            if self.custom_xlim:
+                ax.set_xlim(self.custom_xlim)
+            if self.custom_ylim_upper:
+                ax.set_ylim(self.custom_ylim_upper)
+        
+        self.spectrum_canvas.draw()
+    
+    def toggle_interactive_ew(self):
+        """Toggle interactive EW range selection mode."""
+        if not self.current_spec:
+            self.controller.status_updated.emit("Please select a system first.")
+            self.interactive_ew_checkbox.setChecked(False)
+            return
+        
+        self.interactive_ew_mode = self.interactive_ew_checkbox.isChecked()
+        
+        if self.interactive_ew_mode:
+            # Enable interactive mode
+            self.connect_ew_interactions()
+            self.spectrum_canvas.setFocus()
+            self.controller.status_updated.emit("Interactive EW mode enabled. Click on plot to set velocity limits. Press ESC to exit.")
+        else:
+            # Disable interactive mode
+            self.disconnect_ew_interactions()
+            self.controller.status_updated.emit("Interactive EW mode disabled.")
+    
+    def connect_ew_interactions(self):
+        """Connect mouse and key events for interactive EW selection."""
+        # Disconnect any existing connections
+        self.disconnect_ew_interactions()
+        
+        # Connect new events
+        click_cid = self.spectrum_canvas.mpl_connect('button_press_event', self.on_ew_plot_click)
+        key_cid = self.spectrum_canvas.mpl_connect('key_press_event', self.on_ew_plot_key)
+        
+        self.ew_click_connections = [click_cid, key_cid]
+    
+    def disconnect_ew_interactions(self):
+        """Disconnect interactive EW events."""
+        for cid in self.ew_click_connections:
+            self.spectrum_canvas.mpl_disconnect(cid)
+        self.ew_click_connections = []
+    
+    def on_ew_plot_click(self, event):
+        """Handle mouse clicks for EW range selection."""
+        if not self.interactive_ew_mode or not event.inaxes:
+            return
+        
+        # Get clicked velocity
+        velocity = int(event.xdata)
+        
+        # Get current values
+        current_vmin = self.ew_vmin_spin.value()
+        current_vmax = self.ew_vmax_spin.value()
+        
+        # Determine which boundary to set based on proximity
+        if velocity < current_vmin:
+            self.ew_vmin_spin.setValue(velocity)
+        elif velocity > current_vmax:
+            self.ew_vmax_spin.setValue(velocity)
+        else:
+            # Inside current range - set closest boundary
+            if abs(velocity - current_vmin) < abs(velocity - current_vmax):
+                self.ew_vmin_spin.setValue(velocity)
+            else:
+                self.ew_vmax_spin.setValue(velocity)
+        
+        # Optimized redraw - only update EW region visualization
+        self.update_ew_region_overlay()
+        
+        self.controller.status_updated.emit(f"EW boundary set to {velocity} km/s. Click Update to apply changes.")
+    
+    def update_ew_region_overlay(self):
+        """Optimized update of just the EW region visualization."""
+        try:
+            axes = self.spectrum_canvas.fig.axes
+            if not axes:
+                return
+            
+            # Get current EW range from spinboxes
+            ew_vmin = self.ew_vmin_spin.value()
+            ew_vmax = self.ew_vmax_spin.value()
+            
+            # Update EW region in all axes (both upper and lower panels)
+            for ax in axes:
+                # Remove existing EW region spans
+                for collection in ax.collections[:]:
+                    if hasattr(collection, '_ew_region_marker'):
+                        collection.remove()
+                
+                # Remove existing EW boundary lines
+                for line in ax.lines[:]:
+                    if hasattr(line, '_ew_boundary_marker'):
+                        line.remove()
+                
+                # Add new EW region
+                span = ax.axvspan(ew_vmin, ew_vmax, alpha=0.15, color='blue', label='EW Region')
+                span._ew_region_marker = True  # Mark for removal
+                
+                # Add new boundary lines
+                vmin_line = ax.axvline(x=ew_vmin, color='b', linestyle=':', alpha=0.8, linewidth=0.8)
+                vmax_line = ax.axvline(x=ew_vmax, color='b', linestyle=':', alpha=0.8, linewidth=0.8)
+                vmin_line._ew_boundary_marker = True
+                vmax_line._ew_boundary_marker = True
+            
+            # Quick redraw without full recomputation
+            self.spectrum_canvas.draw_idle()
+            
+        except Exception as e:
+            print(f"Error updating EW region overlay: {e}")
+            # Fallback to full plot update if optimized version fails
+            self.update_spectrum_plot(self.current_item, self.current_spec)
+    
+    def on_ew_plot_key(self, event):
+        """Handle key presses in interactive EW mode."""
+        if not self.interactive_ew_mode:
+            return
+        
+        if event.key == 'escape':
+            # Exit interactive mode
+            self.interactive_ew_checkbox.setChecked(False)
+            self.toggle_interactive_ew()
+        elif event.key == 'r':
+            # Reset to defaults
+            self.ew_vmin_spin.setValue(-200)
+            self.ew_vmax_spin.setValue(200)
+            self.update_ew_region_overlay()
+            self.controller.status_updated.emit("EW range reset to defaults.")
 
     def update_status_bar_info(self):
         """Send comprehensive info to main window status bar."""
@@ -204,7 +613,6 @@ class ReviewPanel(QWidget):
         
         # Send to main window status bar
         self.controller.status_updated.emit(status_msg)
-
 
     def on_filter_changed(self, filter_type):
         """Handle filter radio button changes."""
@@ -268,8 +676,6 @@ class ReviewPanel(QWidget):
                 failed_count += 1
         
         return total_count, complete_count, failed_count
-    
-
     
     def get_current_position_in_filter(self):
         """Get the current position within the filtered items."""
@@ -372,8 +778,13 @@ class ReviewPanel(QWidget):
         
         self.display_item_spectrum(selected_item)
         self.edit_continuum_btn.setEnabled(True)
-        self.edit_ew_btn.setEnabled(True)
+        self.update_ew_btn.setEnabled(True)
+        self.interactive_ew_checkbox.setEnabled(True)
         self.select_for_processing_btn.setEnabled(True)
+        
+        # Update EW spinboxes with current values
+        self.ew_vmin_spin.setValue(selected_item.template.ew_vmin)
+        self.ew_vmax_spin.setValue(selected_item.template.ew_vmax)
         
         # Update navigation state
         self.update_navigation_state()
@@ -456,11 +867,16 @@ class ReviewPanel(QWidget):
             self.clear_preview()
             print(f"Error getting spectrum: {e}")
 
+    
     def update_spectrum_plot(self, item, spec):
         """Updated plotting method using the new plotting module."""
         try:
             # Use the new plotting module to generate the complete figure
             plot_spectrum_overview(spec, item, figure=self.spectrum_canvas.fig, clear_figure=True)
+            
+            # Apply custom axis limits if set
+            if self.custom_xlim or self.custom_ylim_upper or self.custom_ylim_lower:
+                self.apply_custom_limits()
             
             # Redraw the canvas
             self.spectrum_canvas.draw()
@@ -468,6 +884,7 @@ class ReviewPanel(QWidget):
         except Exception as e:
             print(f"Error updating spectrum plot: {e}")
             self.clear_preview()
+
     
     def update_details(self, item, spec):
         """Update details display with comprehensive system information."""
@@ -542,6 +959,75 @@ class ReviewPanel(QWidget):
         
         if hasattr(self, 'details_label'):
             self.details_label.setText("Select a system to view details.")
+    
+    def update_ew_range(self):
+        """Update EW range using the same logic as the existing EW range editor."""
+        if not self.current_item or self.current_index < 0:
+            self.controller.status_updated.emit("Please select a system first.")
+            return
+        
+        try:
+            # Get new values from spinboxes
+            new_ew_vmin = self.ew_vmin_spin.value()
+            new_ew_vmax = self.ew_vmax_spin.value()
+            
+            # Validate range
+            if new_ew_vmin >= new_ew_vmax:
+                QMessageBox.warning(self, "Invalid Range", "EW min must be less than EW max.")
+                return
+            
+            # Update template parameters in master table
+            self.controller.master_table.update_template(self.current_index, 
+                                                       ew_vmin=new_ew_vmin, 
+                                                       ew_vmax=new_ew_vmax)
+            
+            # Get the updated spectrum and recalculate EW
+            master_spec = self.controller.master_table.get_rb_spec_object(self.current_index)
+            if master_spec:
+                updated_spec = copy.deepcopy(master_spec)
+                
+                # Recalculate EW with new range
+                updated_spec.compute_EW(
+                    self.current_item.template.transition,
+                    vmin=new_ew_vmin,
+                    vmax=new_ew_vmax,
+                    SNR=self.current_item.analysis.calculate_snr,
+                    _binsize=self.current_item.analysis.binsize
+                )
+                
+                # Update results in master table
+                self.controller.master_table.update_results(
+                    self.current_index,
+                    W=updated_spec.W,
+                    W_e=updated_spec.W_e,
+                    N=updated_spec.N,
+                    N_e=updated_spec.N_e,
+                    logN=updated_spec.logN,
+                    logN_e=updated_spec.logN_e,
+                    vel_centroid=getattr(updated_spec, 'vel_centroid', 0),
+                    vel_disp=getattr(updated_spec, 'vel_disp', 0),
+                    SNR=getattr(updated_spec, 'SNR', 0),
+                    calculation_timestamp=datetime.now().isoformat()
+                )
+                
+                # Mark as complete
+                self.controller.master_table.update_analysis(self.current_index, processing_status="complete")
+                
+                # Store the updated rb_spec object
+                self.controller.master_table.set_rb_spec_object(self.current_index, updated_spec)
+                
+                # Refresh display
+                self.current_spec = updated_spec
+                updated_item = self.controller.master_table.get_item(self.current_index)
+                if updated_item:
+                    self.current_item = updated_item
+                    self.update_spectrum_plot(self.current_item, self.current_spec)
+                    self.update_details(self.current_item, self.current_spec)
+                
+                self.controller.status_updated.emit("EW range updated successfully!")
+                
+        except Exception as e:
+            self.controller.status_updated.emit(f"Error updating EW range: {str(e)}")
     
     def edit_continuum(self):
         """Launch continuum editor - using original working logic."""
@@ -658,57 +1144,11 @@ class ReviewPanel(QWidget):
                     self.current_item = updated_item
                     self.update_spectrum_plot(self.current_item, self.current_spec)
                     self.update_details(self.current_item, self.current_spec)
+                    # Update EW spinboxes with potentially new values
+                    self.ew_vmin_spin.setValue(updated_item.template.ew_vmin)
+                    self.ew_vmax_spin.setValue(updated_item.template.ew_vmax)
                 
                 self.controller.status_updated.emit("Continuum updated successfully!")
                 
         except Exception as e:
             self.controller.status_updated.emit(f"Error editing continuum: {str(e)}")
-    
-    def edit_ew_range(self):
-        """Launch EW range editor - using original working logic."""
-        if not self.current_item or self.current_index < 0:
-            self.controller.status_updated.emit("Please select a system first.")
-            return
-        
-        try:
-            from rbcodes.GUIs.specgui.batch.panels.ew_range_editor import edit_ew_range_dialog
-            
-            editor_item = type('EditorItem', (), {
-                'template': self.current_item.template,
-                'analysis': self.current_item.analysis,
-                'results': self.current_item.results,
-                'row_index': self.current_index
-            })()
-            
-            success = edit_ew_range_dialog(
-                editor_item, 
-                self.current_spec, 
-                self.controller,
-                parent=self
-            )
-            
-            if success:
-                # ORIGINAL WORKING REFRESH LOGIC
-                updated_item = self.controller.master_table.get_item(self.current_index)
-                
-                if updated_item:
-                    master_spec = self.controller.master_table.get_rb_spec_object(self.current_index)
-                    if master_spec:
-                        updated_spec = copy.deepcopy(master_spec)
-                        self.current_spec = updated_spec
-                    else:
-                        self.controller.status_updated.emit("Failed to get rb_spec object from master table.")
-                        return
-                    
-                    self.current_item = updated_item
-                    self.refresh_results_table()
-                    self.update_spectrum_plot(self.current_item, self.current_spec)
-                    self.update_details(self.current_item, self.current_spec)
-                    self.controller.status_updated.emit("EW range updated successfully!")
-                else:
-                    self.controller.status_updated.emit("Failed to get updated item from master table.")
-            
-        except ImportError as e:
-            self.controller.status_updated.emit(f"EW range editor not available: {str(e)}")
-        except Exception as e:
-            self.controller.status_updated.emit(f"Error editing EW range: {str(e)}")
