@@ -32,6 +32,19 @@ def display_examples():
     print("  rb_multispec.py -c file.fits            # Run classic version with specified file")
     print("  rb_multispec.py --classic *.fits        # Run classic version with all FITS files")
     print("")
+    print("Programmatic Usage (from Python):")
+    print("  from rbcodes.GUIs.multispecviewer import rb_multispec")
+    print("  from rbcodes.utils.rb_spectrum import rb_spectrum")
+    print("")
+    print("  # Single spectrum from arrays")
+    print("  spec = rb_spectrum.from_tuple((wave, flux, error))")
+    print("  window = rb_multispec.from_data(spec)")
+    print("")
+    print("  # Multiple spectra from 2D arrays")
+    print("  spec_list = rb_spectrum.from_arrays(wave_2d, flux_2d, error_2d)")
+    print("  combined = rb_spectrum.append(spec_list)")
+    print("  window = rb_multispec.from_data(combined)")
+    print("")
     print("Tips:")
     print("  - Use quotes for paths with spaces: rb_multispec.py \"My Data/file.fits\"")
     print("  - You can mix options and filenames: rb_multispec.py -c /path/to/file.fits")
@@ -140,6 +153,186 @@ def main():
         return 1
     
     return 0
+
+
+def from_data(spectrum_data, show=True):
+    """
+    Launch MultispecViewer GUI with spectral data from arrays or spectrum objects.
+    """
+    try:
+        # Import required modules
+        from PyQt5.QtWidgets import QApplication
+        from rbcodes.GUIs.multispecviewer import multispec
+        
+        # Handle QApplication - reuse existing or create new
+        app = QApplication.instance()
+        if app is None:
+            # No existing QApplication, create one
+            app = QApplication(sys.argv)
+            need_exec = True
+        else:
+            # Use existing QApplication
+            need_exec = False
+            
+        # Normalize input to a list of spectrum objects
+        spectra_list = _prepare_spectra_list(spectrum_data)  # Fix the typo here
+        
+        if not spectra_list:
+            raise ValueError("No valid spectra provided")
+            
+        # Create MainWindow instance
+        window = multispec.MainWindow()
+        
+        # Load spectra directly into the window
+        window.spectra = spectra_list
+        window.canvas.plot_spectra(spectra_list)
+        
+        # Update file label to show data source
+        if hasattr(window, 'file_label'):
+            window.file_label.setText(f"{len(spectra_list)} spectra loaded from arrays")
+            
+        # Show the window if requested
+        if show:
+            window.show()
+            
+        # Set focus to canvas for keyboard shortcuts
+        window.canvas.setFocus()
+        
+        # Start event loop if we created the QApplication
+        if need_exec:
+            # Check if we're in IPython
+            try:
+                ipython = get_ipython()
+                # IPython case - enable Qt integration
+                try:
+                    ipython.magic('gui qt')
+                    print("Enabled Qt integration in IPython - GUI should stay open.")
+                except Exception as e:
+                    print(f"Could not enable Qt integration: {e}")
+                    print("You may need to run '%gui qt' manually.")
+            except NameError:
+                # Regular Python case
+                print("GUI launched. Close window to return to Python prompt.")
+                app.exec_()  # Remove sys.exit() here
+                print("GUI closed, returning to Python.")
+            
+        return window
+        
+    except Exception as e:
+        print(f"Error launching MultispecViewer: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+def _prepare_spectra_list(spectrum_data):
+    """
+    Convert various input formats to a list of spectrum objects compatible with MultispecViewer.
+    
+    Parameters
+    ----------
+    spectrum_data : various
+        Input spectrum data in various formats
+        
+    Returns
+    -------
+    list
+        List of spectrum objects (rb_spectrum or XSpectrum1D)
+    """
+    # Import here to avoid circular imports
+    try:
+        from rbcodes.utils.rb_spectrum import rb_spectrum, rb_spectrum_collection
+    except ImportError:
+        rb_spectrum = None
+        rb_spectrum_collection = None
+        
+    try:
+        from linetools.spectra.xspectrum1d import XSpectrum1D
+    except ImportError:
+        XSpectrum1D = None
+    
+    # Handle different input types
+    if rb_spectrum and isinstance(spectrum_data, rb_spectrum):
+        # Single rb_spectrum object
+        return [spectrum_data]
+        
+    elif rb_spectrum_collection and isinstance(spectrum_data, rb_spectrum_collection):
+        # rb_spectrum_collection object
+        return list(spectrum_data.spectra)
+        
+    elif XSpectrum1D and isinstance(spectrum_data, XSpectrum1D):
+        # Single XSpectrum1D object
+        return [spectrum_data]
+        
+    elif isinstance(spectrum_data, (list, tuple)):
+        # List or tuple of spectrum objects
+        validated_list = []
+        for i, spec in enumerate(spectrum_data):
+            if rb_spectrum and isinstance(spec, rb_spectrum):
+                validated_list.append(spec)
+            elif XSpectrum1D and isinstance(spec, XSpectrum1D):
+                validated_list.append(spec)
+            else:
+                print(f"Warning: Skipping invalid spectrum at index {i} (type: {type(spec)})")
+                
+        return validated_list
+        
+    else:
+        raise ValueError(f"Unsupported spectrum data type: {type(spectrum_data)}. "
+                        f"Expected rb_spectrum, rb_spectrum_collection, XSpectrum1D, or list of these.")
+
+
+def launch_empty(show=True):
+    """
+    Launch empty MultispecViewer GUI.
+    """
+    try:
+        # Import required modules
+        from PyQt5.QtWidgets import QApplication
+        from rbcodes.GUIs.multispecviewer import multispec
+        
+        # Handle QApplication - reuse existing or create new
+        app = QApplication.instance()
+        if app is None:
+            # No existing QApplication, create one
+            app = QApplication(sys.argv)
+            need_exec = True
+        else:
+            # Use existing QApplication
+            need_exec = False
+            
+        # Create MainWindow instance
+        window = multispec.MainWindow()
+        
+        # Show the window if requested
+        if show:
+            window.show()
+            
+        # Start event loop if we created the QApplication
+        if need_exec:
+            # Check if we're in IPython
+            try:
+                ipython = get_ipython()
+                # IPython case - enable Qt integration
+                try:
+                    ipython.magic('gui qt')
+                    print("Enabled Qt integration in IPython - GUI should stay open.")
+                except Exception as e:
+                    print(f"Could not enable Qt integration: {e}")
+                    print("You may need to run '%gui qt' manually.")
+            except NameError:
+                # Regular Python case
+                print("GUI launched. Close window to return to Python prompt.")
+                app.exec_()  # This will block until GUI closes
+                print("GUI closed, returning to Python.")
+        
+        return window
+        
+    except Exception as e:
+        print(f"Error launching MultispecViewer: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -3,18 +3,37 @@ All notable changes to MultispecViewer will be documented in this file.
 
 ## [Unreleased]
 
-## [1.2.0] - 2025-01-XX
+## [1.2.0] - 2025-06-06
 ### Added
 - rb_spectrum: Lightweight spectrum reader/writer as alternative to linetools.XSpectrum1D
 - Automatic fallback mechanism: tries rb_spectrum first, falls back to linetools on failure
 - Enhanced FITS format support including SDSS binary tables
 - Safe exit handling with `_read_failed` flag for robust error recovery
+- **New programmatic API for launching GUI with arrays:**
+  - `rb_spectrum.from_arrays()`: Create multiple spectra from 2D numpy arrays
+  - `rb_spectrum.append()`: Combine multiple rb_spectrum objects into collections
+  - `rb_multispec.from_data()`: Launch GUI programmatically with spectrum objects
+  - `rb_multispec.launch_empty()`: Launch empty GUI programmatically
+- **Enhanced SDSS support:**
+  - Binary table parser now handles `loglam` wavelength columns
+  - Automatic conversion from log wavelength to linear wavelength
+  - Support for `ivar` (inverse variance) error columns with proper conversion
+- **Improved IPython/Jupyter integration:**
+  - Automatic Qt event loop management for IPython environments
+  - Fallback to `%gui qt` magic command when needed
+  - Better handling of QApplication conflicts
 
 ### Changed
 - IO operations now use rb_spectrum by default with linetools fallback
 - Improved binary FITS table detection (fixes SDSS spectrum loading)
 - Enhanced error handling in spectrum loading pipeline
+- **Event loop management:** Removed problematic `sys.exit()` calls that caused Python to exit
+- **Documentation:** Updated examples to include programmatic usage patterns
 
+### Enhanced
+- **Workflow support:** Complete pipeline from arrays → spectrum objects → GUI display
+- **Multi-format compatibility:** Seamless integration between rb_spectrum and XSpectrum1D
+- **Error robustness:** Better handling of failed spectrum reads with graceful fallbacks
 
 ## [1.1.1] - 2025-05-28
 ### Fixed

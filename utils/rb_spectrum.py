@@ -237,6 +237,142 @@ class rb_spectrum:
             meta=self.meta.copy(),
             units=self.units.copy()
         )
+
+
+    @classmethod
+    def from_arrays(cls, wave_2d, flux_2d, error_2d=None, continuum_2d=None,
+                   wave_unit=None, flux_unit=None, filenames=None, **kwargs):
+        """
+        Create multiple spectra from 2D arrays
+        
+        Parameters
+        ----------
+        wave_2d : array-like, shape (nspec, npix)
+            Wavelength arrays for multiple spectra
+        flux_2d : array-like, shape (nspec, npix)  
+            Flux arrays for multiple spectra
+        error_2d : array-like, optional
+            Error arrays for multiple spectra (same shape as flux_2d)
+        continuum_2d : array-like, optional
+            Continuum arrays for multiple spectra (same shape as flux_2d)
+        wave_unit : str or astropy.units.Unit, optional
+            Unit for wavelength (default: Angstrom)
+        flux_unit : str or astropy.units.Unit, optional
+            Unit for flux (default: dimensionless)
+        filenames : list of str, optional
+            Filenames for each spectrum
+        **kwargs
+            Additional arguments
+            
+        Returns
+        -------
+        list of rb_spectrum
+            List of spectrum objects
+        """
+        try:
+            # Convert to numpy arrays
+            wave_2d = np.asarray(wave_2d)
+            flux_2d = np.asarray(flux_2d)
+            
+            if error_2d is not None:
+                error_2d = np.asarray(error_2d)
+            if continuum_2d is not None:
+                continuum_2d = np.asarray(continuum_2d)
+                
+            # Handle units
+            if wave_unit is None:
+                wave_unit = u.AA
+                warnings.warn("No wavelength unit specified, assuming Angstroms")
+            elif isinstance(wave_unit, str):
+                wave_unit = getattr(u, wave_unit)
+                
+            if flux_unit is None:
+                flux_unit = u.dimensionless_unscaled
+            elif isinstance(flux_unit, str):
+                flux_unit = getattr(u, flux_unit)
+                
+            # Validate arrays
+            if wave_2d.ndim != 2 or flux_2d.ndim != 2:
+                raise ValueError("Input arrays must be 2D")
+                
+            if wave_2d.shape != flux_2d.shape:
+                raise ValueError("Wave and flux arrays must have same shape")
+                
+            nspec, npix = wave_2d.shape
+            
+            # Validate error and continuum shapes if provided
+            if error_2d is not None and error_2d.shape != (nspec, npix):
+                raise ValueError("Error array shape doesn't match wave/flux arrays")
+            if continuum_2d is not None and continuum_2d.shape != (nspec, npix):
+                raise ValueError("Continuum array shape doesn't match wave/flux arrays")
+                
+            # Handle filenames
+            if filenames is None:
+                filenames = [f'spectrum_{i}' for i in range(nspec)]
+            elif len(filenames) != nspec:
+                raise ValueError(f"Number of filenames ({len(filenames)}) doesn't match number of spectra ({nspec})")
+                
+            # Create spectrum objects
+            spectra = []
+            for i in range(nspec):
+                wave_i = wave_2d[i, :]
+                flux_i = flux_2d[i, :]
+                error_i = error_2d[i, :] if error_2d is not None else None
+                continuum_i = continuum_2d[i, :] if continuum_2d is not None else None
+                
+                # Convert wavelength to Angstroms for consistency
+                if wave_unit != u.AA:
+                    wave_quantity = wave_i * wave_unit
+                    wave_i = wave_quantity.to(u.AA).value
+                    internal_wave_unit = u.AA
+                else:
+                    internal_wave_unit = wave_unit
+                    
+                internal_units = {'wave': internal_wave_unit, 'flux': flux_unit}
+                
+                spec = cls(wave_i, flux_i, error_i, continuum_i,
+                          filename=filenames[i], units=internal_units, **kwargs)
+                spectra.append(spec)
+                
+            return spectra
+            
+        except Exception as e:
+            print(f"rb_spectrum.from_arrays failed: {str(e)}")
+            traceback.print_exc()
+            # Return list with failed spectrum objects
+            return [cls(None, None, _read_failed=True, filename=f'failed_spectrum_{i}') 
+                   for i in range(len(filenames) if filenames else 1)]
+    
+
+    @classmethod  
+    def append(cls, spectrum_list, sort_by_wavelength=True):
+        """
+        Combine multiple rb_spectrum objects into a single multi-spectrum container
+        
+        Parameters
+        ----------
+        spectrum_list : list of rb_spectrum
+            List of spectrum objects to combine
+        sort_by_wavelength : bool, optional
+            Sort spectra by their minimum wavelength (default: True)
+            
+        Returns
+        -------
+        rb_spectrum_collection
+            Container object that behaves like a list of spectra
+        """
+        if not spectrum_list:
+            raise ValueError("Cannot append empty spectrum list")
+            
+        if not all(isinstance(spec, rb_spectrum) for spec in spectrum_list):
+            raise ValueError("All items must be rb_spectrum objects")
+            
+        # Sort by wavelength if requested
+        if sort_by_wavelength:
+            spectrum_list = sorted(spectrum_list, key=lambda s: s.wvmin.value)
+            
+        return rb_spectrum_collection(spectrum_list)
+
     
     def write(self, filename, **kwargs):
         """
@@ -429,6 +565,61 @@ class rb_spectrum:
         return (f'<rb_spectrum: file={self.filename}, '
                 f'npix={self.npix}, '
                 f'wvmin={self.wvmin:.1f}, wvmax={self.wvmax:.1f}>')
+
+
+class rb_spectrum_collection:
+    """
+    Container for multiple rb_spectrum objects that behaves like a list
+    but maintains compatibility with multispec GUI expectations
+    """
+    
+    def __init__(self, spectrum_list):
+        """
+        Initialize collection
+        
+        Parameters
+        ----------
+        spectrum_list : list of rb_spectrum
+            List of spectrum objects
+        """
+        self.spectra = spectrum_list
+        self.nspec = len(spectrum_list)
+        
+    def __len__(self):
+        return len(self.spectra)
+        
+    def __getitem__(self, index):
+        return self.spectra[index]
+        
+    def __iter__(self):
+        return iter(self.spectra)
+        
+    def append(self, spectrum):
+        """Add a spectrum to the collection"""
+        if not isinstance(spectrum, rb_spectrum):
+            raise ValueError("Can only append rb_spectrum objects")
+        self.spectra.append(spectrum)
+        self.nspec += 1
+        
+    def extend(self, spectrum_list):
+        """Add multiple spectra to the collection"""
+        for spec in spectrum_list:
+            self.append(spec)
+            
+    def sort_by_wavelength(self):
+        """Sort spectra by minimum wavelength"""
+        self.spectra.sort(key=lambda s: s.wvmin.value)
+        
+    def get_wavelength_range(self):
+        """Get overall wavelength range of all spectra"""
+        if not self.spectra:
+            return None, None
+        min_wave = min(spec.wvmin for spec in self.spectra)
+        max_wave = max(spec.wvmax for spec in self.spectra)
+        return min_wave, max_wave
+        
+    def __repr__(self):
+        return f'<rb_spectrum_collection: {self.nspec} spectra>'
 
 
 # =============================================================================
@@ -682,14 +873,14 @@ def _rb_parse_fits_binary_table(hdulist, filename=None, **kwargs):
         table = Table(hdulist[1].data)
         
         # Check for required columns with case insensitivity
-        if not any(col in table.colnames for col in ['WAVE', 'wave', 'WAVELENGTH', 'wavelength']):
+        if not any(col in table.colnames for col in ['WAVE', 'wave', 'WAVELENGTH', 'wavelength', 'loglam', 'LOGLAM']):
             raise ValueError(f"Wavelength column not found in FITS file: {filename}")
         if not any(col in table.colnames for col in ['FLUX', 'flux', 'SPEC', 'spec']):
             raise ValueError(f"Flux column not found in FITS file: {filename}")
         
         # Get column names with case insensitivity
         wave_col = None
-        for col in ['WAVE', 'wave', 'WAVELENGTH', 'wavelength', 'loglam']:
+        for col in ['WAVE', 'wave', 'WAVELENGTH', 'wavelength', 'loglam', 'LOGLAM']:
             if col in table.colnames:
                 wave_col = col
                 break
@@ -701,7 +892,7 @@ def _rb_parse_fits_binary_table(hdulist, filename=None, **kwargs):
                 break
                 
         error_col = None
-        for col in ['ERROR', 'error', 'ERR', 'err', 'SIGMA', 'sigma']:
+        for col in ['ERROR', 'error', 'ERR', 'err', 'SIGMA', 'sigma', 'ivar', 'IVAR']:
             if col in table.colnames:
                 error_col = col
                 break
