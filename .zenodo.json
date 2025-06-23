@@ -1,0 +1,60 @@
+{
+  "title": "rongmon/rbcodes: rbcodes v1.0.0",
+  "description": "A collection of Python codes for astronomical data analysis and research applications.",
+  "version": "v1.0.0",
+  "upload_type": "software",
+  "access_right": "open",
+  "license": "MIT",
+  "creators": [
+    {
+      "name": "Bordoloi, Rongmon",
+      "affiliation": "North Carolina State University",
+      "orcid": "0000-0002-3120-7173"
+    },
+    {
+      "name": "Liu, Bin",
+      "affiliation": "North Carolina State University"
+    },
+    {
+      "name": "Clark, Sean",
+      "affiliation": "North Carolina State University"
+    },
+    {
+      "name": "Higginson, Jack",
+      "affiliation": "North Carolina State University"
+    },
+    {
+      "name": "Flores, Derick",
+      "affiliation": "North Carolina State University"
+    }
+  ],
+  "keywords": [
+    "astronomy",
+    "python",
+    "data-analysis",
+    "research-software"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/rongmon/rbcodes",
+      "relation": "isSupplementTo",
+      "resource_type": "software"
+    },
+    {
+      "identifier": "10.5281/zenodo.6079263",
+      "relation": "isVersionOf",
+      "resource_type": "software"
+    }
+  ],
+  "subjects": [
+    {
+      "term": "Astronomical software",
+      "scheme": "keyword"
+    },
+    {
+      "term": "Data analysis tools",
+      "scheme": "keyword"
+    }
+  ],
+  "notes": "This is version 1.0.0 of rbcodes, an updated release building upon the original v0.2 release with additional contributors and improvements."
+}
