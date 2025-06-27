@@ -1,8 +1,8 @@
 rbcodes
 -------
 
-This is a public release of python codes commonly used for astrophysical reserach by Rongmon Bordoloi.
-This package is constantly under development and will be periodically updated. 
+This is a public release of Python code commonly used for astrophysical research by Rongmon Bordoloi and collaborators.  
+The package is under active development and will be periodically updated.
 
 
 ### 📖 Citation
@@ -33,13 +33,14 @@ Please also mention the **version you used** for reproducibility. For example:
   url          = {https://doi.org/10.5281/zenodo.15723701}
 }
 ```
+</details>details>
 
 ### 📚 Documentation
 
 Full documentation is available in [`rbcodes/docs/main_readme.md`](docs/main_readme.md).
 
 
-## Contributing
+## 🤝 Contributing
 - This package is constantly under development and will be periodically updated.
 - Contributions and improvements are welcome
 
@@ -47,4 +48,3 @@ Full documentation is available in [`rbcodes/docs/main_readme.md`](docs/main_rea
 
 This project is licensed under the [MIT License](LICENSE).
 
-	
