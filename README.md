@@ -29,11 +29,11 @@ Please also mention the **version you used** for reproducibility. For example:
   year         = 2025,
   publisher    = {Zenodo},
   version      = {v1.0.0},
-  doi          = {10.5281/zenodo.15723701},
-  url          = {https://doi.org/10.5281/zenodo.15723701}
+  doi          = {10.5281/zenodo.6079263},
+  url          = {https://doi.org/10.5281/zenodo.6079263}
 }
 ```
-</details>details>
+</details>
 
 ### 📚 Documentation
 
