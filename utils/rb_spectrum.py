@@ -626,7 +626,7 @@ class rb_spectrum_collection:
 # File reading functions (adapted from linetools io.py)
 # =============================================================================
 
-def rb_read_spectrum(filename, **kwargs):
+def rb_read_spectrum(filename, meta=None, **kwargs):
     """
     Read a spectrum from file with automatic format detection
     
@@ -634,6 +634,8 @@ def rb_read_spectrum(filename, **kwargs):
     ----------
     filename : str
         Path to spectrum file
+    meta : dict, optional
+        User-provided metadata (will override file metadata)
     **kwargs
         Additional arguments
         
@@ -652,14 +654,21 @@ def rb_read_spectrum(filename, **kwargs):
         ext = filename.split('.')[-1].lower()
         
         if ext == 'hdf5':
-            return _rb_read_hdf5(filename, **kwargs)
+            spectrum = _rb_read_hdf5(filename, **kwargs)
         elif ext == 'json':
-            return _rb_read_json(filename, **kwargs)
+            spectrum = _rb_read_json(filename, **kwargs)
         elif ext in ['fits', 'fit']:
-            return _rb_read_fits(filename, **kwargs)
+            spectrum = _rb_read_fits(filename, **kwargs)
         else:
             # Default to ASCII for unknown extensions
-            return _rb_read_ascii(filename, **kwargs)
+            spectrum = _rb_read_ascii(filename, **kwargs)
+        
+        # Apply user-provided metadata if specified
+        if meta is not None and not spectrum._read_failed:
+            # Update spectrum metadata with user values (user takes precedence)
+            spectrum.meta.update(meta)
+        
+        return spectrum
     
     except Exception as e:
         print(f"rb_spectrum failed to read {filename}: {str(e)}")
