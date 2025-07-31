@@ -798,7 +798,7 @@ def _rb_read_ascii(filename, **kwargs):
 def _rb_parse_rbspec_json(data, filename=None, **kwargs):
     """Parse rb_spec analysis JSON format"""
     # Extract core spectral arrays
-    wave = np.array(data['wave_slice'])
+    wave = np.array(data['wave_slice'])*(1+data['zabs'])
     flux = np.array(data['flux_slice']) 
     error = np.array(data['error_slice']) if 'error_slice' in data else None
     

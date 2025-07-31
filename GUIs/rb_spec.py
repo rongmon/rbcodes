@@ -1760,14 +1760,6 @@ class rb_spec(object):
         ax2.set_xlabel('vel [km/s]')
         plt.show()
 
-    def vpfit_singlet(self,FWHM=6.5):
-        """Test Wrapper to call vpfit GUI
-        """
-        try:
-            from rbcodes.GUIs import rb_interactive_vpfit_singlet as vf 
-        except:
-            from GUIs import rb_interactive_vpfit_singlet as vf 
-        vt=vf.rb_interactive_vpfit_singlet(self.wave_slice,self.fnorm,self.enorm,self.transition);    
 
 
 
