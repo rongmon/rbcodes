@@ -305,13 +305,15 @@ def _create_plot(results, cut_data, cutout_size, save_plot):
     else:
         # QSO outside cutout - draw direction arrow
         qso_direction = np.array([dx_qso, dy_qso])
-        qso_direction = qso_direction / np.linalg.norm(qso_direction) * 20
+        # Make direction vector longer
+        qso_direction = qso_direction / np.linalg.norm(qso_direction) * 45  # Increase from 20 to 35
+        
         ax2.arrow(gal_pix_cutout[0], gal_pix_cutout[1], 
                   qso_direction[0], qso_direction[1],
-                  head_width=3, head_length=3, fc='blue', ec='blue',
-                  linewidth=2, alpha=0.8, label='QSO direction', 
+                  head_width=4, head_length=4, fc='yellow', ec='yellow',  # Changed to yellow
+                  linewidth=3, alpha=0.9, label='QSO direction',         # Increased linewidth 
                   transform=ax2.get_transform('pixel'))
-    
+            
     # Draw galaxy major axis
     center_sky = shape['center']
     pa_rad_sky = np.deg2rad(shape['pa_pixel'])
