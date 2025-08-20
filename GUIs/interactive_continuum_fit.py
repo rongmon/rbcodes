@@ -645,6 +645,10 @@ class InteractiveContinuumFitWindow(QMainWindow):
         # Update the main domain property
         self.domain = input_xrange
 
+        # Store current y limits before clearing
+        ax_flux, ax_norm = self.canvas.axes
+        current_flux_ylim = ax_flux.get_ylim() if ax_flux.get_ylim() != (0, 1.5) else None
+        current_norm_ylim = ax_norm.get_ylim() if ax_norm.get_ylim() != (0, 1.5) else None
 
         # Clear axes
         for ax in self.canvas.axes:
@@ -692,6 +696,12 @@ class InteractiveContinuumFitWindow(QMainWindow):
         
         # Set x-axis limits
         ax_flux.set_xlim(input_xrange)
+        
+        # Restore y limits if they existed, otherwise let matplotlib auto-scale
+        if current_flux_ylim is not None:
+            ax_flux.set_ylim(current_flux_ylim)
+        if current_norm_ylim is not None and self.normalized_flux is not None:
+            ax_norm.set_ylim(current_norm_ylim)
         
         # Update canvas
         self.canvas.draw()
@@ -1045,16 +1055,19 @@ class InteractiveContinuumFitWindow(QMainWindow):
         """Reset the plot zoom to the domain limits."""
         ax_flux = self.canvas.axes[0]
 
-        # Update the appropriate domain based on current x-axis type
+        # Get the appropriate domain limits based on x-axis type
         if self.x_axis_type == 'velocity':
-            self.velocity_domain = new_xlim
+            self.velocity_domain = self.domain if self.domain else [min(self.velocity), max(self.velocity)]
+            ax_flux.set_xlim(self.velocity_domain)
         else:
-            self.wave_domain = new_xlim
+            self.wave_domain = self.domain if self.domain else [min(self.wave), max(self.wave)]
+            ax_flux.set_xlim(self.wave_domain)
         
-        self.domain = new_xlim
-        ax_flux.set_xlim(self.domain)
-        ax_flux.autoscale(axis='y')
+        # Update the main domain property
+        self.domain = ax_flux.get_xlim()
 
+        # Reset y-axis scaling
+        ax_flux.autoscale(axis='y')
         self.canvas.draw()
     
     def reset_masks(self):
