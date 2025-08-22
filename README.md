@@ -25,10 +25,10 @@ Please also mention the **version you used** for reproducibility. For example:
                   Clark, Sean and
                   Higginson, Jack and
                   Flores, Derick},
-  title        = {rongmon/rbcodes: rbcodes v1.0.0},
+  title        = {rongmon/rbcodes: rbcodes v2.0.0},
   year         = 2025,
   publisher    = {Zenodo},
-  version      = {v1.0.0},
+  version      = {v2.0.0},
   doi          = {10.5281/zenodo.6079263},
   url          = {https://doi.org/10.5281/zenodo.6079263}
 }

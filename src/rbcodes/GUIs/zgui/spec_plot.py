@@ -73,6 +73,13 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.addtional_linelist = {i:[] for i in range(num_2ndlist)}
 		self.addtional_linelist_z = {i:0. for i in range(num_2ndlist)}
 
+		# Modern line management
+		self.error_line = None
+		self.flux_line = None  
+		self.interactive_lines = []
+		self.emission_markers = []
+		self.gaussian_fits = []
+
 		super().__init__(self.fig)
 
 		# connect funcitons to events
@@ -88,14 +95,23 @@ class MplCanvas(FigureCanvasQTAgg):
 	def plot_spec(self, wave, flux, error, filename):
 		self.fig.clf()
 		self.axes = self.fig.add_subplot(111)
-		self.axes.cla()
-		self.axes.lines[0] = self.axes.plot(wave, error, color='red')# label='Error')
-		self.axes.lines[1] = self.axes.plot(wave, flux, color='black')#, label='Flux')
-		#self.axes.legend(loc='upper right')
 		
-		self.axes.set_xlabel('Wavelength (Angstrom)')
-		self.axes.set_ylabel('Flux')
-		self.axes.set_title(filename)
+		# Modern matplotlib: use explicit line object storage
+		self.error_line, = self.axes.plot(wave, error, color='#E74C3C', 
+		                                 linewidth=1.0, alpha=0.8, label='Error')
+		self.flux_line, = self.axes.plot(wave, flux, color='#2C3E50', 
+		                                linewidth=1.2, label='Flux')
+		
+		# Modern styling
+		self.axes.set_xlabel('Wavelength (Å)', fontsize=12)
+		self.axes.set_ylabel('Flux', fontsize=12)
+		self.axes.set_title(filename, fontsize=14, pad=15)
+		self.axes.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+		
+		# Store data for updates
+		self.wave, self.flux, self.error = wave, flux, error
+		self.current_filename = filename
+		
 		self.draw()
 
 		self.send_message.emit(f'You are currently working on {filename} spectrum.')
@@ -121,22 +137,38 @@ class MplCanvas(FigureCanvasQTAgg):
 	
 
 	def replot(self, wave, new_spec, new_err):
-		'''Re-plot smoothed/unsmoothed spectrum
-		'''
+		"""Update existing line data instead of recreating lines"""
+		# Store current view limits
 		axes = self.fig.gca()
 		self.cur_xlims = axes.get_xlim()
 		self.cur_ylims = axes.get_ylim()
 		
-		self.axes.lines[0] = self.axes.plot(wave, new_err, color='red')# label='Error')
-		self.axes.lines[1] = self.axes.plot(wave, new_spec, color='black')#, label='Flux')
-		# for a better y range
-		ytmp = np.nan_to_num(new_spec, nan=0., posinf=0., neginf=0.)
-		self.axes.set_ylim(self.cur_ylims)
+		# Modern approach: update existing line data
+		if self.error_line is not None:
+			self.error_line.set_data(wave, new_err)
+		else:
+			self.error_line, = self.axes.plot(wave, new_err, color='#E74C3C', 
+			                                 linewidth=1.0, alpha=0.8)
+		
+		if self.flux_line is not None:
+			self.flux_line.set_data(wave, new_spec)
+		else:
+			self.flux_line, = self.axes.plot(wave, new_spec, color='#2C3E50', 
+			                                linewidth=1.2)
+		
+		# Update stored data
+		self.wave, self.flux, self.error = wave, new_spec, new_err
+		
+		# Clear interactive elements using modern approach
+		self.clear_interactive_elements()
+		
+		# Restore view limits
 		self.axes.set_xlim(self.cur_xlims)
-		#self.axes.set_ylim([np.nanmin(ytmp), np.nanmax(ytmp)])
-		#self.axes.set_xlim([np.min(wave), np.max(wave)])
-
-		del self.axes.lines[2:]
+		self.axes.set_ylim(self.cur_ylims)
+		
+		# Update axes limits properly
+		self.axes.relim()
+		self.axes.autoscale_view(scalex=False, scaley=False)
 		self.draw()
 
 	def _compute_distance(self, gxval, gyval, event):
@@ -153,6 +185,54 @@ class MplCanvas(FigureCanvasQTAgg):
 		while self.axes.collections:
 			self.axes.collections.pop()
 		self.draw()
+
+	def clear_interactive_elements(self):
+		"""Remove all interactive elements except base flux/error lines"""
+		for line in self.interactive_lines:
+			if line in self.axes.lines:
+				line.remove()
+		self.interactive_lines.clear()
+		
+		for marker in self.emission_markers:
+			if marker in self.axes.lines:
+				marker.remove()
+		self.emission_markers.clear()
+		
+		for fit in self.gaussian_fits:
+			if fit in self.axes.lines:
+				fit.remove()
+		self.gaussian_fits.clear()
+		
+		# Also clear text and collections
+		while self.axes.texts:
+			self.axes.texts.pop()
+		while self.axes.collections:
+			self.axes.collections.pop()
+		
+		self.draw()
+
+	def add_emission_marker(self, wavelength, color='#3498DB', name=""):
+		"""Add emission line marker and track it"""
+		ylim = self.axes.get_ylim()
+		marker = self.axes.axvline(wavelength, color=color, linestyle='--', 
+		                          alpha=0.7, linewidth=1.5)
+		
+		# Add text annotation if name provided
+		if name:
+			text = self.axes.text(wavelength, ylim[1]*0.9, name, 
+			                     color=color, fontsize=10, rotation=90,
+			                     verticalalignment='top', alpha=0.8)
+			self.interactive_lines.append(text)
+		
+		self.emission_markers.append(marker)
+		return marker
+
+	def add_gaussian_fit(self, wave_range, gauss_data, color='#27AE60'):
+		"""Add Gaussian fit curve with modern styling"""
+		fit_line, = self.axes.plot(wave_range, gauss_data, color=color,
+		                          linewidth=2.0, alpha=0.8, linestyle='-')
+		self.gaussian_fits.append(fit_line)
+		return fit_line
 
 	def _select_lines_within_xlim(self, linelist, estZ=0., xbound=0.):
 		# select lines within axes.xlim
@@ -274,7 +354,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		#return fl1d_opt, err1d
 
 
-	def plot_spec2d(self, wave, flux2d, error2d, filename, scale=0, normalization=0, prev_extraction=None):
+	def plot_spec2d(self, wave, flux2d, error2d, filename, scale=0, normalization=0, prev_extraction=None, fixed_colorbar_scale=False, fixed_vmin=None, fixed_vmax=None):
 		'''Display 2D spec in top panel, 1D extraction in bottom panel
 		self.flux2d, self.err2d - 2D spec info
 		self.flux, self.error - 1D spec extraction
@@ -452,16 +532,19 @@ class MplCanvas(FigureCanvasQTAgg):
 									cmap=self.cur_cmap)
 
 		else:
-			#RB Hack hard coding the color map to show a given limit. 
-			#REVERT BACK AFTER ANALYSIS
-			#pos_ax2d = self.ax2d.imshow(img, origin='lower', 
-			#						vmin=scaled2d.min(), vmax=scaled2d.max() * 1.,
-			#						extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
-			#						cmap=self.cur_cmap)
-			pos_ax2d = self.ax2d.imshow(img, origin='lower', 
-									vmin=-0.02, vmax=0.02,
-									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
-									cmap=self.cur_cmap)
+			# Use fixed or dynamic colorbar scaling based on checkbox
+			if fixed_colorbar_scale and fixed_vmin is not None and fixed_vmax is not None:
+				# Fixed colorbar scaling using stored values
+				pos_ax2d = self.ax2d.imshow(img, origin='lower', 
+										vmin=fixed_vmin, vmax=fixed_vmax,
+										extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
+										cmap=self.cur_cmap)
+			else:
+				# Dynamic colorbar scaling based on data
+				pos_ax2d = self.ax2d.imshow(img, origin='lower', 
+										vmin=scaled2d.min(), vmax=scaled2d.max() * 1.,
+										extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
+										cmap=self.cur_cmap)
 
 		del scaled2d # release memory
 		self.pos_ax2d = pos_ax2d
@@ -486,17 +569,22 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axnum = 2
 
 	def replot2d(self, wave, new_spec, new_err, new_extraction):
-		'''Re-plot smoothed/unsmoothed spectrum
-		'''
+		"""Update 1D spectrum with modern matplotlib practices"""
+		# Update line data instead of reassigning
+		if self.error_line is not None:
+			self.error_line.set_data(wave, new_err)
+		if self.flux_line is not None:
+			self.flux_line.set_data(wave, new_spec)
+		
+		# Preserve current view limits
 		axes = self.fig.gca()
 		self.cur_xlims = axes.get_xlim()
 		self.cur_ylims = axes.get_ylim()
-		self.axes.lines[0] = axes.plot(wave, new_err, color='red')# label='Error')
-		self.axes.lines[1] = axes.plot(wave, new_spec, color='black')#, label='Flux')
 		self.axes.set_xlim(self.cur_xlims)
 		self.axes.set_ylim(self.cur_ylims)
-
-		del self.axes.lines[2:]
+		
+		# Clear interactive elements using modern approach
+		self.clear_interactive_elements()
 
 		ax2d_xlim = self.ax2d.get_xlim()
 		while self.ax2d.collections:
@@ -556,7 +644,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		if event.key == 'r':
 			if event.inaxes == self.axes:
 				# reset flux/err and clear all lines
-				#del self.axes.lines[2:]	# delete everything except flux/err
+				self.clear_interactive_elements()  # Modern replacement for del self.axes.lines[2:]
 				self.line_xlim, self.line_ylim = [], []
 				self.gxval, self.gyval = [], []
 
@@ -903,17 +991,24 @@ class MplCanvas(FigureCanvasQTAgg):
 		elif event.key == 'D':
 			# delete previous unwanted points for Gaussian profile fitting
 			fclick = len(self.gxval)
-			'''
-			if (fclick > 0) & (fclick <2):
+			
+			# Modern approach: remove from tracked collections
+			if self.interactive_lines:
+				last_line = self.interactive_lines.pop()
+				last_line.remove()
+			elif self.emission_markers:
+				last_marker = self.emission_markers.pop()
+				last_marker.remove()
+			elif self.gaussian_fits:
+				last_fit = self.gaussian_fits.pop()
+				last_fit.remove()
+			
+			# Also remove from coordinate tracking
+			if fclick > 0:
 				self.gxval = np.delete(self.gxval, -1)
 				self.gyval = np.delete(self.gyval, -1)
-				del self.axes.lines[-1]
-			else:
-				del self.axes.lines[-4:]
+			
 			self.gauss_profiles = []
-			'''
-			if len(self.axes.lines) > 2:
-				self.axes.lines.pop()			
 			self.draw()
 			self.send_message.emit('A previous added object is deleted.')
 
@@ -1081,8 +1176,9 @@ class MplCanvas(FigureCanvasQTAgg):
 
 	def _on_ransac_cont(self, wave_cont):
 		#print(wave_cont)
-		del self.axes.lines[2:]
-		self.axes.plot(wave_cont[0], wave_cont[-1], color='blue')
+		self.clear_interactive_elements()  # Modern replacement
+		cont_line, = self.axes.plot(wave_cont[0], wave_cont[-1], color='#3498DB')
+		self.interactive_lines.append(cont_line)  # Track the continuum line
 		self.draw()
 
 

@@ -15,10 +15,7 @@ from PyQt5.QtGui import QIcon, QFont, QTextCursor
 import datetime  # Add this to fix the datetime error
 
 # Import the LLSFitter class
-try:
-    from rbcodes.IGM.LLSFitter import LLSFitter
-except:
-    from IGM.LLSFitter import LLSFitter
+from rbcodes.IGM.LLSFitter import LLSFitter
 
 class MatplotlibWidget(QWidget):
     def __init__(self, parent=None):

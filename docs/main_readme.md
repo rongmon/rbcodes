@@ -37,33 +37,28 @@ conda create -n myenv python=3.9.6
 # Activate the environment
 conda activate myenv
 
-# Install packages (use conda to ensure compatibility)
+# Install dependencies (use conda to ensure compatibility)
 conda install -c conda-forge --file requirements_simple.txt
 
-# Add rbcodes package to your PYTHONPATH
-# Option 1: Temporarily add to PYTHONPATH for current session
-export PYTHONPATH=$PYTHONPATH:/path/to/rbcodes  # For Linux/Mac
-# OR
-set PYTHONPATH=%PYTHONPATH%;C:\path\to\rbcodes  # For Windows
-
-# Option 2: Permanently add to PYTHONPATH in your environment
-# For Linux/Mac, add this to your ~/.bashrc, ~/.zshrc, or similar:
-echo 'export PYTHONPATH=$PYTHONPATH:/path/to/rbcodes' >> ~/.bashrc
-source ~/.bashrc
-
-# For Windows, set through System Properties > Environment Variables
-# Or use this command:
-setx PYTHONPATH "%PYTHONPATH%;C:\path\to\rbcodes"
-
-#****This is not yet implemented***
-# Option 3: Install the package in development mode
+# Install package in development mode
 cd /path/to/rbcodes
-pip install -e .  # This requires a setup.py file in the package #COMING SOON. 
+pip install -e .
 ```
 
 ### Dependencies
-- Core Dependencies: 
-  astropy, lmfit, scipy, numpy, matplotlib, linetools, emcee, corner, PyQt5, pandas, scikit-learn 
+- Core Dependencies (automatically installed):
+  - PyQt5 >= 5.15.7
+  - numpy >= 1.22.3
+  - matplotlib >= 3.5.0
+  - astropy >= 5.3.3
+  - linetools >= 0.3
+  - scipy >= 1.7.3
+  - pandas >= 1.3.5
+  - emcee >= 3.0
+  - photutils >= 1.0
+  - corner >= 2.0
+  - scikit-learn >= 1.5.0
+  - tqdm >= 4.65.0
 
 ## Contents
 

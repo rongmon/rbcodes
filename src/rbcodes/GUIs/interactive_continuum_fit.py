@@ -647,8 +647,8 @@ class InteractiveContinuumFitWindow(QMainWindow):
 
         # Store current y limits before clearing
         ax_flux, ax_norm = self.canvas.axes
-        current_flux_ylim = ax_flux.get_ylim() if ax_flux.get_ylim() != (0, 1.5) else None
-        current_norm_ylim = ax_norm.get_ylim() if ax_norm.get_ylim() != (0, 1.5) else None
+        current_flux_ylim = ax_flux.get_ylim() if ax_flux.get_ylim() != (0, 1.0) else None
+        current_norm_ylim = ax_norm.get_ylim() if ax_norm.get_ylim() != (0, 1.0) else None
 
         # Clear axes
         for ax in self.canvas.axes:
@@ -697,11 +697,19 @@ class InteractiveContinuumFitWindow(QMainWindow):
         # Set x-axis limits
         ax_flux.set_xlim(input_xrange)
         
-        # Restore y limits if they existed, otherwise let matplotlib auto-scale
+        # Set y limits: either restore previous or set to 0-150% of flux for initial plot
         if current_flux_ylim is not None:
             ax_flux.set_ylim(current_flux_ylim)
+        else:
+            # Initial y limits: 0 to 150% of max flux
+            max_flux = max(np.max(self.flux), np.max(self.error))
+            ax_flux.set_ylim(0, 1.5 * max_flux)
+
         if current_norm_ylim is not None and self.normalized_flux is not None:
             ax_norm.set_ylim(current_norm_ylim)
+        elif self.normalized_flux is not None:
+            # For normalized flux, use 0 to 1.5 range
+            ax_norm.set_ylim(0, 1.5)
         
         # Update canvas
         self.canvas.draw()

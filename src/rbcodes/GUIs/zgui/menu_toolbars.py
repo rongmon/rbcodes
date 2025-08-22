@@ -7,7 +7,7 @@ from astropy.io import fits, ascii
 from astropy.table import Table
 
 from PyQt5.QtCore import Qt, QSize, QUrl, pyqtSignal
-from PyQt5.QtWidgets import QAction, QToolBar, QStatusBar, QMenuBar, QFileDialog, QComboBox, QLineEdit, QLabel, QPushButton
+from PyQt5.QtWidgets import QAction, QToolBar, QStatusBar, QMenuBar, QFileDialog, QComboBox, QLineEdit, QLabel, QPushButton, QCheckBox
 from PyQt5.QtGui import QKeySequence, QDesktopServices
 
 from user_manual import UserManualDialog
@@ -45,8 +45,12 @@ class Custom_ToolBar(QToolBar):
 		self.maxfile_lim = 50 # max displayed files in f_combobox at a time
 		self.manual_range = [0,1] # manual scaling range preset
 		self.num_length = 10 # number of total digits displayed in min/max boxes
+		self.fixed_colorbar_scale = False # use fixed colorbar scale instead of dynamic
+		self.fixed_vmin = None # stored colorbar minimum when fixed
+		self.fixed_vmax = None # stored colorbar maximum when fixed
 
 		self.setWindowTitle('Customizable TooBar')
+		self.setMovable(True)  # Dont Prevent toolbar from being draggable
 		#self.setFixedSize(QSize(200, 50))
 
 		# "Read All" button
@@ -71,7 +75,7 @@ class Custom_ToolBar(QToolBar):
 		btn_prevf.triggered.connect(self._prev_fitsfile)
 		# File dropbox
 		self.f_combobox = QComboBox()
-		self.f_combobox.setMinimumWidth(200)
+		self.f_combobox.setMinimumWidth(150)
 		self.f_combobox.addItem('No FITS File')
 		self.f_combobox.setCurrentIndex(0)
 		# set the max visible items for one page
@@ -94,7 +98,7 @@ class Custom_ToolBar(QToolBar):
 			btn_prevframe.triggered.connect(self._prev_frame)
 			# main frame dropbox
 			self.frame_combobox = QComboBox()
-			self.frame_combobox.setMinimumWidth(130)
+			self.frame_combobox.setMinimumWidth(100)
 			self.frame_combobox.addItem('NONE')
 			self.frame_combobox.setCurrentIndex(0)
 			self.frame_combobox.currentTextChanged.connect(self._select_frames)
@@ -112,27 +116,32 @@ class Custom_ToolBar(QToolBar):
 		self.addWidget(s_label)
 		# scaling dropbox
 		self.s_combobox = QComboBox()
-		self.s_combobox.setFixedWidth(100)
+		self.s_combobox.setFixedWidth(80)
 		self.addWidget(self.s_combobox)
 
 		# normalization dropbox
 		self.n_combobox = QComboBox()
-		self.n_combobox.setFixedWidth(100)
+		self.n_combobox.setFixedWidth(80)
 		self.addWidget(self.n_combobox)
 
 		# normalization range
 		self.min_range = QLineEdit()
-		self.min_range.setFixedWidth(100)
+		self.min_range.setFixedWidth(70)
 		self.addWidget(self.min_range)
 		self.min_range.setPlaceholderText('Min')
 		self.min_range.returnPressed.connect(self._return_pressed)
 		self.min_range.setReadOnly(True)
 		self.max_range = QLineEdit()
-		self.max_range.setFixedWidth(100)
+		self.max_range.setFixedWidth(70)
 		self.max_range.setPlaceholderText('Max')
 		self.max_range.returnPressed.connect(self._return_pressed)
 		self.max_range.setReadOnly(True)
 		self.addWidget(self.max_range)
+
+		# Fixed colorbar scaling checkbox
+		self.fixed_colorbar_checkbox = QCheckBox('Fixed Scale')
+		self.fixed_colorbar_checkbox.setToolTip('Lock colorbar to current range instead of dynamic scaling')
+		self.addWidget(self.fixed_colorbar_checkbox)
 
 		self.addSeparator()
 
@@ -384,7 +393,10 @@ class Custom_ToolBar(QToolBar):
 			self.mW.sc.plot_spec2d(self.fitsobj.wave,
 										self.display2d,
 										self.fitsobj.error2d,
-										self.filename)
+										self.filename,
+										fixed_colorbar_scale=self.fixed_colorbar_scale,
+										fixed_vmin=self.fixed_vmin,
+										fixed_vmax=self.fixed_vmax)
 			# reset scale and normalization comboboxes
 			#self.s_combobox.setCurrentIndex(0)
 			#self.n_combobox.setCurrentIndex(0)
@@ -476,7 +488,10 @@ class Custom_ToolBar(QToolBar):
 						self.mW.sc.plot_spec2d(self.fitsobj.wave,
 											self.display2d,
 											self.fitsobj.error2d,
-											self.filename)
+											self.filename,
+											fixed_colorbar_scale=self.fixed_colorbar_scale,
+								fixed_vmin=self.fixed_vmin,
+								fixed_vmax=self.fixed_vmax)
 						self._add_scale2d()
 
 					elif (self.fitsobj.flux is not None) & (self.fitsobj.flux2d is None):
@@ -504,7 +519,10 @@ class Custom_ToolBar(QToolBar):
 												self.display2d,
 												self.fitsobj.error2d,
 												self.filename,
-												prev_extraction=extraction_box)
+												prev_extraction=extraction_box,
+												fixed_colorbar_scale=self.fixed_colorbar_scale,
+								fixed_vmin=self.fixed_vmin,
+								fixed_vmax=self.fixed_vmax)
 							self.mW.sc.replot(self.fitsobj.wave, 
 											self.fitsobj.flux, 
 											self.fitsobj.error)
@@ -516,7 +534,10 @@ class Custom_ToolBar(QToolBar):
 												self.display2d,
 												self.fitsobj.error2d,
 												self.filename,
-												prev_extraction=None)
+												prev_extraction=None,
+												fixed_colorbar_scale=self.fixed_colorbar_scale,
+								fixed_vmin=self.fixed_vmin,
+								fixed_vmax=self.fixed_vmax)
 							self.mW.sc.replot(self.fitsobj.wave, 
 											self.fitsobj.flux, 
 											self.fitsobj.error)
@@ -559,6 +580,9 @@ class Custom_ToolBar(QToolBar):
 		self.n_combobox.setCurrentIndex(0)
 		#self.n_combobox.currentIndexChanged.connect(self._normalization_changed)
 		self.n_combobox.activated.connect(self._normalization_changed)
+		
+		# Connect checkbox signal
+		self.fixed_colorbar_checkbox.toggled.connect(self._colorbar_scale_toggled)
 
 		self.min_range.setReadOnly(False)
 		self.max_range.setReadOnly(False)
@@ -569,7 +593,10 @@ class Custom_ToolBar(QToolBar):
 								self.display2d,
 								self.fitsobj.error2d,
 								self.filename, scale=i,
-								normalization=self.normalization)
+								normalization=self.normalization,
+								fixed_colorbar_scale=self.fixed_colorbar_scale,
+								fixed_vmin=self.fixed_vmin,
+								fixed_vmax=self.fixed_vmax)
 			
 			self.scale = i
 		else:
@@ -583,8 +610,11 @@ class Custom_ToolBar(QToolBar):
 									self.fitsobj.error2d,
 									self.filename, 
 									scale=self.scale,
-									normalization=i)
-				if i == 1:
+									normalization=i,
+									fixed_colorbar_scale=self.fixed_colorbar_scale,
+								fixed_vmin=self.fixed_vmin,
+								fixed_vmax=self.fixed_vmax)
+				if i == 1 and not self.fixed_colorbar_scale:
 					self.min_range.setText(str(0)[:self.num_length])
 					self.max_range.setText(str(1)[:self.num_length])
 				elif i == 10:
@@ -597,7 +627,10 @@ class Custom_ToolBar(QToolBar):
 									self.fitsobj.error2d,
 									self.filename,
 									scale=self.scale,
-									normalization=self.manual_range)
+									normalization=self.manual_range,
+									fixed_colorbar_scale=self.fixed_colorbar_scale,
+								fixed_vmin=self.fixed_vmin,
+								fixed_vmax=self.fixed_vmax)
 				self._on_scale_limits_slot(self.manual_range)
 
 
@@ -605,6 +638,10 @@ class Custom_ToolBar(QToolBar):
 			pass
 
 	def _on_scale_limits_slot(self, sent_limits):
+		# Don't update textboxes if fixed scale is enabled to preserve user values
+		if self.fixed_colorbar_scale:
+			return
+			
 		if np.isnan(sent_limits[0]) or np.isnan(sent_limits[-1]):
 			self.min_range.setReadOnly(True)
 			self.max_range.setReadOnly(True)
@@ -631,9 +668,49 @@ class Custom_ToolBar(QToolBar):
 							self.fitsobj.error2d,
 							self.filename,
 							scale=self.scale,
-							normalization=manual_range)
+							normalization=manual_range,
+							fixed_colorbar_scale=self.fixed_colorbar_scale)
 		# save manual_range for other frames
 		self.manual_range = manual_range
+
+	def _colorbar_scale_toggled(self, checked):
+		"""Handle colorbar scale checkbox toggle"""
+		self.fixed_colorbar_scale = checked
+		
+		# If checking the box, read values from min/max textboxes
+		if checked:
+			try:
+				# Read values from the existing min_range and max_range textboxes
+				min_text = self.min_range.text().strip()
+				max_text = self.max_range.text().strip()
+				
+				if min_text and max_text:
+					self.fixed_vmin = float(min_text)
+					self.fixed_vmax = float(max_text)
+					print(f"Fixed scale enabled with vmin={self.fixed_vmin}, vmax={self.fixed_vmax}")
+				else:
+					# If textboxes are empty, use default values
+					self.fixed_vmin = -0.02
+					self.fixed_vmax = 0.02
+					print(f"Fixed scale enabled with default values: vmin={self.fixed_vmin}, vmax={self.fixed_vmax}")
+			except ValueError as e:
+				print(f"Error parsing textbox values: {e}. Using defaults.")
+				self.fixed_vmin = -0.02
+				self.fixed_vmax = 0.02
+		else:
+			print(f"Fixed scale disabled - using dynamic scaling")
+				
+		# Refresh the plot if we have data loaded
+		if hasattr(self, 'fitsobj') and self.fitsobj.flux2d is not None:
+			self.mW.sc.plot_spec2d(self.fitsobj.wave,
+								self.display2d,
+								self.fitsobj.error2d,
+								self.filename,
+								scale=self.scale,
+								normalization=self.normalization,
+								fixed_colorbar_scale=self.fixed_colorbar_scale,
+								fixed_vmin=self.fixed_vmin,
+								fixed_vmax=self.fixed_vmax)
 
 	def _on_sent_extract1d(self, sent_extract1d):
 		self.extract1d = sent_extract1d

@@ -40,7 +40,7 @@ class CustomZTable(QtWidgets.QWidget):
 		layout.addLayout(layout_b)
 		layout.setAlignment(Qt.AlignCenter)
 		self.setLayout(layout)
-		self.setFixedHeight(200)
+		#self.setFixedHeight(200)
 
 	def _on_sent_estZ(self, sent_z_est):
 		if self.estZ.shape[0] == 0:

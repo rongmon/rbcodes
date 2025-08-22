@@ -14,7 +14,7 @@ import pandas as pd
 from scipy.interpolate import splrep, splev
 from scipy.optimize import curve_fit
 
-from IGM.rb_setline import read_line_list
+from rbcodes.IGM.rb_setline import read_line_list
 
 class Gaussfit_2d(QWidget):
     send_linelist = pyqtSignal(object)
@@ -250,7 +250,7 @@ class Gaussfit_2d(QWidget):
         if s == Qt.Checked:
             self.kernel_ransac.setReadOnly(False)
             self.kernel_ransac.setText(str(self.kernel_size))
-            from IGM.ransac_contfit import cont_fitter
+            from rbcodes.IGM.ransac_contfit import cont_fitter
             self.c = cont_fitter.from_data(self.wave, self.flux1d, error=self.error1d)
             self.c.fit_continuum(window=self.kernel_size)
             self.line1d.axline.plot(self.wave, self.c.cont, 'b')
@@ -260,7 +260,9 @@ class Gaussfit_2d(QWidget):
             self.kernel_ransac.setReadOnly(True)
             self.kernel_ransac.clear()
             self.cont = None
-            del self.line1d.axline.lines[2:]
+            # Modern matplotlib: clear lines beyond base error/flux lines
+            while len(self.line1d.axline.lines) > 2:
+                self.line1d.axline.lines.pop()
 
     def _draw_button_clicked(self, check):
         if self.cont is not None:
@@ -357,7 +359,9 @@ class LineCanvas(FigureCanvasQTAgg):
             self.axline.texts.pop()
         while self.axline.collections:
             self.axline.collections.pop()
-        del self.axline.lines[2:]
+        # Modern matplotlib: clear lines beyond base error/flux lines
+        while len(self.axline.lines) > 2:
+            self.axline.lines.pop()
         self.draw()
 
 
@@ -430,7 +434,9 @@ class LineCanvas(FigureCanvasQTAgg):
             # do not forget to bring back to observed frame
 
 
-            del self.axline.lines[2:]
+            # Modern matplotlib: clear lines beyond base error/flux lines
+            while len(self.axline.lines) > 2:
+                self.axline.lines.pop()
             cont_fit = self.axline.plot(self.g_wave, cont, 'b')
             model_fit = self.axline.plot(self.g_wave, gfinal, 'r--')
 
@@ -478,8 +484,10 @@ class LineCanvas(FigureCanvasQTAgg):
         elif event.key == 'r':
             axline = self.figure.gca()
             xlim, ylim = axline.get_xlim(), axline.get_ylim()
-            self.axline.lines[0] = self.axline.plot(wave,error1d,'r', alpha=0.8)
-            self.axline.lines[1] = self.axline.plot(wave,flux1d,'k', alpha=0.8)
+            # Modern matplotlib: clear and replot properly  
+            self.axline.clear()
+            self.axline.plot(self.g_wave, self.g_error, 'r', alpha=0.8)
+            self.axline.plot(self.g_wave, self.g_flux, 'k', alpha=0.8)
             self.axline.set_xlim(xlim)
             self.axline.set_ylim(ylim)
         elif event.key == 't':
