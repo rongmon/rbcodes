@@ -19,6 +19,17 @@ Dependencies
 * Removed lmfit
 * All dependencies now have explicit minimum versions
 
+Version 1.0.0
+===========
+* Major Release with significant enhancements
+* New Multispecviewer GUI
+* New launch_specgui GUI [Wrapper for rb_spec] as well as its batch mode implmenetation
+* Mature rb_spec 1d spectrum analysis toolkit with a lot of bells and whistles
+* Large volume of documentation included
+* New io modules included
+* New LLSFitter GUI included
+* New zgui inlcuded for NIRCam data visualizationa nd redshift estimation [optimzied for the JWST EIGER survey data]
+
 Version 0.1
 ===========
 
