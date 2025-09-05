@@ -53,7 +53,7 @@ pip install -e .
   - astropy >= 5.3.3
   - linetools >= 0.3
   - scipy >= 1.7.3
-  - pandas >= 1.3.5
+  - pandas == 1.3.5
   - emcee >= 3.0
   - photutils >= 1.0
   - corner >= 2.0
