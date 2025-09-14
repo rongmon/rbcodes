@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
+from astropy.wcs import WCS
 
 def stiff_rgb(r, g, b,
               min_percent=0.01, max_percent=99.99,
@@ -177,6 +178,181 @@ def lupton_rgb(r, g, b,
 
 
 # Example usage functions
+def reproject_and_crop(r_file, g_file, b_file,
+                      target_grid='r', crop_to='r', custom_crop=None,
+                      reproject_method='interp'):
+    """
+    Reproject three images to common grid and crop to specified coverage.
+    
+    Parameters
+    ----------
+    r_file, g_file, b_file : str
+        Paths to FITS files for red, green, blue channels.
+    target_grid : str
+        Which image's pixel grid to use as target: 'r', 'g', 'b', or 'optimal'.
+    crop_to : str  
+        Which image's coverage to crop to: 'r', 'g', 'b', 'common', or 'union'.
+    custom_crop : tuple, optional
+        Custom crop region as (ra_min, ra_max, dec_min, dec_max) in degrees.
+    reproject_method : str
+        'interp' (fast) or 'exact' (precise) reprojection method.
+    
+    Returns
+    -------
+    r_reproj, g_reproj, b_reproj : 2D arrays
+        Reprojected and cropped image data arrays.
+    target_wcs : WCS
+        WCS of the final reprojected grid.
+    """
+    from reproject import reproject_interp, reproject_exact
+    from reproject.mosaicking import find_optimal_celestial_wcs
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+    
+    # Load all images
+    files = {'r': r_file, 'g': g_file, 'b': b_file}
+    data = {}
+    wcs_dict = {}
+    
+    for channel, filename in files.items():
+        hdu = fits.open(filename)
+        raw_data = hdu[0].data
+        raw_wcs = WCS(hdu[0].header)
+        
+        # Handle 3D data/WCS - extract 2D celestial part
+        if raw_data.ndim == 3:
+            # Take middle slice for 3D cube (or sum/average if preferred)
+            print(f"Warning: {channel}_file has 3D data, taking slice {raw_data.shape[0]//2}")
+            data[channel] = raw_data[raw_data.shape[0]//2, :, :]
+            # Extract 2D celestial WCS
+            wcs_dict[channel] = raw_wcs.celestial
+        elif raw_data.ndim == 2:
+            data[channel] = raw_data
+            # Ensure we have 2D celestial WCS even if header has extra axes
+            wcs_dict[channel] = raw_wcs.celestial
+        else:
+            raise ValueError(f"Unsupported data dimensions: {raw_data.ndim}D in {filename}")
+        
+        hdu.close()
+    
+    # Determine target WCS
+    if target_grid == 'optimal':
+        # Create optimal WCS covering all images
+        data_wcs_pairs = [(data[ch], wcs_dict[ch]) for ch in ['r', 'g', 'b']]
+        target_wcs, target_shape = find_optimal_celestial_wcs(data_wcs_pairs)
+        print(f"Using optimal WCS with shape {target_shape}")
+    else:
+        # Use specified image's WCS
+        target_wcs = wcs_dict[target_grid]
+        target_shape = data[target_grid].shape
+        print(f"Using {target_grid}_file WCS as target grid")
+    
+    # Reproject all images to target grid
+    reproject_func = reproject_exact if reproject_method == 'exact' else reproject_interp
+    reprojected = {}
+    footprints = {}
+    
+    for channel in ['r', 'g', 'b']:
+        if channel == target_grid and target_grid != 'optimal':
+            # No need to reproject if it's already the target
+            reprojected[channel] = data[channel]
+            footprints[channel] = np.ones_like(data[channel], dtype=bool)
+        else:
+            print(f"Reprojecting {channel}_file to target grid...")
+            reprojected[channel], footprints[channel] = reproject_func(
+                (data[channel], wcs_dict[channel]), 
+                target_wcs, 
+                shape_out=target_shape
+            )
+    
+    # Handle cropping
+    if custom_crop is not None:
+        # Custom RA/Dec crop box
+        ra_min, ra_max, dec_min, dec_max = custom_crop
+        print(f"Applying custom crop: RA({ra_min:.3f}, {ra_max:.3f}), Dec({dec_min:.3f}, {dec_max:.3f})")
+        
+        # Create coordinate arrays
+        ny, nx = target_shape
+        x_pix, y_pix = np.meshgrid(np.arange(nx), np.arange(ny))
+        coords = target_wcs.pixel_to_world(x_pix, y_pix)
+        
+        # Create crop mask
+        crop_mask = ((coords.ra.deg >= ra_min) & (coords.ra.deg <= ra_max) & 
+                    (coords.dec.deg >= dec_min) & (coords.dec.deg <= dec_max))
+        
+        # Find bounding box
+        y_indices, x_indices = np.where(crop_mask)
+        if len(y_indices) == 0:
+            raise ValueError("Custom crop region contains no pixels!")
+        
+        y_min, y_max = y_indices.min(), y_indices.max() + 1
+        x_min, x_max = x_indices.min(), x_indices.max() + 1
+        
+    elif crop_to in ['r', 'g', 'b']:
+        # Crop to specific image's footprint
+        print(f"Cropping to {crop_to}_file coverage...")
+        footprint = footprints[crop_to]
+        
+        # Ensure boolean types for logical operations
+        footprint_bool = footprint.astype(bool)
+        nan_mask = ~np.isnan(reprojected[crop_to])
+        
+        # Find bounding box of valid data
+        valid_pixels = np.where(footprint_bool & nan_mask)
+        if len(valid_pixels[0]) == 0:
+            raise ValueError(f"No valid data found in {crop_to}_file!")
+        
+        y_min, y_max = valid_pixels[0].min(), valid_pixels[0].max() + 1
+        x_min, x_max = valid_pixels[1].min(), valid_pixels[1].max() + 1
+        
+    elif crop_to == 'common':
+        # Crop to intersection of all footprints
+        print("Cropping to common coverage area...")
+        
+        # Ensure all boolean types
+        footprint_r = footprints['r'].astype(bool)
+        footprint_g = footprints['g'].astype(bool) 
+        footprint_b = footprints['b'].astype(bool)
+        
+        nan_mask_r = ~np.isnan(reprojected['r'])
+        nan_mask_g = ~np.isnan(reprojected['g'])
+        nan_mask_b = ~np.isnan(reprojected['b'])
+        
+        common_footprint = (footprint_r & footprint_g & footprint_b &
+                           nan_mask_r & nan_mask_g & nan_mask_b)
+        
+        valid_pixels = np.where(common_footprint)
+        if len(valid_pixels[0]) == 0:
+            raise ValueError("No common coverage area found!")
+        
+        y_min, y_max = valid_pixels[0].min(), valid_pixels[0].max() + 1
+        x_min, x_max = valid_pixels[1].min(), valid_pixels[1].max() + 1
+        
+    elif crop_to == 'union':
+        # Keep all coverage (no cropping)
+        print("Keeping full union coverage...")
+        y_min, y_max = 0, target_shape[0]
+        x_min, x_max = 0, target_shape[1]
+        
+    else:
+        raise ValueError("crop_to must be 'r', 'g', 'b', 'common', 'union', or use custom_crop")
+    
+    # Apply cropping
+    r_cropped = reprojected['r'][y_min:y_max, x_min:x_max]
+    g_cropped = reprojected['g'][y_min:y_max, x_min:x_max] 
+    b_cropped = reprojected['b'][y_min:y_max, x_min:x_max]
+    
+    # Update WCS for cropped region
+    target_wcs_cropped = target_wcs.deepcopy()
+    target_wcs_cropped.wcs.crpix[0] -= x_min
+    target_wcs_cropped.wcs.crpix[1] -= y_min
+    
+    print(f"Final cropped shape: {r_cropped.shape}")
+    print(f"Pixel scale: {target_wcs.proj_plane_pixel_scales()[0]*3600:.3f} arcsec/pixel")
+    
+    return r_cropped, g_cropped, b_cropped, target_wcs_cropped
+
+
 def load_and_create_rgb(r_file, g_file, b_file, method='stiff', **kwargs):
     """
     Convenience function to load FITS files and create RGB image.
