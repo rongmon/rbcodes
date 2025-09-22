@@ -14,9 +14,9 @@ import numpy as np
 import copy
 
 
-from guess_transition import GuessTransition
-from spec_hist import FluxHistogram, PixelHistogram
-from spec_fit_gauss2d import Gaussfit_2d
+from .guess_transition import GuessTransition
+from .spec_hist import FluxHistogram, PixelHistogram
+from .spec_fit_gauss2d import Gaussfit_2d
 
 mpl.use('Qt5Agg')
 

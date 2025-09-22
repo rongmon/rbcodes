@@ -7,7 +7,7 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 import numpy as np
 
-from menu_toolbars import Custom_ToolBar
+from .menu_toolbars import Custom_ToolBar
 
 class FluxHistogram(QDialog):
 	def __init__(self, flux2d):

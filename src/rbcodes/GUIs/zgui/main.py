@@ -4,16 +4,16 @@ import pandas as pd
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QStatusBar,
 							QVBoxLayout, QHBoxLayout)
 
-from PyQt5 import QtCore
-from PyQt5 import QtGui
+from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtGui import QKeySequence, QDesktopServices
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
-from menu_toolbars import Custom_ToolBar, Custom_MenuBar
-from spec_plot import MplCanvas
-from linelist_selection import LineListWidget
-from tableview_pandas import CustomZTable
-from message_box import MessageBox
-from utils import FitsObj
+from .menu_toolbars import Custom_ToolBar, Custom_MenuBar
+from .spec_plot import MplCanvas
+from .linelist_selection import LineListWidget
+from .tableview_pandas import CustomZTable
+from .message_box import MessageBox
+from .utils import FitsObj
 
 class MainWindow(QMainWindow):
 	'''Simplified main window with proper positioning'''
@@ -238,68 +238,76 @@ QToolBar QToolButton:hover {
 }
 '''
 
-def read_file_from_commandline(filepath, win=None):
-	filename = window.toolbar._get_filename(filepath, extension=False)
-	win.toolbar.filepaths.append(filepath)
-	win.toolbar.filenames.append(filename)		
-	win.toolbar.f_combobox.addItem(filename)
-	win.toolbar.f_combobox.setCurrentIndex(1)
+def read_file_from_commandline(filepath, win):
+    filename = win.toolbar._get_filename(filepath, extension=False)
+    win.toolbar.filepaths.append(filepath)
+    win.toolbar.filenames.append(filename)        
+    win.toolbar.f_combobox.addItem(filename)
+    win.toolbar.f_combobox.setCurrentIndex(1)
 
+def launch_gui(xspecio=False, toggle_frames=False, fitsfile=''):
+    """Launch the zgui GUI application.
+    
+    Args:
+        xspecio (bool): Whether to use XSpectrum1D for IO
+        toggle_frames (bool): Enable frame toggling
+        fitsfile (str): Optional FITS file to load on startup
+    """
+    app = QApplication(sys.argv[:1])
+    
+    # Report IO mode
+    if xspecio:
+        print('Enable XSpectrum1D IO') 
+    else:
+        print('Enable Default IO')
+        
+    # Report toggling mode
+    if toggle_frames:
+        print('Frame toggling enabled')
+    else:
+        print('Frame toggling disabled')
+
+    # Create main window
+    window = MainWindow(xspecio=xspecio, toggle_frames=toggle_frames)
+    window.setAttribute(Qt.WA_DeleteOnClose)
+
+    # Load file if provided
+    if fitsfile:
+        if fitsfile.endswith('fits'):
+            filepath = os.path.abspath(fitsfile)
+            if os.path.exists(filepath):
+                print(f'Reading: {filepath}')
+                read_file_from_commandline(filepath, win=window)
+            else:
+                print('File does not exist.')
+                return
+        else:
+            print('GUI can only read FITS files.')
+            return
+
+    # Show window and start event loop
+    window.show()
+    app.setStyleSheet(qss)
+    app.exec_()
+    app.quit()
 
 if __name__ == '__main__':
-	parser = argparse.ArgumentParser(description='GUI default IO Initialization',
-									add_help=True)
-	# add mutual exclusive arguments to allow users to intialize one IO at a time
-	group = parser.add_mutually_exclusive_group()
-	group.add_argument('-d', '--default', action='store_true', required=False, default=True,
-		help='Read fits files using default gui_io IO class')
-	group.add_argument('-x', '--xspec', action='store_true', required=False, default=False,
-		help='Read fits files using XSpectrum1D class from linetools')
-	parser.add_argument('-f', '--fitsfile', type=str, action='store', required=False, default='',
-		help='Feed one FITS file to the internal GUI database')
+    parser = argparse.ArgumentParser(description='GUI default IO Initialization',
+                                  add_help=True)
+    # add mutual exclusive arguments to allow users to intialize one IO at a time
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('-d', '--default', action='store_true', required=False, default=True,
+        help='Read fits files using default gui_io IO class')
+    group.add_argument('-x', '--xspec', action='store_true', required=False, default=False,
+        help='Read fits files using XSpectrum1D class from linetools')
+    parser.add_argument('-f', '--fitsfile', type=str, action='store', required=False, default='',
+        help='Feed one FITS file to the internal GUI database')
+    parser.add_argument('-tf', '--toggleframes', action='store_true', required=False, default=False,
+        help='Enable toggling different frames within the same file')
+    args = parser.parse_args()
 
-	parser.add_argument('-tf', '--toggleframes', action='store_true', required=False, default=False,
-		help='Enable toggling different frames within the same file')
-	args = parser.parse_args()
-
-	app = QApplication(sys.argv[:1])
-
-	# Select IO class
-	if args.xspec:
-		print('Enable XSpectrum1D IO')
-		xspecio = True	
-	else:
-		print('Enable Default IO')
-		xspecio = False
-
-	# Enable toggling feature
-	if args.toggleframes:
-		print('Frame toggling enabled')
-		toggle_frames = True
-	else:
-		print('Frame toggling disabled')
-		toggle_frames = False
-
-	window = MainWindow(xspecio=xspecio, toggle_frames=toggle_frames)
-	window.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-
-	# Check if filename provided
-	if len(args.fitsfile) > 0:
-		if args.fitsfile.endswith('fits'):
-			filepath = os.path.abspath(args.fitsfile)
-			file_exists = os.path.exists(filepath)
-			if file_exists:
-				print(f'Reading: {filepath}')
-				read_file_from_commandline(filepath, win=window)
-
-			else:
-				print('Your file does not exists.')
-				exit()
-		else:
-			print('GUI can only read FITS files.')
-			exit()
-
-	window.show()
-	app.setStyleSheet(qss)
-	app.exec_()
-	app.quit()	
+    launch_gui(
+        xspecio=args.xspec,
+        toggle_frames=args.toggleframes, 
+        fitsfile=args.fitsfile
+    )

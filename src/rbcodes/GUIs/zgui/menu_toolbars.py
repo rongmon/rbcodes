@@ -10,14 +10,12 @@ from PyQt5.QtCore import Qt, QSize, QUrl, pyqtSignal
 from PyQt5.QtWidgets import QAction, QToolBar, QStatusBar, QMenuBar, QFileDialog, QComboBox, QLineEdit, QLabel, QPushButton, QCheckBox
 from PyQt5.QtGui import QKeySequence, QDesktopServices
 
-from user_manual import UserManualDialog
-
-from utils import FitsObj, Fits_2dAux
-from spec_advanced2d import ShowAdvanced, ZGuessPosterior
+from .user_manual import UserManualDialog
+from .utils import FitsObj, Fits_2dAux
+from .spec_advanced2d import ShowAdvanced, ZGuessPosterior
 
 WORKING_DIR = os.path.abspath(os.getcwd()) + './example-data'
-# This is not used anymore
-#LINELIST_DIR = os.path.dirname(os.path.abspath(__file__)) + '/lines'
+LINELIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lines')
 
 class Custom_ToolBar(QToolBar):
 	send_fitsobj = pyqtSignal(object)
@@ -444,7 +442,7 @@ class Custom_ToolBar(QToolBar):
 			if self.mW.xspecio:
 				# enable XSpectrum1D io
 				#print('xspec io mode')
-				from gui_io_xspec import LoadXSpec
+				from .gui_io_xspec import LoadXSpec
 				self.loadspec = LoadXSpec(self.filepaths[i-1])
 				if len(self.loadspec.warning) > 0:
 					# even XSpectrum1D cant read this file
@@ -463,7 +461,7 @@ class Custom_ToolBar(QToolBar):
 			else:
 				# enable standalone IO class
 				#print('default io mode')
-				from gui_io import LoadSpec
+				from .gui_io import LoadSpec
 				fnlist = self.filepaths[i-1].split('_')
 				# searching for corresponding 2D for advanced display
 				if '1D' in fnlist[-2]:
@@ -552,7 +550,7 @@ class Custom_ToolBar(QToolBar):
 
 				# toggle_frames only available for default io
 				if self.mW.toggle_frames:
-					from gui_frame_io import ToggleFrames
+					from .gui_frame_io import ToggleFrames
 					toggle_f = ToggleFrames(self.filepaths[i-1])
 					self.frames, self.frames_err, self.frames1d = toggle_f._check_available_frames()
 
