@@ -41,30 +41,37 @@ class ContinuumPanel(QWidget):
         instructions.setWordWrap(True)
         main_layout.addWidget(instructions)
         
-        # Launch button
+        # Launch button group
         launch_group = QGroupBox("Continuum Options")
         launch_layout = QVBoxLayout()
-        
+
         # Add option to skip continuum normalization
-        self.skip_continuum = QCheckBox("Skip continuum fitting (use flat continuum)")
+        self.skip_continuum = QCheckBox("Skip continuum fitting")
         self.skip_continuum.setChecked(False)
         self.skip_continuum.toggled.connect(self.toggle_skip_continuum)
         self.skip_continuum.setToolTip("Skip continuum fitting and use a flat continuum instead")
 
         launch_layout.addWidget(self.skip_continuum)
-        
+
         # Launch interactive fitter button
         self.launch_btn = QPushButton("Launch Interactive Continuum Fitter")
         self.launch_btn.clicked.connect(self.launch_fitter)
         self.launch_btn.setToolTip("Open the interactive tool to fit a continuum to the spectrum")
+        launch_layout.addWidget(self.launch_btn)
 
-        #launch_layout.addWidget(self.launch_btn)
-        
         # Apply flat continuum button
         self.flat_btn = QPushButton("Apply Flat Continuum")
         self.flat_btn.clicked.connect(self.apply_flat_continuum)
         self.flat_btn.setEnabled(False)  # Initially disabled
         self.flat_btn.setToolTip("Use a flat line at value 1.0 as the continuum (skips fitting)")
+        launch_layout.addWidget(self.flat_btn)
+
+        # Apply current continuum button
+        self.current_btn = QPushButton("Apply Current Continuum")
+        self.current_btn.clicked.connect(self.apply_current_continuum)
+        self.current_btn.setEnabled(False)  # Initially disabled
+        self.current_btn.setToolTip("Apply the existing fitted continuum (if available)")
+        launch_layout.addWidget(self.current_btn)
 
         #launch_layout.addWidget(self.flat_btn)
         
@@ -73,10 +80,14 @@ class ContinuumPanel(QWidget):
         buttons_layout.addSpacing(10)  # Add some space between buttons
         buttons_layout.addWidget(self.flat_btn)
         buttons_layout.addStretch()  # Push buttons to the left, or remove for center
-        
+        buttons_layout.addSpacing(10)  # Add some space between buttons
+        buttons_layout.addWidget(self.current_btn)
+        buttons_layout.addStretch()  # Push buttons to the left, or remove for center
+
         launch_layout.addLayout(buttons_layout)
         self.launch_btn.setMaximumWidth(320)
         self.flat_btn.setMaximumWidth(320)
+        self.current_btn.setMaximumWidth(320)
 
         # Status label
         self.status_label = QLabel("No continuum fitted yet")
@@ -183,6 +194,7 @@ class ContinuumPanel(QWidget):
         """Toggle between interactive fitter and flat continuum."""
         self.launch_btn.setEnabled(not checked)
         self.flat_btn.setEnabled(checked)
+        self.current_btn.setEnabled(checked)
 
     def apply_flat_continuum(self):
         """Apply a flat continuum (equal to 1 everywhere)."""
@@ -205,3 +217,25 @@ class ContinuumPanel(QWidget):
             print(f"Error applying flat continuum: {str(e)}")
             QMessageBox.warning(self, "Error", f"Failed to apply flat continuum: {str(e)}")
             self.continuum_fitted.emit(False)    
+
+    def apply_current_continuum(self):
+        """Apply the currently stored continuum (no re-fitting)."""
+        if not self.controller.has_spectrum():
+            QMessageBox.warning(self, "Error", "No spectrum loaded or not sliced.")
+            return
+
+        try:
+            success = self.controller.apply_current_continuum()
+
+            if success:
+                self.status_label.setText("Applied existing continuum to normalize spectrum")
+                self.update_plot()
+                self.continuum_fitted.emit(True)
+            else:
+                self.status_label.setText("Failed to apply existing continuum")
+                self.continuum_fitted.emit(False)
+
+        except Exception as e:
+            print(f"Error applying current continuum: {str(e)}")
+            QMessageBox.warning(self, "Error", f"Failed to apply existing continuum: {str(e)}")
+            self.continuum_fitted.emit(False)
