@@ -421,6 +421,42 @@ class SpectrumController(QObject):
         except Exception as e:
             print(f"Error applying flat continuum: {str(e)}")
             return False
+        
+    def apply_current_continuum(self):
+        """Normalize flux/error by the *existing* continuum in self.spec.cont."""
+        if not self.has_spectrum() or not hasattr(self.spec, 'velo'):
+            return False
+
+        # Need an existing continuum to apply
+        if not hasattr(self.spec, 'cont') or self.spec.cont is None:
+            print("No existing continuum to apply.")
+            return False
+
+        try:
+            cont = self.spec.cont
+
+            # Shape/slice sanity check
+            if cont.shape != self.spec.flux_slice.shape:
+                # If you store a *full* continuum for the whole spectrum,
+                # you may need to slice it here to the current window:
+                #   cont = cont[self.current_slice]
+                # For now, fail fast so you can wire up slicing explicitly.
+                print("Continuum shape does not match flux_slice shape.")
+                return False
+
+            # Avoid divide-by-zero/NaNs/infs
+            safe = np.where(np.isfinite(cont) & (cont != 0.0), cont, 1.0)
+
+            # Apply normalization using the current continuum
+            self.spec.fnorm = self.spec.flux_slice / safe
+            self.spec.enorm = self.spec.error_slice / safe
+
+            self.spectrum_changed.emit()
+            return True
+
+        except Exception as e:
+            print(f"Error applying current continuum: {str(e)}")
+            return False
 
     def export_measurement_plot(self, filepath):
         """Export the equivalent width measurement plot directly from compute_EW."""
