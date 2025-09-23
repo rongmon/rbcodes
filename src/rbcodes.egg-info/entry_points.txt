@@ -1,0 +1,5 @@
+[console_scripts]
+launch_specgui = rbcodes.GUIs.launch_specgui:launch
+rb_llsfitter = rbcodes.GUIs.LLSFitter_GUI:main
+rb_multispec = rbcodes.GUIs.multispecviewer.rb_multispec:main
+rb_zgui = rbcodes.GUIs.zgui.main:launch_gui
