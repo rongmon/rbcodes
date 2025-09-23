@@ -31,11 +31,11 @@ This package is constantly under development and will be periodically updated.
 ## Installation
 
 ```bash
-# Create the environment with Python 3.9.6
-conda create -n myenv python=3.9.6
+# Recommended: Python 3.10 (also supports 3.9.6)
+conda create -n rbcodes-env python=3.10
 
 # Activate the environment
-conda activate myenv
+conda activate rbcodes-env
 
 # Install dependencies (use conda to ensure compatibility)
 conda install -c conda-forge --file requirements_simple.txt
@@ -44,6 +44,7 @@ conda install -c conda-forge --file requirements_simple.txt
 cd /path/to/rbcodes
 pip install -e .
 ```
+
 
 ### Dependencies
 - Core Dependencies (automatically installed):
