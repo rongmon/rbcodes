@@ -53,41 +53,38 @@ class ContinuumPanel(QWidget):
 
         launch_layout.addWidget(self.skip_continuum)
 
-        # Launch interactive fitter button
-        self.launch_btn = QPushButton("Launch Interactive Continuum Fitter")
+        # Create buttons
+        self.launch_btn = QPushButton("Launch Continuum Fitter")
         self.launch_btn.clicked.connect(self.launch_fitter)
         self.launch_btn.setToolTip("Open the interactive tool to fit a continuum to the spectrum")
-        launch_layout.addWidget(self.launch_btn)
 
-        # Apply flat continuum button
-        self.flat_btn = QPushButton("Apply Flat Continuum")
+        self.flat_btn = QPushButton("Apply Flat Continuum") 
         self.flat_btn.clicked.connect(self.apply_flat_continuum)
         self.flat_btn.setEnabled(False)  # Initially disabled
         self.flat_btn.setToolTip("Use a flat line at value 1.0 as the continuum (skips fitting)")
-        launch_layout.addWidget(self.flat_btn)
 
-        # Apply current continuum button
         self.current_btn = QPushButton("Apply Current Continuum")
         self.current_btn.clicked.connect(self.apply_current_continuum)
         self.current_btn.setEnabled(False)  # Initially disabled
         self.current_btn.setToolTip("Apply the existing fitted continuum (if available)")
-        launch_layout.addWidget(self.current_btn)
 
-        #launch_layout.addWidget(self.flat_btn)
-        
+        # Create horizontal button layout with equal spacing
         buttons_layout = QHBoxLayout()
+        buttons_layout.addStretch()  # Center the buttons
         buttons_layout.addWidget(self.launch_btn)
-        buttons_layout.addSpacing(10)  # Add some space between buttons
+        buttons_layout.addSpacing(20)  # Consistent spacing between buttons
         buttons_layout.addWidget(self.flat_btn)
-        buttons_layout.addStretch()  # Push buttons to the left, or remove for center
-        buttons_layout.addSpacing(10)  # Add some space between buttons
+        buttons_layout.addSpacing(20)  # Consistent spacing between buttons
         buttons_layout.addWidget(self.current_btn)
-        buttons_layout.addStretch()  # Push buttons to the left, or remove for center
+        buttons_layout.addStretch()  # Center the buttons
+
+        # Set equal width for all buttons
+        button_width = 200  # Pixels
+        self.launch_btn.setFixedWidth(button_width)
+        self.flat_btn.setFixedWidth(button_width)
+        self.current_btn.setFixedWidth(button_width)
 
         launch_layout.addLayout(buttons_layout)
-        self.launch_btn.setMaximumWidth(320)
-        self.flat_btn.setMaximumWidth(320)
-        self.current_btn.setMaximumWidth(320)
 
         # Status label
         self.status_label = QLabel("No continuum fitted yet")
