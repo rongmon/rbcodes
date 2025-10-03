@@ -4,7 +4,7 @@ import copy
 from astropy.io import fits
 import numpy as np
 
-from utils import FitsObj, Fits_2dAux
+from rbcodes.GUIs.zgui.utils import FitsObj, Fits_2dAux
 # use test.fits from rbcodes/example-data as testing example
 '''
 file = fits.open('test.fits')
