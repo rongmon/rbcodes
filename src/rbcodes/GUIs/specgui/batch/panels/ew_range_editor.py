@@ -62,13 +62,13 @@ def edit_ew_range_dialog(item, current_spec, controller, parent=None):
     
     # Velocity min/max inputs
     ew_vmin_spin = QSpinBox()
-    ew_vmin_spin.setRange(-5000, 0)
+    ew_vmin_spin.setRange(-15000, 15000)
     ew_vmin_spin.setValue(current_ew_vmin)
     ew_vmin_spin.setSingleStep(10)
     ew_vmin_spin.setSuffix(" km/s")
     
     ew_vmax_spin = QSpinBox()
-    ew_vmax_spin.setRange(0, 5000)
+    ew_vmax_spin.setRange(-15000, 15000)
     ew_vmax_spin.setValue(current_ew_vmax)
     ew_vmax_spin.setSingleStep(10)
     ew_vmax_spin.setSuffix(" km/s")

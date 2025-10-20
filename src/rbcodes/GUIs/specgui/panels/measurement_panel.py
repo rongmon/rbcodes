@@ -68,12 +68,12 @@ class MeasurementPanel(QWidget):
         velocity_layout = QHBoxLayout()
         
         self.vmin_spinbox = QSpinBox()
-        self.vmin_spinbox.setRange(-10000, 10000)
+        self.vmin_spinbox.setRange(-15000, 15000)
         self.vmin_spinbox.setValue(-200)
         self.vmin_spinbox.setSingleStep(10)
         
         self.vmax_spinbox = QSpinBox()
-        self.vmax_spinbox.setRange(-10000, 10000)
+        self.vmax_spinbox.setRange(-15000, 15000)
         self.vmax_spinbox.setValue(200)
         self.vmax_spinbox.setSingleStep(10)
         

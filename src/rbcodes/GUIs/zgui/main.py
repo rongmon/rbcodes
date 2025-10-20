@@ -8,12 +8,12 @@ from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QKeySequence, QDesktopServices
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
-from .menu_toolbars import Custom_ToolBar, Custom_MenuBar
-from .spec_plot import MplCanvas
-from .linelist_selection import LineListWidget
-from .tableview_pandas import CustomZTable
-from .message_box import MessageBox
-from .utils import FitsObj
+from rbcodes.GUIs.zgui.menu_toolbars import Custom_ToolBar, Custom_MenuBar
+from rbcodes.GUIs.zgui.spec_plot import MplCanvas
+from rbcodes.GUIs.zgui.linelist_selection import LineListWidget
+from rbcodes.GUIs.zgui.tableview_pandas import CustomZTable
+from rbcodes.GUIs.zgui.message_box import MessageBox
+from rbcodes.GUIs.zgui.utils import FitsObj
 
 class MainWindow(QMainWindow):
 	'''Simplified main window with proper positioning'''
@@ -291,23 +291,39 @@ def launch_gui(xspecio=False, toggle_frames=False, fitsfile=''):
     app.exec_()
     app.quit()
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='GUI default IO Initialization',
-                                  add_help=True)
+def main():
+    """Entry point for the zgui command line interface"""
+    parser = argparse.ArgumentParser(
+        description='ZGUI: A GUI tool for analyzing spectroscopic data and estimating redshifts',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+Examples:
+---------
+rb_zgui                     # Launch with default IO
+rb_zgui -tf                 # Launch with frame toggling enabled
+rb_zgui -x                  # Launch with XSpectrum1D IO
+rb_zgui -f spectrum.fits    # Launch and load specific FITS file
+
+For more information see: https://github.com/rongmon/rbcodes
+''')
+
     # add mutual exclusive arguments to allow users to intialize one IO at a time
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-d', '--default', action='store_true', required=False, default=True,
-        help='Read fits files using default gui_io IO class')
+        help='Read FITS files using default gui_io IO class')
     group.add_argument('-x', '--xspec', action='store_true', required=False, default=False,
-        help='Read fits files using XSpectrum1D class from linetools')
+        help='Read FITS files using XSpectrum1D class from linetools')
     parser.add_argument('-f', '--fitsfile', type=str, action='store', required=False, default='',
-        help='Feed one FITS file to the internal GUI database')
+        help='Feed one FITS file to the internal GUI database at startup')
     parser.add_argument('-tf', '--toggleframes', action='store_true', required=False, default=False,
-        help='Enable toggling different frames within the same file')
+        help='Enable toggling between different frames (SCI, EMLINE, etc.) within FITS files')
     args = parser.parse_args()
 
     launch_gui(
         xspecio=args.xspec,
-        toggle_frames=args.toggleframes, 
+        toggle_frames=args.toggleframes,
         fitsfile=args.fitsfile
     )
+
+if __name__ == '__main__':
+    main()

@@ -310,7 +310,7 @@ class ReviewPanel(QWidget):
         
         filter_layout.addWidget(QLabel("vmin"))
         self.ew_vmin_spin = QSpinBox()
-        self.ew_vmin_spin.setRange(-2000, 0)
+        self.ew_vmin_spin.setRange(-15000, 150000)
         self.ew_vmin_spin.setValue(-200)
         self.ew_vmin_spin.setSuffix(" km/s")
         self.ew_vmin_spin.setMaximumWidth(70)
@@ -318,7 +318,7 @@ class ReviewPanel(QWidget):
         
         filter_layout.addWidget(QLabel("vmax"))
         self.ew_vmax_spin = QSpinBox()
-        self.ew_vmax_spin.setRange(0, 2000)
+        self.ew_vmax_spin.setRange(-15000, 150000)
         self.ew_vmax_spin.setValue(200)
         self.ew_vmax_spin.setSuffix(" km/s")
         self.ew_vmax_spin.setMaximumWidth(70)
