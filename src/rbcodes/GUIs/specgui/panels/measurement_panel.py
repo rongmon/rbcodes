@@ -240,22 +240,34 @@ class MeasurementPanel(QWidget):
         velocity = event.xdata
         
         # Determine whether to set vmin or vmax based on which is closer
-        current_vmin = self.vmin_spinbox.value()
-        current_vmax = self.vmax_spinbox.value()
+        vmin = self.vmin_spinbox.value()
+        vmax = self.vmax_spinbox.value()
         
-        # If velocity is outside current range, set the closest endpoint
-        if velocity < current_vmin:
-            self.vmin_spinbox.setValue(int(velocity))
-        elif velocity > current_vmax:
-            self.vmax_spinbox.setValue(int(velocity))
+        # Case 1: Click clearly outside current range
+        if velocity <= vmin:
+            vmin = int(velocity)
+        elif velocity >= vmax:
+            vmax = int(velocity)
         else:
-            # If inside current range, set whichever endpoint is closer
-            if abs(velocity - current_vmin) < abs(velocity - current_vmax):
-                self.vmin_spinbox.setValue(int(velocity))
+            # Case 2: Inside range → adjust whichever side is closer
+            if abs(velocity - vmin) < abs(velocity - vmax):
+                vmin = int(velocity)
             else:
-                self.vmax_spinbox.setValue(int(velocity))
+                vmax = int(velocity)
         
-        # Update the plot
+        # Ensure ordering (vmin < vmax)
+        if vmin > vmax:
+            vmin, vmax = vmax, vmin
+        
+        # Update spinboxes
+        self.vmin_spinbox.blockSignals(True)
+        self.vmax_spinbox.blockSignals(True)
+        self.vmin_spinbox.setValue(vmin)
+        self.vmax_spinbox.setValue(vmax)
+        self.vmin_spinbox.blockSignals(False)
+        self.vmax_spinbox.blockSignals(False)
+        
+        # Redraw plot with new limits
         self.update_plot()
 
     def on_plot_key_press(self, event):

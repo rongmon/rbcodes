@@ -28,7 +28,7 @@ from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QTimer
 
 # Version information
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __author__ = "Rongmon Bordoloi"
 __description__ = "rb_spec GUI - Absorption Line Analysis Tool"
 

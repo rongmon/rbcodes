@@ -516,25 +516,40 @@ class ReviewPanel(QWidget):
         velocity = int(event.xdata)
         
         # Get current values
-        current_vmin = self.ew_vmin_spin.value()
-        current_vmax = self.ew_vmax_spin.value()
+        vmin = self.ew_vmin_spin.value()
+        vmax = self.ew_vmax_spin.value()
         
-        # Determine which boundary to set based on proximity
-        if velocity < current_vmin:
-            self.ew_vmin_spin.setValue(velocity)
-        elif velocity > current_vmax:
-            self.ew_vmax_spin.setValue(velocity)
+        # Case 1: Click outside current range → set nearest bound
+        if velocity <= vmin:
+            vmin = velocity
+        elif velocity >= vmax:
+            vmax = velocity
         else:
-            # Inside current range - set closest boundary
-            if abs(velocity - current_vmin) < abs(velocity - current_vmax):
-                self.ew_vmin_spin.setValue(velocity)
+            # Case 2: Inside range → adjust whichever side is closer
+            if abs(velocity - vmin) < abs(velocity - vmax):
+                vmin = velocity
             else:
-                self.ew_vmax_spin.setValue(velocity)
+                vmax = velocity
+        
+        # Ensure ordering (vmin < vmax)
+        if vmin > vmax:
+            vmin, vmax = vmax, vmin
+        
+        # Block signals during updates to avoid redundant redraws
+        self.ew_vmin_spin.blockSignals(True)
+        self.ew_vmax_spin.blockSignals(True)
+        self.ew_vmin_spin.setValue(vmin)
+        self.ew_vmax_spin.setValue(vmax)
+        self.ew_vmin_spin.blockSignals(False)
+        self.ew_vmax_spin.blockSignals(False)
         
         # Optimized redraw - only update EW region visualization
         self.update_ew_region_overlay()
         
-        self.controller.status_updated.emit(f"EW boundary set to {velocity} km/s. Click Update to apply changes.")
+        # Feedback
+        self.controller.status_updated.emit(
+            f"EW boundaries set to {vmin}–{vmax} km/s (clicked {velocity}). Click Update to apply changes."
+        )
     
     def update_ew_region_overlay(self):
         """Optimized update of just the EW region visualization."""

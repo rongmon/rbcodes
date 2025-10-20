@@ -1,5 +1,11 @@
 # Changelog - rb_spec GUI
 
+## [1.0.1] - 2025-10-20
+### Changed
+   - Bug fix: interactive equivalent width range correctly applied.
+
+
+
 ## [1.0.0] - 2025-05-28
 
 ### Added
