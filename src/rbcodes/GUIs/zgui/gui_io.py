@@ -36,6 +36,10 @@ class LoadSpec():
 		fitsfile = fits.open(self.filepath)
 		labels = [label.name for label in fitsfile]
 
+		# Detect frame sources from FITS headers
+		detected_frames = self._detect_frame_sources()
+		self.fitsobj.frame_sources = detected_frames
+
 		# ------------ FORMAT 1 --------------
 		# check if filename has keywords ymin/ymax for 2D fits
 		if 'ymin' in fitsfile.filename():
@@ -321,6 +325,50 @@ class LoadSpec():
 		fitsfile_copy = copy.deepcopy(fitsfile)
 		fitsfile.close()
 		return fitsfile_copy
+
+	# Extract frame sources (EMLINE* frames) from FITS headers
+	def _detect_frame_sources(self):
+		"""Detect available frame sources from FITS file headers.
+
+		Returns:
+			list: Uppercase frame names found in FITS file (e.g., ['EMLINEA', 'EMLINEB'])
+		"""
+		detected_frames = set()
+		try:
+			fitsfile = fits.open(self.filepath)
+
+			# First priority: Check HDU names for EMLINE* frames (most reliable)
+			# HDU names like EMLINEA, EMLINEB, EMLINEC are the frame sources
+			labels = [label.name.upper() for label in fitsfile]
+			for label in labels:
+				# Match EMLINE followed by single letter (A, B, C, etc.)
+				if label.startswith('EMLINE') and len(label) == 7:
+					# This is EMLINEA, EMLINEB, etc.
+					detected_frames.add(label)
+
+			# Second priority: Check HDU headers for EMLINE* keywords
+			# Only extract if we haven't found frames via HDU names
+			if not detected_frames:
+				for hdu in fitsfile:
+					if hdu.header is not None:
+						# Look for keywords that start with EMLINE followed by letter(s)
+						for key in hdu.header:
+							key_upper = key.upper()
+							if key_upper.startswith('EMLINE') and len(key_upper) > 6:
+								# Extract the frame designation (e.g., EMLINEA from EMLINEA_XYZ)
+								# Get characters after EMLINE until underscore or end
+								remainder = key_upper[6:]  # Skip 'EMLINE'
+								if remainder[0].isalpha():  # Next char must be letter
+									frame_base = 'EMLINE' + remainder[0]
+									if frame_base not in ['EMLINE']:  # Skip invalid
+										detected_frames.add(frame_base)
+
+			fitsfile.close()
+		except Exception as e:
+			print(f"Warning: Could not detect frame sources from FITS header: {e}")
+
+		# Return sorted list of uppercase frame names
+		return sorted(list(detected_frames))
 
 	# Extract addtional information from FITS file if available
 	# Addtional infomation includes

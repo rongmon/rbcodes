@@ -41,14 +41,17 @@ class LineListWidget(QWidget):
 	send_linelists2multiG = pyqtSignal(list)
 
 	# initialization - widget layout
-	def __init__(self):
+	def __init__(self, canvas=None):
 		super().__init__()
 
 		#internal values
+		self.canvas = canvas  # Reference to MplCanvas to read current_frame
 		self.linelist = []
 		self.filename = ''
 		self.filenames = []
 		self.newz = []
+		self.fitsobj = None  # Store FitsObj for frame source information
+		self.frame_sources = []  # Available frame sources from FITS file
 
 		# Main(Grand) widget layout
 		glayout = QVBoxLayout()
@@ -222,7 +225,10 @@ class LineListWidget(QWidget):
 	# Display all available ions in a selected linelist
 	def _linelist_changed(self, s):
 		if s in 'NONE':
-			self.send_linelist.emit(s)
+			# Send empty DataFrame instead of string to avoid type mismatch
+			empty_df = pd.DataFrame(columns=['wave', 'name'])
+			self.linelist = empty_df
+			self.send_linelist.emit(empty_df)
 			self.l_combobox.clear()
 			self.l_combobox.addItem('NONE')
 			self.l_combobox.setCurrentIndex(0)
@@ -263,6 +269,8 @@ class LineListWidget(QWidget):
 	# importing signal(FitsObj) to slot
 	def _on_sent_fitsobj(self, sent_fitsobj):
 		self.fitsobj = sent_fitsobj
+		# Extract frame sources from FitsObj
+		self.frame_sources = sent_fitsobj.frame_sources if hasattr(sent_fitsobj, 'frame_sources') else []
 		'''
 		if self.fitsobj.z_est is not None:
 			# change estZ from z_guess to z_est
@@ -287,13 +295,30 @@ class LineListWidget(QWidget):
 		if len(self.flag.text().strip()) < 1:
 			self.flag.setText('No comments')
 
+		# Determine z_source based on gauss_num
+		gauss_num = int(self.gauss_num.currentText())
+		if gauss_num == 0:
+			z_source = 'Manual'
+		elif gauss_num == 1:
+			z_source = 'Gaussian'
+		else:
+			z_source = 'Multi-Gaussian'
+
+		# Determine frame_source: read current frame from canvas if available, otherwise use first available frame
+		if self.canvas and hasattr(self.canvas, 'current_frame'):
+			frame_source = self.canvas.current_frame
+		else:
+			frame_source = self.frame_sources[0] if self.frame_sources else 'DEFAULT'
+
 		# prepare exporting data
 		data = {'Name': self.filename,
 				'z': self.newz[0], #float(self.estZ.text()),
 				'z_err': self.newz[1], #float(self.estZstd.text()),
 				'Confidence': float(self.conf.text()),
 				'Linelist': self.l_lln.currentText(),
-				'Flag': self.flag.text()}
+				'Flag': self.flag.text(),
+				'z_source': z_source,
+				'frame_source': frame_source}
 		# add coordiantes if they are available
 		if self.fitsobj.ra is not None:
 			data.update({'RA': self.fitsobj.ra,

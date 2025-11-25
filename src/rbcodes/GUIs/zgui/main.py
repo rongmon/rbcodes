@@ -62,7 +62,7 @@ class MainWindow(QMainWindow):
 		main_layout.addWidget(self.sc)
 		
 		# Line selection widget
-		widget_z = LineListWidget()
+		widget_z = LineListWidget(canvas=self.sc)
 		main_layout.addWidget(widget_z)
 		
 		# Bottom section with table and message box
@@ -89,6 +89,8 @@ class MainWindow(QMainWindow):
 		self.toolbar.send_filename.connect(self.table_z._move_current_filename_top)
 		self.toolbar.send_filename.connect(self.sc._update_lines_for_newfile)
 		self.toolbar.send_fitsobj.connect(self.on_fitsobj_slot)
+		self.toolbar.send_fitsobj.connect(self.sc._on_sent_fitsobj)
+		self.toolbar.send_frame.connect(self.sc._on_frame_selected)
 		self.toolbar.send_message.connect(lambda s,c='#ff0000': self.mbox.on_sent_message(s, c))
 		
 		# Widget_z signals

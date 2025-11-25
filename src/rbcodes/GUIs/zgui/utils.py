@@ -7,9 +7,9 @@ import sys
 class FitsObj():
 	'''Main object to save and traverse data between widgets
 	'''
-	def __init__(self, wave=None, flux=None, error=None, 
+	def __init__(self, wave=None, flux=None, error=None,
 				ra=None, dec=None, z_est=None, z_guess=None,
-				flag=None, flux2d=None, error2d=None):
+				flag=None, flux2d=None, error2d=None, frame_sources=None):
 		# 1D wavelength array
 		self.wave = wave
 		# 1D spectrum
@@ -32,6 +32,9 @@ class FitsObj():
 		self.flux2d = flux2d
 		# 2D error spectrum in SCI frame
 		self.error2d = error2d
+
+		# Detected frame sources from FITS headers (e.g., ['EMLINEA', 'EMLINEB'])
+		self.frame_sources = frame_sources if frame_sources is not None else []
 
 class Fits_2dAux():
 	'''Auxiliary object to save and traverse non-important data

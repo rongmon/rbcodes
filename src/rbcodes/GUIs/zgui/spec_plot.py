@@ -54,6 +54,8 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.stamp = None
 		self.current_extraction = None
 		self.current_filename = None
+		self.frame_sources = []  # Available frame sources from loaded FITS file
+		self.current_frame = 'SCI'  # Currently active frame for measurements
 
 		# custom colormap information
 		self.cur_cmap = 'viridis' # default colormap
@@ -407,8 +409,8 @@ class MplCanvas(FigureCanvasQTAgg):
 		
 		# plot starting...
 		# 1d spec plot... (keep same varname as axes in plot_spec)
-		self.axes.plot(wave, self.error, color='red')
-		self.axes.plot(wave, self.flux, color='black')
+		self.error_line, = self.axes.plot(wave, self.error, color='red')
+		self.flux_line, = self.axes.plot(wave, self.flux, color='black')
 		self.axes.set_xlabel('Wavelength (Angstrom)')
 		self.axes.set_ylabel('Flux')
 		#xlim_spec1d = self.axes.get_xlim()
@@ -517,31 +519,45 @@ class MplCanvas(FigureCanvasQTAgg):
 			scaled2d = tmp*(normalization[1] - normalization[0]) + normalization[0]
 			
 		if scale == 1:
-			pos_ax2d = self.ax2d.imshow(img, origin='lower', 
-									vmin=scaled2d.min(), vmax=scaled2d.max() * 1.,
-									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
-									cmap=self.cur_cmap)
+			# Log transformation - respect fixed colorbar scale if enabled
+			if fixed_colorbar_scale and fixed_vmin is not None and fixed_vmax is not None:
+				pos_ax2d = self.ax2d.imshow(img, origin='lower',
+										vmin=fixed_vmin, vmax=fixed_vmax,
+										extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
+										cmap=self.cur_cmap)
+			else:
+				pos_ax2d = self.ax2d.imshow(img, origin='lower',
+										vmin=scaled2d.min(), vmax=scaled2d.max() * 1.,
+										extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
+										cmap=self.cur_cmap)
 		elif normalization == 10:
-			# magnification power after zscore centering
-			mag_power = scaled2d.std() / img.std()
-			# 1-sigma range after zscore centering
-			z_vmin = scaled2d.mean() - scaled2d.std()
-			z_vmax = scaled2d.mean() + scaled2d.std()
-			pos_ax2d = self.ax2d.imshow(img, origin='lower', vmin=z_vmin/mag_power, vmax=z_vmax/mag_power,
-									extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
-									cmap=self.cur_cmap)
+			# Z-score normalization - respect fixed colorbar scale if enabled
+			if fixed_colorbar_scale and fixed_vmin is not None and fixed_vmax is not None:
+				pos_ax2d = self.ax2d.imshow(img, origin='lower',
+										vmin=fixed_vmin, vmax=fixed_vmax,
+										extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
+										cmap=self.cur_cmap)
+			else:
+				# magnification power after zscore centering
+				mag_power = scaled2d.std() / img.std()
+				# 1-sigma range after zscore centering
+				z_vmin = scaled2d.mean() - scaled2d.std()
+				z_vmax = scaled2d.mean() + scaled2d.std()
+				pos_ax2d = self.ax2d.imshow(img, origin='lower', vmin=z_vmin/mag_power, vmax=z_vmax/mag_power,
+										extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
+										cmap=self.cur_cmap)
 
 		else:
 			# Use fixed or dynamic colorbar scaling based on checkbox
 			if fixed_colorbar_scale and fixed_vmin is not None and fixed_vmax is not None:
 				# Fixed colorbar scaling using stored values
-				pos_ax2d = self.ax2d.imshow(img, origin='lower', 
+				pos_ax2d = self.ax2d.imshow(img, origin='lower',
 										vmin=fixed_vmin, vmax=fixed_vmax,
 										extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
 										cmap=self.cur_cmap)
 			else:
 				# Dynamic colorbar scaling based on data
-				pos_ax2d = self.ax2d.imshow(img, origin='lower', 
+				pos_ax2d = self.ax2d.imshow(img, origin='lower',
 										vmin=scaled2d.min(), vmax=scaled2d.max() * 1.,
 										extent=(self.wave[0], self.wave[-1], 0, len(self.flux2d)),
 										cmap=self.cur_cmap)
@@ -1064,6 +1080,11 @@ class MplCanvas(FigureCanvasQTAgg):
 		'''
 		if event.button == 3:
 			if event.inaxes == self.axes:
+				# Check if linelist is available and not empty
+				if isinstance(self.linelist, list) or (hasattr(self.linelist, 'empty') and self.linelist.empty):
+					self.send_message.emit('Error: No linelist loaded. Please select a linelist first.')
+					return
+
 				#Manual mode
 				if self.gauss_num == 0:
 					self.send_message.emit('You are in manual mode now.')
@@ -1075,7 +1096,7 @@ class MplCanvas(FigureCanvasQTAgg):
 				#For single Gaussian
 				elif self.gauss_num == 1:
 					self.send_message.emit(f'Currently, we need {self.gauss_num} Gaussian to guess the line position.')
-					
+
 					if self.guess_gcenter:
 						self.guess_ion = GuessTransition(self.linelist, self.guess_gcenter[0], self.guess_gcenter[-1])
 						self.guess_ion.show()
@@ -1153,7 +1174,9 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.estZ = newz[0]
 		self.estZstd = newz[1]
 		self._lines_in_current_range()
-		self.send_z_est.emit([self.estZ, self.estZstd])
+		# Use current frame, or fall back to first available or 'DEFAULT'
+		frame_source = self.current_frame if self.current_frame else 'SCI'
+		self.send_z_est.emit([self.estZ, self.estZstd, frame_source])
 
 	def _on_estZ_return_pressed(self, sent_estZ):
 		self.estZ = sent_estZ
@@ -1161,6 +1184,17 @@ class MplCanvas(FigureCanvasQTAgg):
 
 	def _on_sent_gauss_num(self, sent_gauss_num):
 		self.gauss_num = int(sent_gauss_num)
+
+	def _on_sent_fitsobj(self, sent_fitsobj):
+		"""Receive FitsObj and store available frame sources."""
+		self.frame_sources = sent_fitsobj.frame_sources if hasattr(sent_fitsobj, 'frame_sources') else []
+
+	def _on_frame_selected(self, frame_name):
+		"""Update the currently active frame for measurements.
+
+		Called when user selects a different frame in the toolbar.
+		"""
+		self.current_frame = frame_name
 
 	def _update_lines_for_newfile(self, sent_filename):
 		if len(self.linelist) > 0:

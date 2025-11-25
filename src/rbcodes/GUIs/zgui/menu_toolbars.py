@@ -22,6 +22,7 @@ class Custom_ToolBar(QToolBar):
 	send_filename = pyqtSignal(str)
 	send_filenames = pyqtSignal(list)
 	send_message = pyqtSignal(str)
+	send_frame = pyqtSignal(str)  # Emit frame name when user selects different frame
 
 	#Our personalized custom Toolbar
 	def __init__(self, mainWindow):
@@ -364,6 +365,9 @@ class Custom_ToolBar(QToolBar):
 
 	# frame_combobox event
 	def _select_frames(self, s):
+		# Emit frame selection signal so canvas knows which frame is active
+		self.send_frame.emit(s)
+
 		if self.fitsobj.flux2d is None:
 			# only 1d spec exists
 			pass
@@ -554,10 +558,30 @@ class Custom_ToolBar(QToolBar):
 					toggle_f = ToggleFrames(self.filepaths[i-1])
 					self.frames, self.frames_err, self.frames1d = toggle_f._check_available_frames()
 
+					# Block signals while populating frame combobox to avoid multiple frame selection events
+					self.frame_combobox.blockSignals(True)
 					self.frame_combobox.clear()
-					for frame_name in self.frames.keys():
-						if self.frames[frame_name] is not None:
+					# Add SCI first if it exists (it's the main frame)
+					if 'SCI' in self.frames and self.frames['SCI'] is not None:
+						self.frame_combobox.addItem('SCI')
+
+					# Add all other frames
+					for frame_name in sorted(self.frames.keys()):
+						if frame_name != 'SCI' and self.frames[frame_name] is not None:
 							self.frame_combobox.addItem(str(frame_name))
+
+					# Set SCI as current if it exists, otherwise first frame
+					sci_idx = self.frame_combobox.findText('SCI')
+					if sci_idx >= 0:
+						self.frame_combobox.setCurrentIndex(sci_idx)
+					else:
+						self.frame_combobox.setCurrentIndex(0)
+
+					# Re-enable signals and emit frame selection for current frame
+					self.frame_combobox.blockSignals(False)
+					current_frame = self.frame_combobox.currentText()
+					if current_frame and current_frame != 'NONE':
+						self.send_frame.emit(current_frame)
 
 			# reset scale and normalization comboboxes
 			self.s_combobox.setCurrentIndex(0)
@@ -652,8 +676,37 @@ class Custom_ToolBar(QToolBar):
 			self.max_range.setText(str(sent_limits[1])[:self.num_length])
 
 	def _return_pressed(self):
+		# Validate min and max values
+		min_text = self.min_range.text().strip()
+		max_text = self.max_range.text().strip()
+
+		# Check if values are empty
+		if not min_text or not max_text:
+			self.mW.statusBar().showMessage('Error: Min and Max values cannot be empty', 5000)
+			return
+
+		# Try to convert to float
+		try:
+			min_val = float(min_text)
+			max_val = float(max_text)
+		except ValueError:
+			error_msg = f'Error: Invalid values entered.\n\n'
+			if not self._is_valid_number(min_text):
+				error_msg += f'Min value "{min_text}" is not a valid number.\n'
+			if not self._is_valid_number(max_text):
+				error_msg += f'Max value "{max_text}" is not a valid number.\n'
+			error_msg += '\nPlease enter numeric values (e.g., 0.5, -1.2, 100)'
+
+			# Show error in status bar
+			self.mW.statusBar().showMessage('Invalid input - please enter numeric values', 5000)
+
+			# Show detailed error dialog
+			from PyQt5.QtWidgets import QMessageBox
+			QMessageBox.warning(self, 'Invalid Input', error_msg)
+			return
+
 		# min,max current values
-		manual_range = [float(self.min_range.text()), float(self.max_range.text())]
+		manual_range = [min_val, max_val]
 		# sort and assign min,max values to avoid user errors
 		manual_range.sort()
 		self.min_range.setText(str(manual_range[0])[:self.num_length])
@@ -671,17 +724,25 @@ class Custom_ToolBar(QToolBar):
 		# save manual_range for other frames
 		self.manual_range = manual_range
 
+	def _is_valid_number(self, text):
+		"""Check if text can be converted to a float"""
+		try:
+			float(text)
+			return True
+		except ValueError:
+			return False
+
 	def _colorbar_scale_toggled(self, checked):
 		"""Handle colorbar scale checkbox toggle"""
 		self.fixed_colorbar_scale = checked
-		
+
 		# If checking the box, read values from min/max textboxes
 		if checked:
 			try:
 				# Read values from the existing min_range and max_range textboxes
 				min_text = self.min_range.text().strip()
 				max_text = self.max_range.text().strip()
-				
+
 				if min_text and max_text:
 					self.fixed_vmin = float(min_text)
 					self.fixed_vmax = float(max_text)
@@ -693,6 +754,19 @@ class Custom_ToolBar(QToolBar):
 					print(f"Fixed scale enabled with default values: vmin={self.fixed_vmin}, vmax={self.fixed_vmax}")
 			except ValueError as e:
 				print(f"Error parsing textbox values: {e}. Using defaults.")
+				# Show warning to user
+				from PyQt5.QtWidgets import QMessageBox
+				error_msg = f'Error: Invalid Min/Max values.\n\n'
+				if not self._is_valid_number(min_text):
+					error_msg += f'Min value "{min_text}" is not a valid number.\n'
+				if not self._is_valid_number(max_text):
+					error_msg += f'Max value "{max_text}" is not a valid number.\n'
+				error_msg += '\nPlease enter numeric values or leave empty to use defaults.\n'
+				error_msg += 'Using default values: vmin=-0.02, vmax=0.02'
+
+				self.mW.statusBar().showMessage('Invalid Min/Max values - using defaults', 5000)
+				QMessageBox.warning(self, 'Invalid Values', error_msg)
+
 				self.fixed_vmin = -0.02
 				self.fixed_vmax = 0.02
 		else:
