@@ -1,5 +1,13 @@
 # Changelog - rb_spec GUI
 
+## [1.0.2] - 2025-11-25
+### Added
+- **Batch Mode - Use Existing Continuum**: New feature to use continuum data embedded in spectrum files
+  - Added "Use Existing Continuum" option to Processing panel continuum method dropdown
+  - Added "Use Existing Continuum" button in Review panel for per-item application
+  - Graceful fallback to flat continuum if no embedded continuum is found
+  - Seamless integration with existing batch processing workflow
+
 ## [1.0.1] - 2025-10-20
 ### Changed
    - Bug fix: interactive equivalent width range correctly applied.

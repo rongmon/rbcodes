@@ -276,6 +276,13 @@ class ReviewPanel(QWidget):
         self.edit_continuum_btn.clicked.connect(self.edit_continuum)
         self.edit_continuum_btn.setEnabled(False)
         button_layout.addWidget(self.edit_continuum_btn)
+
+        # Use Existing Continuum button
+        self.use_existing_cont_btn = QPushButton("Use Existing Continuum")
+        self.use_existing_cont_btn.clicked.connect(self.apply_existing_continuum)
+        self.use_existing_cont_btn.setEnabled(False)
+        self.use_existing_cont_btn.setToolTip("Use the continuum embedded in the spectrum file")
+        button_layout.addWidget(self.use_existing_cont_btn)
         
         nav_layout.addLayout(button_layout)
         
@@ -790,9 +797,10 @@ class ReviewPanel(QWidget):
         # Update current tracking
         self.current_index = original_index
         self.current_item = selected_item
-        
+
         self.display_item_spectrum(selected_item)
         self.edit_continuum_btn.setEnabled(True)
+        self.use_existing_cont_btn.setEnabled(True)
         self.update_ew_btn.setEnabled(True)
         self.interactive_ew_checkbox.setEnabled(True)
         self.select_for_processing_btn.setEnabled(True)
@@ -1164,6 +1172,85 @@ class ReviewPanel(QWidget):
                     self.ew_vmax_spin.setValue(updated_item.template.ew_vmax)
                 
                 self.controller.status_updated.emit("Continuum updated successfully!")
-                
+
         except Exception as e:
             self.controller.status_updated.emit(f"Error editing continuum: {str(e)}")
+
+    def apply_existing_continuum(self):
+        """Apply the existing continuum from the spectrum file to the current item."""
+        if not self.current_item or not self.current_spec or self.current_index < 0:
+            self.controller.status_updated.emit("Please select a system first.")
+            return
+
+        try:
+            working_spec = self.current_spec
+            working_item = self.current_item
+
+            # Check if spectrum has an existing continuum
+            if not hasattr(working_spec, 'cont') or working_spec.cont is None or len(working_spec.cont) == 0:
+                self.controller.status_updated.emit("No existing continuum found in spectrum file. Using flat continuum instead.")
+                working_spec.cont = np.ones_like(working_spec.flux_slice)
+                working_spec.fnorm = working_spec.flux_slice.copy()
+                working_spec.enorm = working_spec.error_slice.copy()
+            else:
+                # Use the existing continuum
+                working_spec.fnorm = working_spec.flux_slice / working_spec.cont
+                working_spec.enorm = working_spec.error_slice / working_spec.cont
+
+            # Recalculate EW with the applied continuum
+            if hasattr(working_item, 'results'):
+                working_spec.compute_EW(
+                    working_item.template.transition,
+                    vmin=working_item.template.ew_vmin,
+                    vmax=working_item.template.ew_vmax,
+                    SNR=working_item.analysis.calculate_snr,
+                    _binsize=working_item.analysis.binsize
+                )
+
+            # Update master table
+            self.controller.master_table.update_analysis(
+                self.current_index,
+                continuum_method="use_existing",
+                continuum_order=0,  # Not applicable for use_existing
+                continuum_masks=[],  # Not applicable for use_existing
+                processing_status="complete",
+                last_modified=datetime.now().isoformat()
+            )
+
+            if hasattr(working_item, 'results') and working_item.results.W > 0:
+                self.controller.master_table.update_results(
+                    self.current_index,
+                    W=working_spec.W,
+                    W_e=working_spec.W_e,
+                    N=working_spec.N,
+                    N_e=working_spec.N_e,
+                    logN=working_spec.logN,
+                    logN_e=working_spec.logN_e,
+                    vel_centroid=getattr(working_spec, 'vel_centroid', 0),
+                    vel_disp=getattr(working_spec, 'vel_disp', 0),
+                    SNR=getattr(working_spec, 'SNR', 0)
+                )
+
+            # Store updated rb_spec object
+            self.controller.master_table.set_rb_spec_object(self.current_index, working_spec)
+
+            # Refresh display
+            master_spec = self.controller.master_table.get_rb_spec_object(self.current_index)
+            if master_spec:
+                self.current_spec = copy.deepcopy(master_spec)
+
+            self.refresh_results_table()
+
+            updated_item = self.controller.master_table.get_item(self.current_index)
+            if updated_item:
+                self.current_item = updated_item
+                self.update_spectrum_plot(self.current_item, self.current_spec)
+                self.update_details(self.current_item, self.current_spec)
+                # Update EW spinboxes with potentially new values
+                self.ew_vmin_spin.setValue(updated_item.template.ew_vmin)
+                self.ew_vmax_spin.setValue(updated_item.template.ew_vmax)
+
+            self.controller.status_updated.emit("Applied existing continuum successfully!")
+
+        except Exception as e:
+            self.controller.status_updated.emit(f"Error applying existing continuum: {str(e)}")

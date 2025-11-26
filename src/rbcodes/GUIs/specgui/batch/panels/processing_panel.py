@@ -110,7 +110,7 @@ class ProcessingPanel(QWidget):
         
         # Continuum fitting method
         self.cont_method = QComboBox()
-        self.cont_method.addItems(["Polynomial", "Flat (Skip Fitting)"])
+        self.cont_method.addItems(["Polynomial", "Flat (Skip Fitting)", "Use Existing Continuum"])
         self.cont_method.currentTextChanged.connect(self.on_cont_method_changed)
         settings_layout.addRow("Continuum Method:", self.cont_method)
         
@@ -204,10 +204,17 @@ class ProcessingPanel(QWidget):
         # Enable/disable polynomial order based on method
         is_polynomial = method == "Polynomial"
         self.poly_order.setEnabled(is_polynomial)
-        
+
         # Mark settings as not applied
         self.settings_status.setText("Settings changed - click 'Apply Settings' to save.")
         self.settings_status.setStyleSheet("QLabel { color: red; font-style: italic; }")
+
+        # Show info message for "Use Existing Continuum" option
+        if method == "Use Existing Continuum":
+            self.selection_info.setText(
+                "This option uses any continuum data embedded in your spectrum files. "
+                "If no continuum is found, it will fall back to a flat continuum."
+            )
     
     def update_process_options(self):
         """Update the process options dropdown with current item counts."""
@@ -339,6 +346,8 @@ class ProcessingPanel(QWidget):
             method = self.cont_method.currentText().lower()
             if "polynomial" in method:
                 continuum_method = "polynomial"
+            elif "existing" in method:
+                continuum_method = "use_existing"
             else:
                 continuum_method = "flat"
             
@@ -367,7 +376,12 @@ class ProcessingPanel(QWidget):
             self.settings_status.setStyleSheet("QLabel { color: green; }")
             
             # Show summary
-            method_name = "Polynomial" if continuum_method == "polynomial" else "Flat"
+            if continuum_method == "polynomial":
+                method_name = "Polynomial"
+            elif continuum_method == "use_existing":
+                method_name = "Use Existing Continuum"
+            else:
+                method_name = "Flat"
             summary = f"Applied {method_name} continuum settings to {len(items_to_process)} selected items"
             self.controller.status_updated.emit(summary)
             

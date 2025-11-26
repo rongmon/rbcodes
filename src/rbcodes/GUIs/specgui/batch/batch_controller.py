@@ -283,7 +283,7 @@ class BatchController(QObject):
                 mask = []
                 for vmin, vmax in item.analysis.continuum_masks:
                     mask.extend([vmin, vmax])
-                
+
                 # Use polynomial fitting
                 spec.fit_continuum(
                     mask=mask if mask else False,
@@ -297,6 +297,17 @@ class BatchController(QObject):
                 spec.cont = np.ones_like(spec.flux_slice)
                 spec.fnorm = spec.flux_slice.copy()
                 spec.enorm = spec.error_slice.copy()
+            elif method == 'use_existing':
+                # Use existing continuum from the spectrum data
+                if hasattr(spec, 'cont') and spec.cont is not None and len(spec.cont) > 0:
+                    # Continuum already loaded from the spectrum file
+                    spec.fnorm = spec.flux_slice / spec.cont
+                    spec.enorm = spec.error_slice / spec.cont
+                else:
+                    # No existing continuum found, fall back to flat
+                    spec.cont = np.ones_like(spec.flux_slice)
+                    spec.fnorm = spec.flux_slice.copy()
+                    spec.enorm = spec.error_slice.copy()
             
             # Store the rb_spec object
             self.master_table.set_rb_spec_object(row_index, spec)
