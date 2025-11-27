@@ -854,12 +854,12 @@ class SpectralPlot(FigureCanvas):
             ax.set_ylim(current_ylims[i])
         
         self.fig.canvas.draw_idle()  # Ensure the figure updates
-        
+
         if self.message_box:
             if lines_plotted > 0:
-                self.message_box.on_sent_message(f"Plotted {lines_plotted} lines for absorber at z={z_abs:.6f}", "#008000")
+                self.message_box.append_message(f"Plotted {lines_plotted} lines for absorber at z={z_abs:.6f}", "#008000")
             else:
-                self.message_box.on_sent_message(f"No lines found within wavelength range for z={z_abs:.6f}", "#FFA500")
+                self.message_box.append_message(f"No lines found within wavelength range for z={z_abs:.6f}", "#FFA500")
         
         return True  
         
@@ -885,9 +885,9 @@ class SpectralPlot(FigureCanvas):
             
             # Update the plot
             self.fig.canvas.draw_idle()
-            
+
             if self.message_box:
-                self.message_box.on_sent_message(f"Removed absorber system {absorber_id}", "#008000")
+                self.message_box.append_message(f"Removed absorber system {absorber_id}", "#008000")
             
             return True
 
@@ -1406,15 +1406,15 @@ class MainWindow(QMainWindow):
                 # Initialize line_list if it doesn't exist
                 if not hasattr(self.canvas, 'line_list'):
                     self.canvas.line_list = pd.DataFrame(columns=['Name', 'Wave_obs', 'Zabs'])
-                
+
                 if append_mode:
                     # Append to existing line list
                     self.canvas.line_list = pd.concat([self.canvas.line_list, line_list], ignore_index=True)
-                    self.message_box.on_sent_message(f"Appended {len(line_list)} line identifications", "#008000")
+                    self.message_box.append_message(f"Appended {len(line_list)} line identifications", "#008000")
                 else:
                     # Replace with loaded data
                     self.canvas.line_list = line_list
-                    self.message_box.on_sent_message(f"Loaded {len(line_list)} line identifications", "#008000")
+                    # Don't show duplicate message - it's already shown by integrated_load_data
             
             # Update absorbers if loaded
             if absorbers_df is not None and not absorbers_df.empty:
@@ -1444,8 +1444,8 @@ class MainWindow(QMainWindow):
                         self.absorber_manager.add_absorber(
                             row['Zabs'], row['LineList'], row['Color'], visible=False
                         )
-                    
-                    self.message_box.on_sent_message(
+
+                    self.message_box.append_message(
                         f"Appended {len(absorbers_df)} absorber systems (not displayed)", "#008000"
                     )
                 else:
@@ -1459,18 +1459,18 @@ class MainWindow(QMainWindow):
                                     pass
                         self.canvas.absorber_lines = {}
                         self.canvas.draw()
-                    
+
                     # Clear existing absorbers from manager
                     for i in range(self.absorber_manager.get_absorber_count()-1, -1, -1):
                         self.absorber_manager.remove_absorber(i)
-                    
+
                     # Add loaded absorbers
                     for _, row in absorbers_df.iterrows():
                         self.absorber_manager.add_absorber(
                             row['Zabs'], row['LineList'], row['Color'], visible=False
                         )
-                    
-                    self.message_box.on_sent_message(
+
+                    self.message_box.append_message(
                         f"Loaded {len(absorbers_df)} absorber systems (not displayed)", "#008000"
                     )
                 

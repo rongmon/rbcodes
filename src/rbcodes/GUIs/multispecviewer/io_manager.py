@@ -39,12 +39,15 @@ class IOManager:
             'absorbers': os.getcwd(),
             'json': os.getcwd(),
         }
-        
+
         # Version info for file formats
         self.current_version = __version__  # Use imported version
-        
+
         # Reference to message box (to be set by MainWindow)
         self.message_box = None
+
+        # Store last loaded metadata for pre-filling on save
+        self.last_loaded_metadata = {}
     
     def set_message_box(self, message_box):
         """Set the message box reference for displaying messages"""
@@ -54,6 +57,13 @@ class IOManager:
         """Display a message in the message box if available, otherwise print"""
         if self.message_box:
             self.message_box.on_sent_message(message, color)
+        else:
+            print(message)
+
+    def append_message(self, message, color="#FFFFFF"):
+        """Append a message to the message box if available, otherwise print"""
+        if self.message_box:
+            self.message_box.append_message(message, color)
         else:
             print(message)
     
@@ -608,11 +618,11 @@ class IOManager:
                     message += " and "
                 message += f"{len(absorbers_df)} absorber systems"
             self.show_message(message, "#008000")
-            
-            # Display user comment if available
+
+            # Display user comment if available (use append_message to keep previous messages)
             user_comment = metadata.get('user_comment', '')
             if user_comment:
-                self.show_message(f"Comment: {user_comment}", "#FFA500")
+                self.append_message(f"Comment: {user_comment}", "#FFA500")
             
             return line_list, absorbers_df, spectrum_files, metadata, None
             
@@ -798,13 +808,14 @@ class IOManager:
     
     # ===== User Comment Dialog =====
     
-    def get_user_comment_dialog(self, parent=None):
+    def get_user_comment_dialog(self, parent=None, previous_metadata=None):
             """
             Create a dialog for entering metadata when saving files.
-            
+
             Args:
                 parent (QWidget, optional): Parent widget for the dialog
-                
+                previous_metadata (dict, optional): Dictionary with previously saved metadata to pre-fill
+
             Returns:
                 tuple: (comment, metadata_dict, accepted)
                        comment: string with user's comment
@@ -812,46 +823,54 @@ class IOManager:
                        accepted: boolean indicating if dialog was accepted
             """
             try:
-                from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QTextEdit, 
+                from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QTextEdit,
                                              QLineEdit, QDialogButtonBox, QFormLayout,
                                              QWidget)
                 from PyQt5.QtCore import Qt
-                
+
                 dialog = QDialog(parent)
                 dialog.setWindowTitle("Add Metadata")
                 dialog.setMinimumWidth(400)
                 dialog.setMinimumHeight(300)
-                
+
                 # Apply Fusion style for consistent appearance
                 dialog.setStyle(parent.style() if parent else None)
-                
+
                 # Create layout
                 layout = QVBoxLayout(dialog)
-                
+
                 # Add form for metadata fields
                 form_layout = QFormLayout()
-                
+
                 # Add title field
                 title_edit = QLineEdit()
+                if previous_metadata and 'title' in previous_metadata:
+                    title_edit.setText(previous_metadata['title'])
                 form_layout.addRow("Title:", title_edit)
-                
+
                 # Add author field
                 author_edit = QLineEdit()
+                if previous_metadata and 'author' in previous_metadata:
+                    author_edit.setText(previous_metadata['author'])
                 form_layout.addRow("Author:", author_edit)
-                
+
                 # Add target field
                 target_edit = QLineEdit()
+                if previous_metadata and 'target' in previous_metadata:
+                    target_edit.setText(previous_metadata['target'])
                 form_layout.addRow("Target Object:", target_edit)
-                
+
                 layout.addLayout(form_layout)
-                
+
                 # Add comment label
                 comment_label = QLabel("Comments (optional):")
                 layout.addWidget(comment_label)
-                
+
                 # Add comment text area
                 comment_edit = QTextEdit()
                 comment_edit.setPlaceholderText("Enter any additional notes about this data...")
+                if previous_metadata and 'user_comment' in previous_metadata:
+                    comment_edit.setPlainText(previous_metadata['user_comment'])
                 layout.addWidget(comment_edit)
                 
                 # Add button box
@@ -980,8 +999,8 @@ class IOManager:
             # Determine format from selected filter
             if "JSON" in selected_filter:
                 format_type = "json"
-                # Show metadata dialog for JSON
-                comment, additional_metadata, accepted = self.get_user_comment_dialog(parent)
+                # Show metadata dialog for JSON, pre-filled with last loaded metadata
+                comment, additional_metadata, accepted = self.get_user_comment_dialog(parent, self.last_loaded_metadata)
                 if not accepted:
                     return False  # User cancelled
                 
@@ -1097,25 +1116,46 @@ class IOManager:
             if ext == '.json':
                 # Load JSON data
                 line_list, absorbers_df, spectrum_files, metadata, error = self.load_combined_data(file_path)
-                
+
                 if error:
                     self.show_message(f"Error loading data: {error}", "#FF0000")
                     return None, None, error
-                
+
+                # Store metadata for pre-filling on next save
+                if metadata:
+                    self.last_loaded_metadata = metadata.copy()
+
                 # Display metadata summary if available
                 if metadata:
-                    # Show title if available
-                    if 'title' in metadata and metadata['title']:
-                        self.show_message(f"Title: {metadata['title']}", "#8AB4F8")
-                    
+                    # Build metadata display message with non-empty fields
+                    metadata_lines = []
+
+                    # Show target if available
+                    if 'target' in metadata and metadata['target']:
+                        metadata_lines.append(f"Target: {metadata['target']}")
+
+                    # Show author if available
+                    if 'author' in metadata and metadata['author']:
+                        metadata_lines.append(f"Author: {metadata['author']}")
+
+                    # Show user comment if available
+                    if 'user_comment' in metadata and metadata['user_comment']:
+                        metadata_lines.append(f"Comment: {metadata['user_comment']}")
+
+                    # Display all non-empty metadata fields as appended messages
+                    if metadata_lines:
+                        self.append_message("Metadata:", "#8AB4F8")
+                        for line in metadata_lines:
+                            self.append_message(f"  {line}", "#8AB4F8")
+
                     # Show creation date if available
                     if 'creation_date' in metadata:
                         try:
                             date = datetime.datetime.fromisoformat(metadata['creation_date'])
-                            self.show_message(f"Created: {date.strftime('%Y-%m-%d %H:%M')}", "#8AB4F8")
+                            self.append_message(f"Created: {date.strftime('%Y-%m-%d %H:%M')}", "#8AB4F8")
                         except:
                             pass
-                
+
                 return line_list, absorbers_df, None
                 
             elif ext == '.txt':

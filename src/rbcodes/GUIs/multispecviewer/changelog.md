@@ -3,6 +3,21 @@ All notable changes to MultispecViewer will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.1] - 2025-11-26
+### Added
+- **Metadata support for linelists:**
+  - Display metadata (target, author, comment) in message box when loading JSON files
+  - Multi-line formatted metadata display with proper spacing for readability
+  - Pre-fill save dialog with previously loaded metadata for seamless workflow
+  - Automatic metadata persistence across save/load cycles
+  - Only non-empty metadata fields are displayed
+
+### Enhanced
+- **Message box improvements:**
+  - Messages now properly append instead of replace previous content
+  - Multiple load messages and metadata all visible simultaneously
+  - Better workflow visibility with sequential message display
+
 ## [1.2.0] - 2025-06-06
 ### Added
 - rb_spectrum: Lightweight spectrum reader/writer as alternative to linetools.XSpectrum1D
