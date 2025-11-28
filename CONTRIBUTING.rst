@@ -1,28 +1,3 @@
-.. todo:: THIS IS SUPPOSED TO BE AN EXAMPLE. MODIFY IT ACCORDING TO YOUR NEEDS!
-
-   The document assumes you are using a source repository service that promotes a
-   contribution model similar to `GitHub's fork and pull request workflow`_.
-   While this is true for the majority of services (like GitHub, GitLab,
-   BitBucket), it might not be the case for private repositories (e.g., when
-   using Gerrit).
-
-   Also notice that the code examples might refer to GitHub URLs or the text
-   might use GitHub specific terminology (e.g., *Pull Request* instead of *Merge
-   Request*).
-
-   Please make sure to check the document having these assumptions in mind
-   and update things accordingly.
-
-.. todo:: Provide the correct links/replacements at the bottom of the document.
-
-.. todo:: You might want to have a look on `PyScaffold's contributor's guide`_,
-
-   especially if your project is open source. The text should be very similar to
-   this template, but there are a few extra contents that you might decide to
-   also include, like mentioning labels of your issue tracker or automated
-   releases.
-
-
 ============
 Contributing
 ============
@@ -68,29 +43,22 @@ Documentation Improvements
 You can help improve ``rbcodes`` docs by making them more readable and coherent, or
 by adding missing information and correcting mistakes.
 
-``rbcodes`` documentation uses Sphinx_ as its main documentation compiler.
-This means that the docs are kept in the same repository as the project code, and
-that any documentation update is done in the same way was a code contribution.
+``rbcodes`` documentation is written in Markdown and kept in the ``docs/`` directory.
+Documentation updates are contributed the same way as code contributions.
 
-.. todo:: Don't forget to mention which markup language you are using.
+.. tip::
+   Please notice that the `GitHub web interface`_ provides a quick way to
+   propose changes in ``rbcodes``'s files. While this mechanism can
+   be tricky for normal code contributions, it works perfectly fine for
+   contributing to the docs, and can be quite handy.
 
-    e.g.,  reStructuredText_ or CommonMark_ with MyST_ extensions.
-
-.. todo:: If your project is hosted on GitHub, you can also mention the following tip:
-
-   .. tip::
-      Please notice that the `GitHub web interface`_ provides a quick way of
-      propose changes in ``rbcodes``'s files. While this mechanism can
-      be tricky for normal code contributions, it works perfectly fine for
-      contributing to the docs, and can be quite handy.
-
-      If you are interested in trying this method out, please navigate to
-      the ``docs`` folder in the source repository_, find which file you
-      would like to propose changes and click in the little pencil icon at the
-      top, to open `GitHub's code editor`_. Once you finish editing the file,
-      please write a message in the form at the bottom of the page describing
-      which changes have you made and what are the motivations behind them and
-      submit your proposal.
+   If you are interested in trying this method out, please navigate to
+   the ``docs`` folder in the `source repository`_, find which file you
+   would like to propose changes and click the little pencil icon at the
+   top, to open `GitHub's code editor`_. Once you finish editing the file,
+   please write a message in the form at the bottom of the page describing
+   which changes you have made and what your motivations are,
+   then submit your proposal.
 
 When working on documentation changes in your local machine, you can
 compile them using |tox|_::
@@ -106,11 +74,8 @@ and use Python's built-in web server for a preview in your web browser
 Code Contributions
 ==================
 
-.. todo:: Please include a reference or explanation about the internals of the project.
-
-   An architecture description, design principles or at least a summary of the
-   main concepts will make it easy for potential contributors to get started
-   quickly.
+For more information about the project structure and main modules, please see the
+`documentation <https://github.com/rongmon/rbcodes/blob/main/docs/main_readme.md>`_.
 
 Submit an issue
 ---------------
@@ -124,42 +89,28 @@ Create an environment
 
 Before you start coding, we recommend creating an isolated `virtual
 environment`_ to avoid any problems with your installed Python packages.
-This can easily be done via either |virtualenv|_::
+This can easily be done via Miniconda_::
 
-    virtualenv <PATH TO VENV>
-    source <PATH TO VENV>/bin/activate
-
-or Miniconda_::
-
-    conda create -n rbcodes python=3 six virtualenv pytest pytest-cov
+    conda create -n rbcodes python=3.10
     conda activate rbcodes
 
 Clone the repository
 --------------------
 
-#. Create an user account on |the repository service| if you do not already have one.
-#. Fork the project repository_: click on the *Fork* button near the top of the
-   page. This creates a copy of the code under your account on |the repository service|.
-#. Clone this copy to your local disk::
+#. Create a GitHub account if you do not already have one.
+#. Fork the `rbcodes repository <https://github.com/rongmon/rbcodes>`_: click on the *Fork* button near the top of the
+   page. This creates a copy of the code under your account on GitHub.
+#. Clone your fork to your local disk::
 
-    git clone git@github.com:YourLogin/rbcodes.git
+    git clone https://github.com/<your-username>/rbcodes.git
     cd rbcodes
 
-#. You should run::
+#. Install the package in development mode::
 
-    pip install -U pip setuptools -e .
+    pip install -U pip setuptools
+    pip install -e .
 
-   to be able to import the package under development in the Python REPL.
-
-   .. todo:: if you are not using pre-commit, please remove the following item:
-
-#. Install |pre-commit|_::
-
-    pip install pre-commit
-    pre-commit install
-
-   ``rbcodes`` comes with a lot of hooks configured to automatically help the
-   developer to check the code being written.
+   This allows you to import the package under development and test your changes.
 
 Implement your changes
 ----------------------
@@ -168,61 +119,55 @@ Implement your changes
 
     git checkout -b my-feature
 
-   and start making changes. Never work on the main branch!
+   Never work directly on the main branch!
 
-#. Start your work on this branch. Don't forget to add docstrings_ to new
+#. Make your changes on this branch. Please add docstrings_ to new
    functions, modules and classes, especially if they are part of public APIs.
 
-#. Add yourself to the list of contributors in ``AUTHORS.rst``.
-
-#. When you’re done editing, do::
+#. When you're done editing, commit your changes with a clear message::
 
     git add <MODIFIED FILES>
-    git commit
+    git commit -m "Description of your changes"
 
-   to record your changes in git_.
+   Writing a `descriptive commit message`_ is highly recommended.
+   You can check the commit history with::
 
-   .. todo:: if you are not using pre-commit, please remove the following item:
+      git log --oneline -10
 
-   Please make sure to see the validation messages from |pre-commit|_ and fix
-   any eventual issues.
-   This should automatically use flake8_/black_ to check/fix the code style
-   in a way that is compatible with the project.
+   to see the project's commit message style.
 
-   .. important:: Don't forget to add unit tests and documentation in case your
-      contribution adds an additional feature and is not just a bugfix.
+#. Add unit tests and documentation if your contribution adds a new feature
+   (not just a bugfix).
 
-      Moreover, writing a `descriptive commit message`_ is highly recommended.
-      In case of doubt, you can check the commit history with::
+#. Before submitting, check that your changes don't break unit tests::
 
-         git log --graph --decorate --pretty=oneline --abbrev-commit --all
+    pytest
 
-      to look for recurring communication patterns.
-
-#. Please check that your changes don't break any unit tests with::
+   or run the full test suite with::
 
     tox
 
-   (after having installed |tox|_ with ``pip install tox`` or ``pipx``).
-
-   You can also use |tox|_ to run several other pre-configured tasks in the
-   repository. Try ``tox -av`` to see a list of the available checks.
+   (install with ``pip install tox`` if needed).
 
 Submit your contribution
 ------------------------
 
-#. If everything works fine, push your local branch to |the repository service| with::
+#. Push your local branch to your fork on GitHub::
 
     git push -u origin my-feature
 
-#. Go to the web page of your fork and click |contribute button|
-   to send your changes for review.
+#. Go to the GitHub page of your fork and click the "Compare & pull request" button
+   to create a Pull Request.
 
-   .. todo:: if you are using GitHub, you can uncomment the following paragraph
+#. In the PR description, explain:
+   - What problem does this solve or what feature does it add?
+   - How did you test this change?
+   - Any related issues (reference them with ``#123``)
 
-      Find more detailed information in `creating a PR`_. You might also want to open
-      the PR as a draft first and mark it as ready for review after the feedbacks
-      from the continuous integration (CI) system or any required fixes.
+   You can also open the PR as a draft first and mark it as ready for review
+   after any feedback from CI checks or code review.
+
+#. We'll review your PR and provide feedback. Thank you for contributing!
 
 
 Troubleshooting
@@ -278,27 +223,19 @@ Maintainer tasks
 Releases
 --------
 
-.. todo:: This section assumes you are using PyPI to publicly release your package.
+For maintainers, releasing a new version involves:
 
-   If instead you are using a different/private package index, please update
-   the instructions accordingly.
+#. Make sure all unit tests pass.
+#. Tag the current commit on the main branch with a release tag, e.g., ``v2.0.0``.
+#. Push the new tag to the repository::
 
-If you are part of the group of maintainers and have correct user permissions
-on PyPI_, the following steps can be used to release a new version for
-``rbcodes``:
+    git tag v2.0.0
+    git push origin v2.0.0
 
-#. Make sure all unit tests are successful.
-#. Tag the current commit on the main branch with a release tag, e.g., ``v1.2.3``.
-#. Push the new tag to the upstream repository_, e.g., ``git push upstream v1.2.3``
-#. Clean up the ``dist`` and ``build`` folders with ``tox -e clean``
-   (or ``rm -rf dist build``)
-   to avoid confusion with old builds and Sphinx docs.
-#. Run ``tox -e build`` and check that the files in ``dist`` have
-   the correct version (no ``.dirty`` or git_ hash) according to the git_ tag.
-   Also check the sizes of the distributions, if they are too big (e.g., >
-   500KB), unwanted clutter may have been accidentally included.
-#. Run ``tox -e publish -- --repository pypi`` and check that everything was
-   uploaded to PyPI_ correctly.
+#. GitHub will automatically create a release from the tag. You can add release notes
+   describing the changes in that release.
+
+Automated releases to PyPI can be set up via GitHub Actions if desired in the future.
 
 
 
@@ -308,15 +245,9 @@ on PyPI_, the following steps can be used to release a new version for
    of environments, including private companies and proprietary code bases.
 
 
-.. <-- start -->
-.. todo:: Please review and change the following definitions:
-
-.. |the repository service| replace:: GitHub
-.. |contribute button| replace:: "Create pull request"
-
-.. _repository: https://github.com/<USERNAME>/rbcodes
-.. _issue tracker: https://github.com/<USERNAME>/rbcodes/issues
-.. <-- end -->
+.. Links
+.. _issue tracker: https://github.com/rongmon/rbcodes/issues
+.. _source repository: https://github.com/rongmon/rbcodes
 
 
 .. |virtualenv| replace:: ``virtualenv``
