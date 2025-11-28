@@ -96,13 +96,13 @@ For more installation options and troubleshooting, see [INSTALLATION.md](../INST
    - Equivalent width/column density measurements
    - Simple Voigt profile fitting
 2. [multispecviewer](/docs/GUIs/multispec/multispec.md): Enhanced spectrum viewer for handling multiple 1D spectra simultaneously with advanced line identification and absorber cataloging capabilities.
-3. [interactive_continuum_fit.py](/docs/GUIs/interactive_continuum_fit.py): Interactive continuum fitting tool for manual continuum definition
+3. [interactive_continuum_fit.py](/docs/GUIs/interactive_continuum_fit.md): **Recommended continuum fitter** - Interactive tool with polynomial and spline methods, manual masking, and real-time feedback
 4. [AbsTools](/docs/GUIs/AbsTools/README.md): Complex absorption line analysis GUI with batch processing capabilities
 5. [rb_zgui (zgui/main.py)](/docs/GUIs/zgui/Tutorial_for_Emission_Line_Redshift_Estimator_GUI.pdf): Redshift measurement GUI (PDF tutorial)
    - Supports 1D and 2D spectra
    - Optimized for JWST NIRCam/Grism spectroscopy
 6. [LLSFitter_GUI.py](/docs/GUIs/LLSFitter/LLSFitter.md): GUI to fit Lyman Limit System column densities
-7. [rb_cont.py](/docs/GUIs/rb_cont.md): Interactive continuum fitter
+7. [rb_cont.py](/docs/GUIs/rb_cont.md): ⚠️ **LEGACY** - Older continuum fitter (use `interactive_continuum_fit.py` instead)
 
 ### Intergalactic Medium (IGM) Tools
 
