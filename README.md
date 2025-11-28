@@ -1,22 +1,35 @@
-rbcodes
--------
+# rbcodes
 
-This is a public release of Python code commonly used for astrophysical research by Rongmon Bordoloi and collaborators.  
-The package is under active development and will be periodically updated.
+Python tools for analyzing spectroscopic data in astrophysics. Developed by Rongmon Bordoloi and collaborators.
 
+## Quick Start
 
-### 📖 Citation
+```bash
+# Install
+pip install -e /path/to/rbcodes
 
-If you use this package, please **cite the following Concept DOI**. This ensures your citation is counted and attributed to the full `rbcodes` project:
+# Run main analysis tool
+launch_specgui
+
+# Or view/compare multiple spectra
+rb_multispec
+```
+
+## 📚 Full Documentation
+
+See **[`docs/main_readme.md`](docs/main_readme.md)** for:
+- Complete installation instructions
+- All available tools and modules
+- Detailed feature descriptions
+- Quick start guide
+
+## 📖 Citation
+
+If you use rbcodes in your research, please cite the following DOI:
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6079263.svg)](https://doi.org/10.5281/zenodo.6079263)
 
-👉 https://doi.org/10.5281/zenodo.6079263
-
-Please also mention the **version you used** for reproducibility. For example:
-
-<details>
-<summary>📄 BibTeX for version 1.0.0</summary>
+**Citation for v2.0.0:**
 
 ```bibtex
 @software{bordoloi_2025_15723701,
@@ -33,18 +46,12 @@ Please also mention the **version you used** for reproducibility. For example:
   url          = {https://doi.org/10.5281/zenodo.6079263}
 }
 ```
-</details>
-
-### 📚 Documentation
-
-Full documentation is available in [`rbcodes/docs/main_readme.md`](docs/main_readme.md).
-
 
 ## 🤝 Contributing
-- This package is constantly under development and will be periodically updated.
-- Contributions and improvements are welcome
 
-## ![License](https://img.shields.io/badge/license-MIT-green)
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## License
 
 This project is licensed under the [MIT License](LICENSE).
 
