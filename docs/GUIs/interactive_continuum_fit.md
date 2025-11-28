@@ -13,10 +13,10 @@ Both methods allow for masking of spectral features that should be excluded from
 
 ## Launching the Tool
 
-```bash
-# Via command line or Python
-from rbcodes.GUIs.interactive_continuum_fit import main_interactive_continuum_fit
-main_interactive_continuum_fit()
+```python
+# Via Python
+from rbcodes.GUIs.interactive_continuum_fit import launch_interactive_continuum_fit
+launch_interactive_continuum_fit()
 ```
 
 Or use it from within `launch_specgui` (rb_spec pipeline).
