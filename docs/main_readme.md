@@ -68,7 +68,7 @@ pip install -e .
 conda install -c conda-forge --file requirements_simple.txt
 ```
 
-For more installation options and troubleshooting, see [INSTALLATION.md](../../INSTALLATION.md).
+For more installation options and troubleshooting, see [INSTALLATION.md](../INSTALLATION.md).
 
 ### Dependencies
 - Core Dependencies (automatically installed):
@@ -155,7 +155,7 @@ For more installation options and troubleshooting, see [INSTALLATION.md](../../I
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](../../CONTRIBUTING.md) for detailed guidelines on:
+Contributions are welcome! Please see [CONTRIBUTING.md](../CONTRIBUTING.md) for detailed guidelines on:
 - How to set up a development environment
 - The fork-and-pull-request workflow
 - Code contribution standards
