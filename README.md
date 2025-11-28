@@ -5,10 +5,14 @@ Python tools for analyzing spectroscopic data in astrophysics. Developed by Rong
 ## Quick Start
 
 ```bash
-# Install
+# 1. Create a new conda environment
+conda create -n rbcodes-env python=3.10
+conda activate rbcodes-env
+
+# 2. Install rbcodes
 pip install -e /path/to/rbcodes
 
-# Run main analysis tool
+# 3. Run main analysis tool
 launch_specgui
 
 # Or view/compare multiple spectra
