@@ -53,7 +53,7 @@ If you use rbcodes in your research, please cite the following DOI:
 
 ## 🤝 Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome! See [CONTRIBUTING.rst](CONTRIBUTING.rst) for guidelines.
 
 ## License
 

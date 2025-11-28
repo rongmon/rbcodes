@@ -155,7 +155,7 @@ For more installation options and troubleshooting, see [INSTALLATION.md](../INST
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](../CONTRIBUTING.md) for detailed guidelines on:
+Contributions are welcome! Please see [CONTRIBUTING.rst](../CONTRIBUTING.rst) for detailed guidelines on:
 - How to set up a development environment
 - The fork-and-pull-request workflow
 - Code contribution standards
