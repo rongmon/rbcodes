@@ -32,9 +32,9 @@ See **[`docs/main_readme.md`](docs/main_readme.md)** for:
 If you use rbcodes in your research, please cite the following DOI:
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6079263.svg)](https://doi.org/10.5281/zenodo.6079263)
-
-**Citation for v2.0.0:**
-
+<details>
+<summary>📄 BibTeX for version 2.0.0</summary>
+  
 ```bibtex
 @software{bordoloi_2025_15723701,
   author       = {Bordoloi, Rongmon and
@@ -50,6 +50,8 @@ If you use rbcodes in your research, please cite the following DOI:
   url          = {https://doi.org/10.5281/zenodo.6079263}
 }
 ```
+</details>
+
 
 ## 🤝 Contributing
 
