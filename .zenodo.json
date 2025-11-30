@@ -1,7 +1,7 @@
 {
-  "title": "rongmon/rbcodes: rbcodes v1.0.0",
+  "title": "rongmon/rbcodes: rbcodes v2.0.0",
   "description": "A collection of Python codes for astronomical data analysis and research applications.",
-  "version": "v1.0.0",
+  "version": "v2.0.0",
   "upload_type": "software",
   "access_right": "open",
   "license": "MIT",
@@ -56,5 +56,5 @@
       "scheme": "keyword"
     }
   ],
-  "notes": "This is version 1.0.0 of rbcodes, an updated release building upon the original v0.2 release with additional contributors and improvements."
+  "notes": "Version 2.0.0 builds on v1.0.0 with bug fixes and is now pip installable for easier installation and distribution."
 }
