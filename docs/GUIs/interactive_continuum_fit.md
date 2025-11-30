@@ -13,13 +13,31 @@ Both methods allow for masking of spectral features that should be excluded from
 
 ## Launching the Tool
 
+### Basic Usage
+
 ```python
-# Via Python
+import pkg_resources
 from rbcodes.GUIs.interactive_continuum_fit import launch_interactive_continuum_fit
-launch_interactive_continuum_fit()
+from rbcodes.utils import rb_spectrum as r
+
+# Load spectrum from example data
+example_file = pkg_resources.resource_filename('rbcodes', 'example-data/sdss1.fits')
+sp = r.rb_spectrum.from_file(example_file)
+
+# Launch the interactive continuum fitting tool
+result = launch_interactive_continuum_fit(
+    wave=sp.wavelength.value,
+    flux=sp.flux.value,
+    error=sp.sig.value
+)
+
+# Access the fitted continuum
+fitted_continuum = result['continuum']
 ```
 
-Or use it from within `launch_specgui` (rb_spec pipeline).
+### Integration with rb_spec Pipeline
+
+You can also use it from within `launch_specgui` (rb_spec GUI pipeline) for a more integrated workflow.
 
 ## Interface Layout
 
