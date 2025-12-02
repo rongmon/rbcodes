@@ -191,22 +191,36 @@ class ConfigurationPanel(QWidget):
         transition_combo = QComboBox()
         transitions = [
             "Custom",
-            "Lyα (1215.67 Å)",
-            "Lyβ (1025.72 Å)",
-            "Lyγ (972.54 Å)",
+            "AlII (1670.79 Å)",
+            "AlIII (1854.72 Å)",
+            "AlIII (1862.79 Å)",
             "CII (1036.3367 Å)",
             "CII (1334.532 Å)",
             "CIV (1548.20 Å)",
             "CIV (1550.78 Å)",
+            "FeII (2344.21 Å)",
+            "FeII (2382.76 Å)",
+            "FeII (2586.65 Å)",
+            "FeII (2600.17 Å)",
+            "Lyα (1215.67 Å)",
+            "Lyβ (1025.72 Å)",
+            "Lyγ (972.54 Å)",
             "MgII (2796.35 Å)",
             "MgII (2803.53 Å)",
-            "SiIV (1393.76 Å)",
-            "SiIV (1402.77 Å)",
+            "OI (1302.17 Å)",
             "OVI (1031.926 Å)",
-            "OVI (1037.617 Å)"
+            "OVI (1037.617 Å)",
+            "SiII (1190.4 Å)",
+            "SiII (1193.29 Å)",
+            "SiII (1260.42 Å)",
+            "SiII (1304.37 Å)",
+            "SiII (1526.71 Å)",
+            "SiIII (1206.5 Å)",
+            "SiIV (1393.76 Å)",
+            "SiIV (1402.77 Å)"
         ]
         transition_combo.addItems(transitions)
-        
+
         custom_wavelength = QDoubleSpinBox()
         custom_wavelength.setRange(1.0, 10000.0)
         custom_wavelength.setValue(item.template.transition)  # Pre-populate
@@ -673,22 +687,36 @@ class ConfigurationPanel(QWidget):
         transition_combo = QComboBox()
         transitions = [
             "Custom",
-            "Lyα (1215.67 Å)",
-            "Lyβ (1025.72 Å)",
-            "Lyγ (972.54 Å)",
+            "AlII (1670.79 Å)",
+            "AlIII (1854.72 Å)",
+            "AlIII (1862.79 Å)",
             "CII (1036.3367 Å)",
             "CII (1334.532 Å)",
             "CIV (1548.20 Å)",
             "CIV (1550.78 Å)",
+            "FeII (2344.21 Å)",
+            "FeII (2382.76 Å)",
+            "FeII (2586.65 Å)",
+            "FeII (2600.17 Å)",
+            "Lyα (1215.67 Å)",
+            "Lyβ (1025.72 Å)",
+            "Lyγ (972.54 Å)",
             "MgII (2796.35 Å)",
             "MgII (2803.53 Å)",
-            "SiIV (1393.76 Å)",
-            "SiIV (1402.77 Å)",
+            "OI (1302.17 Å)",
             "OVI (1031.926 Å)",
-            "OVI (1037.617 Å)"
+            "OVI (1037.617 Å)",
+            "SiII (1190.4 Å)",
+            "SiII (1193.29 Å)",
+            "SiII (1260.42 Å)",
+            "SiII (1304.37 Å)",
+            "SiII (1526.71 Å)",
+            "SiIII (1206.5 Å)",
+            "SiIV (1393.76 Å)",
+            "SiIV (1402.77 Å)"
         ]
         transition_combo.addItems(transitions)
-        
+
         custom_wavelength = QDoubleSpinBox()
         custom_wavelength.setRange(1.0, 10000.0)
         custom_wavelength.setValue(1215.67)

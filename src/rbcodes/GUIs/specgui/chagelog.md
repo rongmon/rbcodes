@@ -6,8 +6,13 @@
   - Transition selection now persists when switching tabs and returning to transition panel
   - Only resets when loading a new spectrum file or clicking "New Transition" button
 - **Batch Mode Transition List**: Updated "Add Single Ion" dialog transition list to match edit dialog
-  - Now includes CII and OVI transitions for consistency across all modes
   - All three entry points (single mode, batch add, batch edit) now have identical transition lists
+
+### Added
+- **Expanded Transition Lines**: Added common absorption lines organized alphabetically
+  - Added: AlII, AlIII, FeII, OI, SiII (5 lines), SiIII
+  - Reorganized all transitions alphabetically by ion species for easier navigation
+  - Now includes 28 common spectral lines covering UV to optical wavelengths
 
 ## [1.0.2] - 2025-11-25
 ### Added
