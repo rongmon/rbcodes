@@ -1,5 +1,14 @@
 # Changelog - rb_spec GUI
 
+## [1.0.3] - 2025-12-02
+### Fixed
+- **Transition Dropdown Persistence**: Fixed transition dropdown defaulting to Lya when navigating between panels in single mode
+  - Transition selection now persists when switching tabs and returning to transition panel
+  - Only resets when loading a new spectrum file or clicking "New Transition" button
+- **Batch Mode Transition List**: Updated "Add Single Ion" dialog transition list to match edit dialog
+  - Now includes CII and OVI transitions for consistency across all modes
+  - All three entry points (single mode, batch add, batch edit) now have identical transition lists
+
 ## [1.0.2] - 2025-11-25
 ### Added
 - **Batch Mode - Use Existing Continuum**: New feature to use continuum data embedded in spectrum files
