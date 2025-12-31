@@ -100,16 +100,27 @@ class SpectralPlot(FigureCanvas):
                 if self.message_box:
                     self.message_box.on_sent_message("Load spectra", "#FF0000")
                 return
-            if not hasattr(self, 'linelist') or self.linelist == "None":
+
+            # Get the current linelist from the redshift widget if available
+            if hasattr(self.parent_window, 'redshift_widget'):
+                current_linelist = self.parent_window.redshift_widget.linelist_combo.currentText()
+                if current_linelist and current_linelist != "None":
+                    self.linelist = current_linelist
+                elif not hasattr(self, 'linelist') or self.linelist == "None":
+                    if self.message_box:
+                        self.message_box.on_sent_message("No line list selected, defaulting to LLS", "#FFA500")
+                    self.linelist = 'LLS'
+            elif not hasattr(self, 'linelist') or self.linelist == "None":
                 if self.message_box:
                     self.message_box.on_sent_message("No line list selected, defaulting to LLS", "#FFA500")
-                self.linelist='LLS'
+                self.linelist = 'LLS'
+
             observed_wavelength = event.xdata
             if observed_wavelength is None:
                 if self.message_box:
                     self.message_box.on_sent_message("Click on a valid position on the plot", "#FF0000")
                 return
-                
+
             # Read line list
             line_list = rb_setline.read_line_list(self.linelist)
             

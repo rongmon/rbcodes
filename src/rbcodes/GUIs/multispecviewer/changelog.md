@@ -3,6 +3,11 @@ All notable changes to MultispecViewer will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.2] - 2025-12-31
+### Fixed
+- Right-click line identification dialog now uses the linelist selected in the main GUI instead of hardcoding to 'LLS'
+- Improved linelist synchronization between redshift widget and right-click dialog
+
 ## [1.2.1] - 2025-11-26
 ### Added
 - **Metadata support for linelists:**
