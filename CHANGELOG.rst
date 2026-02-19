@@ -2,8 +2,23 @@
 Changelog
 =========
 
+Version 2.1.0 (2026-02-19)
+==========================
+
+Enhancements
+------------
+* LLSFitter GUI: Added "Restore Session" feature to Load Results
+  - Can now restore filepath, redshift, continuum regions, and all fit parameters from saved JSON
+  - Automatically loads spectrum if file exists, shows warning if file moved/missing
+  - Backward compatible with older JSON files (uses defaults if fit_parameters not present)
+* LLSFitter GUI: Save Results now includes full fit_parameters section
+  - Stores initial guesses (C0, C1, logNHI)
+  - Stores parameter bounds
+  - Stores MCMC settings (walkers, steps, burnin_frac)
+  - Stores sigma_clip and plot options
+
 Version 2.0.0 (2025-08-21)
-=======================
+==========================
 
 Breaking Changes
 --------------

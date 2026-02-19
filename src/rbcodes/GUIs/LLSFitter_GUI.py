@@ -581,28 +581,28 @@ class LLSFitterGUI(QMainWindow):
     def save_results(self):
         """Save fit results to a JSON file"""
         if self.lls_fitter is None or (
-            self.lls_fitter.curve_fit_results is None and 
+            self.lls_fitter.curve_fit_results is None and
             self.lls_fitter.mcmc_results is None
         ):
             QMessageBox.warning(self, "No Results", "No fit results available to save")
             return
-        
+
         # Open file dialog for JSON
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Save Results", "", "JSON Files (*.json);;All Files (*.*)"
         )
-        
+
         if not file_path:
             return
-        
+
         try:
             import json
             import datetime
-            
+
             # Get results and other data
             results = self.lls_fitter.get_results_summary()
-            
-            # Create simplified data structure
+
+            # Create data structure with all parameters used in the fit
             data = {
                 "metadata": {
                     "created": datetime.datetime.now().isoformat(),
@@ -610,6 +610,31 @@ class LLSFitterGUI(QMainWindow):
                     "redshift": float(self.redshift_edit.text())
                 },
                 "continuum_regions": self.get_current_continuum_regions(),
+                "fit_parameters": {
+                    "initial": {
+                        "C0": self.c0_input.value(),
+                        "C1": self.c1_input.value(),
+                        "logNHI": self.nhi_input.value()
+                    },
+                    "bounds": {
+                        "C0": [self.c0_min.value(), self.c0_max.value()],
+                        "C1": [self.c1_min.value(), self.c1_max.value()],
+                        "logNHI": [self.nhi_min.value(), self.nhi_max.value()]
+                    },
+                    "mcmc": {
+                        "walkers": self.walkers_input.value(),
+                        "steps": self.steps_input.value(),
+                        "burnin_frac": self.burnin_input.value()
+                    },
+                    "sigma_clip": self.sigma_input.value(),
+                    "plot_options": {
+                        "wmin": self.wmin_input.value(),
+                        "wmax": self.wmax_input.value(),
+                        "y_auto": self.y_auto_checkbox.isChecked(),
+                        "ymin": self.ymin_input.value(),
+                        "ymax": self.ymax_input.value()
+                    }
+                },
                 "results": {}
             }
             
@@ -653,98 +678,217 @@ class LLSFitterGUI(QMainWindow):
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Load Results", "", "JSON Files (*.json);;All Files (*.*)"
         )
-        
+
         if not file_path:
             return
-        
+
         try:
             import json
-            
+
             # Read the JSON file
             with open(file_path, 'r') as f:
                 data = json.load(f)
-            
-            # Display a summary of the loaded results
-            if 'metadata' in data and 'results' in data:
-                # Create a dialog to show the loaded results
-                dialog = QDialog(self)
-                dialog.setWindowTitle("Loaded Results")
-                dialog.resize(600, 400)
-                
-                layout = QVBoxLayout(dialog)
-                
-                # Create text display
-                text_edit = QTextEdit()
-                text_edit.setReadOnly(True)
-                font = QFont("Monospace")
-                font.setStyleHint(QFont.TypeWriter)
-                text_edit.setFont(font)
-                
-                # Format results
-                text = "Loaded LLS Fit Results\n"
-                text += "====================\n\n"
-                
-                # Metadata
-                meta = data['metadata']
-                text += f"Spectrum: {meta.get('spectrum_file', 'N/A')}\n"
-                text += f"Redshift: {meta.get('redshift', 'N/A')}\n"
-                text += f"Created: {meta.get('created', 'N/A')}\n\n"
-                
-                # Continuum regions
-                if 'continuum_regions' in data:
-                    text += "Continuum Regions:\n"
-                    for i, (wmin, wmax) in enumerate(data['continuum_regions']):
-                        text += f"  Region {i+1}: {wmin:.1f} - {wmax:.1f} Å\n"
-                    text += "\n"
-                
-                # Results
-                if 'results' in data:
-                    results = data['results']
-                    
-                    if 'curve_fit' in results:
-                        cf = results['curve_fit']
-                        text += "Curve Fit Results:\n"
-                        text += f"  C0:      {cf['C0']:.6f} ± {cf['C0_err']:.6f}\n"
-                        text += f"  C1:      {cf['C1']:.6f} ± {cf['C1_err']:.6f}\n"
-                        text += f"  log N(HI): {cf['logNHI']:.4f} ± {cf['logNHI_err']:.4f}\n\n"
-                    
-                    if 'mcmc' in results:
-                        mc = results['mcmc']
-                        text += "MCMC Results:\n"
-                        text += f"  C0:      {mc['C0']:.6f} ± {mc['C0_err']:.6f}\n"
-                        text += f"  C1:      {mc['C1']:.6f} ± {mc['C1_err']:.6f}\n"
-                        text += f"  log N(HI): {mc['logNHI']:.4f} ± {mc['logNHI_err']:.4f}\n\n"
-                    
-                    if 'mcmc_percentiles' in results:
-                        percentiles = results['mcmc_percentiles']
-                        text += "MCMC Percentiles:\n"
-                        for param, values in percentiles.items():
-                            p50, upper, lower = values['p50'], values['upper_error'], values['lower_error']
-                            text += f"  {param}: {p50:.6f} (+{upper:.6f}) (-{lower:.6f})\n"
-                
-                text_edit.setText(text)
-                layout.addWidget(text_edit)
-                
-                # Add buttons
-                button_layout = QHBoxLayout()
-                close_button = QPushButton("Close")
-                close_button.clicked.connect(dialog.accept)
-                copy_button = QPushButton("Copy to Clipboard")
-                copy_button.clicked.connect(lambda: QApplication.clipboard().setText(text))
-                
-                button_layout.addWidget(copy_button)
-                button_layout.addWidget(close_button)
-                layout.addLayout(button_layout)
-                
-                # Show dialog
-                dialog.exec_()
-                
-                self.statusBar().showMessage(f"Results loaded from {file_path}", 3000)
-            else:
+
+            # Check if valid file
+            if 'metadata' not in data or 'results' not in data:
                 QMessageBox.warning(self, "Invalid File", "The file does not contain valid LLS fit results")
-                
+                return
+
+            # Ask user what they want to do
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Question)
+            msg.setWindowTitle("Load Results")
+            msg.setText("What would you like to do with the loaded results?")
+            view_button = msg.addButton("View Results", QMessageBox.ActionRole)
+            restore_button = msg.addButton("Restore Session", QMessageBox.ActionRole)
+            cancel_button = msg.addButton("Cancel", QMessageBox.RejectRole)
+            msg.exec_()
+
+            if msg.clickedButton() == cancel_button:
+                return
+            elif msg.clickedButton() == view_button:
+                self._show_results_dialog(data)
+            elif msg.clickedButton() == restore_button:
+                self._restore_session(data)
+
+            self.statusBar().showMessage(f"Results loaded from {file_path}", 3000)
+
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error loading results: {str(e)}")
+
+    def _show_results_dialog(self, data):
+        """Display loaded results in a dialog (view only)"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Loaded Results")
+        dialog.resize(600, 400)
+
+        layout = QVBoxLayout(dialog)
+
+        # Create text display
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        font = QFont("Monospace")
+        font.setStyleHint(QFont.TypeWriter)
+        text_edit.setFont(font)
+
+        # Format results
+        text = "Loaded LLS Fit Results\n"
+        text += "====================\n\n"
+
+        # Metadata
+        meta = data['metadata']
+        text += f"Spectrum: {meta.get('spectrum_file', 'N/A')}\n"
+        text += f"Redshift: {meta.get('redshift', 'N/A')}\n"
+        text += f"Created: {meta.get('created', 'N/A')}\n\n"
+
+        # Continuum regions
+        if 'continuum_regions' in data:
+            text += "Continuum Regions:\n"
+            for i, (wmin, wmax) in enumerate(data['continuum_regions']):
+                text += f"  Region {i+1}: {wmin:.1f} - {wmax:.1f} Å\n"
+            text += "\n"
+
+        # Fit parameters (if present)
+        if 'fit_parameters' in data:
+            fp = data['fit_parameters']
+            text += "Fit Parameters Used:\n"
+            if 'initial' in fp:
+                text += f"  Initial C0: {fp['initial'].get('C0', 'N/A')}\n"
+                text += f"  Initial C1: {fp['initial'].get('C1', 'N/A')}\n"
+                text += f"  Initial log N(HI): {fp['initial'].get('logNHI', 'N/A')}\n"
+            if 'sigma_clip' in fp:
+                text += f"  Sigma Clip: {fp['sigma_clip']}\n"
+            if 'mcmc' in fp:
+                text += f"  MCMC Walkers: {fp['mcmc'].get('walkers', 'N/A')}\n"
+                text += f"  MCMC Steps: {fp['mcmc'].get('steps', 'N/A')}\n"
+                text += f"  MCMC Burn-in: {fp['mcmc'].get('burnin_frac', 'N/A')}\n"
+            text += "\n"
+
+        # Results
+        if 'results' in data:
+            results = data['results']
+
+            if 'curve_fit' in results:
+                cf = results['curve_fit']
+                text += "Curve Fit Results:\n"
+                text += f"  C0:      {cf['C0']:.6f} ± {cf['C0_err']:.6f}\n"
+                text += f"  C1:      {cf['C1']:.6f} ± {cf['C1_err']:.6f}\n"
+                text += f"  log N(HI): {cf['logNHI']:.4f} ± {cf['logNHI_err']:.4f}\n\n"
+
+            if 'mcmc' in results:
+                mc = results['mcmc']
+                text += "MCMC Results:\n"
+                text += f"  C0:      {mc['C0']:.6f} ± {mc['C0_err']:.6f}\n"
+                text += f"  C1:      {mc['C1']:.6f} ± {mc['C1_err']:.6f}\n"
+                text += f"  log N(HI): {mc['logNHI']:.4f} ± {mc['logNHI_err']:.4f}\n\n"
+
+            if 'mcmc_percentiles' in results:
+                percentiles = results['mcmc_percentiles']
+                text += "MCMC Percentiles:\n"
+                for param, values in percentiles.items():
+                    p50, upper, lower = values['p50'], values['upper_error'], values['lower_error']
+                    text += f"  {param}: {p50:.6f} (+{upper:.6f}) (-{lower:.6f})\n"
+
+        text_edit.setText(text)
+        layout.addWidget(text_edit)
+
+        # Add buttons
+        button_layout = QHBoxLayout()
+        close_button = QPushButton("Close")
+        close_button.clicked.connect(dialog.accept)
+        copy_button = QPushButton("Copy to Clipboard")
+        copy_button.clicked.connect(lambda: QApplication.clipboard().setText(text))
+
+        button_layout.addWidget(copy_button)
+        button_layout.addWidget(close_button)
+        layout.addLayout(button_layout)
+
+        # Show dialog
+        dialog.exec_()
+
+    def _restore_session(self, data):
+        """Restore GUI fields from loaded results data"""
+        meta = data.get('metadata', {})
+
+        # Always restore redshift
+        redshift = meta.get('redshift', '')
+        if redshift:
+            self.redshift_edit.setText(str(redshift))
+
+        # Always restore continuum regions
+        if 'continuum_regions' in data:
+            regions = data['continuum_regions']
+            self.continuum_table.setRowCount(0)
+            for wmin, wmax in regions:
+                row = self.continuum_table.rowCount()
+                self.continuum_table.insertRow(row)
+                self.continuum_table.setItem(row, 0, QTableWidgetItem(str(wmin)))
+                self.continuum_table.setItem(row, 1, QTableWidgetItem(str(wmax)))
+
+        # Restore fit parameters (use defaults if not present - backward compatibility)
+        if 'fit_parameters' in data:
+            fp = data['fit_parameters']
+
+            # Initial guesses
+            if 'initial' in fp:
+                self.c0_input.setValue(fp['initial'].get('C0', 1.0))
+                self.c1_input.setValue(fp['initial'].get('C1', 0.0))
+                self.nhi_input.setValue(fp['initial'].get('logNHI', 17.0))
+
+            # Bounds
+            if 'bounds' in fp:
+                if 'C0' in fp['bounds']:
+                    self.c0_min.setValue(fp['bounds']['C0'][0])
+                    self.c0_max.setValue(fp['bounds']['C0'][1])
+                if 'C1' in fp['bounds']:
+                    self.c1_min.setValue(fp['bounds']['C1'][0])
+                    self.c1_max.setValue(fp['bounds']['C1'][1])
+                if 'logNHI' in fp['bounds']:
+                    self.nhi_min.setValue(fp['bounds']['logNHI'][0])
+                    self.nhi_max.setValue(fp['bounds']['logNHI'][1])
+
+            # MCMC settings
+            if 'mcmc' in fp:
+                self.walkers_input.setValue(fp['mcmc'].get('walkers', 50))
+                self.steps_input.setValue(fp['mcmc'].get('steps', 500))
+                self.burnin_input.setValue(fp['mcmc'].get('burnin_frac', 0.2))
+
+            # Sigma clip
+            if 'sigma_clip' in fp:
+                self.sigma_input.setValue(fp['sigma_clip'])
+
+            # Plot options
+            if 'plot_options' in fp:
+                po = fp['plot_options']
+                self.wmin_input.setValue(po.get('wmin', 880))
+                self.wmax_input.setValue(po.get('wmax', 975))
+                y_auto = po.get('y_auto', True)
+                self.y_auto_checkbox.setChecked(y_auto)
+                self.ymin_input.setValue(po.get('ymin', 0))
+                self.ymax_input.setValue(po.get('ymax', 2))
+                self.ymin_input.setEnabled(not y_auto)
+                self.ymax_input.setEnabled(not y_auto)
+
+        # Always populate filepath
+        spectrum_file = meta.get('spectrum_file', '')
+        if spectrum_file:
+            self.file_path_edit.setText(spectrum_file)
+
+            # Check if file exists
+            if os.path.exists(spectrum_file):
+                # File exists - load spectrum automatically
+                self.load_spectrum()
+            else:
+                # File doesn't exist - show warning
+                QMessageBox.warning(
+                    self, "Spectrum File Not Found",
+                    f"Spectrum file not found:\n{spectrum_file}\n\n"
+                    "Redshift and continuum regions have been restored.\n"
+                    "Please browse to locate the spectrum file."
+                )
+                # Disable fit buttons since no spectrum loaded
+                self.curve_fit_button.setEnabled(False)
+                self.mcmc_fit_button.setEnabled(False)
     
         
     def export_current_plot(self):
