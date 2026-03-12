@@ -43,7 +43,7 @@ def rb_setline(lambda_rest: float,
         The line list to use. Default is 'atom'.
         Available options: 'atom', 'LLS', 'LLS Small', 'DLA', 'LBG', 'Gal',
         'Eiger_Strong', 'Gal_Em', 'Gal_Abs', 'Gal_long', 'AGN', 'HI_recomb',
-        'HI_recomb_light'
+        'HI_recomb_light', 'HI', 'EUV', 'LLS_EUV'
     target_name : str, optional
         Required when method='Name'. The name of the target species to match.
 
@@ -187,7 +187,7 @@ def read_line_list(label: str) -> List[Dict[str, Any]]:
         Label string identifying which line list to read
         Available options: 'atom', 'LLS', 'LLS Small', 'DLA', 'LBG', 'Gal',
         'Eiger_Strong', 'Gal_Em', 'Gal_Abs', 'Gal_long', 'AGN', 'HI_recomb',
-        'HI_recomb_light'
+        'HI_recomb_light', 'HI', 'EUV', 'LLS_EUV'
 
     Returns
     -------
@@ -224,7 +224,10 @@ def read_line_list(label: str) -> List[Dict[str, Any]]:
         'Gal_long': resource_filename('rbcodes.IGM', 'lines/Galaxy_Long_E_n_A.lst'),
         'AGN': resource_filename('rbcodes.IGM', 'lines/AGN.lst'),
         'HI_recomb': resource_filename('rbcodes.IGM', 'lines/HI_recombination.lst'),
-        'HI_recomb_light': resource_filename('rbcodes.IGM', 'lines/HI_recombination_light.lst')
+        'HI_recomb_light': resource_filename('rbcodes.IGM', 'lines/HI_recombination_light.lst'),
+        'HI': resource_filename('rbcodes.IGM', 'lines/hi.lst'),
+        'EUV': resource_filename('rbcodes.IGM', 'lines/euv.lst'),
+        'LLS_EUV': resource_filename('rbcodes.IGM', 'lines/lls_euv.lst')
     }
 
     # Check if the label is valid
@@ -283,9 +286,9 @@ def read_line_list(label: str) -> List[Dict[str, Any]]:
                 data.append(source)
 
         elif label in ('HI_recomb', 'HI_recomb_light'):
-            # Read recombination line lists 
+            # Read recombination line lists
             s = ascii.read(filename)
-            
+
             for line in range(len(s['wrest'])):
                 source = {
                     'wrest': float(s['wrest'][line]) * 1e4,  # Convert to Angstroms
@@ -294,6 +297,34 @@ def read_line_list(label: str) -> List[Dict[str, Any]]:
                     'gamma': 0.0  # Default to 0
                 }
                 data.append(source)
+
+        elif label in ('HI', 'EUV', 'LLS_EUV'):
+            # Read new format line lists with f-value and gamma
+            with open(filename, 'r') as f:
+                # Skip count header line
+                header1 = f.readline()
+
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+
+                    columns = line.split()
+
+                    if len(columns) < 4:
+                        logger.warning(f"Skipping invalid line in {filename}: {line}")
+                        continue
+
+                    try:
+                        source = {
+                            'wrest': float(columns[0]),
+                            'ion': f"{columns[1]} {columns[2]}",
+                            'fval': float(columns[3]),
+                            'gamma': float(columns[4]) if len(columns) > 4 else 0.0
+                        }
+                        data.append(source)
+                    except (ValueError, IndexError) as e:
+                        logger.warning(f"Error parsing line in {filename}: {line} - {str(e)}")
 
         else:
             # Generic format for other line lists

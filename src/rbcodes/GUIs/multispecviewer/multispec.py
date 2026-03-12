@@ -537,13 +537,13 @@ class SpectralPlot(FigureCanvas):
                                  labelcolor='#FFFFFF')
         
 
-    def set_redshift_data(self, redshift, linelist, color='white'):
+    def set_redshift_data(self, redshift, linelist, color='sky_blue'):
         """
         Receives redshift and linelist data from the main window.
-        
+
         :param redshift: float, the redshift value
         :param linelist: str, the selected line list
-        :param color: str, the color to use for line plotting (default 'white')
+        :param color: str, the color to use for line plotting (default 'sky_blue')
         """
         # Get color dictionary
         clr = rt.rb_set_color()
@@ -589,7 +589,7 @@ class SpectralPlot(FigureCanvas):
         
         # Use the color from the dictionary, with a fallback
         clr = rt.rb_set_color()
-        line_color = clr.get(self.line_color, clr['white'])
+        line_color = clr.get(self.line_color, clr['sky_blue'])
         
         # Get the line list data
         try:
@@ -818,8 +818,8 @@ class SpectralPlot(FigureCanvas):
         
         # Get the color values from the dictionary
         clr = rt.rb_set_color()
-        # Default to white if color isn't in the dictionary
-        color_value = clr.get(color, clr['white'])
+        # Default to sky_blue if color isn't in the dictionary
+        color_value = clr.get(color, clr['sky_blue'])
         
         # Draw vertical lines for each spectral feature
         lines_plotted = 0
@@ -1565,9 +1565,9 @@ class MainWindow(QMainWindow):
             # Get unique redshifts and assign colors
             unique_redshifts = self.canvas.line_list['Zabs'].unique()
             
-            # Define a set of distinct colors
-            colors = ['cyan', 'magenta', 'yellow', 'lime', 'orange', 'pink', 'white', 
-                     'red', 'green', 'blue', 'purple', 'gold', 'silver', 'turquoise']
+            # Define a set of distinct colors (dark theme friendly)
+            colors = ['cyan', 'magenta', 'yellow', 'lime', 'orange', 'coral', 'sky_blue',
+                     'vermillion', 'lavender', 'mint', 'rose', 'gold', 'teal', 'pale_cyan']
             
             # Assign a color to each redshift
             redshift_colors = {}

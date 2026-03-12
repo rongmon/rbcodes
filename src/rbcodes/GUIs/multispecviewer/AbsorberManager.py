@@ -262,7 +262,7 @@ class AbsorberManager(QWidget):
         """Add a new absorber to the manager"""
         # Default values if not provided
         line_list = line_list or 'LLS'
-        color = color or 'white'
+        color = color or 'sky_blue'  # Dark theme friendly default
         
         # Add to dataframe
         new_row = pd.Series({

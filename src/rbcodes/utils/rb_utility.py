@@ -72,46 +72,53 @@ def format_interval(t):
    
 def rb_set_color():
     """
-    Defines a set of colors
-       
-       Parameters 
-       ----------
-       None
-
-       Returns
-       -------
-       clr: a dictionary with different colors
+    Defines an expanded set of colors optimized for dark theme GUIs.
+    Returns a dictionary with RGB values (0 to 1).
     """
-    clr={}
-    clr['black']=[  0.,   0.,   0.]
-    clr['white'] =[ 255./ 255., 255./ 255., 255./ 255.]
-    clr['red'] =[ 255./ 255.,   0./ 255.,   0./ 255.]
-    clr['green'] =[   0., 255./ 255.,   0.]
-    clr['blue'] =[   0.,   0., 255./ 255.]
-    clr['dark_orange']=[1., 0.5, 0.2]
-    clr['orange'] =[ 230./ 255., 159./ 255.,   0./ 255.]
-    clr['sky_blue'] =[  86./ 255., 180./ 255., 233./ 255.]
-    clr['bluish_green'] =[   0./ 255., 158./ 255., 115./ 255.]
-    clr['yellow'] =[ 240./ 255., 228./ 255.,  66./ 255.]
-    clr['blue2'] =[   0./ 255., 114./ 255., 178./ 255.]
-    clr['vermillion'] =[ 213./ 255.,  94./ 255.,   0.]
-    clr['reddish_purple'] =[ 204./ 255., 121./ 255., 167./ 255.] 
-    clr['cream'] =[ 248./ 255., 248./ 255., 248./ 255.]
-    clr['cyan'] =[   0./ 255., 255./ 255., 255./ 255.]
-    clr['light_lime_green'] =[ 153./ 255., 255./ 255., 153./ 255.]
-    clr['pale_lime_green'] =[ 200./ 255., 255./ 255., 200./ 255.]
-    clr['purple_wordle'] =[ 204./ 255.,   0., 255./ 255.]
-    clr['light_purple'] =[ 231./ 255., 113./ 255., 255./ 255.]
-    clr['orange2'] =[ 217./ 255., 110./ 255.,   0./ 255.]
-    clr['light_orange'] =[ 233./ 255., 172./ 255.,  55./ 255.]
-    clr['teal'] =[  62./ 255., 133./ 255., 181./ 255.]
-    clr['pale_red'] =[ 255./ 255., 118./ 255., 110./ 255.]
-    clr['pale_cyan'] =[ 133./ 255., 249./ 255., 255./ 255.]
-    clr['dark_red'] =[ 100./ 255.,   0.,   0.]
-    clr['dark_green'] =[   0., 100./ 255.,   0.] 
-    clr['dark_blue'] =[   0.,   0., 100./ 255.]
-    clr['gray']=[.5,.5,.5]
-    clr['light_gray']=[.8,.8,.8]
+    clr = {}
+    
+    # --- TOP SELECTIONS (Reordered for Dark Theme Visibility) ---
+    clr['sky_blue'] = [86./255., 180./255., 233./255.] # Good primary accent
+    clr['orange'] = [230./255., 159./255., 0./255.]
+    clr['light_lime_green'] = [153./255., 255./255., 153./255.]
+    clr['vermillion'] = [213./255., 94./255., 0.]
+    clr['reddish_purple'] = [204./255., 121./255., 167./255.]
+    clr['cyan'] = [0./255., 255./255., 255./255.]
+    
+    # --- NEW ADDITIONS (Muted & Professional Tones) ---
+    clr['gold'] = [1.0, 0.84, 0.0]
+    clr['coral'] = [1.0, 0.5, 0.31]
+    clr['lavender'] = [0.7, 0.7, 1.0]
+    clr['mint'] = [0.67, 1.0, 0.82]
+    clr['slate_gray'] = [0.44, 0.5, 0.56]
+    clr['rose'] = [1.0, 0.4, 0.7]
+    
+    # --- EXISTING COLORS ---
+    clr['blue2'] = [0./255., 114./255., 178./255.]
+    clr['bluish_green'] = [0./255., 158./255., 115./255.]
+    clr['yellow'] = [240./255., 228./255., 66./255.]
+    clr['dark_orange'] = [1., 0.5, 0.2]
+    clr['purple_wordle'] = [204./255., 0., 255./255.]
+    clr['light_purple'] = [231./255., 113./255., 255./255.]
+    clr['orange2'] = [217./255., 110./255., 0./255.]
+    clr['light_orange'] = [233./255., 172./255., 55./255.]
+    clr['teal'] = [62./255., 133./255., 181./255.]
+    clr['pale_red'] = [255./255., 118./255., 110./255.]
+    clr['pale_cyan'] = [133./255., 249./255., 255./255.]
+    clr['pale_lime_green'] = [200./255., 255./255., 200./255.]
+    
+    # --- DARKER/BASIC TONES (End of list) ---
+    clr['dark_red'] = [100./255., 0., 0.]
+    clr['dark_green'] = [0., 100./255., 0.] 
+    clr['dark_blue'] = [0., 0., 100./255.]
+    clr['gray'] = [.5, .5, .5]
+    clr['light_gray'] = [.8, .8, .8]
+    clr['white'] = [1., 1., 1.]
+    clr['black'] = [0., 0., 0.]
+    clr['cream'] = [248./255., 248./255., 248./255.]
+    clr['red'] = [1., 0., 0.]
+    clr['green'] = [0., 1., 0.]
+    clr['blue'] = [0., 0., 1.]
 
     return clr
 

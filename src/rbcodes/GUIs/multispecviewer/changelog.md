@@ -1,7 +1,21 @@
 # Changelog
 All notable changes to MultispecViewer will be documented in this file.
 
-## [Unreleased]
+## [1.3.0] - 20206-03-12
+
+### Added
+- **New linelists in IGM/lines:**
+  - `hi.lst`: HI Lyman series lines (30 lines) with f-values and gamma values
+  - `euv.lst`: EUV lines (816 lines) with f-values and gamma values
+  - `lls_euv.lst`: Merged LLS + EUV lines (567 lines) without duplicates, covering 1.35-5897 Å
+  - All generated from linetools LineList data
+
+### Fixed
+- **Dark theme color improvements:**
+  - Changed default linelist colors from 'white' to 'sky_blue' for better dark theme visibility
+  - Updated color exclusion list to filter out jarring colors (white, cream, light_gray, black)
+  - Replaced hardcoded color cycling list with dark theme friendly palette
+  - Applied consistent color filtering across AbsorberManager, RedshiftInputWidget, and multispec canvas
 
 ## [1.2.2] - 2025-12-31
 ### Fixed

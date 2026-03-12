@@ -610,16 +610,23 @@ def reconcile_linelists(input_files, velocity_threshold=20, output_file=None, cr
                 except Exception as e:
                     print(f"Error processing CSV file {csv_file}: {str(e)}")
         
-        # Get color list from rb_utility
+
         try:
             from rbcodes.utils import rb_utility as rt
-            clr = rt.rb_set_color()
-            colors = list(clr.keys())[1:]  # Skip the first color (usually background)
+            clr_dict = rt.rb_set_color()
+            
+            # 1. Get all keys in the order they appear in the dictionary
+            all_keys = list(clr_dict.keys())
+            
+            # 2. Filter out colors you don't want in the GUI (black, white, etc.)
+            # Exclude colors that are jarring on dark theme
+            exclude = ['black', 'white', 'cream', 'light_gray']
+            colors = [k for k in all_keys if k not in exclude]
+            
         except ImportError:
-            # Fallback colors if rb_utility not available
-            colors = ['white', 'red', 'blue', 'green', 'yellow', 'cyan', 'magenta', 
-                    'orange', 'purple', 'pink', 'teal', 'lime', 'brown', 'navy']
-        
+            # Improved fallback list for Dark Theme
+            colors = ['sky_blue', 'orange', 'cyan', 'yellow', 'lime', 'magenta', 'red', 'teal']
+
         # Assign different colors to each absorber, cycling through the color list
         absorber_df['Color'] = [colors[i % len(colors)] for i in range(len(absorber_df))]
         

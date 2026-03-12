@@ -36,11 +36,12 @@ class RedshiftInputWidget(QWidget):
         # Set default values
         self.default_redshift = 0.0
         self.default_linelist = "LLS"
-        self.default_color = "white"
+        self.default_color = "sky_blue"  # Dark theme friendly default
         
-        # Get color options from utility
+        # Get color options from utility, filtering out jarring colors for dark theme
         clr = rt.rb_set_color()
-        self.color_options = list(clr.keys())[1:]  # Skip the first color (usually background)
+        exclude = ['black', 'white', 'cream', 'light_gray']
+        self.color_options = [k for k in clr.keys() if k not in exclude]
         
         self.initUI()
         
