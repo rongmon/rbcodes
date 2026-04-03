@@ -381,6 +381,12 @@ class SpectralPlot(FigureCanvas):
         elif event.key == 'v' or event.key == 'V':
             # Check if redshift is set
             if hasattr(self, 'redshift') and hasattr(self, 'linelist'):
+                # Update linelist from widget to get current selection
+                if hasattr(self.parent_window, 'redshift_widget'):
+                    current_linelist = self.parent_window.redshift_widget.linelist_combo.currentText()
+                    if current_linelist and current_linelist != "None":
+                        self.linelist = current_linelist
+
                 # Initialize line_list if it doesn't exist
                 if not hasattr(self, 'line_list'):
                     self.line_list = pd.DataFrame(columns=['Name', 'Wave_obs', 'Zabs'])

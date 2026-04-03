@@ -32,7 +32,7 @@ class Absorber:
             ion_dict['f'] = line_dat['fval']
             ion_dict['lam_0'] = line_dat['wave']
             ion_dict['name'] = line_dat['name']
-            ion_dict['gamma'] = line_dat['gamma']
+            ion_dict['gamma'] = line_dat.get('gamma', 0.0)
             ion_dict['z'] = z
             ion_dict['window_lim'] = window_lim 
 
@@ -67,17 +67,18 @@ class Absorber:
     
     
     
-    def __init__(self, z, wave, flux, error, lines=None, mask_init=[-200,200], window_lim=[-1000,1000], load_file=False, nofrills=False):
+    def __init__(self, z, wave, flux, error, lines=None, mask_init=[-200,200], window_lim=[-1000,1000], load_file=False, nofrills=False, linelist='atom'):
         mask = mask_init
         self.z = z
         self.ions = {}
-    
+        self.linelist = linelist
+
         if lines:
             valid_lines = []
             wave_min, wave_max = np.min(wave), np.max(wave)
-            
+
             for line in lines:
-                line_dat = rb_setline.rb_setline(line, method='closest')
+                line_dat = rb_setline.rb_setline(line, method='closest', linelist=self.linelist)
                 redshifted_line = line_dat['wave'] * (1 + z)
                 
                 # Check if the line is within the observable range

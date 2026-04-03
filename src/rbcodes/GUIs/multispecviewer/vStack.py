@@ -84,8 +84,8 @@ def prepare_absorber_object(z_abs, wave, flux, error, line_flg='LLS', vlim=[-100
     wavelist_selected = wavelist[q]
     
     # Create absorber object
-    absys = A.Absorber(z_abs, wave, flux, error, list(wavelist_selected), window_lim=vlim, nofrills=True)   
-    
+    absys = A.Absorber(z_abs, wave, flux, error, list(wavelist_selected), window_lim=vlim, nofrills=True, linelist=line_flg)
+
     return absys.ions
 
 class vStack:

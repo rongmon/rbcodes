@@ -1,7 +1,14 @@
 # Changelog
 All notable changes to MultispecViewer will be documented in this file.
 
-## [1.3.0] - 20206-03-12
+## [1.3.1] - 2026-04-03
+
+### Fixed
+- **vStack linelist selection:** vStack ('v' key) now uses the currently selected linelist from the GUI dropdown instead of requiring Submit to be clicked first
+- **Linelist propagation to Absorber:** Fixed bug where Absorber class always used 'atom' linelist regardless of selection. Now correctly passes the selected linelist (e.g., LLS_EUV) through the entire chain
+- **Gamma key error:** Fixed KeyError when using non-atom linelists that don't include gamma values (now defaults to 0.0)
+
+## [1.3.0] - 2026-03-12
 
 ### Added
 - **New linelists in IGM/lines:**
