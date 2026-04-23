@@ -283,7 +283,15 @@ class ReviewPanel(QWidget):
         self.use_existing_cont_btn.setEnabled(False)
         self.use_existing_cont_btn.setToolTip("Use the continuum embedded in the spectrum file")
         button_layout.addWidget(self.use_existing_cont_btn)
-        
+
+        # Mark as Failed / Reset button
+        self.mark_failed_btn = QPushButton("✗ Mark as Failed")
+        self.mark_failed_btn.clicked.connect(self.toggle_failed_status)
+        self.mark_failed_btn.setEnabled(False)
+        self.mark_failed_btn.setToolTip("Manually mark this spectrum as failed (corrupt/unusable)")
+        self.mark_failed_btn.setStyleSheet("QPushButton { color: darkred; font-weight: bold; }")
+        button_layout.addWidget(self.mark_failed_btn)
+
         nav_layout.addLayout(button_layout)
         
         # Status filter radio buttons + EW controls (Edit Continuum moved to navigation row)
@@ -661,8 +669,8 @@ class ReviewPanel(QWidget):
                     filtered.append((i, item))
                     
             elif self.current_filter == "failed":
-                # Failed: status error OR NaN W/W_e
-                is_error_status = item.analysis.processing_status == "error"
+                # Failed: status error/manually_failed OR NaN W/W_e
+                is_error_status = item.analysis.processing_status in ("error", "manually_failed")
                 has_nan_results = (hasattr(item.results, 'W') and hasattr(item.results, 'W_e') and
                                  (np.isnan(item.results.W) or np.isnan(item.results.W_e)))
                 if is_error_status or has_nan_results:
@@ -690,8 +698,8 @@ class ReviewPanel(QWidget):
                 not np.isnan(item.results.W) and not np.isnan(item.results.W_e)):
                 complete_count += 1
             
-            # Failed: status error OR NaN W/W_e
-            is_error_status = item.analysis.processing_status == "error"
+            # Failed: status error/manually_failed OR NaN W/W_e
+            is_error_status = item.analysis.processing_status in ("error", "manually_failed")
             has_nan_results = (hasattr(item.results, 'W') and hasattr(item.results, 'W_e') and
                              (np.isnan(item.results.W) or np.isnan(item.results.W_e)))
             if is_error_status or has_nan_results:
@@ -804,7 +812,9 @@ class ReviewPanel(QWidget):
         self.update_ew_btn.setEnabled(True)
         self.interactive_ew_checkbox.setEnabled(True)
         self.select_for_processing_btn.setEnabled(True)
-        
+        self.mark_failed_btn.setEnabled(True)
+        self._update_mark_failed_btn(selected_item)
+
         # Update EW spinboxes with current values
         self.ew_vmin_spin.setValue(selected_item.template.ew_vmin)
         self.ew_vmax_spin.setValue(selected_item.template.ew_vmax)
@@ -933,9 +943,12 @@ class ReviewPanel(QWidget):
         details_parts.append(f"EW Range: [{ew_vmin}, {ew_vmax}] km/s")
         
         # 5. Status with color coding
-        status = item.analysis.processing_status.replace('_', ' ').title()
+        raw_status = item.analysis.processing_status
+        status = raw_status.replace('_', ' ').title()
         if status == 'Complete':
             status_html = f'<span style="color: green; font-weight: bold;">Status: {status}</span>'
+        elif raw_status == 'manually_failed':
+            status_html = f'<span style="color: darkred; font-weight: bold;"><i>Status: Manually Failed</i></span>'
         elif status == 'Error':
             status_html = f'<span style="color: red; font-weight: bold;">Status: {status}</span>'
         elif 'Processing' in status:
@@ -1254,3 +1267,43 @@ class ReviewPanel(QWidget):
 
         except Exception as e:
             self.controller.status_updated.emit(f"Error applying existing continuum: {str(e)}")
+
+    def _update_mark_failed_btn(self, item):
+        """Update the Mark as Failed button label/style to reflect current item status."""
+        if item.analysis.processing_status == "manually_failed":
+            self.mark_failed_btn.setText("↩ Reset to Pending")
+            self.mark_failed_btn.setStyleSheet("QPushButton { color: darkgreen; font-weight: bold; }")
+            self.mark_failed_btn.setToolTip("Reset this spectrum back to pending (needs_processing)")
+        else:
+            self.mark_failed_btn.setText("✗ Mark as Failed")
+            self.mark_failed_btn.setStyleSheet("QPushButton { color: darkred; font-weight: bold; }")
+            self.mark_failed_btn.setToolTip("Manually mark this spectrum as failed (corrupt/unusable)")
+
+    def toggle_failed_status(self):
+        """Toggle between manually_failed and needs_processing for the current item."""
+        if not self.current_item or self.current_index < 0:
+            self.controller.status_updated.emit("Please select a system first.")
+            return
+
+        current_status = self.current_item.analysis.processing_status
+        if current_status == "manually_failed":
+            new_status = "needs_processing"
+            msg = "Status reset to pending."
+        else:
+            new_status = "manually_failed"
+            msg = "Spectrum marked as failed."
+
+        self.controller.master_table.update_analysis(
+            self.current_index,
+            processing_status=new_status,
+            error_message="Manually marked as failed by user" if new_status == "manually_failed" else ""
+        )
+
+        updated_item = self.controller.master_table.get_item(self.current_index)
+        if updated_item:
+            self.current_item = updated_item
+            self._update_mark_failed_btn(updated_item)
+            self.update_details(updated_item, self.current_spec)
+
+        self.refresh_results_table()
+        self.controller.status_updated.emit(msg)

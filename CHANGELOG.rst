@@ -2,6 +2,23 @@
 Changelog
 =========
 
+Version 2.1.2 (2026-04-23)
+==========================
+
+Enhancements
+------------
+* launch_specgui batch mode (Review tab): Added manual "Mark as Failed" button.
+  - New ``✗ Mark as Failed`` button in the navigation row lets users flag corrupt,
+    noisy, or otherwise unusable spectra without re-running processing.
+  - Sets a distinct ``manually_failed`` status (separate from auto-generated ``error``
+    status) so manual rejections are clearly distinguishable in exports and logs.
+  - Button label toggles to ``↩ Reset to Pending`` when the item is already
+    manually failed, allowing the mark to be undone in one click.
+  - Manually-failed items appear in the ``Failed`` filter view and are excluded from
+    the "Ready Items Only" processing selector.
+  - Status bar and details line render ``Manually Failed`` in dark-red italic for
+    quick visual identification.
+
 Version 2.1.1 (2026-04-23)
 ==========================
 
