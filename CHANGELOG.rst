@@ -2,6 +2,19 @@
 Changelog
 =========
 
+Version 2.1.1 (2026-04-23)
+==========================
+
+Bug Fixes
+---------
+* launch_specgui batch mode: Fixed incorrect ion/filename assignment when saving completed items
+  alongside failed items.
+  - When "Export Only Completed Items" was checked, the JSON export used positions in the
+    filtered list as master table row indices, causing rb_spec objects to be looked up at
+    the wrong rows (e.g., a MgII spectrum saved as FeII).
+  - Fix: actual master table row indices are now tracked during filtering and passed through
+    to the export function, ensuring each completed item is matched to its correct rb_spec object.
+
 Version 2.1.0 (2026-02-19)
 ==========================
 

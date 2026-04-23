@@ -481,28 +481,31 @@ class ExportPanel(QWidget):
             )
             return
         
-        # Filter items based on options
+        # Filter items based on options, keeping track of actual master table row indices
         export_items = []
-        
+        export_indices = []
+
         if self.export_complete_only.isChecked():
             # Only export completed items
-            for item in items:
+            for row_index, item in enumerate(items):
                 if item.analysis.processing_status == 'complete':
                     export_items.append(item)
+                    export_indices.append(row_index)
         else:
             # Export all items if requested
             if self.export_all_json.isChecked():
                 export_items = items
-        
+                export_indices = list(range(len(items)))
+
         if not export_items:
             QMessageBox.warning(
-                self, "No Items to Export", 
+                self, "No Items to Export",
                 "No items match the export criteria."
             )
             return
-        
+
         # Export individual JSON files
-        success_count, error_count = self._export_individual_jsons(export_items, directory)
+        success_count, error_count = self._export_individual_jsons(export_items, directory, export_indices)
         
         # Show results
         if error_count == 0:
@@ -514,14 +517,18 @@ class ExportPanel(QWidget):
             self.controller.status_updated.emit(f"JSON export completed: {success_count} successful, {error_count} failed")
             self.export_completed.emit(False, directory)
     
-    def _export_individual_jsons(self, items, directory):
+    def _export_individual_jsons(self, items, directory, row_indices=None):
         """Export individual JSON files for the given items."""
         success_count = 0
         error_count = 0
-        
-        for row_index, item in enumerate(items):
+
+        # Use provided row_indices (actual master table positions) or fall back to enumerate
+        if row_indices is None:
+            row_indices = list(range(len(items)))
+
+        for item, row_index in zip(items, row_indices):
             try:
-                # Get rb_spec object from master table using row index
+                # Get rb_spec object from master table using actual row index
                 spec_object = self.controller.master_table.get_rb_spec_object(row_index)
                 
                 if spec_object is None:
