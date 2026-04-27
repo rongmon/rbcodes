@@ -23,7 +23,7 @@ from scipy.interpolate import splrep, splev
 import warnings
 import datetime
 import os
-import pkg_resources
+from importlib.resources import files
 from PyQt5.QtCore import QUrl
 from PyQt5.QtGui import QIcon
 # Import the minimum required functions
@@ -492,13 +492,11 @@ class InteractiveContinuumFitWindow(QMainWindow):
         
         # Try to set an icon if available
         try:
-            icon_path = pkg_resources.resource_filename(
-                'rbcodes.GUIs.interactive_continuum_fit_help', 'images/help_icon.png'
-            )
+            icon_path = str(files('rbcodes.GUIs.interactive_continuum_fit_help').joinpath('images/help_icon.png'))
             if os.path.exists(icon_path):
                 help_button.setIcon(QIcon(icon_path))
                 help_button.setText("")  # Remove text if icon is used
-        except (ImportError, pkg_resources.DistributionNotFound):
+        except Exception:
             pass  # Use text-only button if icon not found
         
         self.toolbar.addWidget(help_button)    

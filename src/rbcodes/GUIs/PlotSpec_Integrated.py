@@ -20,7 +20,7 @@ from PyQt5.QtWidgets import (QApplication, QWidget, QPushButton, QComboBox,QHBox
     QLineEdit, QInputDialog,QListWidget, QVBoxLayout, QListWidgetItem,QLabel,QTableWidget,QGridLayout,QMessageBox,QBoxLayout,QDesktopWidget)
 
 from PyQt5.QtGui import QPalette, QColor
-from pkg_resources import resource_filename
+
 import pandas as pd
 import matplotlib.pyplot as plt 
 from astropy.convolution import convolve, Box1DKernel

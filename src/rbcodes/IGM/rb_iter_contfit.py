@@ -6,7 +6,7 @@ import warnings
 import os
 from matplotlib.gridspec import GridSpec
 # Read in the 1D spectrum to be analyzed
-from pkg_resources import resource_filename
+from pathlib import Path
 # Check if linetools is available, if not provide installation instructions
 try:
     from linetools.spectra.xspectrum1d import XSpectrum1D
@@ -775,7 +775,7 @@ def fit_spectral_region(filename, lam_min, lam_max, min_order=2, max_order=6,
 # Example usage
 if __name__ == "__main__":
     # Path to the example FITS file
-    filename = resource_filename('rbcodes', 'example-data/test.fits')
+    filename = str(Path(__file__).parents[3] / 'example-data' / 'test.fits')
 
     
     # Define wavelength region to fit

@@ -9,9 +9,8 @@ def read_line_options():
               configuration file cannot be read.
     """
     try:
-        # Use pkg_resources to find the configuration file
-        from pkg_resources import resource_filename
-        config_file = resource_filename('rbcodes.GUIs.multispecviewer', 'line_options.conf')
+        from importlib.resources import files
+        config_file = str(files('rbcodes.GUIs.multispecviewer').joinpath('line_options.conf'))
         
         # Default options in case file is not found
         default_options = ["None", "LLS", "LLS Small", "DLA", "LBG", "Gal", "Eiger_Strong", "AGN"]
@@ -171,13 +170,11 @@ GETTING HELP:
     # Try to find local README file as well
     try:
         import os
-        from pkg_resources import resource_filename
-        
+        from importlib.resources import files
+
         # Check possible local locations
         potential_paths = [
-            resource_filename('rbcodes', 'docs/GUIs/multispec/multispec.md'),
-            resource_filename('rbcodes.GUIs.multispecviewer', 'multispec.md'),
-            resource_filename('rbcodes', 'GUIs/multispecviewer/multispec.md')
+            str(files('rbcodes.GUIs.multispecviewer').joinpath('multispec.md')),
         ]
         
         # Find first existing path

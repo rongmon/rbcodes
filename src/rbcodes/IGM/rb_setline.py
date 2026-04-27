@@ -9,7 +9,7 @@ or matching by species name.
 from __future__ import print_function, absolute_import, division, unicode_literals
 import numpy as np
 from astropy.io import ascii
-from pkg_resources import resource_filename
+from importlib.resources import files
 import os
 import logging
 from pathlib import Path
@@ -212,22 +212,22 @@ def read_line_list(label: str) -> List[Dict[str, Any]]:
 
     # Define the mapping from label to filename
     filename_mapping = {
-        'atom': resource_filename('rbcodes.IGM', 'lines/atom_full.dat'),
-        'LLS': resource_filename('rbcodes.IGM', 'lines/lls.lst'),
-        'LLS Small': resource_filename('rbcodes.IGM', 'lines/lls_sub.lst'),
-        'DLA': resource_filename('rbcodes.IGM', 'lines/dla.lst'),
-        'LBG': resource_filename('rbcodes.IGM', 'lines/lbg.lst'),
-        'Gal': resource_filename('rbcodes.IGM', 'lines/gal_vac.lst'),
-        'Eiger_Strong': resource_filename('rbcodes.IGM', 'lines/Eiger_Strong.lst'),
-        'Gal_Em': resource_filename('rbcodes.IGM', 'lines/Galaxy_emission_Lines.lst'),
-        'Gal_Abs': resource_filename('rbcodes.IGM', 'lines/Galaxy_absorption_Lines.lst'),
-        'Gal_long': resource_filename('rbcodes.IGM', 'lines/Galaxy_Long_E_n_A.lst'),
-        'AGN': resource_filename('rbcodes.IGM', 'lines/AGN.lst'),
-        'HI_recomb': resource_filename('rbcodes.IGM', 'lines/HI_recombination.lst'),
-        'HI_recomb_light': resource_filename('rbcodes.IGM', 'lines/HI_recombination_light.lst'),
-        'HI': resource_filename('rbcodes.IGM', 'lines/hi.lst'),
-        'EUV': resource_filename('rbcodes.IGM', 'lines/euv.lst'),
-        'LLS_EUV': resource_filename('rbcodes.IGM', 'lines/lls_euv.lst')
+        'atom': str(files('rbcodes.IGM').joinpath('lines/atom_full.dat')),
+        'LLS': str(files('rbcodes.IGM').joinpath('lines/lls.lst')),
+        'LLS Small': str(files('rbcodes.IGM').joinpath('lines/lls_sub.lst')),
+        'DLA': str(files('rbcodes.IGM').joinpath('lines/dla.lst')),
+        'LBG': str(files('rbcodes.IGM').joinpath('lines/lbg.lst')),
+        'Gal': str(files('rbcodes.IGM').joinpath('lines/gal_vac.lst')),
+        'Eiger_Strong': str(files('rbcodes.IGM').joinpath('lines/Eiger_Strong.lst')),
+        'Gal_Em': str(files('rbcodes.IGM').joinpath('lines/Galaxy_emission_Lines.lst')),
+        'Gal_Abs': str(files('rbcodes.IGM').joinpath('lines/Galaxy_absorption_Lines.lst')),
+        'Gal_long': str(files('rbcodes.IGM').joinpath('lines/Galaxy_Long_E_n_A.lst')),
+        'AGN': str(files('rbcodes.IGM').joinpath('lines/AGN.lst')),
+        'HI_recomb': str(files('rbcodes.IGM').joinpath('lines/HI_recombination.lst')),
+        'HI_recomb_light': str(files('rbcodes.IGM').joinpath('lines/HI_recombination_light.lst')),
+        'HI': str(files('rbcodes.IGM').joinpath('lines/hi.lst')),
+        'EUV': str(files('rbcodes.IGM').joinpath('lines/euv.lst')),
+        'LLS_EUV': str(files('rbcodes.IGM').joinpath('lines/lls_euv.lst'))
     }
 
     # Check if the label is valid

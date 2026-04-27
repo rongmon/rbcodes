@@ -12,7 +12,6 @@ import json
 from matplotlib import rcParams
 rcParams['lines.linewidth'] = .9
 import webbrowser
-from pkg_resources import resource_filename
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import (
