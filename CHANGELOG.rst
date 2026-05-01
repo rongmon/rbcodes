@@ -2,6 +2,26 @@
 Changelog
 =========
 
+Version 2.2.0 (2026-05-01)
+==========================
+
+Compatibility
+-------------
+* pandas 2.x compatibility: replaced all deprecated ``DataFrame.append()`` calls
+  with ``pd.concat()`` across 8 GUI files (19 call sites in total).
+  Affected: ``PlotSpec_Integrated``, ``AbsorberManager``, ``vStack``,
+  ``prep_guidb``, ``linelist_selection``, ``tableview_pandas``,
+  ``spec_fit_gauss2d``, ``menu_toolbars``.
+
+Bug Fixes
+---------
+* ``rb_multispec``: fixed "Error showing lines" crash caused by custom color names
+  (e.g. ``sky_blue``, ``vermillion``) being passed directly to matplotlib in
+  ``toggle_show_identified_lines``; colors are now resolved through ``rb_set_color()``.
+* ``rb_zgui -x``: fixed ``ModuleNotFoundError: No module named 'utils'`` in
+  ``gui_io_xspec.py`` caused by a bare import that broke under package installation;
+  replaced with a fully-qualified ``rbcodes.GUIs.zgui.utils`` import.
+
 Version 2.1.2 (2026-04-23)
 ==========================
 
