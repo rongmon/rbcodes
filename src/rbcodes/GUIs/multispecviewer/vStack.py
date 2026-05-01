@@ -325,10 +325,10 @@ class vStack:
                 
                 # Check if parent has line_list attribute
                 if hasattr(self.parent, 'line_list'):
-                    self.parent.line_list = self.parent.line_list.append(new_row, ignore_index=True)
+                    self.parent.line_list = pd.concat([self.parent.line_list, new_row.to_frame().T], ignore_index=True)
                     lines_added += 1
                 elif hasattr(self.parent, 'canvas') and hasattr(self.parent.canvas, 'line_list'):
-                    self.parent.canvas.line_list = self.parent.canvas.line_list.append(new_row, ignore_index=True)
+                    self.parent.canvas.line_list = pd.concat([self.parent.canvas.line_list, new_row.to_frame().T], ignore_index=True)
                     lines_added += 1
                 else:
                     print("Could not find line_list attribute on parent or parent.canvas")

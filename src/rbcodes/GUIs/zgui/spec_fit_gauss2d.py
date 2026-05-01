@@ -147,14 +147,12 @@ class Gaussfit_2d(QWidget):
         #need a line to append wrest to name if it doesn't have one
         if any(map(str.isdigit, tmp[1]['ion'])):
             # if name column has wrest
-            for li in tmp:
-                newrow = {'wave': li['wrest'], 'name': li['ion']}
-                llist = llist.append(newrow, ignore_index=True)
+            rows = [{'wave': li['wrest'], 'name': li['ion']} for li in tmp]
+            llist = pd.concat([llist, pd.DataFrame(rows)], ignore_index=True)
         else:
             # if name column doesn't have wrest, need to append
-            for li in tmp:
-                newrow = {'wave': li['wrest'], 'name': li['ion']+' '+str(round(li['wrest']))}
-                llist = llist.append(newrow, ignore_index=True)
+            rows = [{'wave': li['wrest'], 'name': li['ion']+' '+str(round(li['wrest']))} for li in tmp]
+            llist = pd.concat([llist, pd.DataFrame(rows)], ignore_index=True)
 
         return llist
 

@@ -52,16 +52,16 @@ class GUI_DataFrame():
                                 z_guess = np.nan
                         hdul.close()
                         # Update GUI database
-                        self.gui_df = self.gui_df.append(
-                            {'Name': filename, 
-                            'RA': ra, 
-                            'DEC': dec, 
-                            'z': np.nan, 
-                            'z_err': np.nan, 
-                            'Confidence': '', 
-                            'Linelist': np.nan, 
-                            'Flag': '', 
-                            'z_guess': z_guess}, ignore_index=True)
+                        self.gui_df = pd.concat([self.gui_df, pd.DataFrame([{
+                            'Name': filename,
+                            'RA': ra,
+                            'DEC': dec,
+                            'z': np.nan,
+                            'z_err': np.nan,
+                            'Confidence': '',
+                            'Linelist': np.nan,
+                            'Flag': '',
+                            'z_guess': z_guess}])], ignore_index=True)
 
                         # Update GUI FITS dataset
                         self.fitsfiles.append(file)

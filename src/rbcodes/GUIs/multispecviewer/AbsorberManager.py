@@ -271,8 +271,8 @@ class AbsorberManager(QWidget):
             'Color': color,
             'Visible': visible
         })
-        self.absorbers_df = self.absorbers_df.append(new_row, ignore_index=True)
-        
+        self.absorbers_df = pd.concat([self.absorbers_df, new_row.to_frame().T], ignore_index=True)
+
         # Find the first empty row or add a new one
         row_found = False
         for row in range(self.table.rowCount()):
@@ -424,7 +424,7 @@ class AbsorberManager(QWidget):
                             'Color': color,
                             'Visible': visible
                         })
-                        self.absorbers_df = self.absorbers_df.append(new_row, ignore_index=True)
+                        self.absorbers_df = pd.concat([self.absorbers_df, new_row.to_frame().T], ignore_index=True)
                     
                     # Notify parent if needed
                     if hasattr(self.parent, 'update_absorber_redshift'):

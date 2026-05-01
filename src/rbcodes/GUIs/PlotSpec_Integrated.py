@@ -825,7 +825,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         try: linelist = self.manT.combo_ll.currentText()
         except: linelist =self.combo_lines.currentText() 
         new_row = pd.Series(data = {'Zabs': self.zabs, 'list': linelist, 'color': self.color})
-        self.zabs_list=self.zabs_list.append(new_row,ignore_index=True)
+        self.zabs_list=pd.concat([self.zabs_list, new_row.to_frame().T], ignore_index=True)
         
         self.zabs_line_plot.append(self.temp_plots)
         self.text.append(self.tt_temp)
@@ -1220,10 +1220,10 @@ class manage_identified_absorbers(QWidget):
 
         new_row = pd.Series(data = {'Zabs': z, 'list': linelist, 'color': color})
         if parent.zabs_list.shape[0]< 1:
-            parent.zabs_list=parent.zabs_list.append(new_row,ignore_index=True)
-    
+            parent.zabs_list=pd.concat([parent.zabs_list, new_row.to_frame().T], ignore_index=True)
+
         elif parent.zabs not in parent.zabs_list.Zabs.to_numpy():
-            parent.zabs_list=parent.zabs_list.append(new_row,ignore_index=True)
+            parent.zabs_list=pd.concat([parent.zabs_list, new_row.to_frame().T], ignore_index=True)
 #         elif parent.zabs in parent.zabs_list.Zabs.to_numpy():
 
         parent.hide = True #update text objects for removal/hiding
@@ -1977,19 +1977,19 @@ class vStack:
                     name = self.ions[key]['name']
                     zabs = self.ions['Target']['z']
                     new_row = pd.Series(data = {'Name': name, 'Wave_obs': wave_obs, 'Zabs': zabs})
-                    self.parent.line_list=self.parent.line_list.append(new_row,ignore_index=True) 
+                    self.parent.line_list=pd.concat([self.parent.line_list, new_row.to_frame().T], ignore_index=True)
                 elif self.ions[key]['flag'] == 2: #Blended Line Detection
                     wave_obs = self.ions[key]['lam_0_z']
                     name = self.ions[key]['name']
                     zabs = self.ions['Target']['z']
                     new_row = pd.Series(data = {'Name': name + " [b]", 'Wave_obs': wave_obs, 'Zabs': zabs})
-                    self.parent.line_list=self.parent.line_list.append(new_row,ignore_index=True)
+                    self.parent.line_list=pd.concat([self.parent.line_list, new_row.to_frame().T], ignore_index=True)
                 elif self.ions[key]['flag'] == 3: #Low Confidence Line Detection
                     wave_obs = self.ions[key]['lam_0_z']
                     name = self.ions[key]['name']
                     zabs = self.ions['Target']['z']
                     new_row = pd.Series(data = {'Name': name + " [p]", 'Wave_obs': wave_obs, 'Zabs': zabs})
-                    self.parent.line_list=self.parent.line_list.append(new_row,ignore_index=True) 
+                    self.parent.line_list=pd.concat([self.parent.line_list, new_row.to_frame().T], ignore_index=True)
                 
                     
             #lets keep zabs_list sorted by ascending zabs

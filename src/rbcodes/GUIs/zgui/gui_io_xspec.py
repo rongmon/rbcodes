@@ -2,7 +2,7 @@ import numpy as np
 import astropy.units as u
 from linetools.spectra.xspectrum1d import XSpectrum1D
 
-from utils import FitsObj
+from rbcodes.GUIs.zgui.utils import FitsObj
 
 # This class requires installation of linetools
 # check if sys.path has linetools before using

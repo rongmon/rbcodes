@@ -64,7 +64,7 @@ class CustomZTable(QtWidgets.QWidget):
 
 	def _on_sent_estZ(self, sent_z_est):
 		if self.estZ.shape[0] == 0:
-			self.estZ = self.estZ.append(sent_z_est, ignore_index=True)
+			self.estZ = pd.concat([self.estZ, pd.DataFrame([sent_z_est])], ignore_index=True)
 
 		self._update_table()
 		#print(self.estZ)
@@ -113,7 +113,7 @@ class CustomZTable(QtWidgets.QWidget):
 			sent_data[z_col] = sent_data['z']
 			sent_data[z_err_col] = sent_data['z_err']
 
-			self.estZ = self.estZ.append(sent_data, ignore_index=True)
+			self.estZ = pd.concat([self.estZ, pd.DataFrame([sent_data])], ignore_index=True)
 		self._update_table()
 
 	def _move_current_filename_top(self, sent_filename):

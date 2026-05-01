@@ -933,27 +933,23 @@ class Custom_MenuBar(QMenuBar):
 						colnames = f.readline().replace(' ', '')[:-1].split(',')
 						#self.linelist = pd.DataFrame(columns=colnames)
 						lines = f.readlines()
-					self.linelist = pd.DataFrame(columns=['wave', 'ID', 'name'])
+					rows = []
 					for line in lines:
 						tmp = line.replace(' ', '')[:-1].split(',')
 						row = [float(tmp[0]), int(tmp[1]), tmp[2]+'_'+tmp[3]]
-						self.linelist = self.linelist.append({'wave': row[0],
-															  'ID': row[1],
-															  'name': row[2]},
-															  ignore_index=True)
+						rows.append({'wave': row[0], 'ID': row[1], 'name': row[2]})
+					self.linelist = pd.DataFrame(rows, columns=['wave', 'ID', 'name'])
 				elif filepath.endswith('lbg.lst'):
 					with open(filepath, 'r') as f:
 						colnames = f.readline().split()
 						#self.linelist = pd.DataFrame(columns=colnames)
 						lines = f.readlines()
-					self.linelist = pd.DataFrame(columns=['wave', 'ID', 'name'])
+					rows = []
 					for line in lines:
 						tmp = line.split()
 						row = [float(tmp[0]), int(tmp[1]), tmp[2]+'_'+tmp[3]]
-						self.linelist = self.linelist.append({'wave': row[0],
-															  'ID': row[1],
-															  'name': row[2]},
-															  ignore_index=True)
+						rows.append({'wave': row[0], 'ID': row[1], 'name': row[2]})
+					self.linelist = pd.DataFrame(rows, columns=['wave', 'ID', 'name'])
 					
 
 			self.send_linelist.emit(self.linelist)

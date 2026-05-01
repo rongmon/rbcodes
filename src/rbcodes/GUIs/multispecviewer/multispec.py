@@ -1570,15 +1570,19 @@ class MainWindow(QMainWindow):
             
             # Get unique redshifts and assign colors
             unique_redshifts = self.canvas.line_list['Zabs'].unique()
-            
+
             # Define a set of distinct colors (dark theme friendly)
-            colors = ['cyan', 'magenta', 'yellow', 'lime', 'orange', 'coral', 'sky_blue',
-                     'vermillion', 'lavender', 'mint', 'rose', 'gold', 'teal', 'pale_cyan']
-            
-            # Assign a color to each redshift
+            # Resolve through rb_set_color() so custom names map to valid RGB values
+            clr = rt.rb_set_color()
+            color_names = ['sky_blue', 'orange', 'cyan', 'yellow', 'vermillion',
+                           'lavender', 'mint', 'rose', 'gold', 'teal', 'pale_cyan',
+                           'coral', 'reddish_purple', 'pale_red', 'light_lime_green']
+            color_values = [clr[c] for c in color_names]
+
+            # Assign a resolved RGB color to each redshift
             redshift_colors = {}
             for i, z in enumerate(unique_redshifts):
-                redshift_colors[z] = colors[i % len(colors)]
+                redshift_colors[z] = color_values[i % len(color_values)]
             
             # Plot each identified line
             lines_shown = 0
