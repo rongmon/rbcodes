@@ -6,7 +6,7 @@
 # Install packages (use conda to ensure compatibility)
 # conda install -c conda-forge --file requirements_simple.txt
 PyQt5>=5.15.7
-numpy>=1.22.3
+numpy>=1.22.3,<1.24
 matplotlib>=3.5.0
 astropy>=5.3.3
 linetools>=0.3
