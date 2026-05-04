@@ -1,8 +1,42 @@
 # Project Documentation
-
 [Back to Main Page](../main_readme.md)
 
 *Auto-generated documentation from docstrings*
+
+## Modules
+
+### rb_boot
+
+Bootstrap resampling utility.
+
+Standalone module — not imported by other package modules; available for direct use.
+
+Provides case-bootstrap resampling on numpy arrays, with optional support for
+a user-supplied summary statistic function (``bootfunc``). Returns bootstrap
+resamples or the distribution of the statistic, which can be used to estimate
+confidence intervals.
+
+Example
+-------
+    from rbcodes.rbstat.rb_boot import bootstrap
+    import numpy as np
+    data = np.random.normal(0, 1, 100)
+    boot_means = bootstrap(data, bootnum=1000, bootfunc=np.mean)
+
+### rb_wilsonscore
+
+Wilson score confidence interval for binomial proportions.
+
+Standalone module — not imported by other package modules; available for direct use.
+
+Computes the Wilson score interval for a binomial distribution, which is more
+accurate than the normal approximation (Wald interval) for small samples or
+extreme probabilities.
+
+Example
+-------
+    from rbcodes.rbstat.rb_wilsonscore import rb_wilsonscore
+    center, hi, lo = rb_wilsonscore(10, 20, 0.95)
 
 ## Functions
 

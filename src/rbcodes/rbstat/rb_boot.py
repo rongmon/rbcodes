@@ -1,3 +1,20 @@
+"""
+Bootstrap resampling utility.
+
+Standalone module — not imported by other package modules; available for direct use.
+
+Provides case-bootstrap resampling on numpy arrays, with optional support for
+a user-supplied summary statistic function (``bootfunc``). Returns bootstrap
+resamples or the distribution of the statistic, which can be used to estimate
+confidence intervals.
+
+Example
+-------
+    from rbcodes.rbstat.rb_boot import bootstrap
+    import numpy as np
+    data = np.random.normal(0, 1, 100)
+    boot_means = bootstrap(data, bootnum=1000, bootfunc=np.mean)
+"""
 import numpy as np
 def bootstrap(data, bootnum=100, samples=None, bootfunc=None):
     """Performs bootstrap resampling on numpy arrays.

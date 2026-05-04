@@ -1,3 +1,22 @@
+"""
+NFW halo escape velocity and virial-radius/mass conversion utilities.
+
+Standalone module — not imported by other package modules; available for direct use.
+
+Provides:
+- ``NFW_escape_vel``         — escape velocity at radius r for a (possibly truncated) NFW profile
+- ``Deltavir``               — Bryan & Norman (1998) virial overdensity
+- ``rvirmvir``               — convert between Rvir and Mvir
+- ``mvir_to_cvir``           — concentration–mass relation (Dutton & Maccio 2014)
+- ``NFW_property_from_Mvir`` — convenience wrapper returning Rvir, cvir, and vesc
+
+Example
+-------
+    import astropy.units as u
+    from rbcodes.halo.halo_profile import NFW_property_from_Mvir
+    result = NFW_property_from_Mvir(r=10.*u.kpc, Mvir=3e11*u.solMass, z=0.5)
+    print(result['vesc'], result['rvir'])
+"""
 #Load modules
 
 import numpy as np

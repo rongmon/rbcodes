@@ -1,3 +1,18 @@
+"""
+Stellar-mass to halo-mass conversion (Moster et al. 2010).
+
+Standalone module — not imported by other package modules; available for direct use.
+
+Converts a galaxy stellar mass to a halo mass and NFW virial radius using
+the redshift-dependent SMHM relation of Moster et al. (2010), ApJ 710, 903.
+Valid for redshifts 0 < z < 3.5.
+
+Example
+-------
+    from rbcodes.halo.mstar2mhalo import mstar2mhalo
+    import numpy as np
+    mhalo, rvir = mstar2mhalo(mstar=10**10.4, z=0.5)
+"""
 import numpy as np
 def mstar2mhalo(mstar,z):
     """

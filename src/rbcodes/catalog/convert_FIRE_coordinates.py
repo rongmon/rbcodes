@@ -1,3 +1,20 @@
+"""
+Coordinate epoch conversion for Magellan/FIRE spectra.
+
+Standalone module — not imported by other package modules; available for direct use.
+
+Reads the EQUINOX keyword from a Magellan FIRE 1D spectrum FITS header and
+transforms the stored (RA, Dec) to J2000 (FK5) coordinates using Astropy.
+
+Note: Intended specifically for older Magellan FIRE QSO spectra that store
+coordinates in a non-J2000 epoch.
+
+Example
+-------
+    from rbcodes.catalog.convert_FIRE_coordinates import convert_epoch
+    coord_j2000 = convert_epoch('J0100+28_F.fits')
+    print(coord_j2000.to_string('hmsdms'))
+"""
 from astropy.coordinates import FK5, SkyCoord
 from astropy.time import Time
 from astropy import units as u

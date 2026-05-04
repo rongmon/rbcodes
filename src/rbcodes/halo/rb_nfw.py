@@ -1,3 +1,19 @@
+"""
+NFW dark matter halo profile calculator.
+
+Standalone module — not imported by other package modules; available for direct use.
+
+Computes NFW halo profiles including density, circular velocity, escape velocity,
+and velocity dispersion profiles given a halo mass, NFW concentration parameter,
+and redshift.  Uses the Hoeft, Mucket & Gottlober (2004) ApJ 602 velocity
+dispersion prescription.
+
+Example
+-------
+    from rbcodes.halo.rb_nfw import rb_nfw
+    nfw = rb_nfw(m200=1e12, c=10, z=0.5)
+    # nfw keys: m200, c, r200, v200, maxvcirc, maxvcircr, r, rho, vcirc, M_r, sig_v, vesc
+"""
 import numpy as np
 import scipy.integrate as integrate
 def rb_nfw(m200,c,z):

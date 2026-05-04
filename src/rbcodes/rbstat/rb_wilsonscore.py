@@ -1,3 +1,17 @@
+"""
+Wilson score confidence interval for binomial proportions.
+
+Standalone module — not imported by other package modules; available for direct use.
+
+Computes the Wilson score interval for a binomial distribution, which is more
+accurate than the normal approximation (Wald interval) for small samples or
+extreme probabilities.
+
+Example
+-------
+    from rbcodes.rbstat.rb_wilsonscore import rb_wilsonscore
+    center, hi, lo = rb_wilsonscore(10, 20, 0.95)
+"""
 from scipy.special import ndtri
 import numpy as np
 def rb_wilsonscore(count,nobs,confint):

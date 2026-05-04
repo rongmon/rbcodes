@@ -9,6 +9,7 @@ A public release of Python codes for astrophysical research by Rongmon Bordoloi.
 - [Installation](#installation)
 - [Dependencies](#dependencies)
 - [Contents](#contents)
+  - [Core Pipeline — rb_spec.py](#core-pipeline--rb_specpy)
   - [Graphical User Interfaces (GUIs)](#graphical-user-interfaces-guis)
   - [Intergalactic Medium (IGM) Tools](#intergalactic-medium-igm-tools)
   - [Halo Analysis](#halo-analysis)
@@ -24,7 +25,7 @@ A public release of Python codes for astrophysical research by Rongmon Bordoloi.
 **Want to dive in?** Here are the most commonly used tools:
 
 ```bash
-# Launch the main spectrum analysis pipeline
+# Launch the main spectrum analysis pipeline (GUI)
 launch_specgui
 
 # View and compare multiple spectra
@@ -35,6 +36,19 @@ rb_llsfitter
 
 # Estimate redshifts (esp. for JWST)
 rb_zgui
+```
+
+Or use `rb_spec` directly as a Python API:
+
+```python
+from rbcodes.GUIs.rb_spec import rb_spec as r
+
+spec = r.from_file('spectrum.fits', filetype='linetools')
+spec.shift_spec(zabs=0.5)
+spec.slice_spec(1548.2, -1500, 1500, use_vel=True)
+spec.fit_continuum(mask=[-200, 200], Legendre=3)
+spec.compute_EW(1548.2, vmin=-150, vmax=150)
+spec.save_slice('results.json', file_format='json')
 ```
 
 For more details, see the individual tool documentation below.
@@ -73,35 +87,68 @@ For more installation options and troubleshooting, see [INSTALLATION.md](../INST
 ### Dependencies
 - Core Dependencies (automatically installed):
   - PyQt5 >= 5.15.7
-  - numpy >= 1.22.3
+  - numpy >= 1.22.3, < 1.24  *(upper bound required — numpy 1.24+ breaks compatibility)*
   - matplotlib >= 3.5.0
   - astropy >= 5.3.3
   - linetools >= 0.3
   - scipy >= 1.7.3
-  - pandas == 1.3.5
+  - pandas == 1.3.5  *(pinned — newer versions not yet tested)*
   - emcee >= 3.0
   - photutils >= 1.0
   - corner >= 2.0
   - scikit-learn >= 1.5.0
   - tqdm >= 4.65.0
+  - pytest >= 6.0
+  - pytest-cov >= 2.0
 
 ## Contents
 
+### Core Pipeline — rb_spec.py
+
+[Full Documentation](/docs/GUIs/rb_spec/rb_spec.md)
+
+`rb_spec` is the central Python class in `rbcodes`. It is the programmable backbone behind `launch_specgui` and the recommended entry point for all absorption line analysis — both interactive and scripted.
+
+Key capabilities:
+- Load spectra from FITS, ASCII, XSpectrum1D, or numpy arrays
+- Shift to absorber rest frame and slice around any transition
+- Continuum fitting: interactive spline, interactive masking GUI, iterative Legendre polynomial, RANSAC, BIC-optimized order selection
+- Equivalent width and column density (AOD) measurements with full error propagation
+- Saturation detection, SNR estimation, velocity centroid and dispersion
+- Save/load full analysis state to JSON
+
+```python
+from rbcodes.GUIs.rb_spec import rb_spec as r, load_rb_spec_object
+
+# Load and analyse
+spec = r.from_file('spectrum.fits', filetype='linetools')
+spec.shift_spec(zabs=0.348)
+spec.slice_spec(1548.2, -1500, 1500, use_vel=True)
+spec.fit_continuum(mask=[-200, 200], Legendre=3)
+spec.compute_EW(1548.2, vmin=-150, vmax=150, plot=True)
+spec.save_slice('results.json', file_format='json')
+
+# Reload a saved analysis
+spec = load_rb_spec_object('results.json')
+```
+
+See the [full documentation](/docs/GUIs/rb_spec/rb_spec.md) for the complete API, continuum fitting options, output attributes, and worked examples.
+
+---
+
 ### Graphical User Interfaces (GUIs)
 
+[Full Auto-generated Documentation](/docs/GUIs/GUIs_readme.md)
+
 #### Active Tools
-1. [launch_specgui.py](/docs/GUIs/rb_spec/rb_spec.md): **Main tool** - Comprehensive absorption line analysis pipeline (recommended starting point)
-   - Interactive GUI wrapper for rb_spec
-   - Continuum fitting
-   - Equivalent width/column density measurements
-   - Simple Voigt profile fitting
+1. [launch_specgui](/docs/GUIs/rb_spec/rb_spec.md): **GUI launcher** for `rb_spec` — provides a point-and-click interface around the core pipeline; supports single-spectrum and batch modes
 2. [multispecviewer](/docs/GUIs/multispec/multispec.md): Enhanced spectrum viewer for handling multiple 1D spectra simultaneously with advanced line identification and absorber cataloging capabilities.
 3. [interactive_continuum_fit.py](/docs/GUIs/interactive_continuum_fit.md): **Recommended continuum fitter** - Interactive tool with polynomial and spline methods, manual masking, and real-time feedback
-4. [AbsTools](/docs/GUIs/AbsTools/README.md): Complex absorption line analysis GUI with batch processing capabilities
-5. [rb_zgui (zgui/main.py)](/docs/GUIs/zgui/Tutorial_for_Emission_Line_Redshift_Estimator_GUI.pdf): Redshift measurement GUI (PDF tutorial)
+4. [rb_zgui (zgui/main.py)](/docs/GUIs/zgui/Tutorial_for_Emission_Line_Redshift_Estimator_GUI.pdf): Redshift measurement GUI (PDF tutorial)
    - Supports 1D and 2D spectra
    - Optimized for JWST NIRCam/Grism spectroscopy
-6. [LLSFitter_GUI.py](/docs/GUIs/LLSFitter/LLSFitter.md): GUI to fit Lyman Limit System column densities
+5. [LLSFitter_GUI.py](/docs/GUIs/LLSFitter/LLSFitter.md): GUI to fit Lyman Limit System column densities
+6. [AbsTools](/docs/GUIs/AbsTools/README.md): ⚠️ **LEGACY** - Complex absorption line analysis GUI with batch processing capabilities (use `launch_specgui` in batch mode instead for new analyses)
 7. [rb_cont.py](/docs/GUIs/rb_cont.md): ⚠️ **LEGACY** - Older continuum fitter (use `interactive_continuum_fit.py` instead)
 
 ### Intergalactic Medium (IGM) Tools
@@ -119,8 +166,14 @@ For more installation options and troubleshooting, see [INSTALLATION.md](../INST
     
 ### Halo Analysis
 
-1. **rb_nfw.py**: Compute NFW (Navarro-Frenk-White) dark matter halo profiles
-2. **mstar2mhalo.py**: Convert stellar mass to halo mass using Moster et al. 2010 relations
+[Full Auto-generated Documentation](/docs/halo/halo_readme.md)
+
+Standalone utility modules — available for direct import, not used internally by other package modules.
+
+1. **rb_nfw.py**: Compute NFW (Navarro-Frenk-White) halo profiles — density, circular velocity, escape velocity, and velocity dispersion (Hoeft et al. 2004)
+2. **halo_profile.py**: NFW escape velocity, virial radius ↔ mass conversion, and concentration–mass relation (Dutton & Maccio 2014)
+3. **mstar2mhalo.py**: Stellar mass → halo mass and virial radius using Moster et al. (2010) SMHM relation
+4. **halos.py**: Stellar mass → halo mass using the Behroozi UniverseMachine SMHM relation; also computes R_200 (requires `smhm_med_params.txt` parameter file)
 
 ### Statistical Tools
 
@@ -131,12 +184,18 @@ For more installation options and troubleshooting, see [INSTALLATION.md](../INST
 
 ### Lensing
 
-1. **lens_ang_sep.py**: Deflection matrix ray tracing for gravitational lensing calculations
+[Full Auto-generated Documentation](/docs/lensing/lensing_readme.md)
+
+Standalone utility module — available for direct import.
+
+1. **lens_ang_sep.py**: Gravitational lensing ray-tracing — transports image-plane coordinates to a source plane (or any intermediate redshift plane) using deflection matrices from a lens model. Includes supporting cosmological distance calculations (`cosmic_D`, `ang_D12`). Originally written by Ahmed Shaban (2020), extended by Rongmon Bordoloi (2021).
 
 ### Utility Modules
 
-1. **rb_utility.py**: General utility functions (progress reporting, color lists, etc.)
-2. **rb_spectrum.py**: Spectrum handling and I/O utilities
+[Full Auto-generated Documentation](/docs/utils/utils_readme.md)
+
+1. **rb_spectrum.py**: Core spectrum I/O and handling — loads FITS, ASCII, and other formats; used internally by `rb_spec` and the GUIs
+2. **rb_utility.py**: General utility functions (progress reporting, color lists, etc.)
 3. **rb_x1d_id.py**: Inspect HST/COS x1d FITS file headers (exposure type, object type, etc.)
 4. **readmultispec.py**: Read IRAF echelle spectra in multispec format (supports linear, log, cubic spline, Chebyshev, Legendre dispersion)
 5. **cos_inspect.py**: Quick inspection utility for HST/COS x1d files
@@ -149,9 +208,14 @@ For more installation options and troubleshooting, see [INSTALLATION.md](../INST
 
 ### Catalog Tools
 
+[Full Auto-generated Documentation](/docs/catalog/catalog_readme.md)
+
+Standalone utility modules — available for direct import.
+
 1. **rb_search.py**: Cone search around (RA, Dec) coordinates against a list of objects
 2. **convert_FIRE_coordinates.py**: Transform Magellan FIRE spectrum coordinates to J2000 epoch
-3. **galaxy_group_finder.py**: Identify galaxy groups and associations
+3. **galaxy_group_finder.py**: Friend-of-Friends galaxy group finder with angular, comoving, and physical distance linking
+4. **GalaxyGroupFinder_slow.py**: Reference (slower) FoF implementation — easier to read and verify; prefer `galaxy_group_finder.py` for production use
 
 ## Contributing
 

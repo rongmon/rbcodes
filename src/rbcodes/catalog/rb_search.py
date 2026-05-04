@@ -1,3 +1,16 @@
+"""
+Catalog cone-search utility.
+
+Standalone module — not imported by other package modules; available for direct use.
+
+Provides a simple angular cone search around a given (RA, Dec) pointing against
+an input catalogue of coordinates.
+
+Example
+-------
+    from rbcodes.catalog.rb_search import cone_search
+    result = cone_search(ra_center, dec_center, ra_list, dec_list, angular_scale_arcsec)
+"""
 import numpy as np
 def cone_search(ra_center,dec_center,ra_list,dec_list,angular_scale):
     """

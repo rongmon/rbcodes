@@ -1,4 +1,26 @@
 #!/usr/bin/python
+"""
+Stellar-mass to halo-mass conversions via the Behroozi UniverseMachine relation.
+
+Standalone module — not imported by other package modules; available for direct use.
+
+Provides:
+- ``stellarToHaloMass(z, stellar_mass)`` — convert log stellar mass to log halo mass
+  using the Behroozi et al. UniverseMachine SMHM relation.  Requires the parameter
+  file ``smhm_med_params.txt`` to be present in the working directory.
+- ``R_200(Mh, z)``                       — compute the virial radius R_200 from a
+  log halo mass and redshift (uses Planck18 cosmology).
+
+Note: scatter in the SMHM relation is ~0.1 dex (range 0.04–0.13 dex).
+
+Example
+-------
+    from rbcodes.halo import halos as h
+    import numpy as np
+    sm = np.arange(8, 10, 0.2)          # log stellar mass
+    mh = [h.stellarToHaloMass(0.5, s) for s in sm]
+    rv = [h.R_200(m, 0.5) for m in mh]
+"""
 import sys
 import math
 import re
@@ -7,54 +29,6 @@ from astropy.cosmology import Planck18
 from astropy.constants import G
 import astropy.units as u
 from numpy import log10
-
-"""NB: Stellar-mass to halo-mass relations from Behroozi et al 
-Universe Machine. It is possible to calculate scatter in the
-Stellar to halo mass relation but shoulf assume that in the
-mass range of interest, the scatter in this correlation is
-about 0.1 dex (in reality, 0.04-0.13 dex)
-
-example
-from rbcode.halo import halos as h
-import numpy as np
-import matplotlib.pyplot as plt
-
-#define stellar mass in log
-sm=np.arange(8,10,.2)
-
-
-
-hm1=np.zeros(len(sm),)
-hm2=np.zeros(len(sm),)
-hm3=np.zeros(len(sm),)
-hm4=np.zeros(len(sm),)
-
-z1=np.ones(len(sm),)*5.3
-z2=np.ones(len(sm),)*5.6
-z3=np.ones(len(sm),)*6
-z4=np.ones(len(sm),)*6.5
-
-for i in range(0,len(sm)):
-    hm1[i]=h.stellarToHaloMass(z1[i],sm[i])    
-    hm2[i]=h.stellarToHaloMass(z2[i],sm[i])
-    hm3[i]=h.stellarToHaloMass(z3[i],sm[i])
-    hm4[i]=h.stellarToHaloMass(z4[i],sm[i])
-
-
-
-
-plt.plot(sm,hm1,'.',label='z=5.3')
-plt.plot(sm,hm2,'.',label='z=5.6')
-plt.plot(sm,hm3,'.',label='z=6')
-plt.plot(sm,hm4,'.',label='z=6.5')
-
-plt.xlabel('log Stellar Mass')
-plt.ylabel('log halo Mass')
-plt.legend()
-plt.show()
-
-
-"""
 def stellarToHaloMass(z,stellar_mass):
     
     #Load params

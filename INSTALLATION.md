@@ -73,19 +73,20 @@ launch_specgui --help
 ### Core Dependencies (automatically installed)
 
 ```
-PyQt5>=5.15.7         # GUI framework
-numpy>=1.22.3         # Numerical computing
-matplotlib>=3.5.0     # Plotting
-astropy>=5.3.3        # Astronomy utilities
-linetools>=0.3        # Spectroscopy tools
-scipy>=1.7.3          # Scientific computing
-pandas==1.3.5         # Data manipulation
-emcee>=3.0            # MCMC sampling
-photutils>=1.0        # Astronomy photometry
-corner>=2.0           # MCMC visualization
-scikit-learn>=1.5.0   # Machine learning
-tqdm>=4.65.0          # Progress bars
-pytest>=6.0           # Testing
+PyQt5>=5.15.7           # GUI framework
+numpy>=1.22.3,<1.24     # Numerical computing  (upper bound required — numpy 1.24+ breaks compatibility)
+matplotlib>=3.5.0       # Plotting
+astropy>=5.3.3          # Astronomy utilities
+linetools>=0.3          # Spectroscopy tools
+scipy>=1.7.3            # Scientific computing
+pandas==1.3.5           # Data manipulation    (pinned — newer versions not yet tested)
+emcee>=3.0              # MCMC sampling
+photutils>=1.0          # Astronomy photometry
+corner>=2.0             # MCMC visualization
+scikit-learn>=1.5.0     # Machine learning
+tqdm>=4.65.0            # Progress bars
+pytest>=6.0             # Testing framework
+pytest-cov>=2.0         # Test coverage reporting
 ```
 
 ## Troubleshooting

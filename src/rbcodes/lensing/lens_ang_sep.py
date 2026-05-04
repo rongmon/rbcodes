@@ -1,4 +1,28 @@
-""" Image generation and manipulation routines"""
+"""
+Gravitational lensing ray-tracing and angular separation utilities.
+
+Standalone module — not imported by other package modules; available for direct use.
+
+Provides tools to ray-trace image-plane coordinates to a source plane (or any
+intermediate redshift plane) using deflection matrices from a lens model, along
+with supporting cosmological distance calculations.
+
+Key components:
+- ``cosmic_D(w_m, w_l, z)``             — comoving, angular diameter, and luminosity distances
+- ``ang_D12(w_m, w_l, z1, z2)``         — angular diameter distance between two redshifts
+- ``ang_sep_D(xc1, yc1, xc2, yc2)``    — angular separation in radians
+- ``model_delens``                      — class to load lens deflection matrices and ray-trace
+  coordinates to a new source-plane redshift
+
+Example
+-------
+    from rbcodes.lensing import lens_ang_sep as l
+    s = l.model_delens(fits_x, fits_y, zl=0.392, zs_o=2.760)
+    s.raytrace_new_z(ra, dec, zs_n=0.5)
+    print(s.src_ra, s.src_dec)
+
+Originally written by Ahmed Shaban (2020); extended by Rongmon Bordoloi (2021).
+"""
 from __future__ import print_function, absolute_import, division, unicode_literals
 from astropy.io import fits
 from astropy.wcs import WCS

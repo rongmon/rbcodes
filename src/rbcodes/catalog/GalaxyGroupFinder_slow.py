@@ -1,3 +1,22 @@
+"""
+Friend-of-Friends galaxy group finder — reference (slow) implementation.
+
+Standalone module — not imported by other package modules; available for direct use.
+
+This is the original, explicit reference implementation of the FoF group finder.
+It computes pairwise separations in a straightforward loop and is easier to
+read and verify than the optimised version in ``galaxy_group_finder.py``, but
+does not scale to large catalogues.
+
+Prefer ``galaxy_group_finder.GalaxyGroupFinder`` for production use.
+
+Example
+-------
+    from rbcodes.catalog.GalaxyGroupFinder_slow import GalaxyGroupFinder
+    gf = GalaxyGroupFinder()
+    gf.load_catalog(ra, dec, redshift)
+    gf.find_groups(linking_length_kpc=200, velocity_gap_kms=500)
+"""
 import numpy as np
 import pandas as pd
 from astropy.cosmology import Planck18

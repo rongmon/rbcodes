@@ -1,4 +1,5 @@
 # Project Documentation
+[Back to Main Page](../main_readme.md)
 
 *Auto-generated documentation from docstrings*
 
@@ -127,39 +128,59 @@ Function to compute the equivalent width (EW) within a given velocity window.
     Enhanced version with improved error handling, robustness, and dynamic saturation detection.
 
     Parameters:
-        lam (array): Observed wavelength vector (in Angstroms).
-        flx (array): Flux vector (same length as lam, preferably continuum normalized).
+        lam (np.ndarray): Observed wavelength vector (in Angstroms). Must be monotonically increasing.
+        flx (np.ndarray): Flux vector (same length as lam, preferably continuum normalized).
         wrest (float): Rest frame wavelength of the absorption line (in Angstroms).
-        lmts (list): Velocity limits [vmin, vmax] in km/s.
-        flx_err (array): Error spectrum (same length as flx).
+        lmts (List[float]): Velocity limits [vmin, vmax] in km/s. Must have vmin < vmax.
+        flx_err (np.ndarray): Error spectrum (same length as flx).
         plot (bool): If True, will plot the spectrum and equivalent width. Default is False.
-
-    Optional Parameters:
         zabs (float): Absorber redshift. Default is 0.
-        f0 (float): Oscillator strength of the transition.
-        sat_limit (float or str): Limit for saturation. Default is 'auto' which uses median error.
-                                  Can also be a float value or None to disable saturation handling.
+        f0 (Optional[float]): Oscillator strength of the transition. Required for column density calculation.
+        sat_limit (Union[float, str, None]): Limit for saturation detection:
+                                             - 'auto': Uses median error within integration window (default)
+                                             - float value: Custom threshold
+                                             - None: Disables saturation handling
+        normalization (str): Method of flux normalization:
+                             - 'none': No normalization (default)
+                             - 'median': Normalize by median flux
+                             - 'mean': Normalize by mean flux
         verbose (bool): If True, will print detailed output. Default is False.
         SNR (bool): If True, computes the Signal-to-Noise Ratio. Default is False.
-        normalization (str): Method of flux normalization. Options: 'median', 'mean', 'none'. Default is 'none'.
         _binsize (int): Binning size for SNR calculation. Default is 1.
 
     Returns:
-        dict: A dictionary containing equivalent width measurements and related information.
+        Dict[str, Any]: A dictionary containing equivalent width measurements and related information.
             - 'ew_tot': Total rest frame equivalent width (in Angstroms).
             - 'err_ew_tot': Error on the total equivalent width.
             - 'vel_disp': 1-sigma velocity dispersion.
             - 'vel50_err': Error on the velocity centroid.
             - 'line_saturation': Boolean flag indicating if line is saturated.
             - 'saturation_fraction': Fraction of integration window that is saturated.
-            - 'col': AOD column density.
-            - 'colerr': Error on the AOD column density.
-            - 'Tau_a': Apparent optical depth.
-            - 'med_vel': Velocity centroid (EW-weighted velocity within velocity limits).
+            - 'col': AOD column density (only if f0 provided).
+            - 'colerr': Error on the AOD column density (only if f0 provided).
+            - 'Tau_a': Apparent optical depth (only if f0 provided).
+            - 'med_vel': Velocity centroid (only if f0 provided).
+            - 'SNR': Signal-to-noise ratio (only if SNR=True).
+    
+    Examples:
+        # Basic usage with minimal parameters
+        from rbcodes.IGM.compute_EW import compute_EW
+        result = compute_EW(wavelength, flux, 1215.67, [-100, 100], flux_error)
+        
+        # Full analysis with column density calculation and plotting
+        result = compute_EW(
+            wavelength, flux, 1215.67, [-150, 150], flux_error, 
+            plot=True, zabs=0.1, f0=0.4164, verbose=True
+        )
+        
+        # Check for saturation with custom threshold
+        result = compute_EW(
+            wavelength, flux, 1215.67, [-100, 100], flux_error,
+            sat_limit=0.1, normalization='median'
+        )
     
     Written:
         - Rongmon Bordoloi, 2nd November 2016
-        - Translated from Matlab code `compute_EW.m`, which in turn is based on Chris Thom's `eqwrange.pro`.
         - Tested with COS-Halos/Dwarfs data.
         
     Edits:
@@ -169,6 +190,7 @@ Function to compute the equivalent width (EW) within a given velocity window.
         - RB, February 21, 2025: rewritten for clarity, added SNR keyword to compute signal-to-noise of the spectrum.
         - RB, April 8, 2025: Major improvements.
         - RB, April 9, 2025: Added dynamic saturation detection based on median error.
+        - RB, April 26, 2025: plotting updates+type annotations added 
 
     Improvements:
     - Dynamic saturation detection based on median error in the integration window
@@ -239,7 +261,7 @@ Function to read in atomic line information for a given rest frame wavelength,
         The line list to use. Default is 'atom'.
         Available options: 'atom', 'LLS', 'LLS Small', 'DLA', 'LBG', 'Gal',
         'Eiger_Strong', 'Gal_Em', 'Gal_Abs', 'Gal_long', 'AGN', 'HI_recomb',
-        'HI_recomb_light'
+        'HI_recomb_light', 'HI', 'EUV', 'LLS_EUV'
     target_name : str, optional
         Required when method='Name'. The name of the target species to match.
 
@@ -299,7 +321,7 @@ Read a line list defined by the label.
         Label string identifying which line list to read
         Available options: 'atom', 'LLS', 'LLS Small', 'DLA', 'LBG', 'Gal',
         'Eiger_Strong', 'Gal_Em', 'Gal_Abs', 'Gal_long', 'AGN', 'HI_recomb',
-        'HI_recomb_light'
+        'HI_recomb_light', 'HI', 'EUV', 'LLS_EUV'
 
     Returns
     -------
@@ -366,6 +388,29 @@ Example code to plot to plot distances for differetn lens separations
     Returns
 
         Plot of physical separation vs redshift
+
+### estimate_width_percentile() (`find_line_features_wavelet`)
+
+Estimate line width using percentile method around a detected line.
+    Returns width in wavelength units.
+
+### create_feature_mask() (`find_line_features_wavelet`)
+
+Create a mask for continuum fitting based on detected spectral lines.
+    
+    Parameters
+    ----------
+    wavelength : array-like
+        Wavelength array.
+    line_results : dict
+        Results from find_spectral_lines_wavelet.
+    width_scale_factor : float, optional
+        Factor to scale the line width for masking. Default is 3.0.
+        
+    Returns
+    -------
+    mask : ndarray
+        Boolean mask where False indicates regions to mask out (spectral lines).
 
 ### __init__() (`LLSFitter`)
 
@@ -552,48 +597,6 @@ Get a summary of the fitting results.
         Returns:
         --------
         dict : Dictionary with fitting results
-
-### compute_EW() (`compute_EW_old`)
-
-Function to compute the equivalent width (EW) within a given velocity window.
-
-    Parameters:
-        lam (array): Observed wavelength vector (in Angstroms).
-        flx (array): Flux vector (same length as lam, preferably continuum normalized).
-        wrest (float): Rest frame wavelength of the absorption line (in Angstroms).
-        lmts (list): Velocity limits [vmin, vmax] in km/s.
-        flx_err (array): Error spectrum (same length as flx).
-        plot (bool): If True, will plot the spectrum and equivalent width. Default is False.
-
-    Optional Parameters:
-        f0 (float): Oscillator strength of the transition.
-        zabs (float): Absorber redshift. Default is 0.
-        sat_limit (float): Limit for saturation. Default is 0.10 (COS specific).
-        verbose (bool): If True, will print detailed output. Default is False.
-        SNR (bool): If True, computes the Signal-to-Noise Ratio. Default is False.
-        _binsize (int): Binning size for SNR calculation. Default is 1.
-
-    Returns:
-        dict: A dictionary containing the following keys:
-            - 'ew_tot': Total rest frame equivalent width (in Angstroms).
-            - 'err_ew_tot': Error on the total equivalent width.
-            - 'vel_disp': 1-sigma velocity dispersion.
-            - 'vel50_err': Error on the velocity centroid.
-            - 'col': AOD column density.
-            - 'colerr': Error on the AOD column density.
-            - 'Tau_a': Apparent optical depth.
-            - 'med_vel': Velocity centroid (EW-weighted velocity within velocity limits).
-
-    Written:
-        - Rongmon Bordoloi, 2nd November 2016
-        - Translated from Matlab code `compute_EW.m`, which in turn is based on Chris Thom's `eqwrange.pro`.
-        - Tested with COS-Halos/Dwarfs data.
-        
-    Edits:
-        - RB, July 5, 2017: Output is a dictionary; edited minor dictionary arrangement.
-        - RB, July 25, 2019: Added `med_vel` to the output.
-        - RB, April 28, 2021: Modified `med_vel` to be weighted by `EW` and `vel_disp`.
-        - RB, February 21, 2025: rewritten for clarity, added SNR keyword to compute signal-to-noise of the spectrum
 
 ### generate_full_coverage_chunks() (`fit_continuum_full_spec`)
 
@@ -801,6 +804,8 @@ Iterative continuum fitter using Legendre polynomials with sigma clipping
     include_model : bool
         Whether to include the astropy model and fitter objects in the return dictionary (default: False)
         This replaces the previous return_model parameter for consistency.
+    silent : bool
+        If True, suppress all print statements and plots (default: False)
     
     Returns
     ---------
@@ -865,6 +870,7 @@ Iterative continuum fitter using Legendre polynomials with sigma clipping
     Written by:  Rongmon Bordoloi
     Tested on Python 3.7  Sep 4 2019
     Modified April 2025 - Standardized return format to use dictionary
+    Modified May 2025 - Added silent parameter to suppress output
     --------------------------
 
 ### calculate_bic() (`rb_iter_contfit`)
@@ -944,6 +950,8 @@ Fit a spectral region with the optimal polynomial order determined by Bayesian I
         Whether to save the plot to a file (default: False)
     plot_filename : str, optional
         Filename for the saved plot (default: "polynomial_fit.png")
+    silent : bool, optional
+        If True, suppress all print statements and plots (default: False)
     **kwargs : 
         Additional parameters passed directly to rb_iter_contfit
     
@@ -1000,6 +1008,10 @@ Fit a spectral region with the optimal polynomial order determined by Bayesian I
     >>> result = fit_optimal_polynomial(wavelength, flux, error, include_model=True)
     >>> new_wave = np.linspace(wavelength.min(), wavelength.max(), 1000)
     >>> new_cont = result['model'](new_wave)
+    
+    Running in silent mode (no output or plots):
+    
+    >>> result = fit_optimal_polynomial(wavelength, flux, error, silent=True)
 
 ### plot_polynomial_fit_results() (`rb_iter_contfit`)
 
@@ -1051,6 +1063,8 @@ Load a spectrum and fit a specific wavelength region with optimal polynomial ord
         Whether to save the normalized spectrum region (default: False)
     output_filename : str, optional
         Filename for the output normalized spectrum region
+    silent : bool, optional
+        If True, suppress all print statements and plots (default: False)
     
     Returns
     -------

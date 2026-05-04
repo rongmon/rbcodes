@@ -1,3 +1,28 @@
+"""
+Friend-of-Friends galaxy group finder.
+
+Standalone module — not imported by other package modules; available for direct use.
+
+Provides two group-finder classes:
+
+- ``AngularGroupFinder``   — angular-only FoF clustering (no redshift); suitable for
+  photometric catalogues or quick angular associations.
+- ``GalaxyGroupFinder``    — full FoF finder using pairwise angular, comoving, and
+  physical separations plus velocity linking (requires redshifts).
+
+Both classes follow the same interface: load a catalogue, run the group finder,
+and retrieve a group catalogue and member catalogue.
+
+See also: ``GalaxyGroupFinder_slow.py`` — a reference (slower) implementation.
+
+Example
+-------
+    from rbcodes.catalog.galaxy_group_finder import GalaxyGroupFinder
+    gf = GalaxyGroupFinder()
+    gf.load_catalog(ra, dec, redshift)
+    gf.find_groups(linking_length_kpc=200, velocity_gap_kms=500)
+    groups = gf.group_catalog
+"""
 import numpy as np
 import pandas as pd
 from astropy.cosmology import Planck18
