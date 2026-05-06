@@ -362,27 +362,6 @@ class BatchController(QObject):
             self.status_updated.emit(f"Error saving batch configuration: {str(e)}")
             return False
 
-    def load_batch_configuration(self, filepath: str) -> bool:
-        """Load a batch configuration using hybrid format."""
-        try:
-            with open(filepath, 'r') as f:
-                data = json.load(f)
-            
-            # Load master table
-            self.master_table.from_dict(data)
-            
-            # Store the directory where config was loaded from
-            self.config_load_directory = os.path.dirname(filepath)
-            
-            # RECREATE rb_spec objects for completed items
-            self._recreate_rb_spec_objects()
-            
-            self.status_updated.emit(f"Batch configuration loaded from {filepath}")
-            return True
-        except Exception as e:
-            self.status_updated.emit(f"Error loading batch configuration: {str(e)}")
-            return False
-    
     def _recreate_rb_spec_objects(self):
         """Recreate rb_spec objects for items that have been processed."""
         completed_indices = self.master_table.get_items_by_status("complete")
@@ -442,10 +421,9 @@ class BatchController(QObject):
             method = item.analysis.continuum_method
             if method == 'polynomial':
                 # Parse continuum_masks from JSON string
-                import json
                 try:
                     continuum_masks = json.loads(item.analysis.continuum_masks) if item.analysis.continuum_masks else []
-                except:
+                except (json.JSONDecodeError, TypeError):
                     continuum_masks = []
                 
                 mask = []

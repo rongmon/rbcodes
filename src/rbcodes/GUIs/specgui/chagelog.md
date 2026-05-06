@@ -1,4 +1,8 @@
 # Changelog - rb_spec GUI
+##[1.0.6] - 2026-05-06
+###Fixed
+-** Minor under the hood cleanup to make sure batch mode is not causing exception errors.
+
 
 ## [1.0.3] - 2025-12-02
 ### Fixed

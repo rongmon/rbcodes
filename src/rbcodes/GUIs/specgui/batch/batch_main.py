@@ -205,27 +205,27 @@ class BatchSpecGUI(QMainWindow):
     
     def create_status_bar(self):
         """Create an enhanced status bar."""
-        self.statusBar = QStatusBar()
-        self.setStatusBar(self.statusBar)
-        
+        self._status_bar = QStatusBar()
+        self.setStatusBar(self._status_bar)
+
         # Main status label
         self.status_label = QLabel("Ready. Configure batch items to begin.")
-        self.statusBar.addWidget(self.status_label)
-        
+        self._status_bar.addWidget(self.status_label)
+
         # Progress bar (initially hidden)
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
         self.progress_bar.setMaximumWidth(200)
-        self.statusBar.addPermanentWidget(self.progress_bar)
-        
-        # Items count label 
+        self._status_bar.addPermanentWidget(self.progress_bar)
+
+        # Items count label
         self.items_count_label = QLabel("Items: 0")
-        self.statusBar.addPermanentWidget(self.items_count_label)
-        
+        self._status_bar.addPermanentWidget(self.items_count_label)
+
         # Errors count label
         self.errors_count_label = QLabel("")
         self.errors_count_label.setStyleSheet("QLabel { color: red; }")
-        self.statusBar.addPermanentWidget(self.errors_count_label)
+        self._status_bar.addPermanentWidget(self.errors_count_label)
     
     def connect_signals(self):
         """Connect signals between panels and controller."""

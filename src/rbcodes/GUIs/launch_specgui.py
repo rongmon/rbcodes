@@ -28,7 +28,7 @@ from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QTimer
 
 # Version information
-__version__ = "1.0.5"
+__version__ = "1.0.6"
 __author__ = "Rongmon Bordoloi"
 __description__ = "rb_spec GUI - Absorption Line Analysis Tool"
 
@@ -54,7 +54,7 @@ def launch_single_gui(args):
         return 1
     
     # Create application and main window
-    app = QApplication(sys.argv)
+    app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("rb_spec GUI")
     app.setApplicationVersion(__version__)
     app.setOrganizationName("rbcodes")
@@ -96,7 +96,7 @@ def launch_batch_gui(args):
         return 1
     
     # Create application and main window
-    app = QApplication(sys.argv)
+    app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("rb_spec Batch Processing")
     app.setApplicationVersion(__version__)
     app.setOrganizationName("rbcodes")

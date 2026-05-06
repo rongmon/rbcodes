@@ -1,10 +1,21 @@
 # rbcodes/GUIs/specgui/batch/master_batch_table.py
 import os
+import json
 import pandas as pd
 import numpy as np
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Any
 from PyQt5.QtCore import QObject, pyqtSignal
+
+
+def _parse_continuum_masks(value):
+    """Safely parse continuum_masks from a JSON string."""
+    if not value:
+        return []
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return []
 
 
 class MasterBatchTable(QObject):
@@ -156,7 +167,7 @@ class MasterBatchTable(QObject):
                     'processing_status': row['processing_status'],
                     'continuum_method': row['continuum_method'],
                     'continuum_order': row['continuum_order'],
-                    'continuum_masks': eval(row['continuum_masks']) if row['continuum_masks'] else [],
+                    'continuum_masks': _parse_continuum_masks(row['continuum_masks']),
                     'use_weights': row['use_weights'],
                     'optimize_cont': row['optimize_cont'],  # NEW field
                     'calculate_snr': row['calculate_snr'],
@@ -199,7 +210,6 @@ class MasterBatchTable(QObject):
             for field, value in kwargs.items():
                 if field == 'continuum_masks':
                     # Store as JSON string
-                    import json
                     self.df.loc[row_index, field] = json.dumps(value)
                 elif field in self.df.columns:
                     self.df.loc[row_index, field] = value
