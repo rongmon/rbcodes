@@ -895,7 +895,6 @@ class ReviewPanel(QWidget):
                 self.update_details(item, self.current_spec)
             else:
                 self.clear_preview()
-                print(f"No rb_spec object found for {item.template.transition_name}")
         except Exception as e:
             self.clear_preview()
             print(f"Error getting spectrum: {e}")

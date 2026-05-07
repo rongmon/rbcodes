@@ -155,8 +155,6 @@ def _get_spec_object(item, master_table, row_index):
     if spec_object is not None:
         return spec_object
     
-    # If not found, object wasn't processed yet
-    print(f"No rb_spec object found for {item.template.transition_name}")
     return None
 
 def export_batch_figures(items, output_directory, file_format='pdf', figure_type='individual', master_table=None):
