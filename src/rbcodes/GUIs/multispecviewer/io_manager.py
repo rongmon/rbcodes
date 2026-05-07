@@ -12,7 +12,7 @@ try:
     from .rb_multispec import __version__
 except ImportError:
     # Fallback if import fails
-    __version__ = "1.1.1"
+    __version__ = "1.5.0"
 
 class IOManager:
     """

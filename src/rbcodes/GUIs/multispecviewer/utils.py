@@ -41,113 +41,120 @@ def read_line_options():
 def show_help_dialog(parent=None):
     """
     Display a help dialog with keyboard shortcuts and usage information.
-    
+
     Parameters:
     -----------
     parent : QWidget, optional
         Parent widget for the dialog
     """
-    from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QTextEdit, 
-                                QPushButton, QHBoxLayout, QLabel)
+    from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QTextEdit,
+                                 QPushButton, QHBoxLayout, QLabel,
+                                 QTabWidget, QTableWidget, QTableWidgetItem,
+                                 QHeaderView, QWidget)
     from PyQt5.QtCore import Qt
-    from PyQt5.QtGui import QFont
+    from PyQt5.QtGui import QFont, QColor
     import os
-    
-    # Help text
-    help_text = """MULTISPECVIEWER HELP
 
-OVERVIEW:
----------
-MultispecViewer is a tool for visualizing and analyzing multiple spectroscopic datasets simultaneously.
+    # --- shortcut data: (key, action) per section ---
+    sections = {
+        "Navigation": [
+            ("r",   "Reset view to original state and clear all lines"),
+            ("R",   "Keep spectra but remove all lines/text from canvas"),
+            ("x",   "Set left x-limit (xmin) to cursor position"),
+            ("X",   "Set right x-limit (xmax) to cursor position"),
+            ("[",   "Shift view left by one window width"),
+            ("]",   "Shift view right by one window width"),
+            ("o",   "Zoom out (x-axis)"),
+            ("a",   "Autoscale ALL panels y-axis to visible x-range (use after zooming)"),
+            ("A",   "Autoscale CLICKED panel y-axis to visible x-range"),
+            ("Y",   "Manually input y-limits range (dialog)"),
+        ],
+        "Display": [
+            ("L",   "Toggle line labels on/off (vertical lines remain)"),
+            ("t",   "Set maximum y-limit to cursor position"),
+            ("b",   "Set minimum y-limit to cursor position"),
+            ("S",   "Increase smoothing (convolution kernel)"),
+            ("U",   "Decrease smoothing (convolution kernel)"),
+            ("h/H", "Show this help window"),
+        ],
+        "Quick Line ID": [
+            ("M",          "Mark MgII doublet (2796, 2803)"),
+            ("C",          "Mark CIV doublet (1548, 1550)"),
+            ("F",          "Mark FeII multiplet (2600, 2586, 2382)"),
+            ("6",          "Mark OVI doublet (1031, 1037)"),
+            ("4",          "Mark SiIV doublet (1393, 1402)"),
+            ("8",          "Mark NeVIII doublet (778, 770)"),
+            ("2",          "Mark Lyb/Lya"),
+            ("1",          "Mark Lya/Lyb"),
+            ("Right-Click","Line ID dialog: shows all lines at cursor wavelength"),
+        ],
+        "vStack": [
+            ("v",   "Open vStack velocity plot (default ±1000 km/s)"),
+            ("V",   "Open vStack with custom velocity limits"),
+            (">",   "Next page of transitions"),
+            ("<",   "Previous page of transitions"),
+            ("w",   "Cycle flag: Non-Detection → Detection → Blended → Low-Confidence"),
+            ("S",   "Save flagged lines to line list and return to main view"),
+            ("Y",   "Set custom y-limits for clicked panel"),
+        ],
+        "Overview": None,  # handled separately as plain text
+    }
 
-INTERFACE:
-----------
-- Left Widget: Absorber manager for adding, tracking, and plotting absorber systems
-- Main Canvas: Main spectral display area with keyboard shortcuts (click here to enable keyboard events)
-- Redshift Widget: Shows active redshift for line identification; use Catalog button to add to manager
+    overview_text = (
+        "MultispecViewer — multi-spectrum visualization and line identification tool\n\n"
+        "INTERFACE\n"
+        "  Left panel:      Absorber manager — add, track, and toggle absorber systems\n"
+        "  Main canvas:     Spectral display — click here to enable keyboard shortcuts\n"
+        "  Redshift widget: Enter redshift + line list, Submit to overlay lines;\n"
+        "                   Catalog button adds current entry to the absorber manager\n"
+        "  Toolbar (right): Live cursor coordinates — λ, Δv from nearest line\n\n"
+        "FILE MANAGEMENT\n"
+        "  Save → JSON : full session (absorbers, line list, metadata)\n"
+        "  Save → CSV  : absorbers only\n"
+        "  Save → TXT  : line list only\n"
+        "  Load        : JSON (full), CSV/TXT (partial); choose append or overwrite\n"
+    )
 
-BASIC NAVIGATION:
-----------------
-- r: Reset view to original state and clear all lines
-- R: Keep spectra but remove all lines/text from canvas
-- x: Set left limit (xmin) to cursor position
-- X: Set right limit (xmax) to cursor position
-- [: Shift view left
-- ]: Shift view right
-- o: Zoom out (x-axis)
-- Y: Manually input y-limits range
-
-DISPLAY CONTROLS:
-----------------
-- t: Set maximum y-limit to cursor position
-- b: Set minimum y-limit to cursor position
-- S: Increase smoothing (convolution kernel size)
-- U: Decrease smoothing (convolution kernel size)
-
-ANALYSIS TOOLS:
---------------
-- v: Open vStack GUI for identifying transitions (press S to exit)
-- V: Same as 'v' but allows manual velocity axis selection
-- Right-Click: Shows a menu of possible spectral lines at cursor position for identification
-
-QUICK LINE IDENTIFICATION:
--------------------------
-- M: Mark MgII doublet (2796, 2803)
-- C: Mark CIV doublet (1548, 1550)
-- F: Mark FeII multiplet (2600, 2586, 2382)
-- 6: Mark OVI doublet (1031, 1037)
-- 4: Mark SiIV doublet (1393, 1402)
-- 8: Mark NeVIII doublet (778, 770)
-- 2: Mark Lyb/Lya
-- 1: Mark Lya/Lyb
-
-VSTACK CONTROLS:
----------------
-- >: Next page
-- <: Previous page
-- w: Toggle transition flag between:
-   - Detection
-   - Blended-detection
-   - Low-Confidence Detection
-   - Non-Detection
-- S: Save transition list and return to main view
-
-FILE MANAGEMENT:
----------------
-- Save: Save data in different formats:
-   - JSON: Combined data with absorbers, line lists, and metadata
-   - CSV: Absorber data only (.csv)
-   - TXT: Line list data only (.txt)
-- Load: Load previously saved data:
-   - Select a JSON file for complete data
-   - Select a CSV or TXT file for individual components
-   - Choose to append or overwrite existing data
-
-GETTING HELP:
-------------
-- H: Show this help window
-- For complete documentation, see the multispec.md file
-"""
-    
     # Create dialog
     dialog = QDialog(parent)
     dialog.setWindowTitle("MultispecViewer Help")
-    dialog.setMinimumSize(700, 500)
-    
-    # Create layout
+    dialog.setMinimumSize(750, 520)
+
     layout = QVBoxLayout(dialog)
-    
-    # Create text edit for help content
-    text_edit = QTextEdit()
-    text_edit.setReadOnly(True)
-    text_edit.setPlainText(help_text)
-    
-    # Set monospace font for better formatting
-    font = QFont("Courier New", 10)
-    text_edit.setFont(font)
-    
-    # Add to layout
-    layout.addWidget(text_edit)
+
+    # Tab widget
+    tabs = QTabWidget()
+
+    # Helper to build a shortcuts table
+    def make_table(rows):
+        table = QTableWidget(len(rows), 2)
+        table.setHorizontalHeaderLabels(["Key", "Action"])
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        table.verticalHeader().setVisible(False)
+        table.setEditTriggers(QTableWidget.NoEditTriggers)
+        table.setSelectionMode(QTableWidget.NoSelection)
+        table.setShowGrid(False)
+        table.setAlternatingRowColors(True)
+        for i, (key, action) in enumerate(rows):
+            key_item = QTableWidgetItem(key)
+            key_item.setTextAlignment(Qt.AlignCenter)
+            key_item.setFont(QFont("Courier New", 10, QFont.Bold))
+            table.setItem(i, 0, key_item)
+            table.setItem(i, 1, QTableWidgetItem(action))
+        return table
+
+    for section, rows in sections.items():
+        if section == "Overview":
+            widget = QTextEdit()
+            widget.setReadOnly(True)
+            widget.setPlainText(overview_text)
+            widget.setFont(QFont("Courier New", 10))
+            tabs.addTab(widget, section)
+        else:
+            tabs.addTab(make_table(rows), section)
+
+    layout.addWidget(tabs)
     
     # Add a label for README link
     readme_label = QLabel("For more detailed documentation:")
@@ -220,23 +227,31 @@ GETTING HELP:
         
         # Additional styling for dark theme
         dialog.setStyleSheet("""
-            QDialog {
-                background-color: #353535;
-                color: #F2F2F7;
+            QDialog { background-color: #353535; color: #F2F2F7; }
+            QTabWidget::pane { border: 1px solid #636366; background-color: #2C2C2E; }
+            QTabBar::tab {
+                background-color: #3A3A3C; color: #F2F2F7;
+                padding: 6px 14px; border: 1px solid #636366;
+                border-bottom: none; border-radius: 4px 4px 0 0;
+            }
+            QTabBar::tab:selected { background-color: #2C2C2E; color: #FFFFFF; }
+            QTableWidget {
+                background-color: #2C2C2E; color: #F2F2F7;
+                alternate-background-color: #353535;
+                gridline-color: #3A3A3C;
+                border: none;
+            }
+            QHeaderView::section {
+                background-color: #3A3A3C; color: #F2F2F7;
+                padding: 4px; border: 1px solid #636366;
             }
             QTextEdit {
-                background-color: #252525;
-                color: #F2F2F7;
-                border: 1px solid #636366;
-                border-radius: 6px;
-                padding: 8px;
+                background-color: #252525; color: #F2F2F7;
+                border: 1px solid #636366; border-radius: 6px; padding: 8px;
             }
-            QLabel {
-                color: #F2F2F7;
-            }
+            QLabel { color: #F2F2F7; }
             QPushButton {
-                background-color: #474747;
-                color: #F2F2F2;
+                background-color: #474747; color: #F2F2F2;
                 border: none;
                 border-radius: 6px;
                 padding: 6px 12px;
@@ -419,11 +434,11 @@ def reconcile_linelists(input_files, velocity_threshold=20, output_file=None, cr
         # Compare each subsequent line
         for i in range(1, len(sorted_group)):
             line = sorted_group.iloc[i]
-            last_line = current_cluster[-1]
-            
-            # Calculate velocity difference in rest frame
+            anchor_line = current_cluster[0]  # compare to cluster anchor, not last item
+
+            # Calculate velocity difference in rest frame relative to cluster anchor
             # v = c * (λ2 - λ1) / λ1
-            v_diff = c * (line['Wave_rest'] - last_line['Wave_rest']) / last_line['Wave_rest']
+            v_diff = c * (line['Wave_rest'] - anchor_line['Wave_rest']) / anchor_line['Wave_rest']
             v_diff_abs = abs(v_diff)
             
             # If within threshold, add to current cluster

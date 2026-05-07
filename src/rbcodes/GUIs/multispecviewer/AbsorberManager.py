@@ -58,21 +58,23 @@ class AbsorberManager(QWidget):
         """Populate the table from an existing DataFrame"""
         # Clear existing rows
         self.table.setRowCount(0)
-        
+
         # Add rows for each absorber in the DataFrame
         for idx, row in self.absorbers_df.iterrows():
             row_idx = self.table.rowCount()
             self.table.insertRow(row_idx)
             self._add_row_widgets(row_idx)
-            
-            # Set values from DataFrame
+
+            # Block signals to prevent cellChanged from triggering plots during bulk load
+            self.table.blockSignals(True)
             self._populate_row(
-                row_idx, 
-                row['Zabs'], 
-                row['LineList'], 
+                row_idx,
+                row['Zabs'],
+                row['LineList'],
                 row['Color']
             )
-            
+            self.table.blockSignals(False)
+
             # Set checkbox state if Visible column exists
             if 'Visible' in self.absorbers_df.columns:
                 visible = row['Visible']
@@ -235,11 +237,7 @@ class AbsorberManager(QWidget):
         """Remove absorber using row index stored on the button"""
         button = self.sender()
         if hasattr(button, 'row_index'):
-            row = button.row_index
-            print(f"Removing absorber at row {row}")
-            self.remove_absorber(row)
-        else:
-            print("Button does not have a row_index property")
+            self.remove_absorber(button.row_index)
     
     def _populate_row(self, row, z_abs, line_list, color):
         """Populate a row with absorber data"""
@@ -278,7 +276,9 @@ class AbsorberManager(QWidget):
         for row in range(self.table.rowCount()):
             if self.table.item(row, 1) is None:
                 # This is an empty row, use it
+                self.table.blockSignals(True)
                 self._populate_row(row, z_abs, line_list, color)
+                self.table.blockSignals(False)
                 # Set checkbox state
                 checkbox_container = self.table.cellWidget(row, 3)
                 if checkbox_container:
@@ -288,15 +288,17 @@ class AbsorberManager(QWidget):
                             break
                 row_found = True
                 break
-        
+
         if not row_found:
             # No empty rows, add a new one
             new_row_idx = self.table.rowCount()
             self.table.setRowCount(new_row_idx + 1)
-            
+
             # Important: Add widgets BEFORE populating
             self._add_row_widgets(new_row_idx)
+            self.table.blockSignals(True)
             self._populate_row(new_row_idx, z_abs, line_list, color)
+            self.table.blockSignals(False)
             
             # Set checkbox state
             checkbox_container = self.table.cellWidget(new_row_idx, 3)

@@ -38,6 +38,7 @@ from rbcodes.GUIs.multispecviewer.io_manager import IOManager
 from rbcodes.IGM import rb_setline as rb_setline
 from rbcodes.utils import rb_utility as rt
 from rbcodes.GUIs.multispecviewer.LineSelectionDialog import LineSelectionDialog
+from rbcodes.GUIs.multispecviewer.utils import show_help_dialog
 
 
 
@@ -70,6 +71,7 @@ class SpectralPlot(FigureCanvas):
         self.scale = 1. # 1D spec convolution kernel size
         self.redshift_lines = []  # Store references to plotted lines
         self.quickid_lines = []  # New list to store quick line ID markers
+        self.labels_visible = True  # Toggle state for line text labels
         self.line_list = pd.DataFrame(columns=['Name', 'Wave_obs', 'Zabs'])
 
         
@@ -83,8 +85,9 @@ class SpectralPlot(FigureCanvas):
         # Enable focus to receive key events
         self.setFocusPolicy(Qt.StrongFocus)
         
-        # Connect Matplotlib's key press event
+        # Connect Matplotlib's key press and mouse move events
         self.mpl_connect('key_press_event', self.on_key_press)
+        self.mpl_connect('motion_notify_event', self.on_mouse_move)
         
         # Connect right-click event
         self.mpl_connect('button_press_event', self.on_mouse_press)
@@ -200,6 +203,59 @@ class SpectralPlot(FigureCanvas):
         if self.message_box:
             self.message_box.on_sent_message(f"Plotted {num_spectra} spectra", "#008000")
     
+    def on_mouse_move(self, event):
+        """
+        Updates the toolbar coordinate label with spectral information as the
+        cursor moves over the canvas.
+        """
+        # Only act if cursor is inside a panel and spectra are loaded
+        if event.inaxes is None or not self.spectra:
+            if hasattr(self, 'coord_label'):
+                self.coord_label.setText("Hover over spectrum for coordinates")
+            return
+
+        wave_cursor = event.xdata
+        if wave_cursor is None:
+            return
+
+        # Read live values from the redshift widget
+        redshift = 0.0
+        linelist = "None"
+        if hasattr(self, 'parent_window') and hasattr(self.parent_window, 'redshift_widget'):
+            widget = self.parent_window.redshift_widget
+            try:
+                redshift = float(widget.redshift_input.text().strip())
+            except ValueError:
+                redshift = 0.0
+            linelist = widget.linelist_combo.currentText()
+
+        # Base display: observed wavelength
+        text = f"\u03bb = {wave_cursor:.3f} \u00c5"
+
+        # Add Δv from nearest line if a line list is selected
+        if linelist and linelist != "None":
+            try:
+                line_data = rb_setline.read_line_list(linelist)
+                if line_data:
+                    # Find nearest line by observed wavelength
+                    c_kms = 2.998e5  # km/s
+                    best_dv = None
+                    best_name = None
+                    for entry in line_data:
+                        wave_expected = entry['wrest'] * (1.0 + redshift)
+                        dv = c_kms * (wave_cursor - wave_expected) / wave_expected
+                        if best_dv is None or abs(dv) < abs(best_dv):
+                            best_dv = dv
+                            best_name = entry['ion']
+                    if best_dv is not None:
+                        sign = '+' if best_dv >= 0 else ''
+                        text += f"   |   \u0394v = {sign}{best_dv:.0f} km/s  ({best_name} at z={redshift:.4f})"
+            except Exception:
+                pass
+
+        if hasattr(self, 'coord_label'):
+            self.coord_label.setText(text)
+
     def on_key_press(self, event):
         """
         Handles key press events for interactive adjustments of the plots.
@@ -327,6 +383,29 @@ class SpectralPlot(FigureCanvas):
             if self.message_box:
                 self.message_box.on_sent_message(f"Shifted view right on panel {ax_index+1}", "#8AB4F8")
             self.draw()
+        elif event.key == 'a' or event.key == 'A':
+            # a = autoscale all panels, A = autoscale only clicked panel
+            xlim = self.axes[ax_index].get_xlim()
+            panels = list(enumerate(zip(self.axes, self.spectra)))
+            if event.key == 'A':
+                panels = [(ax_index, (self.axes[ax_index], self.spectra[ax_index]))]
+            for i, (ax, spec) in panels:
+                wave = spec.wavelength.value
+                flux = spec.flux.value
+                mask = (wave >= xlim[0]) & (wave <= xlim[1])
+                if np.any(mask):
+                    finite = flux[mask][np.isfinite(flux[mask])]
+                    if len(finite) > 0:
+                        ymin, ymax = np.min(finite), np.max(finite)
+                        pad = 0.1 * (ymax - ymin) if ymax != ymin else 0.1 * abs(ymax)
+                        ax.set_ylim(ymin - pad, ymax + pad)
+            if self.message_box:
+                scope = f"panel {ax_index+1}" if event.key == 'A' else "all panels"
+                self.message_box.on_sent_message(
+                    f"Autoscaled y-axis ({scope}) to visible x-range", "#8AB4F8")
+            self.draw()
+        elif event.key == 'L':
+            self.toggle_labels()
         elif event.key == 'Y':
             Windowname='Manual y-Limits'
             instruction='Input range (e.g. 0.,2.)'
@@ -350,7 +429,6 @@ class SpectralPlot(FigureCanvas):
         # Add to the on_key_press method in SpectralPlot class
         elif event.key == 'h' or event.key == 'H':
             # Show help dialog
-            from rbcodes.GUIs.multispecviewer.utils import show_help_dialog
             show_help_dialog(self.parent_window)
             if self.message_box:
                 self.message_box.on_sent_message("Displayed help window", "#8AB4F8")
@@ -623,13 +701,11 @@ class SpectralPlot(FigureCanvas):
                     
                     # Only add text labels in the top panel (index 0)
                     if i == 0:  # Only for the first/top panel
-                        ylim = ax.get_ylim()
-                        # Position the text within the plot bounds
-                        y_pos = ylim[0] + 0.85 * (ylim[1] - ylim[0])  # Position at 85% of y-axis range
-                        # Use transform=ax.get_xaxis_transform() to keep the text fixed in the y-direction
-                        text = ax.text(observed_wavelength, y_pos, f"{transition_name} z={self.redshift:.4f}", 
+                        text = ax.text(observed_wavelength, 0.85,
+                                    f"{transition_name} z={self.redshift:.4f}",
                                     rotation=90, color=line_color, fontsize=8,
-                                    horizontalalignment='right', verticalalignment='top')
+                                    horizontalalignment='right', verticalalignment='top',
+                                    transform=ax.get_xaxis_transform())
                         self.redshift_lines.append(text)
         self.fig.canvas.draw()  # Change from draw_idle() to draw() for immediate update
 
@@ -658,6 +734,29 @@ class SpectralPlot(FigureCanvas):
                     pass
             self.quickid_lines = []
     
+    def toggle_labels(self):
+        """
+        Toggle visibility of all text labels on plotted lines without removing them.
+        Affects redshift lines, absorber lines, and quick-ID markers.
+        """
+        from matplotlib.text import Text
+        self.labels_visible = not self.labels_visible
+
+        # Collect all artist lists
+        all_collections = [self.redshift_lines, self.quickid_lines]
+        if hasattr(self, 'absorber_lines'):
+            all_collections += list(self.absorber_lines.values())
+
+        for collection in all_collections:
+            for obj in collection:
+                if isinstance(obj, Text):
+                    obj.set_visible(self.labels_visible)
+
+        state = "shown" if self.labels_visible else "hidden"
+        if self.message_box:
+            self.message_box.on_sent_message(f"Line labels {state}", "#8AB4F8")
+        self.draw()
+
     def check_lineid(self, wave0, ionname, yval, ax_index):
         """
         This method quickly draws some doublet/multiplet lines on the canvas for a quicklook
@@ -849,17 +948,11 @@ class SpectralPlot(FigureCanvas):
                     
                     # Only add text labels in the top panel (index 0)
                     if i == 0:  # Only for the first/top panel
-                        y_range = ylim[1] - ylim[0]
-                        y_pos = ylim[0] + 0.85 * y_range  # 85% of the way up
-                        
-                        text = ax.text(observed_wavelength, y_pos, transition_name, rotation=90, 
+                        text = ax.text(observed_wavelength, 0.85,
+                               f"{transition_name} z={z_abs:.4f}", rotation=90,
                                horizontalalignment='right', verticalalignment='top',
-                               fontsize=8, color=color_value)
-                        
-                        # Add redshift indicator to the text
-                        text_with_z = f"{transition_name} z={z_abs:.4f}"
-                        text.set_text(text_with_z)
-                        
+                               fontsize=8, color=color_value,
+                               transform=ax.get_xaxis_transform())
                         self.absorber_lines[absorber_id].append(text)
                         
                     lines_plotted += 1
@@ -1016,6 +1109,32 @@ class MainWindow(QMainWindow):
         # Create SpectralPlot with reference to the message box
         self.canvas = SpectralPlot(self, message_box=self.message_box)
         self.toolbar = NavigationToolbar(self.canvas, self)
+
+        # Add ? help button to the toolbar
+        help_button = QPushButton("?")
+        help_button.setToolTip("Show keyboard shortcuts and help (H)")
+        help_button.setStyleSheet("""
+            QPushButton {
+                background-color: #474747;
+                color: #F2F2F2;
+                border: none;
+                border-radius: 4px;
+                padding: 2px 8px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #505050; }
+            QPushButton:pressed { background-color: #2A2A2A; }
+        """)
+        help_button.clicked.connect(lambda: show_help_dialog(self))
+        self.toolbar.addSeparator()
+        self.toolbar.addWidget(help_button)
+
+        # Add coordinate label to the right side of the toolbar
+        self.canvas.coord_label = QLabel("Hover over spectrum for coordinates")
+        self.canvas.coord_label.setStyleSheet("color: #AAAAAA; padding: 0px 8px; font-size: 11px;")
+        self.toolbar.addSeparator()
+        self.toolbar.addWidget(self.canvas.coord_label)
     
         # Create a splitter for the main display area
         self.main_splitter = QSplitter(Qt.Horizontal)
@@ -1602,16 +1721,10 @@ class MainWindow(QMainWindow):
                     # Add a text label (only on the top panel)
                     if i == 0:  # Only for the first subplot
                         # Get the current y limits
-                        ylim = ax.get_ylim()
-                        y_range = ylim[1] - ylim[0]
-                        
-                        # Position the text at 90% of the way up the panel
-                        y_pos = ylim[0] + 0.9 * y_range
-                        
-                        # Create vertical text with name and redshift
-                        text = ax.text(wave_obs, y_pos, f"{name}\nz={zabs:.4f}", 
+                        text = ax.text(wave_obs, 0.90, f"{name}\nz={zabs:.4f}",
                                       rotation=90, color=color, fontsize=8,
-                                      horizontalalignment='right', verticalalignment='top')
+                                      horizontalalignment='right', verticalalignment='top',
+                                      transform=ax.get_xaxis_transform())
                         self.canvas.line_objects.append(text)
                 
                 lines_shown += 1

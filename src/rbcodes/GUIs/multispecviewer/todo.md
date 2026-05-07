@@ -45,7 +45,7 @@ Work through these one by one. Each item needs: (1) verify the issue is real, (2
 
 ## Potential Logic Issues (needs verification)
 
-- [ ] **LOGIC-1** `reconcile_linelists()` chaining bug in velocity clustering
+- [x] **LOGIC-1** `reconcile_linelists()` chaining bug in velocity clustering
   - Location: `utils.py`
   - Issue: When grouping lines by velocity threshold, each new line is compared only to the *last* entry in the current cluster, not to the cluster anchor/centroid. Lines that drift cumulatively beyond the threshold can still be merged.
   - Needs: write a test case with synthetic data to confirm or rule out.
@@ -62,44 +62,76 @@ Work through these one by one. Each item needs: (1) verify the issue is real, (2
 
 ---
 
-## UX / Visualization Improvements (discuss before implementing)
+## UX / Visualization Improvements
 
-- [ ] **UX-1** Y-axis autoscale to *visible* x-range only
+### High Priority
+
+- [x] **UX-1** Y-axis autoscale to *visible* x-range only
   - Each panel rescales y to whatever flux is in the current zoom window (like IRAF `y` key).
   - Currently: global fixed y-range per spectrum regardless of zoom.
 
-- [ ] **UX-2** Status bar showing cursor position in spectral coordinates
+- [x] **UX-2** Status bar showing cursor position in spectral coordinates
   - Show `λ_obs`, implied `z` (given current linelist), and `Δv` from nearest identified line.
   - Updates on `motion_notify_event`.
 
-- [ ] **UX-3** Line label toggle (`L` key)
+### Medium Priority
+
+- [x] **UX-3** Line label toggle (`L` key)
   - Hide/show all text labels without removing vertical lines.
   - Useful when many absorbers overlap.
 
-- [ ] **UX-4** Right-click context menu on line labels
-  - Options: "Remove this line", "Copy wavelength to clipboard", "Set as primary redshift".
+- [~] **UX-4** Right-click context menu on line labels — **SKIPPED**
+  - Existing right-click dialog already handles line ID and redshift setting.
+  - Hit-testing Text artists is fiddly; moderate effort for marginal gain.
 
-- [ ] **UX-5** Pan by fixed velocity step (`[` / `]` keys)
-  - Step by half a window width along wavelength axis (like xdisplay in IRAF).
+- [~] **UX-9** Auto-restore last session on startup — **SKIPPED**
+  - User can reload the same spectrum + Load the saved JSON to achieve the same effect.
 
-- [ ] **UX-6** Drag-and-drop FITS file loading
-  - Accept drag-and-drop onto the canvas or main window.
-  - `setAcceptDrops(True)` + `dropEvent()` on `MainWindow`.
+### Low Priority
 
-- [ ] **UX-7** Per-spectrum filename label in each subplot
-  - Small text label (top-right corner) in each panel showing the source filename.
+- [x] **UX-8** Help dialog improvements
+  - `h`/`H` already opens a plain-text popup — works fine.
+  - Two possible improvements to discuss/implement together:
+    1. Add a `?` button in the GUI toolbar so the help window is discoverable without knowing the shortcut.
+    2. Replace `QTextEdit` plain text with a `QTableWidget` (Key | Action columns per section) for easier scanning.
 
-- [ ] **UX-8** `?` key help overlay or improved help dialog
-  - A popup listing all keyboard shortcuts. Currently the help text goes to the message box only.
+### Already Implemented — No Action Needed
 
-- [ ] **UX-9** Auto-restore last session on startup
-  - Offer to reload the last saved JSON session (absorbers, line list, redshift).
+- [x] **UX-5** `[`/`]` pan keys — already in `on_key_press` (lines 316–329)
+- [x] **UX-6** Drag-and-drop — not needed, CLI loading works well
+- [x] **UX-7** Filename labels — already shown as legend in each subplot (`plot_one_spec` line 537)
+
+---
+
+## Future / Deferred
+
+- [~] **FUTURE-1** Launch `specgui` from a multispecviewer panel (`G` key)
+  - Cursor panel's wave/flux/error passed to `RbSpecGUI.from_data(wave, flux, error, zabs=None, linelist=None)`
+  - Add `from_data()` class method to `RbSpecGUI` (parallel to `rb_multispec.from_data()`)
+  - Key handler in multispecviewer stays thin; all pre-population logic lives in specgui
+  - Implementation note: do NOT call `app.exec_()` — just `window.show()`, the existing event loop drives both windows. Keep a reference on `self` to prevent GC.
 
 ---
 
 ## Notes
 
-- Start with BUG-1, BUG-2, BUG-3 and CLEAN-1 through CLEAN-3 — these are low-risk and high-confidence.
+- LOGIC-1 (`reconcile_linelists`) is only callable by users directly, not used in the GUI — low priority.
 - LOGIC items need test cases written first before fixing.
-- UX items should be discussed and prioritized before any implementation.
 - All changes go on the `multispec-review` branch.
+
+## AbsorberManager Load Bug (fixed)
+
+- [x] **BUG-4** Loading JSON plots all absorbers even though checkboxes are unchecked
+  - Location: `AbsorberManager.py` `add_absorber` and `populate_table_from_df`
+  - Issue: `_populate_row` calls `table.setItem()` which fires `cellChanged` → `on_cell_changed` → `update_absorber_redshift` → `plot_absorber_lines` unconditionally, ignoring `visible=False`.
+  - Fix: wrap `_populate_row` calls with `table.blockSignals(True/False)` in both methods.
+
+## Final Step (after all UX items done)
+
+- [x] **DOCS** Update `docs/GUIs/multispec/multispec.md` to reflect all changes:
+  - New `a`/`A` keys (autoscale y: `a`=all panels, `A`=current panel)
+  - `L` key: toggle line labels
+  - Status bar showing cursor λ, Δv, nearest line
+  - `?` help button in toolbar
+  - Tabbed help dialog (Navigation, Display, Quick Line ID, vStack, Overview)
+  - Remove references to any removed/changed behaviour

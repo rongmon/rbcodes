@@ -1,6 +1,28 @@
 # Changelog
 All notable changes to MultispecViewer will be documented in this file.
 
+## [1.5.0] - 2026-05-07
+
+### Added
+- **Y-axis autoscale to visible x-range** (`a`/`A` keys): `a` rescales all panels, `A` rescales only the panel under the cursor. Scales to the flux range within the current zoom window, like IRAF's `y` key.
+- **Spectral coordinates status bar**: Always-visible toolbar label showing cursor wavelength (λ in Å) and velocity offset (Δv in km/s) from the nearest line in the active line list at the current redshift. Works with all line lists; computes at z=0 when line list is "None".
+- **Line label toggle** (`L` key): Hide/show all text labels on identified lines without removing the vertical tick marks. Useful when many absorbers overlap.
+- **Help toolbar button** (`?`): Opens the help dialog directly from the toolbar without needing to know the keyboard shortcut.
+- **Tabbed help dialog**: Replaced plain-text help popup with a `QTableWidget`-based dialog organized into five tabs — Navigation, Display, Quick Line ID, vStack, and Overview.
+
+### Fixed
+- **JSON load plots all absorbers regardless of visibility** (`AbsorberManager`): Loading a saved JSON file no longer plots absorber systems whose checkboxes were saved as unchecked. Root cause was `_populate_row` firing `cellChanged` → `plot_absorber_lines` during programmatic table population. Fixed by wrapping `_populate_row` calls with `table.blockSignals(True/False)` in both `add_absorber` and `populate_table_from_df`.
+- **`handle_convert_clicked` ignores return value** (`multispec.py`): `convert_json_to_text()` returns a 4-tuple and `convert_text_to_json()` returns a 2-tuple; both were assigned to `success` and treated as a bool (always truthy). Fixed by unpacking tuples and checking `error is None`.
+- **Double render in `handle_redshift_submission`** (`multispec.py`): `set_redshift_data()` already calls `plot_redshift_lines()` internally; the redundant second call was removed.
+- **"None" linelist blocked by `RedshiftInputWidget` validation**: Submitting with linelist="None" now passes through to the canvas (which correctly clears lines) instead of showing a warning.
+- **`reconcile_linelists` chaining bug** (`utils.py`): Velocity clustering compared each new line to the last item in the cluster rather than the anchor. Lines that drifted cumulatively could be merged far beyond the threshold. Fixed by always comparing against `current_cluster[0]`.
+- **vStack canvas replacement** (`vStack.py`): Simplified canvas swap to use `main_window.right_layout` directly, removing fragile attribute-walking fallback logic.
+
+### Removed
+- ~30 debug `print()` statements from `vStack.py` (key press, page turn, layout events)
+- ~299 lines of dead commented-out old `display_line_list()` implementation from `multispec.py`
+- Duplicate `import matplotlib.pyplot as plt` in `multispec.py`
+
 ## [1.3.1] - 2026-04-03
 
 ### Fixed

@@ -6,7 +6,7 @@ import importlib
 from rbcodes.GUIs.multispecviewer.io_manager import IOManager
 
 # Version information
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 def display_examples():
     """Display detailed usage examples for the rb_multispec tool."""
