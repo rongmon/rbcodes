@@ -1032,8 +1032,9 @@ class MainWindow(QMainWindow):
         self.main_splitter.addWidget(self.absorber_manager)
         
         # Create a widget for the right side of the splitter (canvas and toolbar)
-        right_widget = QWidget()
-        right_layout = QVBoxLayout(right_widget)
+        self.right_widget = QWidget()
+        right_layout = QVBoxLayout(self.right_widget)
+        self.right_layout = right_layout
         right_layout.addWidget(self.toolbar)
         right_layout.addWidget(self.canvas, 10)  # Canvas should expand to fill space
         
@@ -1042,7 +1043,7 @@ class MainWindow(QMainWindow):
         self.toolbar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         
         # Add right widget to splitter
-        self.main_splitter.addWidget(right_widget)
+        self.main_splitter.addWidget(self.right_widget)
         
         # Set initial sizes (20% for absorber manager, 80% for canvas)
         self.main_splitter.setSizes([20, 80])

@@ -50,12 +50,12 @@ Work through these one by one. Each item needs: (1) verify the issue is real, (2
   - Issue: When grouping lines by velocity threshold, each new line is compared only to the *last* entry in the current cluster, not to the cluster anchor/centroid. Lines that drift cumulatively beyond the threshold can still be merged.
   - Needs: write a test case with synthetic data to confirm or rule out.
 
-- [ ] **LOGIC-2** `IOManager` singleton state leaks between `MainWindow` instances
-  - Location: `io_manager.py`, `rb_multispec.py`
-  - Issue: `message_box` reference and `last_directories` are shared across windows. Second window creation (via `from_data()`) redirects all I/O messages.
-  - Needs: test by calling `from_data()` twice to check if messages route correctly.
+- [~] **LOGIC-2** `IOManager` singleton state leaks between `MainWindow` instances — **DEFERRED**
+  - Only affects multi-window `from_data()` usage; symptom is messages routing to wrong window.
+  - `last_directories` sharing across windows is actually desirable UX.
+  - Not worth fixing unless multi-window becomes a first-class use case.
 
-- [ ] **LOGIC-3** Fragile `vStack` canvas replacement — walks widget tree by attribute name
+- [x] **LOGIC-3** Fragile `vStack` canvas replacement — walks widget tree by attribute name
   - Location: `vStack.py` `__init__`
   - Issue: Finds `right_layout`/`main_splitter` by attribute inspection. Falls back silently to a separate `QDialog` if not found. Restoration path may have `AttributeError` risk.
   - Needs: trigger the fallback path and verify behavior.

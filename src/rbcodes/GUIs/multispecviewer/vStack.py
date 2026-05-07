@@ -164,61 +164,24 @@ class vStack:
         # Connect keyboard events
         self.cid = self.fig.canvas.mpl_connect('key_press_event', self.onkb)
         
-        # Find the right parent widget and layout
+        # Replace the spectral canvas with vStack canvas in the main window layout
         canvas_replaced = False
-        
         try:
-            # Get the real parent window from the canvas
-            main_window = None
-            
-            # Try to find the MainWindow (parent_window)
-            if hasattr(parent, 'parent_window'):
-                main_window = parent.parent_window
-            else:
-                # Check if parent itself is MainWindow
-                from PyQt5.QtWidgets import QMainWindow
-                if isinstance(parent, QMainWindow):
-                    main_window = parent
-
-            if main_window is not None:
-                # Try different layout finding strategies
-                if hasattr(main_window, 'right_layout'):
-                    main_window.right_layout.removeWidget(parent)
-                    main_window.right_layout.insertWidget(1, self.canvas)
-                    canvas_replaced = True
-                elif hasattr(main_window, 'main_splitter'):
-                    # Get the right widget in the splitter (usually index 1)
-                    right_widget = main_window.main_splitter.widget(1)
-
-                    if hasattr(right_widget, 'layout'):
-                        right_layout = right_widget.layout()
-
-                        # Find parent's canvas in the layout
-                        for i in range(right_layout.count()):
-                            item = right_layout.itemAt(i)
-                            if item is not None and item.widget() == parent:
-                                right_layout.removeWidget(parent)
-                                right_layout.insertWidget(i, self.canvas)
-                                canvas_replaced = True
-                                break
-                            elif item is not None and hasattr(item.widget(), 'canvas') and item.widget().canvas == parent:
-                                item_widget = item.widget()
-                                right_layout.removeWidget(item_widget)
-                                right_layout.insertWidget(i, self.canvas)
-                                canvas_replaced = True
-                                break
+            main_window = parent.parent_window if hasattr(parent, 'parent_window') else None
+            if main_window is not None and hasattr(main_window, 'right_layout'):
+                main_window.right_layout.removeWidget(parent)
+                main_window.right_layout.insertWidget(1, self.canvas)
+                canvas_replaced = True
         except Exception as e:
             traceback.print_exc()
 
-        # If we couldn't replace the canvas in the layout, show in a separate window
+        # Fallback: show in a separate window if layout swap failed
         if not canvas_replaced:
             self.separate_window = QDialog()
             self.separate_window.setWindowTitle(f"vStack - z={zabs:.6f}")
             self.separate_window.setMinimumSize(800, 600)
-            
             layout = QVBoxLayout(self.separate_window)
             layout.addWidget(self.canvas)
-            
             self.separate_window.show()
         
 
@@ -306,24 +269,12 @@ class vStack:
                 if hasattr(self, 'separate_window') and self.separate_window is not None:
                     self.separate_window.close()
                 else:
-                    # Find the original canvas
+                    # Restore original spectral canvas
                     main_window = self.parent.parent_window
-                    
-                    # Try to restore original canvas
-                    if hasattr(main_window, 'right_layout'):
-                        main_window.right_layout.removeWidget(self.canvas)
-                        main_window.right_layout.insertWidget(1, self.parent)
-                    elif hasattr(main_window, 'main_splitter'):
-                        right_widget = main_window.main_splitter.widget(1)
-                        if hasattr(right_widget, 'layout'):
-                            layout = right_widget.layout()
-                            for i in range(layout.count()):
-                                if layout.itemAt(i).widget() == self.canvas:
-                                    layout.removeWidget(self.canvas)
-                                    layout.insertWidget(i, self.parent)
-                                    break
-                
-                # Close/delete the canvas
+                    main_window.right_layout.removeWidget(self.canvas)
+                    main_window.right_layout.insertWidget(1, self.parent)
+
+                # Close/delete the vStack canvas
                 self.canvas.close()
                 del self.canvas
             except Exception as e:
