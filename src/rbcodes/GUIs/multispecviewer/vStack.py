@@ -14,23 +14,20 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 # Import required modules with error handling
 try:
     from rbcodes.IGM import rb_setline as line
-    print("Imported rb_setline successfully")
 except ImportError as e:
-    print(f"Failed to import rb_setline: {e}")
+    raise ImportError(f"vStack requires rbcodes.IGM.rb_setline: {e}")
 
 try:
     from rbcodes.GUIs.abstools import Absorber as A
-    print("Imported Absorber successfully")
 except ImportError as e:
-    print(f"Failed to import Absorber: {e}")
+    raise ImportError(f"vStack requires rbcodes.GUIs.abstools.Absorber: {e}")
 
 try:
     from rbcodes.utils import rb_utility as rt
-    print("Imported rb_utility successfully")
     # Get color dictionary
     clr = rt.rb_set_color()
 except ImportError as e:
-    print(f"Failed to import rb_utility: {e}")
+    raise ImportError(f"vStack requires rbcodes.utils.rb_utility: {e}")
     # Fallback color dictionary if import fails
     clr = {
         'white': '#FFFFFF',
@@ -114,14 +111,10 @@ class vStack:
         self.zabs = zabs
         self.vlim = vlim
         
-        print(f"Initializing vStack with z={zabs:.6f}, line_flg={line_flg}, vlim={vlim}")
-        
         # Initialize ions data
         try:
             self.ions = prepare_absorber_object(zabs, wave, flux, error, line_flg=line_flg, vlim=vlim)
-            print(f"prepare_absorber_object completed successfully")
         except Exception as e:
-            print(f"Error in prepare_absorber_object: {str(e)}")
             traceback.print_exc()
             raise
         
@@ -135,7 +128,6 @@ class vStack:
         self.keys = list(self.ions.keys())[:-1]  # last item is the full target spectrum
         self.nions = int(len(self.keys))
         
-        print(f"Found {self.nions} transitions in wavelength range")
         
         # Set default flags for all ions (0 = non-detection)
         for i in self.keys:
@@ -152,7 +144,6 @@ class vStack:
         if self.nions % self.plotppage > 0:
             self.npages += 1
         
-        print(f"Grid layout: {self.nrow}x{self.ncol}, {self.npages} pages")
         
         # Create the figure and axes
         self.fig = Figure(figsize=(12, 8))
@@ -183,32 +174,25 @@ class vStack:
             # Try to find the MainWindow (parent_window)
             if hasattr(parent, 'parent_window'):
                 main_window = parent.parent_window
-                print("Found parent_window attribute on canvas")
             else:
-                print("parent_window attribute not found on canvas, trying other approaches")
-                
                 # Check if parent itself is MainWindow
                 from PyQt5.QtWidgets import QMainWindow
                 if isinstance(parent, QMainWindow):
                     main_window = parent
-                    print("Parent is QMainWindow")
-            
+
             if main_window is not None:
                 # Try different layout finding strategies
                 if hasattr(main_window, 'right_layout'):
-                    print("Found right_layout")
                     main_window.right_layout.removeWidget(parent)
                     main_window.right_layout.insertWidget(1, self.canvas)
                     canvas_replaced = True
                 elif hasattr(main_window, 'main_splitter'):
-                    print("Found main_splitter, looking for canvas in children")
-                    
                     # Get the right widget in the splitter (usually index 1)
                     right_widget = main_window.main_splitter.widget(1)
-                    
+
                     if hasattr(right_widget, 'layout'):
                         right_layout = right_widget.layout()
-                        
+
                         # Find parent's canvas in the layout
                         for i in range(right_layout.count()):
                             item = right_layout.itemAt(i)
@@ -216,27 +200,18 @@ class vStack:
                                 right_layout.removeWidget(parent)
                                 right_layout.insertWidget(i, self.canvas)
                                 canvas_replaced = True
-                                print(f"Replaced canvas in right_widget layout at index {i}")
                                 break
                             elif item is not None and hasattr(item.widget(), 'canvas') and item.widget().canvas == parent:
                                 item_widget = item.widget()
                                 right_layout.removeWidget(item_widget)
                                 right_layout.insertWidget(i, self.canvas)
                                 canvas_replaced = True
-                                print(f"Replaced widget containing canvas at index {i}")
                                 break
-                else:
-                    print("Could not find the right layout in MainWindow.")
-                    print("MainWindow attributes:", [attr for attr in dir(main_window) if not attr.startswith('_')])
-            else:
-                print("Could not find MainWindow")
         except Exception as e:
-            print(f"Error replacing canvas: {str(e)}")
             traceback.print_exc()
-        
+
         # If we couldn't replace the canvas in the layout, show in a separate window
         if not canvas_replaced:
-            print("Could not replace canvas in layout, showing in separate window")
             self.separate_window = QDialog()
             self.separate_window.setWindowTitle(f"vStack - z={zabs:.6f}")
             self.separate_window.setMinimumSize(800, 600)
@@ -246,7 +221,6 @@ class vStack:
             
             self.separate_window.show()
         
-        print("vStack initialization complete")
 
     def onkb(self, event):
         """
@@ -270,9 +244,8 @@ class vStack:
                         ylimit = ylim.split(',')
                         ylimit = np.array(ylimit).astype('float32')
                         self.vPlot(ploti=i, yrange=[ylimit[0], ylimit[1]])
-                        print(f"Set y-limits to {ylimit} for panel {i}")
                     except Exception as e:
-                        print(f"Error setting y-limits: {str(e)}")
+                        traceback.print_exc()
         
         # Page right
         elif event.key == '>':
@@ -280,15 +253,13 @@ class vStack:
             if self.page > self.npages: 
                 self.page = 1
             self.vPlot(clearpage=True)
-            print(f"Moved to page {self.page} of {self.npages}")
-        
+
         # Page left
         elif event.key == '<':
             self.page -= 1
-            if self.page < 1: 
+            if self.page < 1:
                 self.page = self.npages
             self.vPlot(clearpage=True)
-            print(f"Moved to page {self.page} of {self.npages}")
         
         # Toggle between detection-non-detection or blended    
         elif event.key == 'w':
@@ -299,7 +270,6 @@ class vStack:
                 temp_flag = (temp_flag + 1) % 4
                 self.ions[self.keys[i]]['flag'] = temp_flag
                 self.vPlot(ploti=i, comment=False)
-                print(f"Changed flag for {self.keys[i]} to {temp_flag} ({self.plotText(flag=temp_flag)})")
         
         # Save linelist and return to main display
         elif event.key == 'S':
@@ -330,10 +300,6 @@ class vStack:
                 elif hasattr(self.parent, 'canvas') and hasattr(self.parent.canvas, 'line_list'):
                     self.parent.canvas.line_list = pd.concat([self.parent.canvas.line_list, new_row.to_frame().T], ignore_index=True)
                     lines_added += 1
-                else:
-                    print("Could not find line_list attribute on parent or parent.canvas")
-            
-            print(f"Added {lines_added} lines to line_list")
             
             # Close vStack and return to main display
             try:
@@ -360,10 +326,7 @@ class vStack:
                 # Close/delete the canvas
                 self.canvas.close()
                 del self.canvas
-                
-                print("Closed vStack and restored original canvas")
             except Exception as e:
-                print(f"Error restoring original canvas: {str(e)}")
                 traceback.print_exc()
 
     def vPlot(self, ploti=None, comment=False, yrange=None, clearpage=False):

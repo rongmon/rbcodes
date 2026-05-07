@@ -246,8 +246,8 @@ class RedshiftInputWidget(QWidget):
             QMessageBox.warning(self, "Invalid Input", "Please enter a valid redshift value (number).")
             return
             
-        # Validate line list selection
-        if not linelist or linelist == "None":
+        # Validate line list selection — "None" is valid (clears lines)
+        if not linelist:
             QMessageBox.warning(self, "Missing Selection", "Please select a line list.")
             return
         
