@@ -2,6 +2,81 @@
 Changelog
 =========
 
+Version 2.3.0 (2026-05-07)
+==========================
+
+Enhancements
+------------
+* ``interactive_continuum_fit``: Added cursor-based and dialog-based navigation shortcuts,
+  consistent with ``multispecviewer`` keybindings.
+
+  - ``x`` / ``X``: set left / right x-limit to cursor position.
+  - ``t`` / ``b``: set top / bottom y-limit of the panel under the cursor
+    (``b`` retains its "add exact spline anchor" behaviour in spline mode).
+  - ``[`` / ``]``: pan left / right by 50 % of the current x-axis range.
+  - ``W``: open a dialog to type an exact x-range (e.g. ``4100, 4300``);
+    pre-filled with the current limits.
+  - ``Y``: open a dialog to type an exact y-range for the panel under the cursor;
+    pre-filled with the current limits.
+  - Overhauled HTML help file: added quick-reference card, grouped shortcut
+    table with category headers, and a dedicated Navigation section documenting
+    all new keys.
+
+* ``multispecviewer`` updated to v1.5.0.
+
+  - ``a`` / ``A`` keys: autoscale y-axis to the flux range visible in the current
+    x-window (``a`` = all panels, ``A`` = panel under cursor).
+  - Always-visible spectral-coordinates label in the toolbar showing cursor
+    wavelength (Å) and velocity offset (km/s) from the nearest line in the
+    active line list at the current redshift.
+  - ``L`` key: toggle line-label text on/off without removing tick marks.
+  - Help toolbar button (``?``) opens the help dialog without needing a
+    keyboard shortcut.
+  - Replaced plain-text help popup with a ``QTableWidget``-based dialog
+    organised into five tabs: Navigation, Display, Quick Line ID, vStack,
+    and Overview.
+
+* ``launch_specgui`` updated to v1.0.6: minor under-the-hood cleanup to
+  prevent spurious exception errors in batch mode.
+
+Bug Fixes
+---------
+* ``interactive_continuum_fit``: zoom state was reset to the initial domain
+  whenever a mask was added, removed, or modified via click.  Root cause: six
+  call sites captured ``xlim`` before redrawing but passed it to
+  ``update_plots()`` without the ``input_xrange`` keyword, causing the method
+  to fall back to ``self.domain`` (only updated by the ``+``/``-`` keyboard
+  zoom, not the matplotlib toolbar).  All six sites now pass
+  ``input_xrange=xlim`` correctly.
+  Affected methods: ``handle_add_mask``, ``handle_remove_mask``,
+  ``add_exact_spline_point``, ``add_median_spline_point``,
+  ``remove_closest_spline_point``, ``clear_spline_points``.
+
+* ``multispecviewer``: JSON load now respects absorber visibility — systems
+  whose checkboxes were saved as unchecked were being replotted on load.
+  Fixed by wrapping ``_populate_row`` calls with ``blockSignals(True/False)``.
+* ``multispecviewer``: ``handle_convert_clicked`` no longer treats multi-value
+  return tuples as a bool (always truthy); tuples are now unpacked and the
+  error field is checked explicitly.
+* ``multispecviewer``: removed double render in ``handle_redshift_submission``
+  (``set_redshift_data`` already calls ``plot_redshift_lines`` internally).
+* ``multispecviewer``: submitting linelist="None" no longer triggers a
+  validation warning; it now passes through and correctly clears plotted lines.
+* ``multispecviewer``: fixed cumulative-drift merging bug in
+  ``reconcile_linelists`` — clustering now always compares against the first
+  element of the current cluster, not the last.
+* ``multispecviewer``: simplified vStack canvas replacement to use
+  ``main_window.right_layout`` directly, removing fragile attribute-walking
+  fallback.
+
+Removed
+-------
+* ``multispecviewer``: ~30 debug ``print()`` statements from ``vStack.py``.
+* ``multispecviewer``: ~299 lines of dead commented-out ``display_line_list()``
+  implementation from ``multispec.py``.
+* ``multispecviewer``: duplicate ``import matplotlib.pyplot as plt`` in
+  ``multispec.py``.
+
 Version 2.2.0 (2026-05-01)
 ==========================
 

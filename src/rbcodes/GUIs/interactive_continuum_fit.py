@@ -13,11 +13,12 @@ matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
-                           QWidget, QPushButton, QLabel, QSpinBox, QCheckBox, 
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,
+                           QWidget, QPushButton, QLabel, QSpinBox, QCheckBox,
                            QTabWidget, QGroupBox, QFormLayout, QDoubleSpinBox,
                            QMessageBox, QStatusBar, QDialog, QDialogButtonBox,
-                           QComboBox,QScrollArea,QGridLayout,QTextBrowser)
+                           QComboBox, QScrollArea, QGridLayout, QTextBrowser,
+                           QInputDialog)
 from PyQt5.QtCore import Qt
 from scipy.interpolate import splrep, splev
 import warnings
@@ -763,9 +764,9 @@ class InteractiveContinuumFitWindow(QMainWindow):
         # Update plots
         ax_flux = self.canvas.axes[0]
         xlim = ax_flux.get_xlim()
-        self.update_plots()
+        self.update_plots(input_xrange=xlim)
 
-    
+
     def add_median_spline_point(self, x, y):
         """Add a spline anchor point using the median flux in a window."""
         # Get window size from UI
@@ -813,9 +814,9 @@ class InteractiveContinuumFitWindow(QMainWindow):
         ax_flux = self.canvas.axes[0]
         xlim = ax_flux.get_xlim()
         # Update plots
-        self.update_plots()
+        self.update_plots(input_xrange=xlim)
 
-    
+
     def remove_closest_spline_point(self, x, y):
         """Remove the spline point closest to the given coordinates."""
         if not self.spline_points:
@@ -835,8 +836,8 @@ class InteractiveContinuumFitWindow(QMainWindow):
         ax_flux = self.canvas.axes[0]
         xlim = ax_flux.get_xlim()
         # Update plots
-        self.update_plots()
-    
+        self.update_plots(input_xrange=xlim)
+
     def clear_spline_points(self):
         """Clear all spline points."""
         if self.spline_points:
@@ -846,7 +847,7 @@ class InteractiveContinuumFitWindow(QMainWindow):
             ax_flux = self.canvas.axes[0]
             xlim = ax_flux.get_xlim()
             # Update plots
-            self.update_plots()
+            self.update_plots(input_xrange=xlim)
 
         else:
             self.statusBar.showMessage("No spline points to clear")
@@ -881,9 +882,9 @@ class InteractiveContinuumFitWindow(QMainWindow):
             ax_flux = self.canvas.axes[0]
             xlim = ax_flux.get_xlim()
             # Update plots
-            self.update_plots()
+            self.update_plots(input_xrange=xlim)
 
-    
+
     def handle_remove_mask(self, event):
         """Handle removing mask regions with right clicks."""
         if self.current_click is None:
@@ -928,9 +929,9 @@ class InteractiveContinuumFitWindow(QMainWindow):
             ax_flux = self.canvas.axes[0]
             xlim = ax_flux.get_xlim()
             # Update plots
-            self.update_plots()
+            self.update_plots(input_xrange=xlim)
 
-    
+
     def merge_masks(self):
         """Merge overlapping mask regions."""
         if len(self.masks) < 4:  # Need at least two pairs to merge
@@ -984,19 +985,79 @@ class InteractiveContinuumFitWindow(QMainWindow):
             self.poly_radio.setChecked(True)
         elif event.key == 's':
             self.spline_radio.setChecked(True)
-        elif event.key == 'b' and self.fit_params['method'] == 'spline':
-            # Add exact spline point at cursor position (if available)
-            if hasattr(event, 'xdata') and hasattr(event, 'ydata') and event.inaxes:
-                self.add_exact_spline_point(event.xdata, event.ydata)
+        elif event.key == 'b':
+            if self.fit_params['method'] == 'spline':
+                # Add exact spline point at cursor position (if available)
+                if hasattr(event, 'xdata') and hasattr(event, 'ydata') and event.inaxes:
+                    self.add_exact_spline_point(event.xdata, event.ydata)
+                else:
+                    self.statusBar.showMessage("Position cursor over plot before pressing 'b'")
             else:
-                self.statusBar.showMessage("Position cursor over plot before pressing 'b'")
+                # Set bottom y-limit to cursor position
+                if event.inaxes and event.ydata is not None:
+                    ax = event.inaxes
+                    ax.set_ylim(event.ydata, ax.get_ylim()[1])
+                    self.canvas.draw()
+                    self.statusBar.showMessage(f"Set bottom y-limit to {event.ydata:.3f}")
+        elif event.key == 't':
+            # Set top y-limit to cursor position
+            if event.inaxes and event.ydata is not None:
+                ax = event.inaxes
+                ax.set_ylim(ax.get_ylim()[0], event.ydata)
+                self.canvas.draw()
+                self.statusBar.showMessage(f"Set top y-limit to {event.ydata:.3f}")
+        elif event.key == 'x':
+            # Set left x-limit to cursor position
+            if event.inaxes and event.xdata is not None:
+                ax_flux = self.canvas.axes[0]
+                new_xlim = (event.xdata, ax_flux.get_xlim()[1])
+                self.update_plots(input_xrange=new_xlim)
+                self.statusBar.showMessage(f"Set left x-limit to {event.xdata:.2f}")
+        elif event.key == 'X':
+            # Set right x-limit to cursor position
+            if event.inaxes and event.xdata is not None:
+                ax_flux = self.canvas.axes[0]
+                new_xlim = (ax_flux.get_xlim()[0], event.xdata)
+                self.update_plots(input_xrange=new_xlim)
+                self.statusBar.showMessage(f"Set right x-limit to {event.xdata:.2f}")
+        elif event.key == 'W':
+            # Manual x-limits dialog
+            current = self.canvas.axes[0].get_xlim()
+            text, ok = QInputDialog.getText(
+                self, 'Manual X-Limits',
+                f'Input range ({self.x_axis_unit}), e.g. {current[0]:.1f}, {current[1]:.1f}')
+            if ok and text.strip():
+                try:
+                    lo, hi = [float(v) for v in text.split(',')]
+                    self.update_plots(input_xrange=(min(lo, hi), max(lo, hi)))
+                    self.statusBar.showMessage(f"X-limits set to [{min(lo,hi):.2f}, {max(lo,hi):.2f}]")
+                except ValueError:
+                    self.statusBar.showMessage("Invalid input — use format: min, max")
+        elif event.key == 'Y':
+            # Manual y-limits dialog for whichever panel the cursor is in
+            ax = event.inaxes if event.inaxes in self.canvas.axes else self.canvas.axes[0]
+            current = ax.get_ylim()
+            text, ok = QInputDialog.getText(
+                self, 'Manual Y-Limits',
+                f'Input range, e.g. {current[0]:.3f}, {current[1]:.3f}')
+            if ok and text.strip():
+                try:
+                    lo, hi = [float(v) for v in text.split(',')]
+                    ax.set_ylim(min(lo, hi), max(lo, hi))
+                    self.canvas.draw()
+                    self.statusBar.showMessage(f"Y-limits set to [{min(lo,hi):.3f}, {max(lo,hi):.3f}]")
+                except ValueError:
+                    self.statusBar.showMessage("Invalid input — use format: min, max")
+        elif event.key == '[':
+            self.pan_left()
+        elif event.key == ']':
+            self.pan_right()
         elif event.key in ['+', '=']:  # Zoom in
             self.zoom_in()
         elif event.key in ['-', '_']:  # Zoom out
             self.zoom_out()
         elif event.key == '0':  # Reset zoom
             self.reset_zoom()
-
         elif event.key == 'h':
             self.show_help_dialog()
             
@@ -1076,6 +1137,24 @@ class InteractiveContinuumFitWindow(QMainWindow):
         ax_flux.autoscale(axis='y')
         self.canvas.draw()
     
+    def pan_left(self):
+        """Pan left by 50% of the current x-axis range."""
+        ax_flux = self.canvas.axes[0]
+        xlim = ax_flux.get_xlim()
+        delta = 0.5 * (xlim[1] - xlim[0])
+        new_xlim = (xlim[0] - delta, xlim[1] - delta)
+        self.update_plots(input_xrange=new_xlim)
+        self.statusBar.showMessage(f"Panned left to [{new_xlim[0]:.2f}, {new_xlim[1]:.2f}]")
+
+    def pan_right(self):
+        """Pan right by 50% of the current x-axis range."""
+        ax_flux = self.canvas.axes[0]
+        xlim = ax_flux.get_xlim()
+        delta = 0.5 * (xlim[1] - xlim[0])
+        new_xlim = (xlim[0] + delta, xlim[1] + delta)
+        self.update_plots(input_xrange=new_xlim)
+        self.statusBar.showMessage(f"Panned right to [{new_xlim[0]:.2f}, {new_xlim[1]:.2f}]")
+
     def reset_masks(self):
         """Reset all masks."""
         if not self.masks:
@@ -1821,6 +1900,12 @@ class HelpDialog(QDialog):
                 <p><b>Key <span class="key">a</span></b>: Accept results</p>
                 <p><b>Key <span class="key">r</span></b>: Reset masks</p>
                 <p><b>Key <span class="key">R</span></b>: Reset all (masks, spline points, fit)</p>
+                <p><b>Key <span class="key">x</span></b>: Set left x-limit to cursor position</p>
+                <p><b>Key <span class="key">X</span></b>: Set right x-limit to cursor position</p>
+                <p><b>Key <span class="key">t</span></b>: Set top y-limit to cursor position</p>
+                <p><b>Key <span class="key">b</span></b>: Set bottom y-limit (polynomial mode) / add exact spline point (spline mode)</p>
+                <p><b>Key <span class="key">[</span></b>: Pan left by 50% of current view</p>
+                <p><b>Key <span class="key">]</span></b>: Pan right by 50% of current view</p>
             </div>
             
             <p><i>Note: This is a fallback help page. The full documentation should be in the 
