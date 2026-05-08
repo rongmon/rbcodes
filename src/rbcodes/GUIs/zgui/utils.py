@@ -1,4 +1,45 @@
-import sys
+import pandas as pd
+from rbcodes.IGM.rb_setline import read_line_list
+
+
+# ------------- Utility functions ----------------------
+
+def clear_artists(ax, keep_lines=None):
+	"""Clear texts and collections from a matplotlib axes.
+
+	Parameters
+	----------
+	ax : matplotlib Axes
+	keep_lines : int or None
+	    If None (default), lines are not touched.
+	    If int, lines beyond that index are removed (e.g. keep_lines=2
+	    preserves the base flux+error lines; keep_lines=0 removes all).
+	"""
+	while ax.texts:
+		ax.texts.pop()
+	while ax.collections:
+		ax.collections.pop()
+	if keep_lines is not None:
+		while len(ax.lines) > keep_lines:
+			ax.lines.pop()
+
+
+def get_linelist_df(linelist_name):
+	"""Load a linelist by name and return a DataFrame with columns ['wave', 'name'].
+
+	Appends the rest wavelength to the ion name if it is not already present.
+	"""
+	llist = pd.DataFrame(columns=['wave', 'name'])
+	tmp = read_line_list(linelist_name)
+
+	if any(map(str.isdigit, tmp[1]['ion'])):
+		# name column already contains the rest wavelength
+		rows = [{'wave': li['wrest'], 'name': li['ion']} for li in tmp]
+	else:
+		# append rest wavelength to name
+		rows = [{'wave': li['wrest'], 'name': li['ion'] + ' ' + str(round(li['wrest']))} for li in tmp]
+
+	return pd.concat([llist, pd.DataFrame(rows)], ignore_index=True)
 
 
 # ------------- Utility classes ------------------------

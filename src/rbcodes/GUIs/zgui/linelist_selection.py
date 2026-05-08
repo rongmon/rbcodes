@@ -1,4 +1,3 @@
-import sys
 import os
 import pandas as pd
 from numpy import floor, log10, isnan, nan, isinf
@@ -10,7 +9,7 @@ from PyQt5 import QtCore
 from PyQt5 import QtGui
 from PyQt5.QtGui import QDoubleValidator
 
-from rbcodes.IGM.rb_setline import read_line_list
+from rbcodes.GUIs.zgui.utils import get_linelist_df
 
 LINELIST_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -188,7 +187,7 @@ class LineListWidget(QWidget):
 				t_color = 'QComboBox {color:' + colors[i] + '}'
 				self.llists_2[i][1].setStyleSheet(t_color)
 				# 2 parameters need to be passed: 1.selected linelist and 2.index of linelist widget changed
-				self.llists_2[i][1].currentTextChanged.connect(lambda s, idx=i: self._addtional_linelist(idx, s))
+				self.llists_2[i][1].currentTextChanged.connect(lambda s, idx=i: self._additional_linelist(idx, s))
 				
 				self.llists_2[i][2].setReadOnly(False)
 				# only the index of linelist widget passed
@@ -218,9 +217,6 @@ class LineListWidget(QWidget):
 	# ion line combobox events
 	def _index_changed(self, i): # i is an int
 		self.send_lineindex.emit(i)
-
-	def _text_changed(self, s): # s is a str
-		tmp_df = self.linelist.set_index('name')
 
 	# Display all available ions in a selected linelist
 	def _linelist_changed(self, s):
@@ -349,7 +345,6 @@ class LineListWidget(QWidget):
 					self.newz[1] = float(sent_dict['z_err'])
 
 				show_sigfig = 5
-				print(self.newz)
 				self.estZ.setText(str(self.round_to_sigfig(self.newz[0], show_sigfig)))
 				if not isnan(float(self.newz[1])):
 					self.estZstd.setText(str(self.round_to_sigfig(self.newz[1], show_sigfig)))
@@ -401,7 +396,7 @@ class LineListWidget(QWidget):
 			return None
 
 	# load full content in all secondary linelist
-	def _addtional_linelist(self, i, s):
+	def _additional_linelist(self, i, s):
 		# i = index of the widget passing linelist
 		# s = name of the linelist
 		llist = pd.DataFrame(columns=['wave', 'name'])
@@ -421,24 +416,11 @@ class LineListWidget(QWidget):
 		else:
 			z_guess = float(self.llists_2[i][2].text())
 
-		if (self.llists_2[i][1].currentText() == 'NONE' ) & (z_guess == 0):
+		if (self.llists_2[i][1].currentText() == 'NONE') and (z_guess == 0):
 			pass
 		else:
 			self.send_more_linelist_z.emit([{i:llist}, z_guess])
 
 	# action to read linelist as dataframe
 	def _get_linelist_df(self, linelist_name):
-		llist = pd.DataFrame(columns=['wave', 'name'])
-		tmp = read_line_list(linelist_name)
-
-		#need a line to append wrest to name if it doesn't have one
-		if any(map(str.isdigit, tmp[1]['ion'])):
-			# if name column has wrest
-			rows = [{'wave': li['wrest'], 'name': li['ion']} for li in tmp]
-			llist = pd.concat([llist, pd.DataFrame(rows)], ignore_index=True)
-		else:
-			# if name column doesn't have wrest, need to append
-			rows = [{'wave': li['wrest'], 'name': li['ion']+' '+str(round(li['wrest']))} for li in tmp]
-			llist = pd.concat([llist, pd.DataFrame(rows)], ignore_index=True)
-
-		return llist
+		return get_linelist_df(linelist_name)

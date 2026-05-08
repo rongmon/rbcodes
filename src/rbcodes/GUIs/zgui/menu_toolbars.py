@@ -69,7 +69,7 @@ class Custom_ToolBar(QToolBar):
 		self.addSeparator()
 
 		# "PREV" buttons for file dropbox
-		btn_prevf = self._create_button('PREV', 'Swtich to previous fits file loaded in backend.')
+		btn_prevf = self._create_button('PREV', 'Switch to previous fits file loaded in backend.')
 		self.addAction(btn_prevf)
 		btn_prevf.triggered.connect(self._prev_fitsfile)
 		# File dropbox
@@ -92,7 +92,7 @@ class Custom_ToolBar(QToolBar):
 		if self.mW.toggle_frames:
 			self.frames = None
 			# '-' button for frame dropbox
-			btn_prevframe = self._create_button('-', 'Swtich to previous available frame.')
+			btn_prevframe = self._create_button('-', 'Switch to previous available frame.')
 			self.addAction(btn_prevframe)
 			btn_prevframe.triggered.connect(self._prev_frame)
 			# main frame dropbox
@@ -141,6 +141,11 @@ class Custom_ToolBar(QToolBar):
 		self.fixed_colorbar_checkbox = QCheckBox('Fixed Scale')
 		self.fixed_colorbar_checkbox.setToolTip('Lock colorbar to current range instead of dynamic scaling')
 		self.addWidget(self.fixed_colorbar_checkbox)
+
+		# Lock y-scale across file loads checkbox
+		self.lock_yscale_checkbox = QCheckBox('Lock Y')
+		self.lock_yscale_checkbox.setToolTip('Retain current y-axis scale when loading a new file')
+		self.addWidget(self.lock_yscale_checkbox)
 
 		self.addSeparator()
 
@@ -244,7 +249,6 @@ class Custom_ToolBar(QToolBar):
 					'Save 1D Spectrum FITS file',
 					newfilename,
 					'Fits Files (*.fits)')
-				print(filepath)
 				if check:
 					# create a deepcopy first
 					hdul_copy = self.loadspec._save_copy()
@@ -263,7 +267,6 @@ class Custom_ToolBar(QToolBar):
 
 					# ymin/ymax are written in the final filename
 					hdul_copy.writeto(filepath, overwrite=True)
-					print('Saving a fits file to [{}]'.format(filepath))
 
 			else:
 				self.send_message.emit('Please select a new extraction box.')
@@ -442,7 +445,6 @@ class Custom_ToolBar(QToolBar):
 			pass
 		else:
 			self.filename = self.filenames[i-1]
-			print(f'Currently, GUI reads FITS file from {self.filepaths[i-1]}')
 			if self.mW.xspecio:
 				# enable XSpectrum1D io
 				#print('xspec io mode')
@@ -468,7 +470,8 @@ class Custom_ToolBar(QToolBar):
 				from rbcodes.GUIs.zgui.gui_io import LoadSpec
 				fnlist = self.filepaths[i-1].split('_')
 				# searching for corresponding 2D for advanced display
-				if '1D' in fnlist[-2]:
+				# only attempt if filename has enough underscore-separated parts
+				if len(fnlist) >= 2 and '1D' in fnlist[-2]:
 					fits2d_path = '_'.join(fnlist[:-2] + ['2D'] + [fnlist[-1]])
 					if os.path.exists(fits2d_path):
 						self.filepaths[i-1] = fits2d_path
@@ -477,10 +480,22 @@ class Custom_ToolBar(QToolBar):
 				self.loadspec = LoadSpec(self.filepaths[i-1])
 
 				selfcheck = self.loadspec._load_spec()
-				#print(selfcheck)
 				if type(selfcheck) is str:
-					print('bad fits format')
-					self.send_message.emit(selfcheck)
+					# default IO cannot read this file — fall back to xspec IO (rb_spectrum)
+					self.send_message.emit(f'Default IO could not read file, trying xspec IO...')
+					from rbcodes.GUIs.zgui.gui_io_xspec import LoadXSpec
+					self.loadspec = LoadXSpec(self.filepaths[i-1])
+					if len(self.loadspec.warning) > 0:
+						self.send_message.emit(self.loadspec.warning)
+					else:
+						self.fitsobj = self.loadspec._load_spec()
+						self.mW.sc.plot_spec(self.fitsobj.wave,
+											self.fitsobj.flux,
+											self.fitsobj.error,
+											self.filename)
+						self.s_combobox.clear()
+						self.send_filename.emit(self.filename)
+						self.send_fitsobj.emit(self.fitsobj)
 				else:
 					self.fitsobj = self.loadspec._load_spec()
 
@@ -603,8 +618,9 @@ class Custom_ToolBar(QToolBar):
 		#self.n_combobox.currentIndexChanged.connect(self._normalization_changed)
 		self.n_combobox.activated.connect(self._normalization_changed)
 		
-		# Connect checkbox signal
+		# Connect checkbox signals
 		self.fixed_colorbar_checkbox.toggled.connect(self._colorbar_scale_toggled)
+		self.lock_yscale_checkbox.toggled.connect(lambda checked: self.mW.sc.set_lock_yscale(checked))
 
 		self.min_range.setReadOnly(False)
 		self.max_range.setReadOnly(False)
@@ -746,14 +762,11 @@ class Custom_ToolBar(QToolBar):
 				if min_text and max_text:
 					self.fixed_vmin = float(min_text)
 					self.fixed_vmax = float(max_text)
-					print(f"Fixed scale enabled with vmin={self.fixed_vmin}, vmax={self.fixed_vmax}")
 				else:
 					# If textboxes are empty, use default values
 					self.fixed_vmin = -0.02
 					self.fixed_vmax = 0.02
-					print(f"Fixed scale enabled with default values: vmin={self.fixed_vmin}, vmax={self.fixed_vmax}")
 			except ValueError as e:
-				print(f"Error parsing textbox values: {e}. Using defaults.")
 				# Show warning to user
 				from PyQt5.QtWidgets import QMessageBox
 				error_msg = f'Error: Invalid Min/Max values.\n\n'
@@ -769,9 +782,6 @@ class Custom_ToolBar(QToolBar):
 
 				self.fixed_vmin = -0.02
 				self.fixed_vmax = 0.02
-		else:
-			print(f"Fixed scale disabled - using dynamic scaling")
-				
 		# Refresh the plot if we have data loaded
 		if hasattr(self, 'fitsobj') and self.fitsobj.flux2d is not None:
 			self.mW.sc.plot_spec2d(self.fitsobj.wave,
@@ -910,7 +920,6 @@ class Custom_MenuBar(QMenuBar):
 			table['WAVELENGTH'] = self.fitsobj.wave
 			table['FLUX'] = self.fitsobj.flux
 			table['ERROR'] = self.fitsobj.error
-			print(filepath)
 			table.write(filepath, format='fits')
 			'''Output fits format
 			table[1].data['WAVELENGTH']
@@ -965,7 +974,6 @@ class Custom_MenuBar(QMenuBar):
 			'ASCII FIles (*.ascii')
 		if check:
 			linetable = Table.from_pandas(self.newlinelist)
-			print(filepath)
 			linetable.write(filepath, format='ascii')
 
 	def _load_z(self):
@@ -980,7 +988,6 @@ class Custom_MenuBar(QMenuBar):
 			self.send_z_est.emit(self.z_est)
 
 			filename = self._get_filename(filepath, extension=False)
-			print(filename)
 
 	def _save_z(self):
 		#Save current estimated redshifts so far

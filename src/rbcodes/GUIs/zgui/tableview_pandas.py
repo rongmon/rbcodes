@@ -1,5 +1,3 @@
-import sys
-
 import pandas as pd
 
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -127,7 +125,6 @@ class CustomZTable(QtWidgets.QWidget):
 			self.estZ.reset_index(inplace=True, drop=True)
 			self._update_table()
 			self.send_dictdata.emit(self.estZ.iloc[0].to_dict())
-			print(self.estZ.iloc[0].to_dict())
 		else:
 			self.send_dictdata.emit({})
 

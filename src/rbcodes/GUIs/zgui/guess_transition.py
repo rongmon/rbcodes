@@ -1,4 +1,3 @@
-import sys
 import numpy as np
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QComboBox, QLineEdit, QListWidget
 from PyQt5.QtCore import pyqtSignal

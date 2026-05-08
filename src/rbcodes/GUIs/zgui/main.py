@@ -125,7 +125,6 @@ class MainWindow(QMainWindow):
 	def on_z_est_slot(self, sent_z_est):
 		self.z_est = sent_z_est
 		self.update()
-		print(self.z_est)
 
 	def passing_estZ(self, estZ):
 		self.sc.estZ = float(estZ.text())
@@ -314,7 +313,7 @@ For more information see: https://github.com/rongmon/rbcodes
     group.add_argument('-d', '--default', action='store_true', required=False, default=True,
         help='Read FITS files using default gui_io IO class')
     group.add_argument('-x', '--xspec', action='store_true', required=False, default=False,
-        help='Read FITS files using XSpectrum1D class from linetools')
+        help='Read FITS files using rb_spectrum (fallback IO for generic FITS formats)')
     parser.add_argument('-f', '--fitsfile', type=str, action='store', required=False, default='',
         help='Feed one FITS file to the internal GUI database at startup')
     parser.add_argument('-tf', '--toggleframes', action='store_true', required=False, default=False,

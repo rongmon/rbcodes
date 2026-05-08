@@ -14,7 +14,7 @@ import pandas as pd
 from scipy.interpolate import splrep, splev
 from scipy.optimize import curve_fit
 
-from rbcodes.IGM.rb_setline import read_line_list
+from rbcodes.GUIs.zgui.utils import get_linelist_df, clear_artists
 
 class Gaussfit_2d(QWidget):
     send_linelist = pyqtSignal(object)
@@ -65,16 +65,21 @@ class Gaussfit_2d(QWidget):
         self.zferr.setReadOnly(True)
         lines_layout.addWidget(self.zferr, 1,2)
 
-        pb = QPushButton('Fit')
-        pb.setFixedWidth(100)
-        pb.clicked.connect(self._button_clicked)
-        lines_layout.addWidget(pb, 1,3)
-        self.fit_result = QLabel('Ready')
+        _disabled_style = 'QPushButton:disabled { color: #888888; background-color: #d0d0d0; }'
+        self.pb_fit = QPushButton('Fit')
+        self.pb_fit.setFixedWidth(100)
+        self.pb_fit.clicked.connect(self._button_clicked)
+        self.pb_fit.setEnabled(False)
+        self.pb_fit.setStyleSheet(_disabled_style)
+        lines_layout.addWidget(self.pb_fit, 1,3)
+        self.fit_result = QLabel('Select ions')
         lines_layout.addWidget(self.fit_result, 0, 3)
-        adv_pb = QPushButton('Advanced')
-        adv_pb.setFixedWidth(100)
-        adv_pb.clicked.connect(self._adv_button_clicked)
-        lines_layout.addWidget(adv_pb, 2,3)
+        self.pb_adv = QPushButton('Advanced')
+        self.pb_adv.setFixedWidth(100)
+        self.pb_adv.clicked.connect(self._adv_button_clicked)
+        self.pb_adv.setEnabled(False)
+        self.pb_adv.setStyleSheet(_disabled_style)
+        lines_layout.addWidget(self.pb_adv, 2,3)
 
         apply_pb = QPushButton('Apply')
         apply_pb.setFixedWidth(100)
@@ -101,8 +106,6 @@ class Gaussfit_2d(QWidget):
         self.send_waves.connect(self.line1d._on_sent_waves)
 
 
-        # --- possible implementation ---
-        # right now it is unstable if linetools is not installed
         c_checkbox = QCheckBox('RANSAC')
         # apply ransac fitting for continuum if checked
         c_checkbox.stateChanged.connect(self._initialize_ransac)
@@ -141,26 +144,7 @@ class Gaussfit_2d(QWidget):
         return ion_i
 
     def _get_linelist_df(self, linelist_name):
-        llist = pd.DataFrame(columns=['wave', 'name'])
-        tmp = read_line_list(linelist_name)
-
-        #need a line to append wrest to name if it doesn't have one
-        if any(map(str.isdigit, tmp[1]['ion'])):
-            # if name column has wrest
-            rows = [{'wave': li['wrest'], 'name': li['ion']} for li in tmp]
-            llist = pd.concat([llist, pd.DataFrame(rows)], ignore_index=True)
-        else:
-            # if name column doesn't have wrest, need to append
-            rows = [{'wave': li['wrest'], 'name': li['ion']+' '+str(round(li['wrest']))} for li in tmp]
-            llist = pd.concat([llist, pd.DataFrame(rows)], ignore_index=True)
-
-        return llist
-
-    def _on_sent_gauss_num(self, sent_gauss_num):
-        self.gauss_num = int(sent_gauss_num)
-        print(self.gauss_num)
-        ion3 = self._create_linelist_widget(lines_layout, 4)
-        ion_widgets.append(ion3)
+        return get_linelist_df(linelist_name)
 
     def _ion_i_index_changed(self, i, ion_widget_idx): # i is an int
         #self.send_lineindex.emit(i)
@@ -170,9 +154,12 @@ class Gaussfit_2d(QWidget):
 
             #print(self.waves)
             #print(self.names)
-            if sum(self.waves > 0) == self.gauss_num:        
-            # now waves contain all selected ion rest wavelength
+            if sum(self.waves > 0) == self.gauss_num:
+                # all ions selected — enable fitting and update status
                 self.send_waves.emit({ni:wi for ni,wi in zip(self.names, self.waves)})
+                self.pb_fit.setEnabled(True)
+                self.pb_adv.setEnabled(True)
+                self.fit_result.setText('Ready')
 
 
     def _on_sent_linelists2multiG(self, l):
@@ -197,7 +184,6 @@ class Gaussfit_2d(QWidget):
 
     def _button_clicked(self, check):
         show_sigfig = 5
-        print('Begin fitting multiple Gaussians')
         self.result = self.line1d.fit(self.cont)
         if self.result is not None:
             self.zf.setText(str(self.round_to_sigfig(self.result[0], show_sigfig)))
@@ -218,12 +204,13 @@ class Gaussfit_2d(QWidget):
     def round_to_sigfig(self, num=0., sigfig=1):
         if np.isinf(float(num)):
             return np.inf
-        else:
-            return round(num, sigfig - int(np.floor(np.log10(abs(num)))) - 1)
+        if num == 0:
+            return 0.
+        return round(num, sigfig - int(np.floor(np.log10(abs(num)))) - 1)
 
     def _adv_button_clicked(self, check):
         print('Change parameter bounds')
-        if (self.line1d.bounds is None) | (self.line1d.init_guess is None):
+        if (self.line1d.bounds is None) or (self.line1d.init_guess is None):
             print('Please Press Fit button first')
         else:
             constraint = FittingConstraintDialog(init_guess=self.line1d.init_guess,
@@ -234,6 +221,9 @@ class Gaussfit_2d(QWidget):
                 self.line1d.init_guess = new_guess
 
     def _fit_ransac_continuum(self):
+        if self.c is None:
+            print('Enable RANSAC checkbox first.')
+            return
         self.kernel_size = int(self.kernel_ransac.text())
         if self.kernel_size % 2 == 0:
             self.kernel_size += 1
@@ -258,9 +248,8 @@ class Gaussfit_2d(QWidget):
             self.kernel_ransac.setReadOnly(True)
             self.kernel_ransac.clear()
             self.cont = None
-            # Modern matplotlib: clear lines beyond base error/flux lines
-            while len(self.line1d.axline.lines) > 2:
-                self.line1d.axline.lines.pop()
+            clear_artists(self.line1d.axline, keep_lines=2)
+            self.line1d.draw()
 
     def _draw_button_clicked(self, check):
         if self.cont is not None:
@@ -271,7 +260,6 @@ class Gaussfit_2d(QWidget):
             'Save Multi-Gaussian Fitting Parameters',
             '',
             'Text Files (*.txt)')
-        print(fpath_params)
         if fcheck:
             if self.line1d.track_fit is not None:
                 with open(fpath_params, 'w') as f:
@@ -320,6 +308,8 @@ class LineCanvas(FigureCanvasQTAgg):
         self.bounds = None
         self.z_guess = 0.
         self.track_fit = None
+        self.waves_guess = None  # set by _plot_line() after user presses Shift+C
+        self.delw = None         # set by _on_sent_waves() after all ions are selected
 
 
     def _plot_spec(self, wave,flux1d,error1d):
@@ -353,20 +343,17 @@ class LineCanvas(FigureCanvasQTAgg):
         self.draw()
 
     def _clear_plotted_lines(self):
-        while self.axline.texts:
-            self.axline.texts.pop()
-        while self.axline.collections:
-            self.axline.collections.pop()
-        # Modern matplotlib: clear lines beyond base error/flux lines
-        while len(self.axline.lines) > 2:
-            self.axline.lines.pop()
+        clear_artists(self.axline, keep_lines=2)
         self.draw()
 
 
 
     def fit(self, ransac_cont=None):
+        if self.waves_guess is None:
+            print('No guess set. Press Shift+C on the plot to set a line center first.')
+            return None
         print('Start fitting multi-Gaussian profile...')
-        fit_log = ['Multi-Gaussian Fitting Log', 
+        fit_log = ['Multi-Gaussian Fitting Log',
                     '----------------------------------']
         # mimic the single Gaussian fitting process
         # 1. fit a local continum across the entire window
@@ -433,8 +420,7 @@ class LineCanvas(FigureCanvasQTAgg):
 
 
             # Modern matplotlib: clear lines beyond base error/flux lines
-            while len(self.axline.lines) > 2:
-                self.axline.lines.pop()
+            clear_artists(self.axline, keep_lines=2)
             cont_fit = self.axline.plot(self.g_wave, cont, 'b')
             model_fit = self.axline.plot(self.g_wave, gfinal, 'r--')
 
@@ -466,8 +452,13 @@ class LineCanvas(FigureCanvasQTAgg):
         '''
         #print(event.key)
         if event.key == 'C':
+            if len(self.wavelist) == 0:
+                print('Select ions first before setting a guess.')
+                return
+            if event.xdata is None:
+                return
             # Pick the Gaussian Center
-            self.axline.plot(event.xdata,event.ydata,'r+')
+            self.axline.plot(event.xdata, event.ydata, 'r+')
             self.g1x_init = event.xdata
             self.g1y_init = event.ydata
 

@@ -1,4 +1,3 @@
-import sys
 import pandas as pd
 
 from PyQt5.QtWidgets import QWidget, QTextEdit, QVBoxLayout
@@ -15,7 +14,7 @@ class MessageBox(QWidget):
 		self.message = ''
 
 		self.te = QTextEdit()
-		self.te.setPlaceholderText('This meesage box will display important messages.')
+		self.te.setPlaceholderText('This message box will display important messages.')
 		self.te.setReadOnly(True)
 
 		self.setFixedHeight(200)

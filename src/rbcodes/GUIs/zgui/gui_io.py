@@ -105,10 +105,13 @@ class LoadSpec():
 
 
 		# ------------ FORMAT 3 --------------
-		# EIGER fits files 
-		# for a pair of fits files:
-		# XXX_2D_YYY.fits; XXX_1D_YYY.fits
-		if '2D' in fitsfile.filename().split('_')[-2]:
+		# EIGER fits files
+		# for a pair of fits files: XXX_2D_YYY.fits; XXX_1D_YYY.fits
+		# Guard: require both filename convention AND SCI+ERR content match
+		# so generic FITS files with unrelated names are never misidentified here
+		_fnparts = fitsfile.filename().split('_')
+		_is_eiger_content = 'SCI' in labels and 'ERR' in labels
+		if len(_fnparts) >= 2 and '2D' in _fnparts[-2] and _is_eiger_content:
 			self.fitsobj.flux2d = fitsfile['SCI'].data
 			self.fitsobj.error2d = fitsfile['ERR'].data
 			self.fitsobj.wave = self._build_wave(fitsfile['SCI'].header)
@@ -135,7 +138,7 @@ class LoadSpec():
 			fitsfile.close()
 			return self.fitsobj
 
-		elif '1D' in fitsfile.filename().split('_')[-2]:
+		elif len(_fnparts) >= 2 and '1D' in _fnparts[-2] and _is_eiger_content:
 			self.fitsobj.flux = np.nan_to_num(fitsfile[1].data['flux_opt_ext'], nan=np.nan)
 			self.fitsobj.error = np.nan_to_num(fitsfile[1].data['flux_opt_ext_err'], nan=np.nan)
 			self.fitsobj.wave = fitsfile[1].data['wavelength']
@@ -230,7 +233,9 @@ class LoadSpec():
 					self.fitsobj.wave = fitsfile[i].data['WAVELENGTH']
 
 				if 'ivar' in search_list:
-					self.fitsobj.error = 1. / np.sqrt(fitsfile[i].data['ivar'])
+					ivar = fitsfile[i].data['ivar']
+					with np.errstate(divide='ignore', invalid='ignore'):
+						self.fitsobj.error = np.where(ivar > 0, 1. / np.sqrt(ivar), np.inf)
 				elif 'ERROR' in search_list:
 					self.fitsobj.error = fitsfile[i].data['ERROR']
 
@@ -278,7 +283,7 @@ class LoadSpec():
 		wav0 = header['CRVAL1']
 		dwav = header['CDELT1']
 		pix0 = header['CRPIX1']
-		wave=np.array([wav0 + (i - pix0) * dwav for i in range(nwav)])
+		wave = wav0 + (np.arange(nwav) - pix0) * dwav
 
 		# Now check units to make sure everything is in angstrom
 		card='CUNIT1'
@@ -370,7 +375,7 @@ class LoadSpec():
 		# Return sorted list of uppercase frame names
 		return sorted(list(detected_frames))
 
-	# Extract addtional information from FITS file if available
+	# Extract additional information from FITS file if available
 	# Addtional infomation includes
 	#													(stamp, contamination, posterior redshift estimation)
 	def _check_advanced(self):

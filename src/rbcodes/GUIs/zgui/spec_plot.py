@@ -17,6 +17,7 @@ import copy
 from .guess_transition import GuessTransition
 from .spec_hist import FluxHistogram, PixelHistogram
 from .spec_fit_gauss2d import Gaussfit_2d
+from .utils import clear_artists
 
 mpl.use('Qt5Agg')
 
@@ -39,6 +40,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.wave, self.flux, self.error = [],[],[]
 		self.init_xlims, self.init_ylims = [],[]
 		self.cur_xlims, self.cur_ylims = [],[]
+		self.lock_yscale = False  # when True, cur_ylims is retained on new file load
 		self.gxval, self.gyval = [], []
 		self.scale = 1. # 1D spec convolution kernel size
 		self.lineindex = -2
@@ -72,8 +74,8 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.cur_stddevs = self.stddevs.copy() # current std
 
 		num_2ndlist = 6
-		self.addtional_linelist = {i:[] for i in range(num_2ndlist)}
-		self.addtional_linelist_z = {i:0. for i in range(num_2ndlist)}
+		self.additional_linelist = {i:[] for i in range(num_2ndlist)}
+		self.additional_linelist_z = {i:0. for i in range(num_2ndlist)}
 
 		# Modern line management
 		self.error_line = None
@@ -88,7 +90,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.fig.canvas.setFocusPolicy(Qt.ClickFocus)
 		self.fig.canvas.setFocus()
 		self.cid_k = self.fig.canvas.mpl_connect('key_press_event', self.ontype)
-		self_cid_m = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
+		self.cid_m = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
 		#self.fig.canvas.mpl_connect('pick_event', self.onpick)
 
 		#self.fig.tight_layout()
@@ -118,11 +120,13 @@ class MplCanvas(FigureCanvasQTAgg):
 
 		self.send_message.emit(f'You are currently working on {filename} spectrum.')
 
-		# update intiial plotting parameters
+		# update initial plotting parameters
 		self.wave, self.flux, self.error = wave, flux, error
+		# frozen originals — used by smooth/unsmooth/reset so replot() mutations don't corrupt them
+		self.flux_fix, self.error_fix = flux.copy(), error.copy()
 		self.axnum = 1
 
-		if len(self.cur_ylims) > 0:
+		if self.lock_yscale and len(self.cur_ylims) > 0:
 			self.axes.set_ylim(self.cur_ylims)
 			self.axes.set_xlim(self.cur_xlims)
 			self.init_xlims = self.axes.get_xlim()
@@ -173,6 +177,9 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.axes.autoscale_view(scalex=False, scaley=False)
 		self.draw()
 
+	def set_lock_yscale(self, state):
+		self.lock_yscale = state
+
 	def _compute_distance(self, gxval, gyval, event):
 		'''Compute the distance between the event xydata and selected point for Gaussian fitting
 		'''
@@ -182,10 +189,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		return distance
 
 	def _clear_plotted_lines(self):
-		while self.axes.texts:
-			self.axes.texts.pop()
-		while self.axes.collections:
-			self.axes.collections.pop()
+		clear_artists(self.axes)
 		self.draw()
 
 	def clear_interactive_elements(self):
@@ -206,11 +210,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.gaussian_fits.clear()
 		
 		# Also clear text and collections
-		while self.axes.texts:
-			self.axes.texts.pop()
-		while self.axes.collections:
-			self.axes.collections.pop()
-		
+		clear_artists(self.axes)
 		self.draw()
 
 	def add_emission_marker(self, wavelength, color='#3498DB', name=""):
@@ -317,8 +317,8 @@ class MplCanvas(FigureCanvasQTAgg):
 		self._clear_plotted_lines()
 		if len(self.linelist) > 0:
 			self._plot_lines(self.lineindex, self.estZ)
-		self._plot_additional_lines(self.addtional_linelist,
-									self.addtional_linelist_z)
+		self._plot_additional_lines(self.additional_linelist,
+									self.additional_linelist_z)
 		
 	def gauss(self, x, amp, mu, sigma):
 		return amp * np.exp(-(x-mu)**2/(2. * sigma**2))
@@ -423,31 +423,23 @@ class MplCanvas(FigureCanvasQTAgg):
 		#self.cur_ylims = [np.nanmin(self.flux[err_good]), np.nanmax(self.flux[err_good])]
 
 		#self.axes.set_xlim([np.nanmin(wave), np.nanmax(wave)])
-		if len(self.cur_ylims) > 0:
-			#print('preset y lim')
-			#print(self.cur_ylims)
+		if self.lock_yscale and len(self.cur_ylims) > 0:
 			tmp_ylim = list(self.cur_ylims)
 			tmp_ylim.sort()
 			self.cur_ylims = tmp_ylim.copy()
-			#print(tmp_ylim)
 			self.axes.set_ylim(self.cur_ylims)
 			self.init_xlims = self.axes.get_xlim()
-
 		else:
 			self.axes.set_ylim([-np.nanmin(self.flux)*0.01, np.nanmedian(self.flux)*3])
 			self.init_ylims = self.axes.get_ylim()
 			self.cur_ylims = self.axes.get_ylim()
 
-		if len(self.cur_xlims) > 0:
-			#print('preset x lim')
-			#print(self.cur_xlims)
+		if self.lock_yscale and len(self.cur_xlims) > 0:
 			tmp_xlim = list(self.cur_xlims)
 			tmp_xlim.sort()
 			self.cur_xlims = tmp_xlim.copy()
-			#print(tmp_xlim)
 			self.axes.set_xlim(self.cur_xlims)
 			self.init_ylims = self.axes.get_ylim()
-
 		else:
 			self.axes.set_xlim([np.nanmin(wave), np.nanmax(wave)])
 			self.init_xlims = self.axes.get_xlim()
@@ -603,10 +595,7 @@ class MplCanvas(FigureCanvasQTAgg):
 		self.clear_interactive_elements()
 
 		ax2d_xlim = self.ax2d.get_xlim()
-		while self.ax2d.collections:
-			self.ax2d.collections.pop()
-		while self.ax2d.lines:
-			self.ax2d.lines.pop()
+		clear_artists(self.ax2d, keep_lines=0)
 		self.ax2d.hlines(new_extraction[0], np.nanmin(wave), np.nanmax(wave), color='red', linestyle='dashed')
 		self.ax2d.hlines(new_extraction[1], np.nanmin(wave), np.nanmax(wave), color='red', linestyle='dashed')
 
@@ -665,13 +654,13 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.gxval, self.gyval = [], []
 
 				if self.axnum == 1:
-					# for 1D spec display only
-					self.replot(self.wave, self.flux, self.error)
+					# for 1D spec display only — use frozen originals
+					self.replot(self.wave, self.flux_fix, self.error_fix)
 				else:
 					# for 2D spec
 					if event.inaxes == self.axes:
-						# cursor in 1d canvas
-						self.replot(self.wave, self.flux, self.error)
+						# cursor in 1d canvas — use frozen originals
+						self.replot(self.wave, self.flux_fix, self.error_fix)
 					else:
 						# cursor in 2d canvas
 						# reset active flux/error to fixed flux/error
@@ -687,18 +676,28 @@ class MplCanvas(FigureCanvasQTAgg):
 				self.scale = 1
 
 			elif event.inaxes == self.ax2d:
+				# restore 2D image
 				self.replot2d_im(self.flux2d)
+				# restore 1D panel with frozen originals
+				self.replot(self.wave, self.flux_fix, self.error_fix)
+				# reset both axes limits to full data range
+				self.axes.set_ylim([np.nanmin(self.flux_fix), np.nanmax(self.flux_fix)])
+				self.axes.set_xlim([np.nanmin(self.wave), np.nanmax(self.wave)])
+				self.cur_xlims = self.axes.get_xlim()
+				self.cur_ylims = self.axes.get_ylim()
+				self.scale = 1
+				self._lines_in_current_range()
 				self.draw()
 				self.send_message.emit('User RESET the 2D Spectrum!')
-				
+
 				# reset Gaussian2DKernel parameters as well
-				self.stddevs = [1, 1] # standard deviation of Gaussian in x and y
-				self.sizes = [self.stddevs[0]*8+1, self.stddevs[-1]*8+1] # size in x ,y directions, default values
-				self.modes_idx = 0# discretization mode index
-				self.mode_txt = 'center' # discretization mode name
-				self.fac = 10 # factor of oversamping, default = 10
-				self.step_2dspec = 1 # incre/decre size of smooth/unsmooth 2D specs
-				self.cur_stddevs = self.stddevs.copy() # current std
+				self.stddevs = [1, 1]
+				self.sizes = [self.stddevs[0]*8+1, self.stddevs[-1]*8+1]
+				self.modes_idx = 0
+				self.mode_txt = 'center'
+				self.fac = 10
+				self.step_2dspec = 1
+				self.cur_stddevs = self.stddevs.copy()
 
 		elif event.key == 't':
 			# set y axis max value
@@ -771,8 +770,8 @@ class MplCanvas(FigureCanvasQTAgg):
 			# smooth ydata
 			if event.inaxes == self.axes:
 				self.scale += 2
-				self.new_spec = convolve(self.flux, Box1DKernel(self.scale))
-				self.new_err = convolve(self.error, Box1DKernel(self.scale))
+				self.new_spec = convolve(self.flux_fix, Box1DKernel(self.scale))
+				self.new_err = convolve(self.error_fix, Box1DKernel(self.scale))
 				self.replot(self.wave, self.new_spec, self.new_err)
 				self.draw()
 
@@ -799,10 +798,10 @@ class MplCanvas(FigureCanvasQTAgg):
 			# unsmooth ydata
 			if event.inaxes == self.axes:
 				self.scale -= 2
-				if self.scale < 0:
+				if self.scale < 1:
 					self.scale = 1
-				self.new_spec = convolve(self.flux, Box1DKernel(self.scale))
-				self.new_err = convolve(self.error, Box1DKernel(self.scale))
+				self.new_spec = convolve(self.flux_fix, Box1DKernel(self.scale))
+				self.new_err = convolve(self.error_fix, Box1DKernel(self.scale))
 				self.replot(self.wave, self.new_spec, self.new_err)
 				self.draw()
 				self.send_message.emit(f'Convolutional kernel size = {int(self.scale//2)}.')
@@ -883,7 +882,8 @@ class MplCanvas(FigureCanvasQTAgg):
 					self.gyval = np.append(self.gyval, event.ydata)
 
 					fclick = len(self.gxval)
-					self.axes.plot(self.gxval[-1], self.gyval[-1], 'rs', ms=5)
+					click_marker, = self.axes.plot(self.gxval[-1], self.gyval[-1], 'rs', ms=5)
+					self.emission_markers.append(click_marker)
 					self.draw()
 
 
@@ -934,8 +934,8 @@ class MplCanvas(FigureCanvasQTAgg):
 							g_final = sign * (self.gauss(g_wave, *popt)) + cont
 
 							perr = np.sqrt(np.diag(pcov))
-							model_fit = self.axes.plot(g_wave, g_final, 'r--')
-							
+							model_fit, = self.axes.plot(g_wave, g_final, 'r--')
+							self.gaussian_fits.append(model_fit)
 							self.draw()
 
 							message = ("A Gaussian model you fit has the following parameters:\n"
@@ -1152,21 +1152,21 @@ class MplCanvas(FigureCanvasQTAgg):
 			self._clear_plotted_lines()
 			self._plot_lines(self.lineindex)
 
-	def on_additional_linelist_slot(self, addtional_linelist_dir):
-		#self._plot_additional_lines(addtional_linelist)
-		idx = list(addtional_linelist_dir.keys())[0]
-		if type(addtional_linelist_dir[idx]) != str:
-			self.addtional_linelist[idx] = addtional_linelist_dir[idx]
+	def on_additional_linelist_slot(self, additional_linelist_dir):
+		#self._plot_additional_lines(additional_linelist)
+		idx = list(additional_linelist_dir.keys())[0]
+		if type(additional_linelist_dir[idx]) != str:
+			self.additional_linelist[idx] = additional_linelist_dir[idx]
 		else:
-			self.addtional_linelist[idx] = []
-		#print(self.addtional_linelist)
-		#print(type(self.addtional_linelist))
+			self.additional_linelist[idx] = []
+		#print(self.additional_linelist)
+		#print(type(self.additional_linelist))
 		self._lines_in_current_range()
 
 	def on_additional_linelist_slot_z(self, linelist_dir_and_z):
 		idx = list(linelist_dir_and_z[0].keys())[0]
-		self.addtional_linelist[idx] = linelist_dir_and_z[0][idx]
-		self.addtional_linelist_z[idx] = linelist_dir_and_z[1]
+		self.additional_linelist[idx] = linelist_dir_and_z[0][idx]
+		self.additional_linelist_z[idx] = linelist_dir_and_z[1]
 
 		self._lines_in_current_range()
 
