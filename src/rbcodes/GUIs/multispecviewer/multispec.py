@@ -127,34 +127,32 @@ class SpectralPlot(FigureCanvas):
             line_list = rb_setline.read_line_list(self.linelist)
             
             
-            # Create the dialog but don't show it yet
-            dialog = LineSelectionDialog(self.parent_window, observed_wavelength, line_list)
-            
+            # Keep a reference on self so the dialog is not garbage-collected
+            # while it is still open (non-modal dialogs stored as local variables
+            # get destroyed by Python's GC after the handler returns).
+            self._line_dialog = LineSelectionDialog(
+                self.parent_window, observed_wavelength, line_list)
+
             # Define the handler for line selection
             def on_line_selected(transition_name, rest_wavelength, new_redshift):
                 if self.message_box:
                     self.message_box.on_sent_message(
                         f"Line identified as {transition_name}, λrest = {rest_wavelength:.2f} Å, "
                         f"implied z = {new_redshift:.6f}", "#008000")
-                
+
                 # Update redshift input and plot lines with new redshift
                 if hasattr(self.parent_window, 'redshift_widget'):
-                    # Get the current color from the redshift widget
                     current_color = self.parent_window.redshift_widget.color_combo.currentText()
                     current_linelist = self.parent_window.redshift_widget.linelist_combo.currentText()
-                    
+
                     self.parent_window.redshift_widget.set_redshift(new_redshift)
-                    # Update the redshift value and replot lines with the current color
                     self.redshift = new_redshift
                     self.linelist = current_linelist
                     self.line_color = current_color
                     self.plot_redshift_lines()
-            
-            # Connect the signal to our handler
-            dialog.lineSelected.connect(on_line_selected)
-            
-            # Show the dialog non-modally
-            dialog.show()
+
+            self._line_dialog.lineSelected.connect(on_line_selected)
+            self._line_dialog.show()
     
     def plot_spectra(self, spectra):
         """
@@ -186,7 +184,7 @@ class SpectralPlot(FigureCanvas):
         for i, spec in enumerate(spectra):
             wave = spec.wavelength.value
             flux = spec.flux.value
-            error = spec.sig.value if hasattr(spec, 'sig') else None
+            error = spec.sig.value if (getattr(spec, "sig", None) is not None) else None
             filename = os.path.basename(spec.filename)
 
             self.plot_one_spec(wave, flux, error, i, filename)
@@ -338,7 +336,7 @@ class SpectralPlot(FigureCanvas):
             filename = os.path.basename(spec.filename)
             wave = spec.wavelength.value
             flux = spec.flux.value
-            error = spec.sig.value if hasattr(spec, 'sig') else None
+            error = spec.sig.value if (getattr(spec, "sig", None) is not None) else None
         
             new_flux = convolve(flux, Box1DKernel(self.scale))
             new_err = convolve(error, Box1DKernel(self.scale)) if error is not None else None
@@ -360,7 +358,7 @@ class SpectralPlot(FigureCanvas):
             filename = os.path.basename(spec.filename)
             wave = spec.wavelength.value
             flux = spec.flux.value
-            error = spec.sig.value if hasattr(spec, 'sig') else None
+            error = spec.sig.value if (getattr(spec, "sig", None) is not None) else None
         
             new_flux = convolve(flux, Box1DKernel(self.scale))
             new_err = convolve(error, Box1DKernel(self.scale)) if error is not None else None
@@ -507,7 +505,7 @@ class SpectralPlot(FigureCanvas):
                 spec = self.spectra[spec_index]
                 wave = spec.wavelength.value
                 flux = spec.flux.value
-                error = spec.sig.value if hasattr(spec, 'sig') else None
+                error = spec.sig.value if (getattr(spec, "sig", None) is not None) else None
                 
                 # Launch vStack with the selected spectrum
                 try:
@@ -553,7 +551,7 @@ class SpectralPlot(FigureCanvas):
                 # Get original data
                 wave = spec.wavelength.value
                 flux = spec.flux.value
-                error = spec.sig.value if hasattr(spec, 'sig') else None
+                error = spec.sig.value if (getattr(spec, "sig", None) is not None) else None
                 filename = os.path.basename(spec.filename)
                 
                 # Clear and replot

@@ -1,0 +1,486 @@
+"""
+ImageCanvas — 2D matplotlib image display panel.
+
+Phase 3: whitelight / plain 2D image display with colorbar.
+Phase 4: raw data stored, update_data(), clim_changed signal, right-click drag.
+Phase 9: left-click → spaxel_locked, left-drag → aperture_drawn.
+"""
+import numpy as np
+import matplotlib as mpl
+mpl.use('Qt5Agg')
+
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+from matplotlib.patches import Rectangle
+from astropy.visualization import ZScaleInterval
+
+from PyQt5.QtCore import pyqtSignal
+
+# Pixel drag threshold: fewer than this → treated as a click, not a drag
+_DRAG_THRESHOLD_PX = 5
+
+# Colors for aperture / spaxel markers (Catppuccin palette)
+_AP_COLOR = '#a6e3a1'   # green dashed box
+_SP_COLOR = '#f9e2af'   # yellow cross
+
+
+class ImageCanvas(FigureCanvasQTAgg):
+    """
+    Matplotlib canvas that displays a single 2-D image.
+
+    Signals
+    -------
+    spaxel_hovered(int, int, object) — (x, y, spectrum) under cursor      [Phase 7]
+    spaxel_locked(int, int, object)  — (x, y, spectrum) on left-click     [Phase 9]
+    aperture_drawn(object)           — boolean mask on left-drag           [Phase 9]
+    cursor_info(str)                 — formatted status-bar string
+    clim_changed(float, float)       — vmin/vmax after right-drag          [Phase 4]
+    """
+
+    spaxel_hovered = pyqtSignal(int, int, object)  # x, y, flux array
+    spaxel_locked  = pyqtSignal(int, int, object)  # x, y, flux array  [Phase 9]
+    aperture_drawn  = pyqtSignal(object)
+    cursor_info     = pyqtSignal(str)
+    clim_changed    = pyqtSignal(float, float)
+
+    def __init__(self, parent=None, dpi=100):
+        self._fig = Figure(dpi=dpi, facecolor='#1e1e2e')
+        self._fig.patch.set_facecolor('#1e1e2e')
+        super().__init__(self._fig)
+        self.setParent(parent)
+
+        self._ax = self._fig.add_subplot(111)
+        self._style_axes()
+
+        self._im         = None   # current AxesImage
+        self._cbar       = None   # current Colorbar
+        self._cube       = None   # active IFUCube (set by MainWindow)
+        self._wcs        = None   # 2D WCS for sky coordinate lookup
+        self._data_shape = None   # (ny, nx)
+        self._data_raw   = None   # raw (unscaled) float64 array
+
+        # Right-click drag state (contrast/bias)
+        self._drag_start    = None   # (x_pixel, y_pixel) at button-press
+        self._drag_vmin     = None
+        self._drag_vmax     = None
+
+        # Left-click / aperture drag state
+        self._left_press       = None   # (canvas_x, canvas_y, data_x, data_y)
+        self._ap_rect          = None   # Rectangle patch while dragging
+        self._extraction_marks = []     # permanent markers (lines/patches)
+
+        # Reference to NavigationToolbar2QT — set by MainWindow after creation.
+        # When toolbar is in zoom/pan mode we skip left-click handling.
+        self._nav_toolbar      = None
+
+        self._fig.tight_layout(pad=0.5)
+        self.mpl_connect('motion_notify_event',  self._on_mouse_move)
+        self.mpl_connect('button_press_event',   self._on_button_press)
+        self.mpl_connect('button_release_event', self._on_button_release)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def show_image(self, data2d, header=None, cmap='gray', norm=None):
+        """
+        Display *data2d* (ny × nx).
+
+        Parameters
+        ----------
+        data2d : np.ndarray, shape (ny, nx)
+        header : astropy fits Header or None
+        cmap   : str
+        norm   : matplotlib Normalize or None  — ZScale used when None
+        """
+        data2d = np.asarray(data2d, dtype=np.float64)
+        self._data_raw   = data2d
+        self._data_shape = data2d.shape
+
+        if norm is None:
+            norm = _zscale_norm(data2d)
+
+        self._wcs = None
+        self._ax.cla()
+        self._style_axes()
+
+        if header is not None:
+            try:
+                from astropy.wcs import WCS
+                wcs2d = WCS(header)
+                self._wcs = wcs2d
+                self._fig.delaxes(self._ax)
+                self._ax = self._fig.add_subplot(111, projection=wcs2d)
+                self._style_axes()
+            except Exception:
+                pass
+
+        self._im = self._ax.imshow(
+            data2d,
+            origin='lower',
+            interpolation='nearest',
+            cmap=cmap,
+            norm=norm,
+            aspect='auto',
+        )
+
+        if self._cbar is not None:
+            try:
+                self._cbar.remove()
+            except Exception:
+                pass
+
+        self._cbar = self._fig.colorbar(self._im, ax=self._ax,
+                                        pad=0.02, fraction=0.046)
+        self._cbar.ax.yaxis.set_tick_params(color='#cdd6f4', labelcolor='#cdd6f4')
+        self._cbar.ax.set_facecolor('#1e1e2e')
+        self._cbar.outline.set_edgecolor('#45475a')
+
+        self._apply_label_colors()
+        self._fig.tight_layout(pad=0.5)
+        self.draw_idle()
+
+    def show_slice(self, i_wave):
+        """Display a single wavelength slice from the stored cube (Channel mode)."""
+        if self._cube is None or self._im is None:
+            return
+        data2d = self._cube.flux[i_wave].astype(np.float64)
+        self._data_raw = data2d
+        self._im.set_data(data2d)
+        norm = _zscale_norm(data2d)
+        self._im.set_clim(norm.vmin, norm.vmax)
+        self.draw_idle()
+
+    def update_data(self, data2d):
+        """Replace displayed array without rebuilding axes (scale/method changes).
+
+        Uses ZScale for the new clim so the window position and size are
+        unaffected — only pixel values change.
+        """
+        if self._im is None:
+            return
+        data2d = np.asarray(data2d, dtype=np.float64)
+        self._data_raw = data2d
+        self._im.set_data(data2d)
+        norm = _zscale_norm(data2d)
+        self._im.set_clim(norm.vmin, norm.vmax)
+        self.draw_idle()
+
+    def update_clim(self, vmin, vmax):
+        """Change display limits without replotting."""
+        if self._im is None:
+            return
+        self._im.set_clim(vmin, vmax)
+        self.draw_idle()
+
+    def update_cmap(self, cmap):
+        """Change colormap without replotting."""
+        if self._im is None:
+            return
+        self._im.set_cmap(cmap)
+        self.draw_idle()
+
+    def clear_extraction_marks(self):
+        """Remove all spaxel/aperture markers drawn on the image."""
+        for artist in self._extraction_marks:
+            try:
+                artist.remove()
+            except Exception:
+                pass
+        self._extraction_marks.clear()
+        self.draw_idle()
+
+    # ------------------------------------------------------------------
+    # Mouse: hover info
+    # ------------------------------------------------------------------
+
+    def _on_mouse_move(self, event):
+        # Right-click drag → contrast/bias
+        if self._drag_start is not None:
+            self._handle_drag(event)
+            return
+
+        # Left-click drag → draw aperture rectangle
+        if self._left_press is not None and event.inaxes:
+            px0, py0, dx0, dy0 = self._left_press
+            dist = ((event.x - px0) ** 2 + (event.y - py0) ** 2) ** 0.5
+            if dist >= _DRAG_THRESHOLD_PX and event.xdata is not None:
+                w = event.xdata - dx0
+                h = event.ydata - dy0
+                if self._ap_rect is None:
+                    self._ap_rect = Rectangle(
+                        (dx0, dy0), w, h,
+                        linewidth=1.2, edgecolor=_AP_COLOR, facecolor='none',
+                        linestyle='--', transform=self._ax.transData,
+                        zorder=10,
+                    )
+                    self._ax.add_patch(self._ap_rect)
+                else:
+                    self._ap_rect.set_xy((dx0, dy0))
+                    self._ap_rect.set_width(w)
+                    self._ap_rect.set_height(h)
+                self.draw_idle()
+            return
+
+        if event.inaxes is None or self._im is None:
+            self.cursor_info.emit("")
+            return
+
+        x, y = event.xdata, event.ydata
+        if x is None or y is None:
+            self.cursor_info.emit("")
+            return
+
+        xi, yi = int(round(x)), int(round(y))
+        ny, nx = self._data_shape if self._data_shape else (0, 0)
+
+        parts = [f"x={xi:d}  y={yi:d}"]
+
+        if 0 <= xi < nx and 0 <= yi < ny:
+            try:
+                val = self._im.get_array()[yi, xi]
+                if not np.ma.is_masked(val) and np.isfinite(val):
+                    parts.append(f"val={val:.4g}")
+            except Exception:
+                pass
+
+            # Emit spaxel spectrum for real-time display (Phase 7)
+            if self._cube is not None and hasattr(self._cube, 'flux'):
+                try:
+                    spectrum = self._cube.flux[:, yi, xi]
+                    self.spaxel_hovered.emit(xi, yi, spectrum)
+                except Exception:
+                    pass
+
+        if self._wcs is not None:
+            try:
+                sky = self._wcs.pixel_to_world(x, y)
+                parts.append(f"RA={sky.ra.deg:.5f}°  Dec={sky.dec.deg:.5f}°")
+            except Exception:
+                pass
+
+        self.cursor_info.emit("    ".join(parts))
+
+    # ------------------------------------------------------------------
+    # Mouse: right-click drag → contrast / bias
+    # ------------------------------------------------------------------
+
+    def _on_button_press(self, event):
+        if event.button == 3 and self._im is not None:  # right click → contrast drag
+            self._drag_start = (event.x, event.y)
+            vmin, vmax = self._im.get_clim()
+            self._drag_vmin = vmin
+            self._drag_vmax = vmax
+
+        elif event.button == 1 and self._cube is not None and event.inaxes:
+            # Left-click: only handle when nav toolbar is idle
+            if self._nav_toolbar is not None and self._nav_toolbar.mode != '':
+                return
+            self._left_press = (event.x, event.y, event.xdata, event.ydata)
+
+    def _on_button_release(self, event):
+        if event.button == 3:
+            self._drag_start = None
+
+        elif event.button == 1 and self._left_press is not None:
+            px0, py0, dx0, dy0 = self._left_press
+            self._left_press = None
+
+            # Remove in-progress rectangle
+            if self._ap_rect is not None:
+                try:
+                    self._ap_rect.remove()
+                except Exception:
+                    pass
+                self._ap_rect = None
+                self.draw_idle()
+
+            if event.xdata is None or event.ydata is None:
+                return
+
+            dist = ((event.x - px0) ** 2 + (event.y - py0) ** 2) ** 0.5
+
+            if dist < _DRAG_THRESHOLD_PX:
+                # --- Single spaxel click ---
+                self._handle_spaxel_click(event.xdata, event.ydata)
+            else:
+                # --- Aperture drag ---
+                self._handle_aperture_drag(dx0, dy0, event.xdata, event.ydata)
+
+    def _handle_drag(self, event):
+        if self._im is None or event.x is None:
+            return
+
+        dx = event.x  - self._drag_start[0]   # horizontal → bias (shift)
+        dy = event.y  - self._drag_start[1]   # vertical   → contrast (stretch)
+
+        vmin0, vmax0 = self._drag_vmin, self._drag_vmax
+        span = vmax0 - vmin0 if (vmax0 - vmin0) != 0 else 1.0
+
+        # dy > 0 (drag down) → increase contrast (narrow range)
+        # dx > 0 (drag right) → shift brighter
+        contrast_factor = 1.0 - dy / 300.0
+        contrast_factor = max(0.05, contrast_factor)
+
+        new_span   = span * contrast_factor
+        mid        = (vmin0 + vmax0) / 2.0 + dx / 300.0 * span
+        new_vmin   = mid - new_span / 2.0
+        new_vmax   = mid + new_span / 2.0
+
+        self._im.set_clim(new_vmin, new_vmax)
+        self.draw_idle()
+        self.clim_changed.emit(float(new_vmin), float(new_vmax))
+
+    # ------------------------------------------------------------------
+    # Left-click / aperture handlers
+    # ------------------------------------------------------------------
+
+    def _handle_spaxel_click(self, xdata, ydata):
+        """Emit spaxel_locked on left-click — marker drawn by MainWindow via draw_aperture_marker."""
+        if self._data_shape is None or self._cube is None:
+            return
+        ny, nx = self._data_shape
+        xi, yi = int(round(xdata)), int(round(ydata))
+        if not (0 <= xi < nx and 0 <= yi < ny):
+            return
+
+        try:
+            spectrum = self._cube.flux[:, yi, xi]
+        except Exception:
+            return
+
+        self.spaxel_locked.emit(xi, yi, spectrum)
+
+    def draw_aperture_marker(self, cx, cy, shape, size,
+                             bg_inner=None, bg_outer=None):
+        """
+        Draw a persistent aperture marker on the image after extraction.
+
+        Parameters
+        ----------
+        cx, cy   : int   — centre pixel
+        shape    : str   — 'Circle' or 'Square'
+        size     : int   — radius (circle) or half-width (square)
+        bg_inner : int or None  — inner radius of background annulus
+        bg_outer : int or None  — outer radius of background annulus
+        """
+        from matplotlib.patches import Circle, Rectangle as MplRect
+
+        src_color = _SP_COLOR    # yellow — source aperture
+        bg_color  = '#74c7ec'    # sky blue — background annulus
+
+        if shape == 'Circle':
+            src = Circle((cx, cy), size, fill=False,
+                         edgecolor=src_color, lw=1.4, zorder=11)
+        else:
+            s = size + 0.5
+            src = MplRect((cx - s, cy - s), 2 * s, 2 * s,
+                          fill=False, edgecolor=src_color, lw=1.4, zorder=11)
+        self._ax.add_patch(src)
+        self._extraction_marks.append(src)
+
+        # Centre cross
+        mk, = self._ax.plot(cx, cy, '+', color=src_color,
+                            ms=8, mew=1.2, zorder=12)
+        self._extraction_marks.append(mk)
+
+        # Background annulus
+        if bg_inner is not None and bg_outer is not None:
+            if shape == 'Circle':
+                in_patch  = Circle((cx, cy), bg_inner, fill=False,
+                                   edgecolor=bg_color, lw=1, linestyle='--', zorder=11)
+                out_patch = Circle((cx, cy), bg_outer, fill=False,
+                                   edgecolor=bg_color, lw=1, linestyle='--', zorder=11)
+            else:
+                si = bg_inner + 0.5
+                so = bg_outer + 0.5
+                in_patch  = MplRect((cx - si, cy - si), 2*si, 2*si,
+                                    fill=False, edgecolor=bg_color, lw=1,
+                                    linestyle='--', zorder=11)
+                out_patch = MplRect((cx - so, cy - so), 2*so, 2*so,
+                                    fill=False, edgecolor=bg_color, lw=1,
+                                    linestyle='--', zorder=11)
+            self._ax.add_patch(in_patch)
+            self._ax.add_patch(out_patch)
+            self._extraction_marks.extend([in_patch, out_patch])
+
+        self.draw_idle()
+
+    def _handle_aperture_drag(self, x0, y0, x1, y1):
+        """Lock an aperture rectangle on left-drag."""
+        if self._data_shape is None or self._cube is None:
+            return
+        ny, nx = self._data_shape
+
+        xi0, xi1 = sorted([int(round(x0)), int(round(x1))])
+        yi0, yi1 = sorted([int(round(y0)), int(round(y1))])
+        xi0 = max(0, xi0); xi1 = min(nx - 1, xi1)
+        yi0 = max(0, yi0); yi1 = min(ny - 1, yi1)
+
+        if xi1 < xi0 or yi1 < yi0:
+            return
+
+        mask = np.zeros((ny, nx), dtype=bool)
+        mask[yi0:yi1 + 1, xi0:xi1 + 1] = True
+
+        # Draw a permanent dashed rectangle
+        rect = Rectangle(
+            (xi0 - 0.5, yi0 - 0.5),
+            xi1 - xi0 + 1, yi1 - yi0 + 1,
+            linewidth=1.2, edgecolor=_AP_COLOR, facecolor='none',
+            linestyle='--', zorder=11,
+        )
+        self._ax.add_patch(rect)
+        self._extraction_marks.append(rect)
+        self.draw_idle()
+
+        self.aperture_drawn.emit(mask)
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _style_axes(self):
+        self._ax.set_facecolor('#1e1e2e')
+        self._ax.tick_params(colors='#cdd6f4', labelsize=8, which='both',
+                             labelcolor='#cdd6f4')
+        for spine in self._ax.spines.values():
+            spine.set_edgecolor('#45475a')
+        self._apply_label_colors()
+
+    def _apply_label_colors(self):
+        c = '#cdd6f4'
+        self._ax.xaxis.label.set_color(c)
+        self._ax.yaxis.label.set_color(c)
+        self._ax.xaxis.label.set_fontsize(8)
+        self._ax.yaxis.label.set_fontsize(8)
+        self._ax.tick_params(axis='both', colors=c, labelcolor=c, labelsize=8)
+        if hasattr(self._ax, 'coords'):
+            for coord in self._ax.coords:
+                try:
+                    coord.axislabels.set_color(c)
+                except Exception:
+                    pass
+                try:
+                    coord.ticklabels.set_color(c)
+                except Exception:
+                    pass
+                try:
+                    coord.ticks.set_color(c)
+                except Exception:
+                    pass
+
+
+# ---------------------------------------------------------------------------
+# Normalization helper
+# ---------------------------------------------------------------------------
+
+def _zscale_norm(data2d):
+    finite = data2d[np.isfinite(data2d)]
+    if finite.size == 0:
+        return mpl.colors.Normalize(vmin=0, vmax=1)
+    try:
+        vmin, vmax = ZScaleInterval().get_limits(finite)
+    except Exception:
+        vmin, vmax = np.nanpercentile(finite, [1, 99])
+    return mpl.colors.Normalize(vmin=vmin, vmax=vmax)

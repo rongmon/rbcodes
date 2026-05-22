@@ -408,7 +408,7 @@ class rb_spectrum:
     def rb_write_fits(self, filename, clobber=True):
         """
         Write to multi-extension FITS file
-        
+
         Parameters
         ----------
         filename : str
@@ -419,18 +419,18 @@ class rb_spectrum:
         # Primary HDU with flux
         hdu_list = [fits.PrimaryHDU(self.flux.value)]
         hdu_list[0].name = 'FLUX'
-        
+
         # Error extension
         if self.sig_is_set:
             hdu_list.append(fits.ImageHDU(self.sig.value, name='ERROR'))
-            
-        # Wavelength extension  
+
+        # Wavelength extension
         hdu_list.append(fits.ImageHDU(self.wavelength.value, name='WAVELENGTH'))
-        
+
         # Continuum extension
         if self.co_is_set:
             hdu_list.append(fits.ImageHDU(self.co.value, name='CONTINUUM'))
-            
+
         # Add metadata
         hdu_list[0].header['NPIX'] = self.npix
         if self.meta:
@@ -439,7 +439,7 @@ class rb_spectrum:
             'wave': str(self.units['wave']),
             'flux': str(self.units['flux'])
         })
-        
+
         # Write
         hdulist = fits.HDUList(hdu_list)
         hdulist.writeto(filename, overwrite=clobber)
