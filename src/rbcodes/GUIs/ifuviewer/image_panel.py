@@ -37,9 +37,10 @@ class ImageCanvas(FigureCanvasQTAgg):
     clim_changed(float, float)       — vmin/vmax after right-drag          [Phase 4]
     """
 
-    spaxel_hovered = pyqtSignal(int, int, object)  # x, y, flux array
-    spaxel_locked  = pyqtSignal(int, int, object)  # x, y, flux array  [Phase 9]
-    aperture_drawn  = pyqtSignal(object)
+    spaxel_hovered  = pyqtSignal(int, int, object)  # x, y, flux array
+    spaxel_locked   = pyqtSignal(int, int, object)  # x, y, flux array
+    aperture_drawn  = pyqtSignal(object)             # boolean mask
+    region_selected = pyqtSignal(int, int, int, int) # x1, y1, x2, y2
     cursor_info     = pyqtSignal(str)
     clim_changed    = pyqtSignal(float, float)
 
@@ -68,6 +69,8 @@ class ImageCanvas(FigureCanvasQTAgg):
         self._left_press       = None   # (canvas_x, canvas_y, data_x, data_y)
         self._ap_rect          = None   # Rectangle patch while dragging
         self._extraction_marks = []     # permanent markers (lines/patches)
+        self._last_rect        = None   # (x1, y1, x2, y2) last drag bounds
+        self._sky_patch        = None   # cyan rectangle for sky region
 
         # Reference to NavigationToolbar2QT — set by MainWindow after creation.
         # When toolbar is in zoom/pan mode we skip left-click handling.
@@ -107,7 +110,7 @@ class ImageCanvas(FigureCanvasQTAgg):
         if header is not None:
             try:
                 from astropy.wcs import WCS
-                wcs2d = WCS(header)
+                wcs2d = WCS(header, naxis=2)
                 self._wcs = wcs2d
                 self._fig.delaxes(self._ax)
                 self._ax = self._fig.add_subplot(111, projection=wcs2d)
@@ -178,6 +181,32 @@ class ImageCanvas(FigureCanvasQTAgg):
         if self._im is None:
             return
         self._im.set_cmap(cmap)
+        self.draw_idle()
+
+    def draw_sky_region(self, x1, y1, x2, y2):
+        """Draw a persistent cyan rectangle marking the sky/background region."""
+        self.clear_sky_region()
+        self._sky_patch = Rectangle(
+            (x1 - 0.5, y1 - 0.5), x2 - x1, y2 - y1,
+            linewidth=1.5, edgecolor='#94e2d5', facecolor='#94e2d5',
+            alpha=0.15, linestyle='-', zorder=10,
+        )
+        self._ax.add_patch(self._sky_patch)
+        # Label
+        self._sky_label = self._ax.text(
+            x1, y2, 'sky', color='#94e2d5', fontsize=7, va='bottom', zorder=12)
+        self.draw_idle()
+
+    def clear_sky_region(self):
+        """Remove the sky region overlay."""
+        for attr in ('_sky_patch', '_sky_label'):
+            artist = getattr(self, attr, None)
+            if artist is not None:
+                try:
+                    artist.remove()
+                except Exception:
+                    pass
+                setattr(self, attr, None)
         self.draw_idle()
 
     def clear_extraction_marks(self):
@@ -423,6 +452,9 @@ class ImageCanvas(FigureCanvasQTAgg):
         mask = np.zeros((ny, nx), dtype=bool)
         mask[yi0:yi1 + 1, xi0:xi1 + 1] = True
 
+        # Store bounds for crop / sky region use (exclusive upper bound)
+        self._last_rect = (xi0, yi0, xi1 + 1, yi1 + 1)
+
         # Draw a permanent dashed rectangle
         rect = Rectangle(
             (xi0 - 0.5, yi0 - 0.5),
@@ -435,6 +467,7 @@ class ImageCanvas(FigureCanvasQTAgg):
         self.draw_idle()
 
         self.aperture_drawn.emit(mask)
+        self.region_selected.emit(xi0, yi0, xi1 + 1, yi1 + 1)
 
     # ------------------------------------------------------------------
     # Private helpers

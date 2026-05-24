@@ -245,11 +245,11 @@ def _load_external_var(var_path, flux_shape):
 def _make_2d_wcs(header):
     """
     Build a 2D spatial astropy WCS from a 3D cube header.
-    Drops the 3rd (spectral) axis.
+    Uses naxis=2 to read only the first two (spatial) axes directly,
+    avoiding the WCS-axis-count mismatch warning.
     """
     try:
-        wcs3d = WCS(header, naxis=3)
-        wcs2d = wcs3d.dropaxis(2)   # drop spectral axis (axis index 2 = NAXIS3)
+        wcs2d = WCS(header, naxis=2)
         return wcs2d
     except Exception:
         return None

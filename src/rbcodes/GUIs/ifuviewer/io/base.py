@@ -40,15 +40,88 @@ class IFUCube:
         """Load data from *path*. Must set flux, var, wave, header, wcs, name."""
         raise NotImplementedError
 
+    def crop(self, x1, y1, x2, y2):
+        """
+        Return a new instance spatially cropped to pixel region x1:x2, y1:y2.
+
+        Works for both 3-D cubes (flux shape n_wave, ny, nx) and 2-D images
+        (flux shape ny, nx).  The wavelength array is unchanged.  WCS CRPIX
+        values are updated automatically.
+
+        Parameters
+        ----------
+        x1, y1 : int  lower-left corner (inclusive, 0-indexed)
+        x2, y2 : int  upper-right corner (exclusive, numpy convention)
+
+        Returns
+        -------
+        New instance of the same class with cropped data and updated header/WCS.
+        """
+        import re
+        cropped = type(self)()
+
+        # Flux + variance
+        if self.flux.ndim == 3:
+            cropped.flux = self.flux[:, y1:y2, x1:x2].copy()
+            cropped.var  = (self.var[:, y1:y2, x1:x2].copy()
+                            if self.var is not None else None)
+        else:  # 2-D image
+            cropped.flux = self.flux[y1:y2, x1:x2].copy()
+            cropped.var  = None
+
+        cropped.wave = self.wave   # shared ref — wavelength axis unchanged
+
+        # WCS — update CRPIX manually (pixel offset is 0-indexed; CRPIX is 1-indexed)
+        if self.wcs is not None:
+            try:
+                import copy as _copy
+                wcs_new = _copy.deepcopy(self.wcs)
+                wcs_new.wcs.crpix[0] -= x1
+                wcs_new.wcs.crpix[1] -= y1
+                wcs_new.wcs.set()
+                cropped.wcs = wcs_new
+            except Exception:
+                cropped.wcs = None
+        else:
+            cropped.wcs = None
+
+        # Header — update NAXIS1/2 and CRPIX1/2
+        if self.header is not None:
+            h = self.header.copy()
+            h['NAXIS1'] = x2 - x1
+            h['NAXIS2'] = y2 - y1
+            if 'CRPIX1' in h:
+                h['CRPIX1'] = float(h['CRPIX1']) - x1
+            if 'CRPIX2' in h:
+                h['CRPIX2'] = float(h['CRPIX2']) - y1
+            if self.flux.ndim == 3:
+                h['NAXIS3'] = self.flux.shape[0]
+            cropped.header = h
+        else:
+            cropped.header = None
+
+        # Name — strip any existing _crop suffix then re-append
+        base = re.sub(r'_crop\d*$', '', self.name)
+        cropped.name = base + '_crop'
+        cropped.path = ''
+
+        return cropped
+
     def spatial_header(self):
         """Return a 2D FITS header suitable for ds9 / region WCS transforms."""
         if self.header is None:
             return None
         from astropy.io import fits
         h = self.header.copy()
-        # Remove 3rd-axis keywords so the header describes a 2D image
-        for key in ('NAXIS3', 'CRVAL3', 'CRPIX3', 'CDELT3', 'CD3_3',
-                    'CTYPE3', 'CUNIT3', 'CROTA3'):
+        # Remove all 3rd-axis WCS keywords (FITS standard + CD/PC matrix terms)
+        scalar_keys = ('NAXIS3', 'CRVAL3', 'CRPIX3', 'CDELT3', 'CD3_3',
+                       'CTYPE3', 'CUNIT3', 'CROTA3',
+                       'PC3_1', 'PC3_2', 'PC3_3',
+                       'PC1_3', 'PC2_3',
+                       'CD1_3', 'CD2_3', 'CD3_1', 'CD3_2',
+                       'LTVL3', 'LTV3', 'LTM3_3',
+                       'WCSAXES')
+        for key in scalar_keys:
             h.remove(key, ignore_missing=True)
         h['NAXIS'] = 2
         return h

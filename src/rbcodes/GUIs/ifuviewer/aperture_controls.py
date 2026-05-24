@@ -1,9 +1,10 @@
 """
 ApertureControls — QFitsView-style extraction aperture settings bar.
 
-Three modes (matching cubespectrum behaviour):
-  Single pixel   — extract the clicked pixel only
-  Circular       — circular aperture of given radius
+Four modes:
+  Single pixel     — extract the clicked pixel only (drag defaults to sum)
+  Rectangle        — left-drag rectangle; Method and Weighting selectable
+  Circular         — circular aperture of given radius
   Circular-Annular — circular aperture with annular background subtraction
 
 Phase 9.
@@ -12,7 +13,7 @@ from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QLabel, QComboBox, QSpinBox)
 from PyQt5.QtCore import pyqtSignal, Qt
 
 
-MODES = ['Single pixel', 'Circular', 'Circular-Annular']
+MODES = ['Single pixel', 'Rectangle', 'Circular', 'Circular-Annular']
 
 WEIGHTINGS = ['None', 'Var-weighted', 'Optimal (Data)', 'Optimal (Gaussian)']
 
@@ -50,6 +51,7 @@ class ApertureControls(QWidget):
         self._mode_box.setFixedWidth(150)
         self._mode_box.setToolTip(
             "Single pixel: extract one spaxel at cursor\n"
+            "Rectangle: left-drag to define extraction box\n"
             "Circular: aperture of given radius\n"
             "Circular-Annular: circular aperture minus annular background"
         )
@@ -149,25 +151,22 @@ class ApertureControls(QWidget):
         is_annular  = mode == 'Circular-Annular'
 
         for w in (self._radius_label, self._radius_spin):
-            w.setVisible(is_circular)
+            w.setVisible(is_circular)  # Rectangle has no radius spinbox
 
         for w in (self._bg_inner_label, self._bg_inner_spin,
                   self._bg_outer_label, self._bg_outer_spin):
             w.setVisible(is_annular)
 
-        for w in (self._weight_label, self._weight_box):
-            w.setVisible(is_circular)
-
-        if not is_circular:
-            self._weight_box.setCurrentIndex(0)   # reset to None
+        # Weighting is always visible — left-drag works in any mode
+        # and optimal extraction should be available regardless of mode.
 
         # Method visibility depends on both mode and current weighting
         self._update_method_visibility()
 
     def _update_method_visibility(self):
-        """Show Method only in circular modes when Weighting = None."""
-        is_circular = self._mode_box.currentText() in ('Circular', 'Circular-Annular')
-        show_method = is_circular and (self._weight_box.currentText() == 'None')
+        """Show Method when mode has multi-spaxel extraction and Weighting = None."""
+        has_method = self._mode_box.currentText() != 'Single pixel'
+        show_method = has_method and (self._weight_box.currentText() == 'None')
         self._method_label.setVisible(show_method)
         self._method_box.setVisible(show_method)
 
@@ -177,7 +176,7 @@ class ApertureControls(QWidget):
 
     @property
     def mode(self):
-        """'Single pixel', 'Circular', or 'Circular-Annular'."""
+        """'Single pixel', 'Rectangle', 'Circular', or 'Circular-Annular'."""
         return self._mode_box.currentText()
 
     @property

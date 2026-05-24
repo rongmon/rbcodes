@@ -76,6 +76,107 @@ def moment2(flux, wave, wmin, wmax, lambda_rest):
         return np.where(m0 > 0, np.sqrt(np.abs(m2 / m0)), np.nan)
 
 
+def compute_snr_map(m0, flux, wave, wmin, wmax,
+                    var=None, sky_mask=None, cont1=None, cont2=None):
+    """
+    Compute a per-spaxel SNR map for use as a moment-map mask.
+
+    Parameters
+    ----------
+    m0       : ndarray (ny, nx)  — moment-0 map (integrated flux)
+    flux     : ndarray (n_wave, ny, nx)
+    wave     : ndarray (n_wave,)
+    wmin, wmax : float  — line window boundaries (Å)
+    var      : ndarray (n_wave, ny, nx) or None  — variance cube
+    sky_mask : ndarray (ny, nx) bool or None     — sky region mask
+    cont1, cont2 : (float, float) or None        — continuum windows (Å)
+
+    Returns
+    -------
+    snr : ndarray (ny, nx) or None if no noise estimate is possible
+    """
+    line_mask = (wave >= wmin) & (wave <= wmax)
+    if not line_mask.any():
+        return None
+    dw = np.gradient(wave[line_mask])
+    N  = int(line_mask.sum())
+
+    if var is not None:
+        # Per-spaxel: σ_M0 = sqrt(∫ var · dw²)
+        with np.errstate(all='ignore'):
+            sigma = np.sqrt(np.nansum(
+                var[line_mask] * dw[:, None, None] ** 2, axis=0))
+
+    elif sky_mask is not None and sky_mask.any():
+        # Sky region: RMS per channel across sky spaxels, then propagate to M0
+        sky_flux = flux[line_mask][:, sky_mask]   # (N_line, N_sky)
+        with np.errstate(all='ignore'):
+            rms_per_ch = np.nanstd(sky_flux, axis=1)          # (N_line,)
+            sigma = np.sqrt(np.nansum(
+                (rms_per_ch[:, None, None] * dw[:, None, None]) ** 2,
+                axis=0))                                        # (ny, nx) — same value everywhere
+
+    elif cont1 is not None:
+        # Continuum window(s): RMS per spaxel → scale to line window
+        cmask = (wave >= cont1[0]) & (wave <= cont1[1])
+        if cont2 is not None:
+            cmask |= (wave >= cont2[0]) & (wave <= cont2[1])
+        if not cmask.any():
+            return None
+        with np.errstate(all='ignore'):
+            rms = np.nanstd(flux[cmask], axis=0)               # (ny, nx)
+            sigma = rms * np.sqrt(N) * float(np.mean(np.abs(dw)))
+
+    else:
+        return None
+
+    with np.errstate(all='ignore'):
+        snr = np.where(sigma > 0, m0 / sigma, np.nan)
+    return snr
+
+
+def subtract_linear_continuum(flux, wave, bcont_min, bcont_max, rcont_min, rcont_max):
+    """
+    Subtract a per-spaxel linear continuum from a flux cube.
+
+    A linear baseline is anchored at the mean flux in the blue and red
+    continuum windows, evaluated at the midpoint wavelength of each window.
+    The fit is extrapolated / interpolated across the full wavelength range.
+
+    Parameters
+    ----------
+    flux       : ndarray (n_wave, ny, nx)
+    wave       : ndarray (n_wave,)
+    bcont_min, bcont_max : float  blue continuum window (Å)
+    rcont_min, rcont_max : float  red  continuum window (Å)
+
+    Returns
+    -------
+    flux_sub : ndarray (n_wave, ny, nx)  continuum-subtracted cube
+    """
+    bmask = (wave >= bcont_min) & (wave <= bcont_max)
+    rmask = (wave >= rcont_min) & (wave <= rcont_max)
+    if not bmask.any():
+        raise ValueError(f"Blue continuum window [{bcont_min:.1f}, {bcont_max:.1f}] Å has no channels.")
+    if not rmask.any():
+        raise ValueError(f"Red continuum window [{rcont_min:.1f}, {rcont_max:.1f}] Å has no channels.")
+
+    lambda_b = float(wave[bmask].mean())
+    lambda_r = float(wave[rmask].mean())
+    if lambda_b >= lambda_r:
+        raise ValueError("Blue continuum window must be at shorter wavelength than red window.")
+
+    with np.errstate(all='ignore'):
+        flux_b = np.nanmean(flux[bmask], axis=0)   # (ny, nx)
+        flux_r = np.nanmean(flux[rmask], axis=0)   # (ny, nx)
+
+    slope     = (flux_r - flux_b) / (lambda_r - lambda_b)            # (ny, nx)
+    intercept = flux_b - slope * lambda_b                             # (ny, nx)
+    continuum = (slope[np.newaxis] * wave[:, np.newaxis, np.newaxis]
+                 + intercept[np.newaxis])                             # (n_wave, ny, nx)
+    return flux - continuum
+
+
 def moment_map(flux, wave, wmin, wmax, order, lambda_rest=None):
     """
     Compute moment map of given order.

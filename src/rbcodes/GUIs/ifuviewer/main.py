@@ -9,8 +9,9 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QStatusBar,
                               QHBoxLayout, QVBoxLayout, QLabel, QAction,
                               QFileDialog, QMessageBox, QSplitter,
                               QDialog, QFormLayout, QLineEdit,
-                              QDialogButtonBox, QDoubleSpinBox, QCheckBox,
-                              QComboBox, QPushButton, QRadioButton, QButtonGroup,
+                              QDialogButtonBox, QDoubleSpinBox, QSpinBox,
+                              QCheckBox, QComboBox, QPushButton,
+                              QRadioButton, QButtonGroup,
                               QGroupBox, QListWidget, QListWidgetItem)
 from PyQt5.QtCore import Qt
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavToolbar
@@ -23,7 +24,8 @@ from rbcodes.GUIs.ifuviewer.spectrum_panel import SpectrumCanvas
 from rbcodes.GUIs.ifuviewer.io.image2d import FITSImage
 from rbcodes.GUIs.ifuviewer.processing.cube_collapse import (
     build_whitelight, build_narrowband, build_continuum_sub)
-from rbcodes.GUIs.ifuviewer.processing.moment_maps import moment_map
+from rbcodes.GUIs.ifuviewer.processing.moment_maps import (
+    moment_map, subtract_linear_continuum, compute_snr_map)
 from rbcodes.GUIs.ifuviewer.processing.aperture_extract import (
     extract_aperture, extract_variance_weighted,
     extract_with_method, subtract_background,
@@ -41,6 +43,8 @@ class MainWindow(QMainWindow):
         self._status_base          = ""   # dataset portion of status bar text
         self._specgui_windows      = []   # keep references to launched GUI windows
         self._extraction_marker_groups = []  # per-extraction list of image artists
+        self._sky_mask             = None  # 2-D bool array — sky region for SNR
+        self._sky_rect             = None  # (x1, y1, x2, y2) pixel bounds
 
         self._build_ui()
         self._build_menu()
@@ -90,6 +94,7 @@ class MainWindow(QMainWindow):
 
         self._spectrum_canvas = SpectrumCanvas()
         self._spectrum_canvas.setMinimumHeight(150)
+        self._spectrum_canvas.cursor_info.connect(self._on_cursor_info)
         self._spectrum_canvas.onband_changed.connect(self._on_onband_changed)
         self._spectrum_canvas.contband_changed.connect(self._on_contband_changed)
         self._spectrum_canvas.window_cleared.connect(self._on_window_cleared)
@@ -195,6 +200,35 @@ class MainWindow(QMainWindow):
             "Compute a zeroth, first, or second moment map over a wavelength window.")
         moment_action.triggered.connect(self._on_moment_map)
         analysis_menu.addAction(moment_action)
+
+        analysis_menu.addSeparator()
+
+        crop_sel_action = QAction("Crop to Drawn Rectangle", self)
+        crop_sel_action.setShortcut("Ctrl+K")
+        crop_sel_action.setToolTip(
+            "Crop the active cube/image to the last rectangle drawn on the image.\n"
+            "Creates a new dataset in the sidebar — original is preserved.")
+        crop_sel_action.triggered.connect(self._on_crop_selection)
+        analysis_menu.addAction(crop_sel_action)
+
+        crop_coord_action = QAction("Crop by Coordinates…", self)
+        crop_coord_action.setToolTip(
+            "Crop by entering pixel (X/Y) or sky (RA/Dec) coordinates.")
+        crop_coord_action.triggered.connect(self._on_crop_by_coords)
+        analysis_menu.addAction(crop_coord_action)
+
+        analysis_menu.addSeparator()
+
+        sky_action = QAction("Set Drawn Rectangle as Sky Region", self)
+        sky_action.setToolTip(
+            "Mark the last drawn rectangle as the sky/background region.\n"
+            "Used for SNR-based moment map masking.")
+        sky_action.triggered.connect(self._on_set_sky_region)
+        analysis_menu.addAction(sky_action)
+
+        clear_sky_action = QAction("Clear Sky Region", self)
+        clear_sky_action.triggered.connect(self._on_clear_sky_region)
+        analysis_menu.addAction(clear_sky_action)
 
     def _build_extract_strip(self):
         """Build the extraction list bar (always shown when cube loaded)."""
@@ -334,6 +368,99 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.warning(self, "Save failed", str(exc))
 
+    # ------------------------------------------------------------------
+    # Crop
+    # ------------------------------------------------------------------
+
+    def _on_crop_selection(self):
+        """Crop active cube/image to the last drawn rectangle (Ctrl+K)."""
+        rect = self._image_canvas._last_rect
+        if rect is None:
+            self.statusBar().showMessage(
+                "Draw a rectangle on the image first, then crop.", 4000)
+            return
+        self._do_crop(*rect)
+
+    def _on_crop_by_coords(self):
+        """Open the coordinate-input crop dialog."""
+        cube = self._active_cube
+        if cube is None:
+            self.statusBar().showMessage("Load a dataset first.", 3000)
+            return
+        ny = cube.ny if hasattr(cube, 'ny') else cube.flux.shape[0]
+        nx = cube.nx if hasattr(cube, 'nx') else cube.flux.shape[1]
+        wcs = cube.wcs
+        dlg = CropDialog(nx, ny, wcs, parent=self)
+        if not dlg.exec_():
+            return
+        x1, y1, x2, y2 = dlg.pixel_bounds()
+        self._do_crop(x1, y1, x2, y2)
+
+    def _do_crop(self, x1, y1, x2, y2):
+        """Perform the crop and add the result to the sidebar."""
+        cube = self._active_cube
+        if cube is None:
+            return
+        ny = cube.flux.shape[-2]
+        nx = cube.flux.shape[-1]
+        x1 = max(0, x1); y1 = max(0, y1)
+        x2 = min(nx, x2); y2 = min(ny, y2)
+        if x2 <= x1 or y2 <= y1:
+            QMessageBox.warning(self, "Crop failed", "Crop region is empty.")
+            return
+        try:
+            cropped = cube.crop(x1, y1, x2, y2)
+        except Exception as exc:
+            QMessageBox.warning(self, "Crop failed", str(exc))
+            return
+        # Warn if sky region overlaps crop — it won't be valid anymore
+        if self._sky_rect is not None:
+            sx1, sy1, sx2, sy2 = self._sky_rect
+            if not (sx1 >= x1 and sx2 <= x2 and sy1 >= y1 and sy2 <= y2):
+                QMessageBox.information(
+                    self, "Sky region",
+                    "The sky region extends outside the crop area and has been cleared.")
+                self._sky_mask = None
+                self._sky_rect = None
+                self._image_canvas.clear_sky_region()
+        self._sidebar.add_cube_object(cropped)
+        self.statusBar().showMessage(
+            f"Cropped '{cube.name}' [{x1}:{x2}, {y1}:{y2}] → '{cropped.name}'  "
+            f"({x2-x1}×{y2-y1} spaxels)", 6000)
+
+    # ------------------------------------------------------------------
+    # Sky region
+    # ------------------------------------------------------------------
+
+    def _on_set_sky_region(self):
+        """Mark the last drawn rectangle as the sky/background region."""
+        rect = self._image_canvas._last_rect
+        if rect is None:
+            self.statusBar().showMessage(
+                "Draw a rectangle on the image first, then set as sky region.", 4000)
+            return
+        cube = self._active_cube
+        if cube is None:
+            return
+        x1, y1, x2, y2 = rect
+        ny = cube.flux.shape[-2]
+        nx = cube.flux.shape[-1]
+        mask = np.zeros((ny, nx), dtype=bool)
+        mask[y1:y2, x1:x2] = True
+        self._sky_mask = mask
+        self._sky_rect = rect
+        self._image_canvas.draw_sky_region(x1, y1, x2, y2)
+        self.statusBar().showMessage(
+            f"Sky region set: x=[{x1},{x2}) y=[{y1},{y2})  "
+            f"({mask.sum()} spaxels)", 5000)
+
+    def _on_clear_sky_region(self):
+        """Remove the sky region."""
+        self._sky_mask = None
+        self._sky_rect = None
+        self._image_canvas.clear_sky_region()
+        self.statusBar().showMessage("Sky region cleared.", 3000)
+
     def _on_moment_map(self):
         """Open the Moment Map dialog (Ctrl+M)."""
         cube = self._active_cube
@@ -344,22 +471,55 @@ class MainWindow(QMainWindow):
 
         sc = self._spectrum_canvas
         onband = sc._onband_ext   # (wmin, wmax) or (nan, nan)
+        cont1  = sc._cont1_ext
+        cont2  = sc._cont2_ext
 
         dlg = MomentMapDialog(
-            wave    = cube.wave,
-            onband  = onband,
-            parent  = self,
+            wave          = cube.wave,
+            onband        = onband,
+            has_variance  = cube.var is not None,
+            has_sky       = self._sky_mask is not None,
+            has_cont      = np.isfinite(cont1[0]) if cont1 else False,
+            parent        = self,
         )
         if not dlg.exec_():
             return
 
-        order, wmin, wmax, lambda_rest = dlg.values()
+        order, wmin, wmax, lambda_rest, subtract_cont, \
+            bcont_min, bcont_max, rcont_min, rcont_max, \
+            apply_snr, snr_thresh, snr_method = dlg.values()
 
         try:
-            img = moment_map(cube.flux, cube.wave, wmin, wmax, order, lambda_rest)
+            flux = cube.flux
+            if subtract_cont:
+                flux = subtract_linear_continuum(
+                    flux, cube.wave, bcont_min, bcont_max, rcont_min, rcont_max)
+            img = moment_map(flux, cube.wave, wmin, wmax, order, lambda_rest)
         except Exception as exc:
             QMessageBox.warning(self, "Moment map failed", str(exc))
             return
+
+        # Apply SNR mask — always derived from M0 (integrated flux).
+        # For M1/M2 compute M0 internally; M1/M2 are only meaningful
+        # where the line is detected, which is a flux question, not a
+        # velocity question.
+        if apply_snr:
+            try:
+                c1 = tuple(cont1) if np.isfinite(cont1[0]) else None
+                c2 = tuple(cont2) if np.isfinite(cont2[0]) else None
+                m0_for_snr = (img if order == 0
+                              else moment_map(flux, cube.wave, wmin, wmax, 0))
+                snr = compute_snr_map(
+                    m0_for_snr, flux, cube.wave, wmin, wmax,
+                    var      = cube.var       if snr_method == 'Variance cube' else None,
+                    sky_mask = self._sky_mask if snr_method == 'Sky region'    else None,
+                    cont1    = c1             if snr_method == 'Cont windows'  else None,
+                    cont2    = c2             if snr_method == 'Cont windows'  else None,
+                )
+                if snr is not None:
+                    img = np.where(snr >= snr_thresh, img, np.nan)
+            except Exception as exc:
+                QMessageBox.warning(self, "SNR mask failed", str(exc))
 
         # Choose colormap per moment order
         cmaps = {0: 'gray', 1: 'RdBu_r', 2: 'plasma'}
@@ -370,12 +530,16 @@ class MainWindow(QMainWindow):
         self._image_controls.set_cmap(cmap)
         self._image_controls.refresh(img)
 
+        cont_tag = (f"  cont [{bcont_min:.0f}–{bcont_max:.0f}, "
+                    f"{rcont_min:.0f}–{rcont_max:.0f}] Å") if subtract_cont else ""
+        snr_tag  = f"  SNR≥{snr_thresh} ({snr_method})" if apply_snr else ""
         units = {0: 'flux·Å', 1: 'km/s', 2: 'km/s'}
         self.statusBar().showMessage(
             f"Moment {order} map  [{wmin:.1f}–{wmax:.1f} Å]"
             + (f"  λ_center={lambda_rest:.2f} Å" if lambda_rest else "")
+            + cont_tag + snr_tag
             + f"  ({units[order]})  — click any mode button to return",
-            0)   # 0 = persistent until next message
+            0)
 
     def _on_set_spec_range(self):
         """Open the spectrum X/Y range + scale dialog (Ctrl+R / Ctrl+W)."""
@@ -433,6 +597,10 @@ class MainWindow(QMainWindow):
         ny, nx   = cube.ny, cube.nx
         ac       = self._aperture_controls
         mode     = ac.mode
+
+        if mode == 'Rectangle':
+            self.statusBar().showMessage("Rectangle mode: drag to define extraction box.", 3000)
+            return
 
         # ---- Single pixel ------------------------------------------------
         if mode == 'Single pixel':
@@ -1813,6 +1981,159 @@ def launch_viewer(fitsfile=None):
     sys.exit(app.exec_())
 
 
+class CropDialog(QDialog):
+    """
+    Dialog for entering crop coordinates as pixel (X/Y) or sky (RA/Dec).
+
+    pixel_bounds() returns (x1, y1, x2, y2) in 0-indexed pixel coords
+    suitable for numpy slicing.
+    """
+
+    def __init__(self, nx, ny, wcs=None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Crop by Coordinates")
+        self.setMinimumWidth(360)
+        self._nx  = nx
+        self._ny  = ny
+        self._wcs = wcs
+
+        layout = QVBoxLayout(self)
+        form   = QFormLayout()
+        layout.addLayout(form)
+
+        # Input type selector
+        self._mode_box = QComboBox()
+        self._mode_box.addItem("Pixel (X / Y)")
+        if wcs is not None:
+            self._mode_box.addItem("Sky (RA / Dec)")
+        self._mode_box.currentIndexChanged.connect(self._on_mode_changed)
+        form.addRow("Input type:", self._mode_box)
+
+        # ---- Pixel inputs ----
+        self._px_widget = QWidget()
+        px_form = QFormLayout(self._px_widget)
+        px_form.setContentsMargins(0, 0, 0, 0)
+
+        self._x1_spin = _int_spinbox(0, nx - 1, 0)
+        self._x2_spin = _int_spinbox(1, nx,     nx)
+        self._y1_spin = _int_spinbox(0, ny - 1, 0)
+        self._y2_spin = _int_spinbox(1, ny,     ny)
+
+        px_form.addRow("X  (start – end):", _hpair(self._x1_spin, self._x2_spin))
+        px_form.addRow("Y  (start – end):", _hpair(self._y1_spin, self._y2_spin))
+        form.addRow(self._px_widget)
+
+        # ---- RA/Dec inputs ----
+        self._rd_widget = QWidget()
+        rd_form = QFormLayout(self._rd_widget)
+        rd_form.setContentsMargins(0, 0, 0, 0)
+
+        self._ra_spin  = QDoubleSpinBox(); self._ra_spin.setRange(0, 360); self._ra_spin.setDecimals(6); self._ra_spin.setSuffix(" deg"); self._ra_spin.setFixedWidth(140)
+        self._dec_spin = QDoubleSpinBox(); self._dec_spin.setRange(-90, 90); self._dec_spin.setDecimals(6); self._dec_spin.setSuffix(" deg"); self._dec_spin.setFixedWidth(140)
+        self._w_spin   = QDoubleSpinBox(); self._w_spin.setRange(0.1, 36000); self._w_spin.setDecimals(1); self._w_spin.setSuffix(" arcsec"); self._w_spin.setValue(30.0); self._w_spin.setFixedWidth(120)
+        self._h_spin   = QDoubleSpinBox(); self._h_spin.setRange(0.1, 36000); self._h_spin.setDecimals(1); self._h_spin.setSuffix(" arcsec"); self._h_spin.setValue(30.0); self._h_spin.setFixedWidth(120)
+
+        # Pre-fill RA/Dec from WCS centre pixel
+        if wcs is not None:
+            try:
+                from astropy.wcs.utils import proj_plane_pixel_scales
+                cx, cy = wcs.all_pix2world(nx / 2, ny / 2, 0)
+                self._ra_spin.setValue(float(cx))
+                self._dec_spin.setValue(float(cy))
+                scales = proj_plane_pixel_scales(wcs) * 3600  # arcsec/pix
+                self._w_spin.setValue(round(nx * scales[0], 1))
+                self._h_spin.setValue(round(ny * scales[1], 1))
+            except Exception:
+                pass
+
+        rd_form.addRow("RA center:",  self._ra_spin)
+        rd_form.addRow("Dec center:", self._dec_spin)
+        rd_form.addRow("Width:",      self._w_spin)
+        rd_form.addRow("Height:",     self._h_spin)
+        form.addRow(self._rd_widget)
+        self._rd_widget.setVisible(False)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _on_mode_changed(self, idx):
+        self._px_widget.setVisible(idx == 0)
+        self._rd_widget.setVisible(idx == 1)
+
+    def pixel_bounds(self):
+        """Return (x1, y1, x2, y2) in 0-indexed pixels."""
+        if self._mode_box.currentIndex() == 0 or self._wcs is None:
+            x1 = self._x1_spin.value()
+            x2 = self._x2_spin.value()
+            y1 = self._y1_spin.value()
+            y2 = self._y2_spin.value()
+        else:
+            # RA/Dec → pixel
+            try:
+                from astropy.wcs.utils import proj_plane_pixel_scales
+                ra   = self._ra_spin.value()
+                dec  = self._dec_spin.value()
+                w_as = self._w_spin.value()
+                h_as = self._h_spin.value()
+                cx, cy = self._wcs.all_pix2world(ra, dec, 0)
+                # pixel scale
+                scales = proj_plane_pixel_scales(self._wcs) * 3600  # arcsec/pix
+                hw = w_as / (2 * scales[0])
+                hh = h_as / (2 * scales[1])
+                # all_world2pix wants (ra, dec) → (x, y)
+                px, py = self._wcs.all_world2pix(ra, dec, 0)
+                x1, x2 = int(px - hw), int(px + hw)
+                y1, y2 = int(py - hh), int(py + hh)
+            except Exception as exc:
+                QMessageBox.warning(self, "Coordinate error", str(exc))
+                return 0, 0, self._nx, self._ny
+        return int(x1), int(y1), int(x2), int(y2)
+
+
+def _int_spinbox(lo, hi, value):
+    sb = QSpinBox()
+    sb.setRange(lo, hi)
+    sb.setValue(value)
+    sb.setFixedWidth(80)
+    return sb
+
+
+def _hpair(w1, w2):
+    w = QWidget()
+    lay = QHBoxLayout(w)
+    lay.setContentsMargins(0, 0, 0, 0)
+    lay.setSpacing(4)
+    lay.addWidget(w1)
+    lay.addWidget(QLabel("–"))
+    lay.addWidget(w2)
+    return w
+
+
+def _wave_spinbox(wave, value):
+    """QDoubleSpinBox pre-configured for wavelength entry."""
+    sb = QDoubleSpinBox()
+    sb.setRange(float(wave[0]), float(wave[-1]))
+    sb.setDecimals(2)
+    sb.setSuffix(" Å")
+    sb.setValue(float(np.clip(value, wave[0], wave[-1])))
+    sb.setFixedWidth(110)
+    return sb
+
+
+def _range_widget(spin_min, spin_max):
+    """Horizontal widget: [spin_min] – [spin_max]."""
+    w = QWidget()
+    lay = QHBoxLayout(w)
+    lay.setContentsMargins(0, 0, 0, 0)
+    lay.setSpacing(4)
+    lay.addWidget(spin_min)
+    lay.addWidget(QLabel("–"))
+    lay.addWidget(spin_max)
+    return w
+
+
 class MomentMapDialog(QDialog):
     """
     Dialog for computing moment maps (M0, M1, M2).
@@ -1821,18 +2142,29 @@ class MomentMapDialog(QDialog):
     Class attributes persist last-used values across dialog opens.
     """
 
-    _last_order  = 0
-    _last_wmin   = None
-    _last_wmax   = None
-    _last_lrest  = None
+    _last_order    = 0
+    _last_wmin     = None
+    _last_wmax     = None
+    _last_lrest    = None
+    _last_cont_sub = False
+    _last_bcont    = (None, None)
+    _last_rcont    = (None, None)
+    _last_snr      = False
+    _last_snr_thr  = 3.0
+    _last_snr_meth = 'Sky region'
 
-    def __init__(self, wave, onband=None, parent=None):
+    def __init__(self, wave, onband=None,
+                 has_variance=False, has_sky=False, has_cont=False,
+                 parent=None):
         super().__init__(parent)
         self.setWindowTitle("Moment Map")
         self.setMinimumWidth(380)
 
-        self._wave   = wave
-        self._onband = onband   # (wmin, wmax) or (nan, nan)
+        self._wave        = wave
+        self._onband      = onband
+        self._has_variance = has_variance
+        self._has_sky      = has_sky
+        self._has_cont     = has_cont
 
         layout = QVBoxLayout(self)
         form   = QFormLayout()
@@ -1909,6 +2241,81 @@ class MomentMapDialog(QDialog):
 
         self._on_order_changed()   # set initial visibility
 
+        # ---- Continuum subtraction ----
+        self._cont_cb = QCheckBox("Subtract linear continuum")
+        self._cont_cb.setToolTip(
+            "Fit a per-spaxel linear baseline anchored in the blue and red\n"
+            "continuum windows and subtract before computing moments.\n"
+            "Leave unchecked for pure emission lines with no continuum.")
+        self._cont_cb.setChecked(self._last_cont_sub)
+        self._cont_cb.toggled.connect(self._on_cont_toggled)
+        form.addRow("", self._cont_cb)
+
+        # Blue continuum window
+        wspan = wmax_def - wmin_def
+        bc_lo = self._last_bcont[0] if self._last_bcont[0] is not None else max(float(wave[0]), wmin_def - wspan)
+        bc_hi = self._last_bcont[1] if self._last_bcont[1] is not None else wmin_def - 2.0
+        rc_lo = self._last_rcont[0] if self._last_rcont[0] is not None else wmax_def + 2.0
+        rc_hi = self._last_rcont[1] if self._last_rcont[1] is not None else min(float(wave[-1]), wmax_def + wspan)
+
+        self._bcont_min = _wave_spinbox(wave, bc_lo)
+        self._bcont_max = _wave_spinbox(wave, bc_hi)
+        self._rcont_min = _wave_spinbox(wave, rc_lo)
+        self._rcont_max = _wave_spinbox(wave, rc_hi)
+
+        self._bcont_widget = _range_widget(self._bcont_min, self._bcont_max)
+        self._rcont_widget = _range_widget(self._rcont_min, self._rcont_max)
+        self._bcont_label  = QLabel("Blue cont window:")
+        self._rcont_label  = QLabel("Red cont window:")
+        form.addRow(self._bcont_label, self._bcont_widget)
+        form.addRow(self._rcont_label, self._rcont_widget)
+
+        self._on_cont_toggled(self._last_cont_sub)   # set initial visibility
+
+        # ---- SNR mask ----
+        self._snr_cb = QCheckBox("Apply SNR mask")
+        self._snr_cb.setToolTip(
+            "Mask spaxels below the SNR threshold to NaN before displaying.\n"
+            "SNR is computed from the moment-0 map divided by the noise estimate.")
+        self._snr_cb.setChecked(self._last_snr)
+        self._snr_cb.toggled.connect(self._on_snr_toggled)
+        form.addRow("", self._snr_cb)
+
+        snr_thr_widget = QWidget()
+        snr_thr_layout = QHBoxLayout(snr_thr_widget)
+        snr_thr_layout.setContentsMargins(0, 0, 0, 0)
+        self._snr_thr_spin = QDoubleSpinBox()
+        self._snr_thr_spin.setRange(0.1, 1000.0)
+        self._snr_thr_spin.setDecimals(1)
+        self._snr_thr_spin.setValue(self._last_snr_thr)
+        self._snr_thr_spin.setFixedWidth(80)
+        snr_thr_layout.addWidget(self._snr_thr_spin)
+
+        self._snr_meth_box = QComboBox()
+        snr_methods = []
+        if has_variance: snr_methods.append('Variance cube')
+        if has_sky:      snr_methods.append('Sky region')
+        if has_cont:     snr_methods.append('Cont windows')
+        if not snr_methods:
+            snr_methods = ['(none available)']
+            self._snr_cb.setEnabled(False)
+            self._snr_cb.setToolTip(
+                "No noise estimate available.\n"
+                "Load a variance cube, set a sky region, or define continuum windows.")
+        self._snr_meth_box.addItems(snr_methods)
+        if self._last_snr_meth in snr_methods:
+            self._snr_meth_box.setCurrentText(self._last_snr_meth)
+        self._snr_meth_box.setFixedWidth(130)
+        snr_thr_layout.addWidget(QLabel("σ  Method:"))
+        snr_thr_layout.addWidget(self._snr_meth_box)
+        snr_thr_layout.addStretch()
+
+        self._snr_thr_label  = QLabel("Threshold:")
+        self._snr_thr_widget = snr_thr_widget
+        form.addRow(self._snr_thr_label, self._snr_thr_widget)
+
+        self._on_snr_toggled(self._last_snr)
+
         # ---- Buttons ----
         buttons = QDialogButtonBox(
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
@@ -1923,25 +2330,59 @@ class MomentMapDialog(QDialog):
         self._lrest_label.setVisible(needs_rest)
         self._lrest_spin.setVisible(needs_rest)
 
+    def _on_cont_toggled(self, checked):
+        for w in (self._bcont_label, self._bcont_widget,
+                  self._rcont_label, self._rcont_widget):
+            w.setVisible(checked)
+
+    def _on_snr_toggled(self, checked):
+        for w in (self._snr_thr_label, self._snr_thr_widget):
+            w.setVisible(checked)
+
     def _fill_from_onband(self):
         if self._onband is not None and np.isfinite(self._onband[0]):
             self._wmin_spin.setValue(float(self._onband[0]))
             self._wmax_spin.setValue(float(self._onband[1]))
 
     def values(self):
-        """Return (order, wmin, wmax, lambda_rest_or_None) and save to class."""
+        """
+        Return (order, wmin, wmax, lambda_rest_or_None,
+                subtract_cont, bcont_min, bcont_max, rcont_min, rcont_max)
+        and save to class for next open.
+        """
         order  = self._order_group.checkedId()
         wmin   = self._wmin_spin.value()
         wmax   = self._wmax_spin.value()
         if wmin > wmax:
             wmin, wmax = wmax, wmin
-        lrest = self._lrest_spin.value() if order in (1, 2) else None
+        lrest       = self._lrest_spin.value() if order in (1, 2) else None
+        subtract    = self._cont_cb.isChecked()
+        bcont_min   = self._bcont_min.value()
+        bcont_max   = self._bcont_max.value()
+        rcont_min   = self._rcont_min.value()
+        rcont_max   = self._rcont_max.value()
+        if bcont_min > bcont_max:
+            bcont_min, bcont_max = bcont_max, bcont_min
+        if rcont_min > rcont_max:
+            rcont_min, rcont_max = rcont_max, rcont_min
         # Persist for next open
-        MomentMapDialog._last_order = order
-        MomentMapDialog._last_wmin  = wmin
-        MomentMapDialog._last_wmax  = wmax
-        MomentMapDialog._last_lrest = lrest
-        return order, wmin, wmax, lrest
+        apply_snr  = self._snr_cb.isChecked() and self._snr_cb.isEnabled()
+        snr_thresh = self._snr_thr_spin.value()
+        snr_method = self._snr_meth_box.currentText()
+
+        MomentMapDialog._last_order    = order
+        MomentMapDialog._last_wmin     = wmin
+        MomentMapDialog._last_wmax     = wmax
+        MomentMapDialog._last_lrest    = lrest
+        MomentMapDialog._last_cont_sub = subtract
+        MomentMapDialog._last_bcont    = (bcont_min, bcont_max)
+        MomentMapDialog._last_rcont    = (rcont_min, rcont_max)
+        MomentMapDialog._last_snr      = apply_snr
+        MomentMapDialog._last_snr_thr  = snr_thresh
+        MomentMapDialog._last_snr_meth = snr_method
+        return (order, wmin, wmax, lrest,
+                subtract, bcont_min, bcont_max, rcont_min, rcont_max,
+                apply_snr, snr_thresh, snr_method)
 
 
 def main():

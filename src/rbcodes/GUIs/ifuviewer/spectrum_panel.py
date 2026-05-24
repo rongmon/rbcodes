@@ -43,6 +43,7 @@ class SpectrumCanvas(FigureCanvasQTAgg):
     contband_changed = pyqtSignal(float, float, float, float)
     window_cleared   = pyqtSignal(str)    # 'onband' | 'cont1' | 'cont2'
     spaxel_locked    = pyqtSignal(int, int)
+    cursor_info      = pyqtSignal(str)
 
     def __init__(self, parent=None, dpi=100):
         self._fig = Figure(dpi=dpi, facecolor='#1e1e2e')
@@ -74,12 +75,16 @@ class SpectrumCanvas(FigureCanvasQTAgg):
         # None | 'onband' | 'cont1' | 'cont2'
         self._drawing_sel = None
 
+        # Legend visibility state
+        self._legend_visible = True
+
         # In-axes status label (created in _build_selectors)
         self._mode_text = None
 
         # Key-press handler for c band drawing
         self.setFocusPolicy(Qt.StrongFocus)
-        self.mpl_connect('key_press_event', self._on_key_press)
+        self.mpl_connect('key_press_event',    self._on_key_press)
+        self.mpl_connect('motion_notify_event', self._on_mouse_move)
 
         # Locked / extracted spectra  [Phase 9]
         self._locked_lines    = []   # matplotlib Line2D objects
@@ -119,9 +124,7 @@ class SpectrumCanvas(FigureCanvasQTAgg):
         self._ax.set_ylim(ymin - pad, ymax + pad)
         self._ax.set_xlabel('Wavelength (Å)', fontsize=8)
         self._ax.set_ylabel('Flux', fontsize=8)
-        self._ax.legend(fontsize=7, loc='upper right',
-                        facecolor='#313244', labelcolor='#cdd6f4',
-                        edgecolor='#45475a')
+        self._rebuild_legend()
 
         self._build_selectors()
         self.set_mode(self._mode)   # re-apply current mode's selector state
@@ -143,9 +146,7 @@ class SpectrumCanvas(FigureCanvasQTAgg):
         self._spaxel_line.set_ydata(spectrum)
         self._spaxel_line.set_visible(True)
         self._spaxel_line.set_label(f'Spaxel ({x},{y})')
-        self._ax.legend(fontsize=7, loc='upper right',
-                        facecolor='#313244', labelcolor='#cdd6f4',
-                        edgecolor='#45475a')
+        self._rebuild_legend()
         self.draw_idle()
 
     def set_mode(self, mode):
@@ -208,9 +209,7 @@ class SpectrumCanvas(FigureCanvasQTAgg):
         self._locked_lines.append(line)
         self._locked_spectra.append((label, rb_spec))
 
-        self._ax.legend(fontsize=7, loc='upper right',
-                        facecolor='#313244', labelcolor='#cdd6f4',
-                        edgecolor='#45475a')
+        self._rebuild_legend()
         self.draw_idle()
 
     def remove_locked_at(self, idx):
@@ -224,9 +223,7 @@ class SpectrumCanvas(FigureCanvasQTAgg):
         del self._locked_lines[idx]
         del self._locked_spectra[idx]
 
-        self._ax.legend(fontsize=7, loc='upper right',
-                        facecolor='#313244', labelcolor='#cdd6f4',
-                        edgecolor='#45475a')
+        self._rebuild_legend()
         self.draw_idle()
 
     def clear_locked(self):
@@ -240,9 +237,7 @@ class SpectrumCanvas(FigureCanvasQTAgg):
         self._locked_spectra.clear()
         self._color_idx = 0
 
-        self._ax.legend(fontsize=7, loc='upper right',
-                        facecolor='#313244', labelcolor='#cdd6f4',
-                        edgecolor='#45475a')
+        self._rebuild_legend()
         self.draw_idle()
 
     @property
@@ -430,31 +425,77 @@ class SpectrumCanvas(FigureCanvasQTAgg):
 
     def _on_key_press(self, event):
         """
-        c / x / z — fixed keys for on-band, Cont 1, Cont 2.
-        First press  → enter that window's draw mode.
-        Second press → clear that window's span and revert to neutral.
-        Esc          → back to neutral (keep all spans).
+        Navigation keys (all modes):
+          x / X   — cursor x → new xmin / xmax
+          t / b   — cursor y → new ymax (top) / ymin (bottom)
+          r       — reset full wavelength range
+          a       — autoscale Y to visible data
+          [ / ]   — pan left / right 10%
+          - / =   — zoom out / in X by 20%
+          l       — toggle legend
+
+        Cont-sub band keys (Cont-sub mode only):
+          c       — on-band window  (press twice to clear)
+          1       — cont window 1   (press twice to clear)
+          2       — cont window 2   (press twice to clear)
+          Esc     — back to neutral (keep all spans)
         """
+        key = event.key
+
+        # ---- Navigation — active in all modes ----
+        if key == 'r':
+            self.reset_wave_limits()
+            return
+        if key == 'a':
+            self.autoscale_y()
+            return
+        if key == 'l':
+            self._toggle_legend()
+            return
+        if key in ('[', ']'):
+            self._pan_x(-0.1 if key == '[' else 0.1)
+            return
+        if key in ('-', '='):
+            self._zoom_x(1.2 if key == '-' else 1.0 / 1.2)
+            return
+        if key in ('x', 'X') and event.xdata is not None:
+            xmin, xmax = self._ax.get_xlim()
+            if key == 'x':
+                self._ax.set_xlim(event.xdata, xmax)
+            else:
+                self._ax.set_xlim(xmin, event.xdata)
+            self.draw_idle()
+            return
+        if key in ('t', 'b') and event.ydata is not None:
+            ymin, ymax = self._ax.get_ylim()
+            if key == 't':
+                self._ax.set_ylim(ymin, event.ydata)
+            else:
+                self._ax.set_ylim(event.ydata, ymax)
+            self.draw_idle()
+            return
+
+        # ---- Cont-sub band keys — Cont-sub mode only ----
         if self._mode != 'Cont-sub':
             return
 
-        if event.key == 'c':
+        if key == 'c':
             if self._drawing_sel == 'onband':
-                self._clear_window('onband')       # second press → clear
+                self._clear_window('onband')
             else:
-                self._set_drawing_selector('onband')   # enter on-band mode
-        elif event.key == 'x':
+                self._set_drawing_selector('onband')
+        elif key == '1':
             if self._drawing_sel == 'cont1':
                 self._clear_window('cont1')
             else:
                 self._set_drawing_selector('cont1')
-        elif event.key == 'z':
+        elif key == '2':
             if self._drawing_sel == 'cont2':
                 self._clear_window('cont2')
             else:
                 self._set_drawing_selector('cont2')
-        elif event.key == 'escape':
-            self._set_drawing_selector(None)       # neutral, keep all spans
+        elif key == 'escape':
+            self._set_drawing_selector(None)
 
     def _clear_window(self, name):
         """
@@ -522,9 +563,9 @@ class SpectrumCanvas(FigureCanvasQTAgg):
             self._mode_text.set_visible(False)
             return
         labels = {
-            'onband': 'On-band [c×2=clear | x=Cont1 | z=Cont2 | Esc]',
-            'cont1':  'Cont 1  [x×2=clear | c=On-band | z=Cont2 | Esc]',
-            'cont2':  'Cont 2  [z×2=clear | c=On-band | x=Cont1 | Esc]',
+            'onband': 'On-band  [c×2=clear | 1=Cont1 | 2=Cont2 | Esc]',
+            'cont1':  'Cont 1   [1×2=clear | c=On-band | 2=Cont2 | Esc]',
+            'cont2':  'Cont 2   [2×2=clear | c=On-band | 1=Cont1 | Esc]',
         }
         self._mode_text.set_text(labels.get(self._drawing_sel, ''))
         self._mode_text.set_visible(True)
@@ -532,6 +573,42 @@ class SpectrumCanvas(FigureCanvasQTAgg):
     # ------------------------------------------------------------------
     # Private
     # ------------------------------------------------------------------
+
+    def _rebuild_legend(self):
+        """Rebuild legend and apply current visibility state."""
+        leg = self._ax.legend(fontsize=7, loc='upper right',
+                              facecolor='#313244', labelcolor='#cdd6f4',
+                              edgecolor='#45475a')
+        if leg is not None:
+            leg.set_visible(self._legend_visible)
+
+    def _toggle_legend(self):
+        self._legend_visible = not self._legend_visible
+        leg = self._ax.get_legend()
+        if leg is not None:
+            leg.set_visible(self._legend_visible)
+            self.draw_idle()
+
+    def _pan_x(self, fraction):
+        """Pan X axis by *fraction* of current range (negative = left)."""
+        xmin, xmax = self._ax.get_xlim()
+        delta = (xmax - xmin) * fraction
+        self._ax.set_xlim(xmin + delta, xmax + delta)
+        self.draw_idle()
+
+    def _zoom_x(self, factor):
+        """Zoom X axis by *factor* around its centre (>1 = zoom out)."""
+        xmin, xmax = self._ax.get_xlim()
+        mid = (xmin + xmax) / 2.0
+        half = (xmax - xmin) / 2.0 * factor
+        self._ax.set_xlim(mid - half, mid + half)
+        self.draw_idle()
+
+    def _on_mouse_move(self, event):
+        if event.inaxes != self._ax or event.xdata is None or event.ydata is None:
+            self.cursor_info.emit('')
+            return
+        self.cursor_info.emit(f"λ={event.xdata:.2f} Å    flux={event.ydata:.4g}")
 
     def _style_axes(self):
         c = '#cdd6f4'

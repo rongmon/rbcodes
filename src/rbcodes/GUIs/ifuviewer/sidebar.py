@@ -81,7 +81,6 @@ class DatasetSidebar(QWidget):
         try:
             cube = load_fits(path, var=var_path)
         except Exception as exc:
-            # Caller (or MainWindow) should handle the error; re-raise
             raise RuntimeError(f"Cannot load '{path}': {exc}") from exc
 
         self._cubes.append(cube)
@@ -89,6 +88,17 @@ class DatasetSidebar(QWidget):
         item.setToolTip(str(path))
         self._list.addItem(item)
         self._list.setCurrentRow(len(self._cubes) - 1)   # triggers dataset_changed
+
+    def add_cube_object(self, cube):
+        """
+        Add a pre-constructed IFUCube / FITSImage to the sidebar without loading
+        from disk (e.g. a cropped subcube).  Selects the new item automatically.
+        """
+        self._cubes.append(cube)
+        item = QListWidgetItem(_item_text(cube))
+        item.setToolTip(cube.path if cube.path else cube.name)
+        self._list.addItem(item)
+        self._list.setCurrentRow(len(self._cubes) - 1)
 
     @property
     def active_cube(self):
