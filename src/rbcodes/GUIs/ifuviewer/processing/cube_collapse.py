@@ -4,6 +4,7 @@ Cube collapse functions — whitelight, narrowband, continuum-subtracted.
 Phase 3 implements build_whitelight.
 Phases 8+ add build_narrowband and build_continuum_sub.
 """
+import warnings
 import numpy as np
 
 
@@ -33,7 +34,8 @@ def build_whitelight(flux, wave, wmin=None, wmax=None, method='mean'):
         raise ValueError(f"No wavelength channels in range [{wmin}, {wmax}].")
 
     data = flux[mask, :, :]
-    with np.errstate(all='ignore'):
+    with warnings.catch_warnings(), np.errstate(all='ignore'):
+        warnings.simplefilter('ignore', RuntimeWarning)
         if method == 'mean':
             return np.nanmean(data, axis=0)
         elif method == 'sum':

@@ -12,8 +12,9 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QStatusBar,
                               QDialogButtonBox, QDoubleSpinBox, QSpinBox,
                               QCheckBox, QComboBox, QPushButton,
                               QRadioButton, QButtonGroup,
-                              QGroupBox, QListWidget, QListWidgetItem)
-from PyQt5.QtCore import Qt
+                              QGroupBox, QListWidget, QListWidgetItem,
+                              QProgressBar, QProgressDialog)
+from PyQt5.QtCore import Qt, QThread, pyqtSignal as _Signal
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavToolbar
 
 from rbcodes.GUIs.ifuviewer.sidebar import DatasetSidebar
@@ -43,8 +44,13 @@ class MainWindow(QMainWindow):
         self._status_base          = ""   # dataset portion of status bar text
         self._specgui_windows      = []   # keep references to launched GUI windows
         self._extraction_marker_groups = []  # per-extraction list of image artists
+        self._extraction_colors    = []   # parallel color list for highlighting
+        self._extraction_marker_info = [] # parallel: how to recreate each marker on restore
+        self._dataset_states       = {}   # id(cube) → saved per-dataset state
         self._sky_mask             = None  # 2-D bool array — sky region for SNR
         self._sky_rect             = None  # (x1, y1, x2, y2) pixel bounds
+        self._ds9_bridge           = None  # DS9Bridge, created on connect
+        self._ds9_frame_queue      = []   # list of (label, data2d, header, frame_no)
 
         self._build_ui()
         self._build_menu()
@@ -66,11 +72,20 @@ class MainWindow(QMainWindow):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # Left: dataset sidebar
+        # Left: dataset sidebar + ds9 queue panel
         self._sidebar = DatasetSidebar()
         self._sidebar.dataset_changed.connect(self._on_dataset_changed)
         self._sidebar.use_as_variance.connect(self._on_use_as_variance)
-        root.addWidget(self._sidebar)
+
+        self._ds9_queue_panel = self._build_ds9_queue_panel()
+
+        left_widget = QWidget()
+        left_vbox   = QVBoxLayout(left_widget)
+        left_vbox.setContentsMargins(0, 0, 0, 0)
+        left_vbox.setSpacing(0)
+        left_vbox.addWidget(self._sidebar, stretch=1)
+        left_vbox.addWidget(self._ds9_queue_panel)
+        root.addWidget(left_widget)
 
         # Right side — VBoxLayout added directly (no wrapper widget)
         right = QVBoxLayout()
@@ -83,6 +98,7 @@ class MainWindow(QMainWindow):
         self._image_canvas.spaxel_hovered.connect(self._on_spaxel_hovered)
         self._image_canvas.spaxel_locked.connect(self._on_spaxel_locked)
         self._image_canvas.aperture_drawn.connect(self._on_aperture_drawn)
+        self._image_canvas.aperture_picked.connect(self._on_aperture_picked)
 
         self._mpl_toolbar    = NavToolbar(self._image_canvas, self)
         self._image_canvas._nav_toolbar = self._mpl_toolbar  # for mode check
@@ -124,8 +140,12 @@ class MainWindow(QMainWindow):
         self._aperture_controls = ApertureControls()
         self._extract_strip = self._build_extract_strip()
 
+        # ds9 button strip [Phase 11]
+        self._ds9_strip = self._build_ds9_strip()
+
         # Fixed widgets above/below the splitter
         right.addWidget(self._mpl_toolbar)
+        right.addWidget(self._ds9_strip)
         right.addWidget(self._channel_slider)
         right.addWidget(self._placeholder)
         right.addWidget(self._splitter, stretch=1)
@@ -152,6 +172,13 @@ class MainWindow(QMainWindow):
         open_action.triggered.connect(self._on_open)
         file_menu.addAction(open_action)
 
+        load_reg_action = QAction("Load Region File…", self)
+        load_reg_action.setToolTip(
+            "Load a ds9 .reg region file from disk (no ds9 required).\n"
+            "Converts regions to extraction masks.")
+        load_reg_action.triggered.connect(self._on_load_region_file)
+        file_menu.addAction(load_reg_action)
+
         file_menu.addSeparator()
 
         save_frame_action = QAction("Save Current Frame…", self)
@@ -161,6 +188,12 @@ class MainWindow(QMainWindow):
             "moment map, …) as a FITS file with spatial WCS header.")
         save_frame_action.triggered.connect(self._on_save_current_frame)
         file_menu.addAction(save_frame_action)
+
+        save_reg_action = QAction("Save Apertures as Region File…", self)
+        save_reg_action.setToolTip(
+            "Save all current aperture markers as a ds9 .reg file.")
+        save_reg_action.triggered.connect(self._on_save_apertures_as_region)
+        file_menu.addAction(save_reg_action)
 
         file_menu.addSeparator()
 
@@ -230,6 +263,14 @@ class MainWindow(QMainWindow):
         clear_sky_action.triggered.connect(self._on_clear_sky_region)
         analysis_menu.addAction(clear_sky_action)
 
+        analysis_menu.addSeparator()
+
+        batch_action = QAction("Batch Extract from Regions…", self)
+        batch_action.setToolTip(
+            "Extract 1D spectra from all regions in a .reg file or from ds9.")
+        batch_action.triggered.connect(self._on_batch_extract)
+        analysis_menu.addAction(batch_action)
+
     def _build_extract_strip(self):
         """Build the extraction list bar (always shown when cube loaded)."""
         strip = QWidget()
@@ -242,6 +283,7 @@ class MainWindow(QMainWindow):
         self._extract_combo = QComboBox()
         self._extract_combo.setMinimumWidth(220)
         self._extract_combo.setToolTip("Select extracted spectrum  (Del = delete selected)")
+        self._extract_combo.currentIndexChanged.connect(self._on_extract_selected)
         layout.addWidget(self._extract_combo)
 
         self._save_btn = QPushButton("Save…")
@@ -278,6 +320,95 @@ class MainWindow(QMainWindow):
             w.setEnabled(enabled)
 
     # ------------------------------------------------------------------
+    # ds9 UI builders
+    # ------------------------------------------------------------------
+
+    def _build_ds9_strip(self):
+        """Thin button strip above the image for ds9 operations."""
+        strip = QWidget()
+        strip.setMaximumHeight(32)
+        layout = QHBoxLayout(strip)
+        layout.setContentsMargins(4, 2, 4, 2)
+        layout.setSpacing(6)
+
+        self._ds9_connect_btn = QPushButton("Connect ds9")
+        self._ds9_connect_btn.setFixedWidth(110)
+        self._ds9_connect_btn.setToolTip("Connect to a running ds9 instance")
+        self._ds9_connect_btn.clicked.connect(self._on_ds9_connect)
+        layout.addWidget(self._ds9_connect_btn)
+
+        self._ds9_send_btn = QPushButton("→ Add to ds9")
+        self._ds9_send_btn.setFixedWidth(100)
+        self._ds9_send_btn.setToolTip("Add the current image to the ds9 frame queue")
+        self._ds9_send_btn.setEnabled(False)
+        self._ds9_send_btn.clicked.connect(self._on_ds9_add_to_queue)
+        layout.addWidget(self._ds9_send_btn)
+
+        self._ds9_import_btn = QPushButton("← Import regions")
+        self._ds9_import_btn.setFixedWidth(120)
+        self._ds9_import_btn.setToolTip("Import regions from the running ds9 instance")
+        self._ds9_import_btn.setEnabled(False)
+        self._ds9_import_btn.clicked.connect(self._on_ds9_import_regions)
+        layout.addWidget(self._ds9_import_btn)
+
+        layout.addStretch()
+
+        self._ds9_status_label = QLabel("ds9: not connected")
+        self._ds9_status_label.setStyleSheet("color: #585b70; font-size: 8pt;")
+        layout.addWidget(self._ds9_status_label)
+
+        return strip
+
+    def _build_ds9_queue_panel(self):
+        """Frame queue panel shown below the sidebar when ds9 is connected."""
+        panel = QWidget()
+        panel.setMaximumHeight(200)
+        vbox = QVBoxLayout(panel)
+        vbox.setContentsMargins(4, 4, 4, 4)
+        vbox.setSpacing(4)
+
+        hdr = QHBoxLayout()
+        hdr.addWidget(QLabel("ds9 Frames"))
+        hdr.addStretch()
+        vbox.addLayout(hdr)
+
+        self._ds9_queue_list = QListWidget()
+        self._ds9_queue_list.setMaximumHeight(100)
+        self._ds9_queue_list.setToolTip("Images queued to send to ds9")
+        vbox.addWidget(self._ds9_queue_list)
+
+        btn_row = QHBoxLayout()
+        add_btn = QPushButton("+ Add current")
+        add_btn.setFixedWidth(90)
+        add_btn.setToolTip("Add the current image to the queue")
+        add_btn.clicked.connect(self._on_ds9_add_to_queue)
+
+        send_btn = QPushButton("Send all")
+        send_btn.setFixedWidth(70)
+        send_btn.setToolTip("Send all queued images to ds9")
+        send_btn.clicked.connect(self._on_ds9_send_all)
+
+        match_btn = QPushButton("Match WCS")
+        match_btn.setFixedWidth(80)
+        match_btn.setToolTip("Lock all ds9 frames to the same WCS")
+        match_btn.clicked.connect(self._on_ds9_match_wcs)
+
+        del_btn = QPushButton("×")
+        del_btn.setFixedWidth(28)
+        del_btn.setToolTip("Remove selected entry from queue")
+        del_btn.clicked.connect(self._on_ds9_queue_delete)
+
+        btn_row.addWidget(add_btn)
+        btn_row.addWidget(send_btn)
+        btn_row.addWidget(match_btn)
+        btn_row.addStretch()
+        btn_row.addWidget(del_btn)
+        vbox.addLayout(btn_row)
+
+        panel.hide()   # hidden until connected
+        return panel
+
+    # ------------------------------------------------------------------
     # Slots
     # ------------------------------------------------------------------
 
@@ -294,7 +425,180 @@ class MainWindow(QMainWindow):
             except RuntimeError as exc:
                 QMessageBox.warning(self, "Load error", str(exc))
 
+    # ------------------------------------------------------------------
+    # Per-dataset state save / restore
+    # ------------------------------------------------------------------
+
+    def _save_dataset_state(self):
+        """Snapshot current extraction + image state for the active dataset."""
+        cube = self._active_cube
+        if cube is None:
+            return
+        locked = []
+        lines  = self._spectrum_canvas._locked_lines
+        specs  = self._spectrum_canvas.locked_spectra   # list of (label, rb_spec)
+        for i, (label, rb_spec) in enumerate(specs):
+            color  = (self._extraction_colors[i]
+                      if i < len(self._extraction_colors) else '#f9e2af')
+            minfo  = (self._extraction_marker_info[i]
+                      if i < len(self._extraction_marker_info) else {})
+            wave_d = lines[i].get_xdata() if i < len(lines) else None
+            flux_d = lines[i].get_ydata() if i < len(lines) else None
+            locked.append({'label': label, 'color': color,
+                           'wave': wave_d, 'flux': flux_d,
+                           'rb_spec': rb_spec, 'marker_info': minfo})
+        im   = getattr(self._image_canvas, '_im', None)
+        norm = im.norm if im is not None else None
+        sc   = self._spectrum_canvas
+        # Snapshot MomentMapDialog class-level params so they restore per-dataset
+        mm = MomentMapDialog
+        moment_params = {
+            'order':    mm._last_order,
+            'wmin':     mm._last_wmin,
+            'wmax':     mm._last_wmax,
+            'lrest':    mm._last_lrest,
+            'cont_sub': mm._last_cont_sub,
+            'bcont':    mm._last_bcont,
+            'rcont':    mm._last_rcont,
+            'snr':      mm._last_snr,
+            'snr_thr':  mm._last_snr_thr,
+            'snr_meth': mm._last_snr_meth,
+        }
+        self._dataset_states[id(cube)] = {
+            'image_data':    self._image_canvas._data_raw,
+            'image_norm':    norm,
+            'slider_mode':   self._channel_slider.current_mode,
+            'locked':        locked,
+            'color_idx':     sc._color_idx,
+            'sky_mask':      self._sky_mask,
+            'sky_rect':      self._sky_rect,
+            'onband_ext':    sc._onband_ext,
+            'cont1_ext':     sc._cont1_ext,
+            'cont2_ext':     sc._cont2_ext,
+            'spec_mode':     sc._mode,
+            'spec_ylim':     sc._ax.get_ylim(),
+            'moment_params': moment_params,
+        }
+
+    def _restore_dataset_state(self, cube):
+        """Restore a previously saved state for *cube*. Returns True if found."""
+        state = self._dataset_states.get(id(cube))
+        if not state:
+            return False
+        # Override image with saved one (using saved norm to preserve colorscale)
+        img = state.get('image_data')
+        if img is not None:
+            self._image_canvas.show_image(img, norm=state.get('image_norm'))
+        # Restore channel slider button (Narrowband / Cont-sub / etc.)
+        slider_mode = state.get('slider_mode', 'Whitelight')
+        btns = self._channel_slider._mode_btns
+        if slider_mode in btns:
+            btns[slider_mode].setChecked(True)
+            # Enable slider for band modes (without triggering a new image build)
+            self._channel_slider._set_slider_enabled(
+                slider_mode in ('Channel', 'Narrowband', 'Cont-sub'))
+        # Sky region
+        self._sky_mask = state.get('sky_mask')
+        self._sky_rect = state.get('sky_rect')
+        # Color cycle position
+        sc = self._spectrum_canvas
+        sc._color_idx = state.get('color_idx', 0)
+        # Re-lock spectra and redraw markers
+        for entry in state.get('locked', []):
+            wave, flux = entry.get('wave'), entry.get('flux')
+            if wave is None or flux is None:
+                continue
+            color   = entry['color']
+            label   = entry['label']
+            minfo   = entry.get('marker_info', {})
+            rb_spec = entry.get('rb_spec')
+            sc.lock_spectrum(wave, flux, None, label, rb_spec=rb_spec, color=color)
+            new_markers = self._redraw_marker(minfo, color)
+            self._extract_combo.addItem(label)
+            self._extraction_marker_groups.append(list(new_markers))
+            self._extraction_colors.append(color)
+            self._extraction_marker_info.append(minfo)
+        if self._extract_combo.count() > 0:
+            self._extract_combo.setCurrentIndex(0)
+            self._set_extract_strip_enabled(True)
+        # Restore spectrum band spans
+        onband = state.get('onband_ext', (np.nan, np.nan))
+        cont1  = state.get('cont1_ext',  (np.nan, np.nan))
+        cont2  = state.get('cont2_ext',  (np.nan, np.nan))
+        spec_mode = state.get('spec_mode', 'Whitelight')
+        sc.set_mode(spec_mode)
+        sc.apply_band_ranges(onband, cont1, cont2)
+        # Restore y-limits (autoscale if spectra were re-locked)
+        ylim = state.get('spec_ylim')
+        if ylim is not None:
+            sc._ax.set_ylim(ylim)
+        if state.get('locked'):
+            sc.autoscale_y()
+        # Redraw sky region overlay if one was set
+        sky_rect = state.get('sky_rect')
+        if sky_rect is not None:
+            self._image_canvas.draw_sky_region(*sky_rect)
+        # Restore MomentMapDialog class-level params for this dataset
+        mp = state.get('moment_params')
+        if mp:
+            mm = MomentMapDialog
+            mm._last_order    = mp.get('order',    mm._last_order)
+            mm._last_wmin     = mp.get('wmin',     mm._last_wmin)
+            mm._last_wmax     = mp.get('wmax',     mm._last_wmax)
+            mm._last_lrest    = mp.get('lrest',    mm._last_lrest)
+            mm._last_cont_sub = mp.get('cont_sub', mm._last_cont_sub)
+            mm._last_bcont    = mp.get('bcont',    mm._last_bcont)
+            mm._last_rcont    = mp.get('rcont',    mm._last_rcont)
+            mm._last_snr      = mp.get('snr',      mm._last_snr)
+            mm._last_snr_thr  = mp.get('snr_thr',  mm._last_snr_thr)
+            mm._last_snr_meth = mp.get('snr_meth', mm._last_snr_meth)
+        self._image_canvas.draw_idle()
+        return True
+
+    def _redraw_marker(self, marker_info, color):
+        """Recreate image markers from stored params; returns list of artists."""
+        if not marker_info:
+            return []
+        mtype  = marker_info.get('type')
+        canvas = self._image_canvas
+        cube   = self._active_cube
+        n_before = len(canvas._extraction_marks)
+        try:
+            if mtype == 'spaxel':
+                mk, = canvas._ax.plot(marker_info['x'], marker_info['y'], '+',
+                                      color=color, ms=9, mew=1.4, zorder=12, picker=5)
+                canvas._extraction_marks.append(mk)
+            elif mtype == 'circle':
+                canvas.draw_aperture_marker(
+                    marker_info['cx'], marker_info['cy'], 'Circle',
+                    marker_info['radius'],
+                    marker_info.get('bg_inner'), marker_info.get('bg_outer'),
+                    color=color)
+            elif mtype == 'rect':
+                from matplotlib.patches import Rectangle as _Rect
+                xi0, yi0 = marker_info['xi0'], marker_info['yi0']
+                xi1, yi1 = marker_info['xi1'], marker_info['yi1']
+                rect = _Rect((xi0 - 0.5, yi0 - 0.5), xi1 - xi0, yi1 - yi0,
+                             linewidth=1.2, edgecolor=color, facecolor='none',
+                             linestyle='--', zorder=11, picker=5)
+                canvas._ax.add_patch(rect)
+                canvas._extraction_marks.append(rect)
+            elif mtype == 'region':
+                reg = marker_info.get('region')
+                if reg and cube:
+                    canvas.draw_region_shape(reg, cube.wcs, color)
+        except Exception as exc:
+            print(f"[restore] marker redraw failed ({mtype}): {exc}")
+        return canvas._extraction_marks[n_before:]
+
+    # ------------------------------------------------------------------
+
     def _on_dataset_changed(self, cube):
+        # Save current dataset's state before switching
+        self._save_dataset_state()
+        # Clear extraction UI (spectrum lines, image marks, combo)
+        self._on_clear_extractions()
+
         self._active_cube = cube
 
         if cube is None:
@@ -309,12 +613,13 @@ class MainWindow(QMainWindow):
             self._spectrum_canvas.clear()
             self._aperture_controls.hide()
             self._extract_strip.hide()
-            self._on_clear_extractions()
             return
 
         self._status_base = _status_text(cube)
         self.statusBar().showMessage(self._status_base)
         self._show_default_image(cube)
+        # Restore state if returning to a previously viewed dataset
+        self._restore_dataset_state(cube)
 
     def _on_use_as_variance(self, var_cube, target_cube):
         """Right-click sidebar: assign var_cube.flux as variance for target_cube."""
@@ -460,6 +765,466 @@ class MainWindow(QMainWindow):
         self._sky_rect = None
         self._image_canvas.clear_sky_region()
         self.statusBar().showMessage("Sky region cleared.", 3000)
+
+    # ------------------------------------------------------------------
+    # Aperture highlighting
+    # ------------------------------------------------------------------
+
+    def _on_extract_selected(self, idx):
+        """Highlight the selected extraction's image marker, dim others."""
+        if idx < 0:
+            return
+        n = len(self._extraction_marker_groups)
+        for i, artists in enumerate(self._extraction_marker_groups):
+            selected = (i == idx)
+            for artist in artists:
+                try:
+                    artist.set_linewidth(2.4 if selected else 1.0)
+                    artist.set_alpha(1.0 if selected else 0.4)
+                except AttributeError:
+                    pass
+        self._image_canvas.draw_idle()
+
+    def _on_aperture_picked(self, artist):
+        """Click on an aperture marker → select the corresponding extraction."""
+        for idx, artists in enumerate(self._extraction_marker_groups):
+            if artist in artists:
+                self._extract_combo.setCurrentIndex(idx)
+                return
+
+    # ------------------------------------------------------------------
+    # ds9 slots
+    # ------------------------------------------------------------------
+
+    def _on_ds9_connect(self):
+        """Connect to (or disconnect from) ds9."""
+        from rbcodes.GUIs.ifuviewer.ds9.bridge import DS9Bridge
+
+        if self._ds9_bridge is not None and self._ds9_bridge.available:
+            # Disconnect
+            self._ds9_bridge.disconnect()
+            self._ds9_bridge = None
+            self._ds9_connect_btn.setText("Connect ds9")
+            self._ds9_status_label.setText("ds9: not connected")
+            self._ds9_status_label.setStyleSheet("color: #585b70; font-size: 8pt;")
+            self._ds9_send_btn.setEnabled(False)
+            self._ds9_import_btn.setEnabled(False)
+            self._ds9_queue_panel.hide()
+            return
+
+        bridge = DS9Bridge()
+        ok, reason = bridge.connect()
+
+        if not ok:
+            if reason == 'no_pyds9':
+                QMessageBox.warning(
+                    self, "pyds9 not found",
+                    "pyds9 is not installed.\n\nInstall with:\n    pip install pyds9")
+            else:
+                QMessageBox.warning(
+                    self, "ds9 not running",
+                    "No running ds9 instance found.\n\nStart ds9 first, then connect.")
+            return
+
+        self._ds9_bridge = bridge
+        self._ds9_connect_btn.setText("Disconnect ds9")
+        self._ds9_status_label.setText("ds9: connected ●")
+        self._ds9_status_label.setStyleSheet(
+            "color: #a6e3a1; font-size: 8pt; font-weight: bold;")
+        self._ds9_send_btn.setEnabled(True)
+        self._ds9_import_btn.setEnabled(True)
+        self._ds9_queue_panel.show()
+        self.statusBar().showMessage("ds9 connected.", 3000)
+
+    def _on_ds9_add_to_queue(self):
+        """Add the current image panel data to the ds9 frame queue."""
+        data2d = self._image_canvas._data_raw
+        if data2d is None:
+            self.statusBar().showMessage("No image to add.", 3000)
+            return
+
+        cube = self._active_cube
+        header = None
+        if cube is not None:
+            try:
+                header = cube.spatial_header()
+            except Exception:
+                pass
+
+        # Auto-name from current mode
+        mode = getattr(self._channel_slider, 'current_mode', 'Image')
+        sc = self._spectrum_canvas
+        if mode == 'Narrowband' and np.isfinite(sc._onband_ext[0]):
+            w0, w1 = sc._onband_ext
+            label = f"NB {w0:.0f}–{w1:.0f} Å"
+        elif mode == 'Cont-sub' and np.isfinite(sc._onband_ext[0]):
+            w0, w1 = sc._onband_ext
+            label = f"Cont-sub {w0:.0f}–{w1:.0f} Å"
+        else:
+            label = mode
+
+        frame_no = len(self._ds9_frame_queue) + 1
+        self._ds9_frame_queue.append((label, data2d.copy(), header, frame_no))
+        item = QListWidgetItem(f"[{frame_no}]  {label}")
+        self._ds9_queue_list.addItem(item)
+
+    def _on_ds9_queue_delete(self):
+        row = self._ds9_queue_list.currentRow()
+        if row < 0:
+            return
+        self._ds9_queue_list.takeItem(row)
+        if row < len(self._ds9_frame_queue):
+            del self._ds9_frame_queue[row]
+
+    def _on_ds9_send_all(self):
+        """Send all queued images to ds9."""
+        if not self._ds9_bridge or not self._ds9_bridge.available:
+            self.statusBar().showMessage("Not connected to ds9.", 3000)
+            return
+        if not self._ds9_frame_queue:
+            self.statusBar().showMessage("Frame queue is empty.", 3000)
+            return
+
+        for label, data2d, header, frame_no in self._ds9_frame_queue:
+            self._ds9_bridge.send_image(data2d, header, frame=frame_no)
+
+        self.statusBar().showMessage(
+            f"Sent {len(self._ds9_frame_queue)} frame(s) to ds9.", 4000)
+
+    def _on_ds9_match_wcs(self):
+        if self._ds9_bridge and self._ds9_bridge.available:
+            self._ds9_bridge.match_wcs()
+            self.statusBar().showMessage("ds9 frames WCS-matched.", 3000)
+
+    def _on_ds9_import_regions(self):
+        """Import regions from the live ds9 instance."""
+        if not self._ds9_bridge or not self._ds9_bridge.available:
+            return
+        dlg = ImportRegionsDialog(source='ds9', parent=self)
+        if not dlg.exec_():
+            return
+        selected_only = dlg.selected_only()
+        reg_text = self._ds9_bridge.get_regions(selected_only=selected_only)
+        if not reg_text.strip():
+            QMessageBox.information(self, "No regions", "No regions found in ds9.")
+            return
+        self._extract_from_region_text(reg_text)
+
+    # ------------------------------------------------------------------
+    # Region file I/O
+    # ------------------------------------------------------------------
+
+    def _on_load_region_file(self):
+        """Load a ds9 .reg file; extract spectra if cube, overlay only if 2D image."""
+        if self._active_cube is None:
+            QMessageBox.information(self, "No data", "Load a cube or image first.")
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Load Region File", "",
+            "ds9 region files (*.reg);;All files (*)")
+        if not path:
+            return
+        try:
+            with open(path, 'r') as f:
+                reg_text = f.read()
+        except Exception as exc:
+            QMessageBox.warning(self, "Load failed", str(exc))
+            return
+
+        dlg = ImportRegionsDialog(source='file', filename=path, parent=self)
+        if not dlg.exec_():
+            return
+
+        self._extract_from_region_text(reg_text)
+
+    def _extract_from_region_text(self, reg_text, method='sum', weighting='None'):
+        """Parse region text; extract spectra if cube, overlay shapes only if 2D image."""
+        from rbcodes.GUIs.ifuviewer.processing.spatial_mask import (
+            parse_ds9_regions, region_to_mask, region_center_sky)
+
+        cube = self._active_cube
+        if cube is None:
+            return
+
+        is_image = isinstance(cube, FITSImage)
+
+        regions = parse_ds9_regions(reg_text)
+        if not regions:
+            QMessageBox.information(self, "No regions",
+                                    "No extractable regions found in the file.")
+            return
+
+        # Color cycle for image-only overlays (no spectrum panel involvement)
+        from rbcodes.GUIs.ifuviewer.spectrum_panel import _EXTRACT_COLORS
+        _img_color_idx = 0
+
+        errors = []
+        n_ok   = 0
+        for i, reg in enumerate(regions):
+            try:
+                mask = region_to_mask(reg, cube.wcs, cube.ny, cube.nx)
+                if not mask.any():
+                    continue
+
+                if is_image:
+                    # 2D image — just draw the shape overlay, no spectrum
+                    color = _EXTRACT_COLORS[_img_color_idx % len(_EXTRACT_COLORS)]
+                    _img_color_idx += 1
+                    self._image_canvas.draw_region_shape(reg, cube.wcs, color)
+                else:
+                    # IFU cube — extract spectrum with optimal (data profile) weighting
+                    flux_arr, err_arr = extract_optimal_weighted(
+                        cube.flux, cube.var, mask, method='data')
+                    name  = reg.get('name') or f"region_{i+1:03d}"
+                    label = f"[{reg['shape']}] {name}"
+                    rb_spec = _make_rb_spectrum(cube.wave, flux_arr, err_arr, label)
+                    ra, dec = region_center_sky(reg, cube.wcs)
+                    if rb_spec is not None and ra is not None:
+                        rb_spec.meta['ra']  = ra
+                        rb_spec.meta['dec'] = dec
+                        rb_spec.meta['object']   = cube.header.get('OBJECT', '') if cube.header else ''
+                        rb_spec.meta['instrume'] = cube.header.get('INSTRUME', '') if cube.header else ''
+                    color = self._spectrum_canvas.lock_spectrum(
+                        cube.wave, flux_arr, err_arr, label, rb_spec=rb_spec)
+                    new_markers = self._image_canvas.draw_region_shape(
+                        reg, cube.wcs, color)
+                    if not new_markers:
+                        yy, xx = np.mgrid[0:cube.ny, 0:cube.nx]
+                        cx = int(np.round(np.mean(xx[mask])))
+                        cy = int(np.round(np.mean(yy[mask])))
+                        mk, = self._image_canvas._ax.plot(
+                            cx, cy, '+', color=color, ms=9, mew=1.4, zorder=12, picker=5)
+                        self._image_canvas._extraction_marks.append(mk)
+                        new_markers = [mk]
+                    self._register_extraction(label, rb_spec, new_markers, color=color,
+                                              marker_info={'type': 'region', 'region': reg})
+
+                n_ok += 1
+            except Exception as e:
+                import traceback
+                errors.append(f"Region {i+1}: {e}")
+                traceback.print_exc()
+
+        self._image_canvas.draw_idle()
+        action = "overlaid" if is_image else "extracted"
+        msg = f"{action.capitalize()} {n_ok} region(s)."
+        if errors:
+            msg += f"  {len(errors)} error(s) — see console."
+            for e in errors:
+                print(f"[region import] {e}")
+        self.statusBar().showMessage(msg, 5000)
+
+    def _on_save_apertures_as_region(self):
+        """Save current apertures back to a ds9 .reg file."""
+        from rbcodes.GUIs.ifuviewer.processing.spatial_mask import regions_to_ds9_text
+
+        if not self._extraction_marker_groups:
+            QMessageBox.information(self, "Nothing to save",
+                                    "No apertures have been defined.")
+            return
+
+        cube  = self._active_cube
+        wcs   = cube.wcs if cube is not None else None
+        spectra = self._spectrum_canvas.locked_spectra
+
+        ap_list = []
+        for i, (label, rb_spec) in enumerate(spectra):
+            meta = (rb_spec.meta if rb_spec is not None and rb_spec.meta else {})
+            ap = {'type': 'single', 'label': label,
+                  'cx': int(meta.get('extr_x', 0)),
+                  'cy': int(meta.get('extr_y', 0))}
+            rad = meta.get('extr_rad', None)
+            if isinstance(rad, (int, float)) and rad > 1:
+                ap['type'] = 'circle'
+                ap['radius'] = rad
+            ap_list.append(ap)
+
+        reg_text = regions_to_ds9_text(ap_list, wcs=wcs)
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Region File", "apertures.reg",
+            "ds9 region files (*.reg);;All files (*)")
+        if not path:
+            return
+        try:
+            with open(path, 'w') as f:
+                f.write(reg_text)
+            self.statusBar().showMessage(f"Saved {len(ap_list)} region(s) to {path}", 4000)
+        except Exception as exc:
+            QMessageBox.warning(self, "Save failed", str(exc))
+
+    # ------------------------------------------------------------------
+    # Batch extraction
+    # ------------------------------------------------------------------
+
+    def _on_batch_extract(self):
+        """Open the batch extract dialog."""
+        cube = self._active_cube
+        if cube is None or isinstance(cube, FITSImage):
+            QMessageBox.information(self, "No cube",
+                                    "Load a cube before batch extracting.")
+            return
+
+        has_ds9 = bool(self._ds9_bridge and self._ds9_bridge.available)
+        dlg = BatchExtractDialog(has_ds9=has_ds9, parent=self)
+        if not dlg.exec_():
+            return
+
+        # Get settings
+        source, reg_text_or_path, method, weighting, \
+            load_strip, save_folder, fname_style, prefix, \
+            open_multispec, run_bg = dlg.values()
+
+        # Get region text
+        reg_text = ''
+        if source == 'file':
+            try:
+                with open(reg_text_or_path, 'r') as f:
+                    reg_text = f.read()
+            except Exception as exc:
+                QMessageBox.warning(self, "Load failed", str(exc))
+                return
+        elif source == 'ds9':
+            selected_only = (reg_text_or_path == 'selected')
+            reg_text = self._ds9_bridge.get_regions(selected_only=selected_only)
+
+        from rbcodes.GUIs.ifuviewer.processing.spatial_mask import (
+            parse_ds9_regions, region_to_mask, region_center_sky, iau_name)
+
+        regions = parse_ds9_regions(reg_text)
+        if not regions:
+            QMessageBox.information(self, "No regions",
+                                    "No extractable regions found.")
+            return
+
+        if load_strip and len(regions) > 10:
+            ret = QMessageBox.question(
+                self, "Many regions",
+                f"Loading {len(regions)} spectra into the strip may be slow.\nContinue?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if ret != QMessageBox.Yes:
+                load_strip = False
+
+        if run_bg:
+            # Launch background thread
+            self._batch_thread = BatchExtractThread(
+                cube, regions, method, weighting,
+                load_strip, save_folder, fname_style, prefix, open_multispec,
+                wcs=cube.wcs)
+            self._batch_thread.progress.connect(self._on_batch_progress)
+            self._batch_thread.finished.connect(self._on_batch_finished_dict)
+            self._batch_thread.error_log.connect(
+                lambda msgs: self.statusBar().showMessage(
+                    f"Batch errors: {len(msgs)} — see console.", 5000))
+            self._batch_thread.start()
+            self.statusBar().showMessage(
+                f"Batch extraction started: {len(regions)} regions…", 0)
+        else:
+            # Run synchronously with a progress dialog
+            prog = QProgressDialog(
+                "Extracting regions…", "Cancel", 0, len(regions), self)
+            prog.setWindowTitle("Batch Extract")
+            prog.setMinimumDuration(0)
+            results = []
+            errors  = []
+            for i, reg in enumerate(regions):
+                if prog.wasCanceled():
+                    break
+                prog.setValue(i)
+                name = reg.get('name') or f"region_{i+1:03d}"
+                prog.setLabelText(f"Extracting {name}  ({i+1}/{len(regions)})")
+                try:
+                    mask = region_to_mask(reg, cube.wcs, cube.ny, cube.nx)
+                    if not mask.any():
+                        continue
+                    flux_arr = extract_with_method(cube.flux, mask, method)
+                    _, err_arr = extract_aperture(cube.flux, cube.var, mask)
+                    ra, dec = region_center_sky(reg, cube.wcs)
+                    results.append((name, flux_arr, err_arr, ra, dec))
+                except Exception as e:
+                    errors.append(f"{name}: {e}")
+            prog.setValue(len(regions))
+            self._apply_batch_results(
+                results, cube, method, load_strip, save_folder,
+                fname_style, prefix, open_multispec, errors)
+
+    def _on_batch_progress(self, current, total, name):
+        self.statusBar().showMessage(
+            f"Extracting regions… {current}/{total}  ({name})", 0)
+
+    def _on_batch_finished_dict(self, d):
+        self._apply_batch_results(
+            d['results'], d['cube'], d['method'],
+            d['load_strip'], d['save_folder'],
+            d['fname_style'], d['prefix'],
+            d['open_multispec'], d['errors'])
+
+    def _apply_batch_results(self, results, cube, method, load_strip,
+                             save_folder, fname_style, prefix,
+                             open_multispec, errors):
+        """Load spectra into strip / save to disk after batch extraction."""
+        from rbcodes.GUIs.ifuviewer.processing.spatial_mask import iau_name
+
+        saved = 0
+        loaded = 0
+        rb_specs = []
+
+        for name, flux_arr, err_arr, ra, dec in results:
+            label   = name
+            rb_spec = _make_rb_spectrum(cube.wave, flux_arr, err_arr, label)
+            if rb_spec is not None:
+                rb_spec.meta['object']   = cube.header.get('OBJECT', '') if cube.header else ''
+                rb_spec.meta['instrume'] = cube.header.get('INSTRUME', '') if cube.header else ''
+                if ra is not None:
+                    rb_spec.meta['ra']  = ra
+                    rb_spec.meta['dec'] = dec
+
+            if load_strip and rb_spec is not None:
+                color = self._spectrum_canvas.lock_spectrum(
+                    cube.wave, flux_arr, err_arr, label, rb_spec=rb_spec)
+                self._register_extraction(label, rb_spec, [], color=color)
+                loaded += 1
+
+            if save_folder and rb_spec is not None:
+                if fname_style == 'coords' and ra is not None:
+                    fname = iau_name(ra, dec, prefix=prefix)
+                elif fname_style == 'name':
+                    safe = name.replace(' ', '_').replace('/', '_')
+                    fname = f"{prefix}{safe}.fits"
+                else:
+                    fname = f"{prefix}{name}.fits"
+                import os
+                fpath = os.path.join(save_folder, fname)
+                try:
+                    rb_spec.write(fpath)
+                    saved += 1
+                except Exception as e:
+                    errors.append(f"Save {fname}: {e}")
+
+            if rb_spec is not None:
+                rb_specs.append(rb_spec)
+
+        self._image_canvas.draw_idle()
+
+        msg = f"Batch complete: {len(results)} extracted"
+        if loaded:
+            msg += f", {loaded} loaded into strip"
+        if saved:
+            msg += f", {saved} saved"
+        if errors:
+            msg += f", {len(errors)} error(s)"
+            for e in errors:
+                print(f"[batch extract] {e}")
+        self.statusBar().showMessage(msg, 6000)
+
+        if open_multispec and rb_specs:
+            try:
+                from rbcodes.GUIs.multispecviewer.rb_multispec import from_data
+                win = from_data(rb_specs, show=True)
+                win.setWindowTitle(f"rb_multispec — {len(rb_specs)} batch spectra")
+                self._specgui_windows.append(win)
+            except Exception as exc:
+                print(f"[batch extract] rb_multispec launch failed: {exc}")
 
     def _on_moment_map(self):
         """Open the Moment Map dialog (Ctrl+M)."""
@@ -618,6 +1383,7 @@ class MainWindow(QMainWindow):
             self._image_canvas._extraction_marks.append(mk)
             self._image_canvas.draw_idle()
             new_markers = self._image_canvas._extraction_marks[n_markers_before:]
+            marker_info = {'type': 'spaxel', 'x': x, 'y': y}
 
         # ---- Circular / Circular-Annular ---------------------------------
         else:
@@ -671,11 +1437,15 @@ class MainWindow(QMainWindow):
             self._image_canvas.draw_aperture_marker(x, y, 'Circle', radius,
                                                     bg_inner, bg_outer)
             new_markers = self._image_canvas._extraction_marks[n_markers_before:]
+            marker_info = {'type': 'circle', 'cx': x, 'cy': y, 'radius': radius,
+                           'bg_inner': bg_inner, 'bg_outer': bg_outer}
 
         rb_spec = _make_rb_spectrum(cube.wave, flux_arr, err_arr, label)
-        self._spectrum_canvas.lock_spectrum(cube.wave, flux_arr, err_arr,
-                                            label, rb_spec=rb_spec)
-        self._register_extraction(label, rb_spec, new_markers)
+        color   = self._spectrum_canvas.lock_spectrum(cube.wave, flux_arr, err_arr,
+                                                      label, rb_spec=rb_spec)
+        _inject_provenance(rb_spec, cube, x, y, mode, ac)
+        self._register_extraction(label, rb_spec, new_markers, color=color,
+                                  marker_info=marker_info)
 
     def _on_aperture_drawn(self, mask):
         """Left-drag on image — extract over the drawn rectangle."""
@@ -726,15 +1496,42 @@ class MainWindow(QMainWindow):
             self._image_canvas._extraction_marks[prev_total:])
 
         rb_spec = _make_rb_spectrum(cube.wave, flux_arr, err_arr, label)
-        self._spectrum_canvas.lock_spectrum(cube.wave, flux_arr, err_arr,
-                                            label, rb_spec=rb_spec)
-        self._register_extraction(label, rb_spec, new_markers)
+        color   = self._spectrum_canvas.lock_spectrum(cube.wave, flux_arr, err_arr,
+                                                      label, rb_spec=rb_spec)
+        # For rectangle drag, inject provenance using mask centroid
+        if cube.wcs is not None:
+            try:
+                yy, xx = np.mgrid[0:cube.ny, 0:cube.nx]
+                cx = float(np.mean(xx[mask])); cy = float(np.mean(yy[mask]))
+                _inject_provenance(rb_spec, cube, cx, cy, 'rect', None)
+            except Exception:
+                pass
+        lr = getattr(self._image_canvas, '_last_rect', None)
+        marker_info = ({'type': 'rect',
+                        'xi0': lr[0], 'yi0': lr[1], 'xi1': lr[2], 'yi1': lr[3]}
+                       if lr else {})
+        self._register_extraction(label, rb_spec, new_markers, color=color,
+                                  marker_info=marker_info)
 
-    def _register_extraction(self, label, rb_spec, markers=None):
+    def _register_extraction(self, label, rb_spec, markers=None, color=None,
+                             marker_info=None):
         """Add entry to extraction combo and enable strip controls."""
         self._extract_combo.addItem(label)
         self._extract_combo.setCurrentIndex(self._extract_combo.count() - 1)
         self._extraction_marker_groups.append(list(markers or []))
+        self._extraction_colors.append(color or '#f9e2af')
+        self._extraction_marker_info.append(marker_info or {})
+        # Recolor markers to match spectrum line color
+        if color and markers:
+            for artist in markers:
+                try:
+                    artist.set_edgecolor(color)
+                except AttributeError:
+                    try:
+                        artist.set_color(color)
+                    except Exception:
+                        pass
+            self._image_canvas.draw_idle()
         self._set_extract_strip_enabled(True)
 
     def _on_save_extraction(self):
@@ -800,6 +1597,10 @@ class MainWindow(QMainWindow):
                 except Exception:
                     pass
             del self._extraction_marker_groups[idx]
+            if idx < len(self._extraction_colors):
+                del self._extraction_colors[idx]
+            if idx < len(self._extraction_marker_info):
+                del self._extraction_marker_info[idx]
             self._image_canvas.draw_idle()
 
         # Remove spectrum line
@@ -831,6 +1632,8 @@ class MainWindow(QMainWindow):
         self._image_canvas.clear_extraction_marks()
         self._extract_combo.clear()
         self._extraction_marker_groups.clear()
+        self._extraction_colors.clear()
+        self._extraction_marker_info.clear()
         self._set_extract_strip_enabled(False)
 
     def _on_spaxel_hovered(self, x, y, spectrum):
@@ -1286,6 +2089,38 @@ def _make_rb_spectrum(wave, flux, err, label):
         )
     except Exception:
         return None
+
+
+def _inject_provenance(rb_spec, cube, cx, cy, mode, ac):
+    """
+    Inject RA/Dec and extraction metadata into rb_spec.meta.
+
+    Parameters
+    ----------
+    rb_spec : rb_spectrum or None
+    cube    : IFUCube
+    cx, cy  : float  — pixel centre (0-indexed)
+    mode    : str    — 'Single pixel', 'Circular', 'Circular-Annular', 'rect'
+    ac      : ApertureControls or None
+    """
+    if rb_spec is None:
+        return
+    try:
+        if cube.wcs is not None:
+            xy  = cube.wcs.all_pix2world([[cx, cy]], 0)
+            rb_spec.meta['ra']  = float(xy[0][0])
+            rb_spec.meta['dec'] = float(xy[0][1])
+        rb_spec.meta['extr_x'] = int(round(cx))
+        rb_spec.meta['extr_y'] = int(round(cy))
+        if ac is not None and mode not in ('Single pixel', 'rect'):
+            rb_spec.meta['extr_rad'] = int(ac.radius)
+        else:
+            rb_spec.meta['extr_rad'] = 1
+        if cube.header is not None:
+            rb_spec.meta['object']   = cube.header.get('OBJECT', '')
+            rb_spec.meta['instrume'] = cube.header.get('INSTRUME', '')
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -1965,6 +2800,299 @@ NavigationToolbar2QT QLabel, QToolBar QLabel {
     font-size: 8pt;
 }
 """
+
+
+# ---------------------------------------------------------------------------
+# Batch extraction thread
+# ---------------------------------------------------------------------------
+
+class BatchExtractThread(QThread):
+    """
+    Background thread for batch-extracting spectra from a list of regions.
+
+    Signals
+    -------
+    progress(int, int, str)       — (current, total, region_name)
+    finished(list, ...)           — (results, cube_ref, method, load_strip,
+                                      save_folder, fname_style, prefix,
+                                      open_multispec, errors)
+    error_log(list[str])          — accumulated per-region error messages
+    """
+    progress  = _Signal(int, int, str)
+    finished  = _Signal(object)   # emits dict with all results
+    error_log = _Signal(list)
+
+    def __init__(self, cube, regions, method, weighting,
+                 load_strip, save_folder, fname_style, prefix, open_multispec,
+                 wcs=None, parent=None):
+        super().__init__(parent)
+        self._cube          = cube
+        self._regions       = regions
+        self._method        = method
+        self._weighting     = weighting
+        self._load_strip    = load_strip
+        self._save_folder   = save_folder
+        self._fname_style   = fname_style
+        self._prefix        = prefix
+        self._open_multispec = open_multispec
+        self._wcs           = wcs
+        self._cancel        = False
+
+    def cancel(self):
+        self._cancel = True
+
+    def run(self):
+        from rbcodes.GUIs.ifuviewer.processing.spatial_mask import (
+            region_to_mask, region_center_sky)
+        from rbcodes.GUIs.ifuviewer.processing.aperture_extract import (
+            extract_aperture, extract_with_method)
+
+        cube    = self._cube
+        results = []
+        errors  = []
+        total   = len(self._regions)
+
+        for i, reg in enumerate(self._regions):
+            if self._cancel:
+                break
+            name = reg.get('name') or f"region_{i+1:03d}"
+            self.progress.emit(i + 1, total, name)
+            try:
+                mask = region_to_mask(reg, self._wcs, cube.ny, cube.nx)
+                if not mask.any():
+                    continue
+                flux_arr = extract_with_method(cube.flux, mask, self._method, var=cube.var)
+                _, err_arr = extract_aperture(cube.flux, cube.var, mask)
+                ra, dec = region_center_sky(reg, self._wcs)
+                results.append((name, flux_arr, err_arr, ra, dec))
+            except Exception as e:
+                errors.append(f"{name}: {e}")
+
+        if errors:
+            self.error_log.emit(errors)
+
+        self.finished.emit({
+            'results':       results,
+            'cube':          cube,
+            'method':        self._method,
+            'load_strip':    self._load_strip,
+            'save_folder':   self._save_folder or '',
+            'fname_style':   self._fname_style,
+            'prefix':        self._prefix,
+            'open_multispec': self._open_multispec,
+            'errors':        errors,
+        })
+
+
+# ---------------------------------------------------------------------------
+# Import regions dialog
+# ---------------------------------------------------------------------------
+
+class ImportRegionsDialog(QDialog):
+    """Simple dialog for choosing which ds9 regions to import."""
+
+    def __init__(self, source='ds9', filename='', parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Import Regions")
+        self.setMinimumWidth(300)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 8)
+
+        if source == 'ds9':
+            layout.addWidget(QLabel("Import regions from ds9:"))
+            self._sel_rb = QRadioButton("Selected region(s) only")
+            self._all_rb = QRadioButton("All regions")
+            self._all_rb.setChecked(True)
+            layout.addWidget(self._sel_rb)
+            layout.addWidget(self._all_rb)
+        else:
+            layout.addWidget(QLabel(f"Load regions from:\n{filename}"))
+            self._sel_rb = None
+            self._all_rb = None
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def selected_only(self):
+        return self._sel_rb is not None and self._sel_rb.isChecked()
+
+
+# ---------------------------------------------------------------------------
+# Batch extract dialog
+# ---------------------------------------------------------------------------
+
+class BatchExtractDialog(QDialog):
+    """
+    Dialog for configuring a batch spectral extraction from region file or ds9.
+    """
+
+    def __init__(self, has_ds9=False, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Batch Extract from Regions")
+        self.setMinimumWidth(400)
+        self._has_ds9 = has_ds9
+        self._reg_path = ''
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 8)
+        layout.setSpacing(8)
+
+        # --- Source ---
+        src_grp = QGroupBox("Source")
+        src_lay = QVBoxLayout(src_grp)
+
+        self._src_file_rb = QRadioButton("Region file")
+        self._src_file_rb.setChecked(True)
+        self._src_file_rb.toggled.connect(self._on_source_changed)
+        src_lay.addWidget(self._src_file_rb)
+
+        file_row = QHBoxLayout()
+        self._file_edit = QLineEdit()
+        self._file_edit.setPlaceholderText("path/to/regions.reg")
+        browse_btn = QPushButton("Browse…")
+        browse_btn.setFixedWidth(70)
+        browse_btn.clicked.connect(self._browse_reg)
+        file_row.addWidget(self._file_edit)
+        file_row.addWidget(browse_btn)
+        src_lay.addLayout(file_row)
+
+        if has_ds9:
+            self._src_ds9_sel_rb = QRadioButton("Live ds9 — selected region(s)")
+            self._src_ds9_all_rb = QRadioButton("Live ds9 — all regions")
+            self._src_ds9_sel_rb.toggled.connect(self._on_source_changed)
+            self._src_ds9_all_rb.toggled.connect(self._on_source_changed)
+            src_lay.addWidget(self._src_ds9_sel_rb)
+            src_lay.addWidget(self._src_ds9_all_rb)
+
+        layout.addWidget(src_grp)
+
+        # --- Extraction method ---
+        meth_row = QHBoxLayout()
+        meth_row.addWidget(QLabel("Method:"))
+        self._method_box = QComboBox()
+        self._method_box.addItems(['sum', 'mean', 'median'])
+        self._method_box.setFixedWidth(90)
+        meth_row.addWidget(self._method_box)
+        meth_row.addSpacing(16)
+        meth_row.addWidget(QLabel("Weighting:"))
+        self._weight_box = QComboBox()
+        self._weight_box.addItems(['None', 'Var-weighted'])
+        self._weight_box.setFixedWidth(110)
+        meth_row.addWidget(self._weight_box)
+        meth_row.addStretch()
+        layout.addLayout(meth_row)
+
+        # --- Output ---
+        out_grp = QGroupBox("Output")
+        out_lay = QVBoxLayout(out_grp)
+
+        self._load_strip_cb = QCheckBox("Load into extract strip")
+        self._load_strip_cb.setChecked(True)
+        out_lay.addWidget(self._load_strip_cb)
+
+        save_row = QHBoxLayout()
+        self._save_cb = QCheckBox("Save to folder:")
+        self._save_cb.setChecked(False)
+        self._save_cb.toggled.connect(self._on_save_toggled)
+        save_row.addWidget(self._save_cb)
+        self._save_edit = QLineEdit()
+        self._save_edit.setPlaceholderText("output folder")
+        self._save_edit.setEnabled(False)
+        save_row.addWidget(self._save_edit)
+        save_browse = QPushButton("…")
+        save_browse.setFixedWidth(28)
+        save_browse.clicked.connect(self._browse_save_dir)
+        save_row.addWidget(save_browse)
+        out_lay.addLayout(save_row)
+
+        fname_lay = QHBoxLayout()
+        fname_lay.addWidget(QLabel("Filename:"))
+        self._fname_coords_rb = QRadioButton("IAU coords")
+        self._fname_idx_rb    = QRadioButton("Region index")
+        self._fname_name_rb   = QRadioButton("Region name")
+        self._fname_coords_rb.setChecked(True)
+        fname_lay.addWidget(self._fname_coords_rb)
+        fname_lay.addWidget(self._fname_idx_rb)
+        fname_lay.addWidget(self._fname_name_rb)
+        out_lay.addLayout(fname_lay)
+
+        pfx_row = QHBoxLayout()
+        pfx_row.addWidget(QLabel("Prefix:"))
+        self._prefix_edit = QLineEdit("spec_")
+        self._prefix_edit.setFixedWidth(90)
+        pfx_row.addWidget(self._prefix_edit)
+        pfx_row.addStretch()
+        out_lay.addLayout(pfx_row)
+
+        self._multispec_cb = QCheckBox("Open in rb_multispec when done")
+        self._multispec_cb.setChecked(False)
+        out_lay.addWidget(self._multispec_cb)
+
+        layout.addWidget(out_grp)
+
+        # --- Background ---
+        self._bg_cb = QCheckBox("Run in background (non-blocking)")
+        self._bg_cb.setChecked(True)
+        layout.addWidget(self._bg_cb)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def _browse_reg(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Select Region File", "",
+            "ds9 region files (*.reg);;All files (*)")
+        if path:
+            self._file_edit.setText(path)
+            self._reg_path = path
+
+    def _browse_save_dir(self):
+        d = QFileDialog.getExistingDirectory(self, "Select output folder")
+        if d:
+            self._save_edit.setText(d)
+
+    def _on_source_changed(self):
+        is_file = self._src_file_rb.isChecked()
+        self._file_edit.setEnabled(is_file)
+
+    def _on_save_toggled(self, checked):
+        self._save_edit.setEnabled(checked)
+
+    def values(self):
+        """Return tuple of all settings."""
+        if self._src_file_rb.isChecked():
+            source = 'file'
+            reg_ref = self._file_edit.text().strip()
+        elif self._has_ds9 and self._src_ds9_sel_rb.isChecked():
+            source  = 'ds9'
+            reg_ref = 'selected'
+        else:
+            source  = 'ds9'
+            reg_ref = 'all'
+
+        method   = self._method_box.currentText()
+        weighting = self._weight_box.currentText()
+        load_strip = self._load_strip_cb.isChecked()
+        save_folder = self._save_edit.text().strip() if self._save_cb.isChecked() else ''
+
+        if self._fname_coords_rb.isChecked():
+            fname_style = 'coords'
+        elif self._fname_name_rb.isChecked():
+            fname_style = 'name'
+        else:
+            fname_style = 'index'
+
+        prefix = self._prefix_edit.text().strip() or 'spec_'
+        open_multispec = self._multispec_cb.isChecked()
+        run_bg = self._bg_cb.isChecked()
+
+        return (source, reg_ref, method, weighting,
+                load_strip, save_folder, fname_style, prefix,
+                open_multispec, run_bg)
 
 
 def launch_viewer(fitsfile=None):

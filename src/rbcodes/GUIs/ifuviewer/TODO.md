@@ -473,75 +473,607 @@ def moment_map(flux, wave, wmin, wmax, order, lambda_rest=None):
 
 ---
 
-### Phase 11 — Help System
-**Goal**: add a `?` toolbar button and `Help > Help` menu entry that opens a tabbed help dialog, matching the rb_multispec style. Include a dedicated `HELP.md` document for the viewer.
+### Phase 11 — Status: COMPLETE ✓
+
+**ds9 Bridge + Region I/O + Per-Dataset State Persistence**
+
+#### What was implemented
+
+**`ds9/bridge.py`**
+- `DS9Bridge.get_regions()` rewritten: tries XPA `get` commands first (`regions wcs fk5 degrees`, `regions fk5`, `regions wcs`) then falls back to `regions save {tmpfile}` (no coord args — those are invalid in XPA `set`)
+- All methods fail gracefully; GUI works fully without pyds9
+
+**`processing/spatial_mask.py`**
+- `parse_ds9_regions()` — uses `astropy-regions` package first, fallback parser for physical/pixel coords
+- Fixed: `if result:` instead of `if result is not None:` — empty list from regions package now falls through to fallback
+- `_reg_shape_name` — ordered list of tuples, `circleannulus` checked before `circle`
+- `_draw_fallback_marker()` — rewritten to draw actual `Circle`/`Ellipse`/`Rectangle`/`Polygon` matplotlib patches from region args (not just crosses)
+- `draw_region_overlay()` — dispatches to `astropy-regions` artists or fallback patches
+
+**`image_panel.py`**
+- `draw_region_shape(region, wcs, color)` — draws imported ds9 region as real shape on image
+
+**`main.py` — Region import**
+- `_extract_from_region_text()` — `FITSImage` path: overlay only (no spectrum extraction); cube path: uses `extract_optimal_weighted(flux, var, mask, method='data')` directly (same pattern as rest of GUI)
+- `_on_load_region_file()` / `_on_ds9_import_regions()` — both work for cubes and 2D images
+- `marker_info` dicts persisted per extraction: `{'type': 'spaxel'|'circle'|'rect'|'region', ...params}`
+
+**`main.py` — Per-dataset state persistence**
+
+Every time you switch datasets, the current state is saved and restored when you return:
+
+| Field saved | What it covers |
+|---|---|
+| `image_data` | Whatever 2D array is on screen (whitelight / narrowband / cont-sub / moment map / SNR map) |
+| `image_norm` | Colorscale (ZScale / percentile / manual) |
+| `slider_mode` | Which channel-slider button was active (Whitelight / Narrowband / Cont-sub / Channel) |
+| `onband_ext`, `cont1_ext`, `cont2_ext` | Green/red shaded band spans on the spectrum |
+| `spec_mode` | Spectrum SpanSelector mode |
+| `spec_ylim` | Y-axis limits |
+| `locked` | All extracted spectra (wave, flux, color, label, rb_spec) |
+| `color_idx` | Position in the color cycle |
+| `sky_mask`, `sky_rect` | Sky region boolean mask + pixel bounds |
+| `moment_params` | All MomentMapDialog last-used values (per dataset) |
+
+On restore:
+- Image redrawn with saved norm (no recompute)
+- Channel slider button restored (setChecked, does not trigger image rebuild)
+- Spectrum bands redrawn via `apply_band_ranges()`
+- All locked spectra re-plotted with exact saved colors
+- All image markers redrawn (`spaxel` cross / `circle` aperture / `rect` / `region` shape)
+- Sky region cyan box redrawn
+- Y-axis autoscaled to fit restored spectra
+- MomentMapDialog class-level `_last_*` attributes swapped to match this dataset
+
+**`spectrum_panel.py`**
+- `lock_spectrum(..., color=None)` — `color` param allows restoring exact saved colors
+- `_rebuild_legend()` — guards with `get_legend_handles_labels()` before calling `legend()` (eliminates "No artists with labels" warning)
+
+**`processing/cube_collapse.py`**
+- Wrapped `nanmean/nansum/nanmedian` with `warnings.catch_warnings()` + `warnings.simplefilter('ignore', RuntimeWarning)` — eliminates "Mean of empty slice" warning
+
+#### Known limitation
+Moment maps: the image pixel data restores correctly (the moment map IS shown). However the channel slider button says "Whitelight" — if you click any mode button it will rebuild from the cube. The moment map parameters (wavelength range, continuum, SNR) are saved per-dataset in `moment_params` so reopening the dialog shows the correct values.
+
+---
+
+### Phase 11 — Step-by-Step Testing Checklist
+
+Run the GUI:
+```bash
+python -m rbcodes.GUIs.ifuviewer.main
+```
+
+#### A — Basic launch
+- [ ] GUI opens with no errors in terminal
+- [ ] No `No artists with labels found` warning on launch
+- [ ] No `RuntimeWarning: Mean of empty slice` warning on launch
+- [ ] Load a KCWI/MUSE datacube → whitelight image appears, collapsed spectrum shown below
+
+#### B — Image modes
+- [ ] **Channel**: click Channel button → slider activates → drag slider → image shows single wavelength slice
+- [ ] **Narrowband**: click Narrowband button → drag green span on spectrum → image updates to narrowband
+- [ ] **Cont-sub**: click Cont-sub button → drag on-band span (green) → press `c` to activate Cont 1 → drag red span → image shows cont-subtracted map
+- [ ] **Whitelight**: click Whitelight → returns to collapsed image
+
+#### C — Spectral extraction
+- [ ] **Single pixel**: click any spaxel on image → spectrum locks in spectrum panel (colored line)
+- [ ] **Circular aperture**: set mode to Circular in aperture controls → click spaxel → circle drawn on image → spectrum locked
+- [ ] **Rectangle**: drag rectangle on image → click Extract → spectrum locked, dashed-rectangle drawn
+- [ ] Verify extraction label appears in combo box
+- [ ] Save spectrum: select extraction → Save… → FITS file saved → open with `astropy.io.fits` and check
+
+#### D — Multiple extractions
+- [ ] Extract 3 spectra → each gets a different color (yellow → teal → mauve)
+- [ ] Select each in combo → correct aperture highlights on image
+- [ ] Delete one → marker removed from image, line removed from spectrum, combo updates
+- [ ] Clear all → image clean, spectrum has only collapsed line
+
+#### E — Per-dataset state: basic
+1. Load **cube A** and **cube B** into sidebar
+2. On cube A: extract 2 spectra (one circle, one rectangle)
+3. Switch to **cube B** → cube A's extractions disappear
+4. Extract 1 spectrum on cube B
+5. Switch back to **cube A** → both extractions restore with correct colors and image markers
+6. Switch to **cube B** → its extraction restores
+- [ ] Image markers match the spectra colors after restore
+- [ ] Spectrum y-limits are reasonable after restore (not stuck at whitelight scale)
+
+#### F — Per-dataset state: image mode
+1. On cube A: set Narrowband mode, drag an on-band span
+2. Switch to cube B
+3. Switch back to cube A
+- [ ] Narrowband image is restored (not whitelight)
+- [ ] Narrowband mode button is checked
+- [ ] Green on-band span is visible on spectrum
+- [ ] If you drag the span again, image updates (span selectors still functional)
+
+#### G — Per-dataset state: moment maps
+1. On cube A: open Moment Map dialog (Ctrl+M)
+2. Set M0, wavelength window e.g. 4850–4870 Å, compute
+3. Switch to cube B
+4. Switch back to cube A
+- [ ] Moment map image is restored (not whitelight)
+- [ ] Open Moment Map dialog again → wavelength window shows 4850–4870, not whatever cube B used
+5. Compute a moment map on cube B with different params
+6. Switch to cube A → open dialog → still shows cube A's params
+- [ ] Confirmed: dialog parameters are per-dataset
+
+#### H — Sky region
+1. Draw a rectangle on the image in an empty sky area
+2. `Analysis > Set Sky Region` (or menu equivalent)
+3. Cyan rectangle appears on image
+4. Switch to cube B → sky rectangle gone (different dataset)
+5. Switch back to cube A → cyan rectangle redrawn
+- [ ] Sky mask works for SNR: open Moment Map, enable SNR mask, method = Sky region → SNR-masked map shows
+
+#### I — ds9 region import (requires ds9 running)
+1. Open ds9, load any image (IFU cube or HST)
+2. Draw a circle region in ds9 (fk5 or image coordinates)
+3. In IFU viewer: `Analysis > Import regions from ds9`
+4. On a datacube:
+   - [ ] Circle drawn on IFU image (not a cross)
+   - [ ] Spectrum extracted and locked
+   - [ ] No XPA error in terminal
+5. On a 2D FITS image in the viewer:
+   - [ ] Circle drawn on image
+   - [ ] No extraction attempted (overlay only)
+
+#### J — Region file loading
+1. Save a `.reg` file from ds9 with 2–3 circles/boxes in fk5 coords
+2. `Analysis > Load Region File…` → select the file
+3. On a datacube:
+   - [ ] Each region drawn as correct shape (circle → circle, box → rectangle)
+   - [ ] Each region extracts a spectrum
+   - [ ] All appear in combo box with distinct colors
+4. Load a `.reg` file with `physical` coordinates:
+   - [ ] Fallback parser runs, shapes still drawn (check terminal for `[spatial_mask] fallback found N extraction region(s)`)
+
+#### K — Cross-instrument region (HST → IFU)
+1. In ds9: open an HST image overlapping the IFU field
+2. Draw a region around a galaxy in HST coordinates (fk5)
+3. Import to IFU viewer on the datacube
+- [ ] Region placed at correct sky position on IFU image (not pixel-shifted)
+- [ ] Spectrum extracted from spaxels within that sky region
+
+#### L — Warning/error sanity
+- [ ] Launch with no cube loaded → no warnings
+- [ ] Switch datasets rapidly → no crash, no stale state
+- [ ] Load a cube with no variance extension → Optimal extraction still works (no `ValueError`)
+
+---
+
+### Phase 11 — ds9 Bridge + Region I/O + Batch Extraction (original spec)
+**Goal**: send images to ds9, import/export region files, batch-extract spectra from regions, highlight apertures interactively, add RA/Dec provenance to extracted spectra.
+
+All ds9 functionality is optional — the GUI must work fully without pyds9 installed.
+
+---
+
+#### 11.1 — `rb_spectrum` RA/Dec provenance (`utils/rb_spectrum.py`)
+
+Add RA/Dec and extraction metadata to `rb_spectrum.meta` and persist as explicit FITS header keywords.
+
+**`rb_write_fits` additions** — after the existing `METADATA` keyword:
+```python
+if 'ra' in self.meta:
+    hdu_list[0].header['RA']      = (self.meta['ra'],  '[deg] J2000 right ascension')
+    hdu_list[0].header['DEC']     = (self.meta['dec'], '[deg] J2000 declination')
+    hdu_list[0].header['EQUINOX'] = 2000.0
+    hdu_list[0].header['RADESYS'] = 'ICRS'
+if 'instrume' in self.meta:
+    hdu_list[0].header['INSTRUME'] = self.meta['instrume']
+if 'object' in self.meta:
+    hdu_list[0].header['OBJECT'] = self.meta['object']
+```
+
+**Provenance fields written into `meta` by IFU extractor** (`main.py`) after every extraction:
+```python
+meta = {}
+if cube.wcs is not None:
+    ra, dec = cube.wcs.all_pix2world([[cx, cy]], 0)[0]
+    meta['ra']  = float(ra)
+    meta['dec'] = float(dec)
+meta['extr_x']   = cx          # pixel center x
+meta['extr_y']   = cy          # pixel center y
+meta['extr_rad'] = radius      # arcsec for circular, 'rect WxH' for rect, 1 for single
+meta['object']   = cube.header.get('OBJECT', '')
+meta['instrume'] = cube.header.get('INSTRUME', '')
+rb_spec.meta.update(meta)
+```
+
+Apply this in `_on_spaxel_locked`, `_on_aperture_drawn`, and the new batch extractor.
+
+---
+
+#### 11.2 — `processing/spatial_mask.py` (new file)
+
+Region parsing and rasterization. Works without ds9 — used by both live ds9 import and disk file loading.
+
+```python
+EXTRACTION_SHAPES = {'circle', 'box', 'ellipse', 'polygon', 'annulus'}
+ANNOTATION_SHAPES = {'text', 'compass', 'ruler', 'projection', 'vector', 'point'}
+
+def parse_ds9_regions(reg_text):
+    """
+    Parse ds9 region format text → list of region dicts.
+    Each dict: {'shape': str, 'coords': [...], 'system': 'fk5'|'image', 'name': str}
+    Skips annotation shapes and excluded regions (lines starting with -).
+    Supports: circle, box, ellipse, polygon, annulus.
+    """
+
+def region_to_mask(region, wcs, ny, nx):
+    """
+    Convert one region dict → boolean mask (ny, nx).
+    Sky coords → pixel via wcs.all_world2pix(); rasterize with skimage.draw.
+    circle   → draw.disk(center, radius)
+    box      → draw.rectangle(top_left, extent)
+    polygon  → draw.polygon(rows, cols)
+    ellipse  → draw.ellipse(center, r_radius, c_radius, rotation)
+    annulus  → outer disk & ~inner disk
+    Clips to image bounds; returns all-False mask (not an error) if region outside FOV.
+    """
+
+def region_center_sky(region, wcs):
+    """
+    Return (ra_deg, dec_deg) of region center.
+    Used for IAU filename generation and meta['ra'/'dec'].
+    """
+
+def iau_name(ra_deg, dec_deg, prefix='spec_'):
+    """
+    Build IAU-format filename: prefix + J101056.2+213042.fits
+    Uses astropy.coordinates.SkyCoord.to_string('hmsdms').
+    """
+```
+
+---
+
+#### 11.3 — `ds9/bridge.py` (new file)
+
+All methods fail gracefully if pyds9 is unavailable or ds9 is not running.
+
+```python
+class DS9Bridge:
+    def __init__(self):
+        self._ds9 = None
+
+    # --- connection ---
+    def connect(self):
+        """
+        Try to connect to a running ds9 instance.
+        Returns (True, '') on success.
+        Returns (False, reason) where reason is:
+          'no_pyds9'  — pyds9 not installed
+          'no_ds9'    — pyds9 installed but no ds9 running
+        """
+        try:
+            import pyds9
+        except ImportError:
+            return False, 'no_pyds9'
+        try:
+            self._ds9 = pyds9.DS9()
+            return True, ''
+        except Exception:
+            return False, 'no_ds9'
+
+    def disconnect(self):
+        self._ds9 = None
+
+    @property
+    def available(self):
+        return self._ds9 is not None
+
+    # --- send image ---
+    def send_image(self, image2d, header, frame=1):
+        """Write 2D image to temp FITS, send to ds9 frame N, delete temp file."""
+        if not self.available: return
+        from astropy.io import fits
+        import tempfile, os
+        hdu = fits.PrimaryHDU(image2d, header=header)
+        with tempfile.NamedTemporaryFile(suffix='.fits', delete=False) as f:
+            hdu.writeto(f.name, overwrite=True)
+            self._ds9.set(f'frame {frame}')
+            self._ds9.set(f'fits {f.name}')
+        os.unlink(f.name)
+
+    # --- WCS ---
+    def match_wcs(self):
+        if not self.available: return
+        self._ds9.set('frame match wcs')
+        self._ds9.set('frame lock wcs')
+
+    # --- regions ---
+    def get_regions(self, selected_only=False):
+        """Return region text string from ds9 (sky coordinates)."""
+        if not self.available: return ''
+        cmd = 'regions selected sky' if selected_only else 'regions sky'
+        try:
+            return self._ds9.get(cmd)
+        except Exception:
+            return ''
+```
+
+---
+
+#### 11.4 — ds9 Frame Queue panel (`main.py`)
+
+A small collapsible panel docked **below the sidebar**, hidden until ds9 is connected.
+
+```
+┌──────────────────────────────┐
+│  ds9 Frames            [▲]  │
+│  ────────────────────────── │
+│  ☑  1  Whitelight           │
+│  ☑  2  NB 6560–6580 Å      │
+│  ☑  3  M0 6540–6600 Å      │
+│                       [× ]  │  ← delete selected row
+│  [+ Add current]            │
+│  [Send all]  [Match WCS]    │
+└──────────────────────────────┘
+```
+
+- **[+ Add current]**: adds current `ImageCanvas._data_raw` + label (auto-named from image mode: "Whitelight", "NB 6560–6580", "M0 …") to queue; frame number auto-incremented; frame spinbox inline-editable
+- **[Send all]**: iterates checked rows, calls `bridge.send_image(data, header, frame)` for each
+- **[Match WCS]**: calls `bridge.match_wcs()` after sending
+- **[× ]**: removes selected row from queue
+- Queue is in-memory only (not persisted); cleared on dataset switch
+
+---
+
+#### 11.5 — ds9 toolbar buttons (`main.py`)
+
+Add to main toolbar (right side, separated by spacer):
+
+```
+[Connect ds9]  [→ Send image]  [← Import regions]
+```
+
+- **[Connect ds9]**: calls `bridge.connect()`
+  - If `no_pyds9` → `QMessageBox`: "pyds9 is not installed.\nInstall with: pip install pyds9"
+  - If `no_ds9` → `QMessageBox`: "No running ds9 instance found.\nStart ds9 first, then connect."
+  - On success → button text becomes "Disconnect"; status bar shows "ds9: connected ●"
+- **[→ Send image]**: shortcut to add current image to frame queue (same as [+ Add current])
+- **[← Import regions]**: opens `ImportRegionsDialog` (see 11.6)
+
+All three buttons disabled when no cube loaded. Send/Import also disabled when not connected.
+
+---
+
+#### 11.6 — Import regions from live ds9 (`main.py`)
+
+`ImportRegionsDialog`:
+```
+  Source: ● Selected region(s) only
+          ○ All regions
+  [OK]  [Cancel]
+```
+On OK: `bridge.get_regions(selected_only)` → `parse_ds9_regions()` → for each → `region_to_mask()` → `extract_aperture()` → add to extract strip exactly as a manual extraction.
+
+---
+
+#### 11.7 — File menu additions (`main.py`)
+
+```
+File
+  ├── Open FITS…               Ctrl+O
+  ├── Load Region File…                  ← new
+  ├── Save Apertures as Region File…     ← new
+  ├── Save Current Frame…      Ctrl+S
+  └── Quit                     Ctrl+Q
+```
+
+**Load Region File…** (no ds9 required):
+- `QFileDialog` → `.reg` file → read text → `parse_ds9_regions()` → ask user: "Extract immediately?" or "Load into batch dialog?"
+- If extract immediately: same path as Import from ds9 above
+
+**Save Apertures as Region File…** (no ds9 required):
+- Iterates `_extraction_marker_groups`, converts each stored aperture (pixel center + shape + size) back to ds9 region syntax
+- Single pixel → `circle(x, y, 1")`, rect → `box(...)`, circular → `circle(...)`, annular → `annulus(...)`
+- Writes `.reg` file with `# Region file format: DS9 version 4.1` header and `global color=green` defaults
+
+---
+
+#### 11.8 — Batch extraction from regions (`main.py`)
+
+`Analysis > Batch Extract from Regions…` (also accessible after loading a region file).
+
+**`BatchExtractThread(QThread)`**:
+```python
+progress = pyqtSignal(int, int, str)   # (current, total, region_name)
+finished = pyqtSignal(list)            # list of (label, rb_spectrum)
+error    = pyqtSignal(str)             # non-fatal per-region errors accumulated
+cancelled = pyqtSignal()
+```
+- Loop: for each region → `region_to_mask()` → `extract_aperture()` → inject RA/Dec meta → store
+- Checks `self._cancel` flag between regions; emits `cancelled()` if set
+- Per-region errors: logged and collected, do not abort the loop
+- Emits `finished(results)` when done; caller loads into strip and/or saves
+
+**`BatchExtractDialog`**:
+```
+┌──────────────────────────────────────────┐
+│  Batch Extract from Regions              │
+│                                          │
+│  Source:  ● Region file  [Browse…]       │
+│           ○ Live ds9 (selected only)     │
+│           ○ Live ds9 (all regions)       │
+│                                          │
+│  Method:    [Sum ▾]                      │
+│  Weighting: [None ▾]                     │
+│                                          │
+│  Output:                                 │
+│  ☑  Load into extract strip             │
+│     (warn if > 10 regions)              │
+│  ☑  Save to folder  [Browse…]           │
+│     Filename:  ● IAU coords (J…)        │
+│                ○ Region index (001…)    │
+│                ○ Region name (.reg)     │
+│     Prefix: [spec_]                     │
+│  ☑  Open in rb_multispec when done      │
+│                                          │
+│  ☑  Run in background                   │
+│                                          │
+│         [Extract N regions]  [Cancel]    │
+└──────────────────────────────────────────┘
+```
+
+- **N regions** button label updates after file selected: "Extract 47 regions"
+- If "Load into strip" checked and N > 10: show warning "Loading 47 spectra into the strip may be slow. Continue?"
+- If background: dialog closes, status bar shows progress: `Extracting regions… 12/47 [■■■□□□] [Cancel]`
+- Cancel button in status bar sets `thread._cancel = True`
+- On `finished`: load into strip (if checked), save files (if checked), open multispec (if checked)
+- On `error` signal: collect all per-region errors, show summary dialog at end
+
+**IAU filename helper** (in `spatial_mask.py`):
+```python
+from astropy.coordinates import SkyCoord
+import astropy.units as u
+
+def iau_name(ra_deg, dec_deg, prefix='spec_'):
+    c = SkyCoord(ra=ra_deg*u.deg, dec=dec_deg*u.deg)
+    s = c.to_string('hmsdms', sep='', precision=1).replace(' ', '')
+    return f'{prefix}{s}.fits'
+```
+
+---
+
+#### 11.9 — Aperture highlighting (`image_panel.py`, `main.py`)
+
+**Color coding (always on)**:
+- Each extraction's aperture marker on the image is drawn in the **same color** as its locked spectrum line in the spectrum panel (Catppuccin 6-color cycle, already used for spectrum lines)
+- Color index tracked in `_extraction_marker_groups` alongside the artists
+
+**Highlight on combo selection** (`main.py`):
+- `_extract_combo.currentIndexChanged` → `_on_extract_selected(idx)`
+- Selected extraction's artists: `linewidth *= 2`, `alpha = 1.0`
+- All other extractions: `linewidth` back to normal, `alpha = 0.5`
+- Calls `image_canvas.canvas.draw_idle()`
+
+**Click aperture → select in combo** (`image_panel.py`):
+- Make aperture artists pickable: `artist.set_picker(5)` (5px tolerance)
+- Connect `pick_event` → `_on_artist_picked(event)`
+- `_on_artist_picked`: look up which extraction group owns `event.artist` → emit new signal `aperture_picked(int)` with extraction index
+- `main.py` connects `aperture_picked` → sets `_extract_combo.setCurrentIndex(idx)` → triggers highlight
+
+---
+
+#### 11.10 — Tests
+
+- Connect with no pyds9 → message box shown, no crash
+- Connect with pyds9 but no ds9 running → correct message
+- Connect with ds9 running → status bar updates, buttons enable
+- Add 3 images to frame queue → Send all → 3 ds9 frames populated
+- Match WCS → frames locked
+- Draw circle in ds9 → Import selected → spectrum appears in extract strip
+- Load `.reg` file with 5 circles → Batch extract → 5 spectra with RA/Dec in meta
+- Save spectra → open one in astropy: `fits.getheader(f)['RA']` returns correct value
+- Save apertures as region file → reload in ds9 → regions appear correctly
+- Background batch of 20 regions → progress bar updates → cancel midway → stops cleanly
+- Click aperture on image → combo selects correct extraction
+- Select extraction in combo → correct aperture highlights on image
+
+---
+
+### Phase 12 — Pending / Future Features
+Items discussed and deferred — implement before writing help.
+
+**Save cropped cube to FITS**
+- Currently crop loads into sidebar but there is no save dialog
+- Add "Save Subcube…" to File menu or as a checkbox in the crop flow
+- Write proper 3D FITS with updated header (NAXIS1/2/3, CRPIX1/2 from cropped WCS)
+
+**Live circular aperture preview** (deferred from Phase 9 discussion)
+- Option A (recommended): click sets center, Radius spinbox drives circle overlay + live extraction
+- Option B: drag to set radius (click=center, drag=edge, live Circle patch)
+- Any mode switch to Circular should draw the circle immediately on click
+
+**Spectrum panel — save current view**
+- Right-click on spectrum panel → "Save spectrum as PNG" or "Export visible range"
+- Or a small save button in the extract strip
+
+**Image panel — right-click "Crop to selection" shortcut**
+- After drawing a rectangle, right-click on the canvas → context menu with
+  "Crop to selection" and "Set as sky region" as alternatives to the Analysis menu
+
+---
+
+### Phase 13 — Help System (LAST — implement after all features stable)
+**⚠ Do not implement until all other phases are complete and tested on real data.**
+**Before writing, audit every feature listed below is actually in the code.**
+
+**Goal**: add a `?` toolbar button and `Help > Help` menu entry that opens a tabbed
+help dialog matching the rb_multispec style. Include a dedicated `HELP.md` document.
 
 **Pattern**: follow `rbcodes/GUIs/multispecviewer/utils.py → show_help_dialog()` exactly.
 
 **Files to create/modify**:
 - `help.py` (new) — `show_help_dialog(parent)` function
 - `HELP.md` (new) — full documentation page for the viewer
-- `main.py` — add `?` toolbar button + `Help > Help` menu item (shortcut `h`)
+- `main.py` — add `?` toolbar button + `Help > Help` menu item (shortcut `F1`)
 
-**`help.py`**:
-- Import pattern identical to multispec utils: lazy PyQt5 imports inside the function so `help.py` has no hard Qt dep at import time
-- Tabbed `QDialog` (min 750×520):
-  - **Overview** tab — `QTextEdit` (monospace), plain-text description of the viewer: panels, workflow, modes
-  - **Keyboard Shortcuts** tab — `QTableWidget` (Key / Action), two columns, alternating rows, key in bold Courier
-  - **Extraction** tab — shortcuts + mode descriptions (Single pixel / Circular / Circular-Annular)
-  - **Image Modes** tab — Channel / Whitelight / Narrowband / Cont-sub with SpanSelector workflow
-  - **Dialogs & Menus** tab — Band Range (Ctrl+B), Spectrum Range (Ctrl+R), Moment Maps, ds9 Bridge
-- Bottom row of buttons:
-  - `[View README on GitHub]` → opens `docs/GUIs/ifuviewer/HELP.md` on GitHub via `webbrowser.open`
-  - `[Open Local README]` → opens `HELP.md` from `importlib.resources` path (if it exists)
-  - `[Close]`
-- Dark theme: inherit parent palette + same stylesheet as multispec dialog
+**`help.py`** — tabbed `QDialog` (min 800×560):
+- **Overview** tab — interface description: sidebar, image panel, spectrum panel, controls
+- **Image Modes** tab — Channel / Whitelight / Narrowband / Cont-sub workflow
+- **Extraction** tab — Single pixel / Rectangle / Circular / Circular-Annular modes, weighting options
+- **Moment Maps** tab — M0/M1/M2, continuum subtraction, SNR mask, sky region workflow
+- **Crop & Analysis** tab — crop by drag, crop by coordinates (pixel/RA-Dec), sky region, save subcube
+- **Keyboard Shortcuts** tab — complete reference table (see below)
+- **ds9 Bridge** tab — optional, install instructions, workflow (omit if Phase 11 not implemented)
+- Bottom: `[Close]`
 
-**Keyboard shortcuts table** (at minimum):
+**Complete keyboard shortcuts to document**:
+
+*Spectrum panel (cursor must be in panel):*
 | Key | Action |
-|---|---|
-| h | Show this help |
-| Del / Backspace | Delete selected extraction |
-| Ctrl+B | Band range dialog |
-| Ctrl+R | Spectrum range & scale dialog |
-| Ctrl+O | Open FITS file |
-| Ctrl+Q | Quit |
+|-----|--------|
+| `x` | Cursor x → new xmin |
+| `X` | Cursor x → new xmax |
+| `t` | Cursor y → new ymax |
+| `b` | Cursor y → new ymin |
+| `r` | Reset to full wavelength range |
+| `a` | Autoscale Y to visible data |
+| `[` | Pan left 10% |
+| `]` | Pan right 10% |
+| `-` | Zoom out X 20% |
+| `=` | Zoom in X 20% |
+| `l` | Toggle legend |
+| `c` | On-band window (Cont-sub mode only; press twice to clear) |
+| `1` | Cont window 1 (Cont-sub mode only; press twice to clear) |
+| `2` | Cont window 2 (Cont-sub mode only; press twice to clear) |
+| `Esc` | Return to neutral (Cont-sub mode only) |
 
-**`main.py` additions**:
-```python
-from rbcodes.GUIs.ifuviewer.help import show_help_dialog
+*Application-level:*
+| Key | Action |
+|-----|--------|
+| `Ctrl+O` | Open FITS file(s) |
+| `Ctrl+S` | Save current frame as FITS |
+| `Ctrl+M` | Moment Map dialog |
+| `Ctrl+K` | Crop to drawn rectangle |
+| `Ctrl+B` | Band Range dialog |
+| `Ctrl+R` / `Ctrl+W` | Spectrum Range & Scale dialog |
+| `Del` / `Backspace` | Delete selected extraction |
+| `Ctrl+Q` | Quit |
+| `F1` | Help |
 
-# In _build_toolbar() — after nav toolbar:
-help_btn = QPushButton("?")
-help_btn.setToolTip("Show help (h)")
-help_btn.setFixedWidth(28)
-help_btn.setStyleSheet("QPushButton { font-weight: bold; font-size: 13px; }")
-help_btn.clicked.connect(lambda: show_help_dialog(self))
-self._mpl_toolbar.addWidget(help_btn)
-
-# In menubar:
-help_menu = menubar.addMenu("Help")
-help_act = QAction("Help…", self)
-help_act.setShortcut("h")
-help_act.triggered.connect(lambda: show_help_dialog(self))
-help_menu.addAction(help_act)
-```
-
-**`HELP.md`** contents (outline):
+**`HELP.md`** contents:
 - Title + one-line description
-- Interface overview (sidebar, image panel, spectrum panel, controls)
-- Loading files (Open, drag-and-drop if supported)
-- Image modes with step-by-step workflow for Narrowband and Cont-sub
-- Spectral extraction (all three modes with tips)
-- Extractions list — save, send to rb_multispec, delete, clear
-- Spectrum Range & Scale dialog
-- Band Range dialog
-- Moment Maps (Phase 10)
-- ds9 Bridge (Phase 11) — optional, what to install
-- Full keyboard shortcut reference table
-- Troubleshooting (common issues: variance cube not found, pyds9 not available)
+- Interface overview with panel diagram (ASCII)
+- Loading files — Open dialog, multiple files, sidebar switching
+- Image controls — colormap, scale, normalization, right-click drag contrast
+- Image modes — step-by-step for each mode including Cont-sub band drawing
+- Spectral extraction — all four modes, weighting options (None/Var-weighted/Optimal)
+- Extraction list — save, send to rb_multispec, delete, clear
+- Aperture controls — Rectangle mode drag, Circular mode Extract button
+- Moment maps — full workflow: set on-band, optional continuum subtraction, SNR mask
+- Crop — drag method and coordinate dialog (pixel and RA/Dec)
+- Sky region — how to set, what it's used for, clearing
+- Spectrum navigation keystrokes — full table
+- Variance cube — how to assign, what features require it
+- ds9 Bridge — optional section
+- Troubleshooting — variance not found, WCS warnings, pyds9 not available
 
-**Test**: click `?` button → dialog opens with correct tabs. Click GitHub link → browser opens. Shortcut `h` → same dialog. Dark theme matches rest of GUI.
+**Test**: click `?` → dialog opens. All tabs present. Shortcut table complete. Dark theme matches GUI.
 
 ---
 

@@ -186,7 +186,7 @@ class SpectrumCanvas(FigureCanvasQTAgg):
         self.setFocus()
         super().enterEvent(event)
 
-    def lock_spectrum(self, wave, flux, err, label, rb_spec=None):
+    def lock_spectrum(self, wave, flux, err, label, rb_spec=None, color=None):
         """
         Add a permanently visible extracted spectrum to the axes.
 
@@ -197,12 +197,15 @@ class SpectrumCanvas(FigureCanvasQTAgg):
         err     : ndarray or None  (not plotted yet, stored in rb_spec)
         label   : str              display label
         rb_spec : rb_spectrum or None  — stored for save/export
+        color   : str or None  — force a specific color (used when restoring
+                  saved state); if None the next color in the cycle is used
         """
         if self._wave is None:
             return
 
-        color = _EXTRACT_COLORS[self._color_idx % len(_EXTRACT_COLORS)]
-        self._color_idx += 1
+        if color is None:
+            color = _EXTRACT_COLORS[self._color_idx % len(_EXTRACT_COLORS)]
+            self._color_idx += 1
 
         line, = self._ax.plot(wave, flux, color=color, lw=0.9,
                               alpha=0.9, label=label, zorder=5)
@@ -211,6 +214,7 @@ class SpectrumCanvas(FigureCanvasQTAgg):
 
         self._rebuild_legend()
         self.draw_idle()
+        return color   # caller uses this to colour the image marker
 
     def remove_locked_at(self, idx):
         """Remove a single extracted spectrum by index."""
@@ -239,6 +243,10 @@ class SpectrumCanvas(FigureCanvasQTAgg):
 
         self._rebuild_legend()
         self.draw_idle()
+
+    def peek_next_color(self):
+        """Return the color that will be used for the *next* lock_spectrum call."""
+        return _EXTRACT_COLORS[self._color_idx % len(_EXTRACT_COLORS)]
 
     @property
     def locked_spectra(self):
@@ -576,6 +584,9 @@ class SpectrumCanvas(FigureCanvasQTAgg):
 
     def _rebuild_legend(self):
         """Rebuild legend and apply current visibility state."""
+        handles, labels = self._ax.get_legend_handles_labels()
+        if not handles:
+            return
         leg = self._ax.legend(fontsize=7, loc='upper right',
                               facecolor='#313244', labelcolor='#cdd6f4',
                               edgecolor='#45475a')

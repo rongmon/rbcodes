@@ -41,6 +41,7 @@ class ImageCanvas(FigureCanvasQTAgg):
     spaxel_locked   = pyqtSignal(int, int, object)  # x, y, flux array
     aperture_drawn  = pyqtSignal(object)             # boolean mask
     region_selected = pyqtSignal(int, int, int, int) # x1, y1, x2, y2
+    aperture_picked = pyqtSignal(object)             # artist that was clicked
     cursor_info     = pyqtSignal(str)
     clim_changed    = pyqtSignal(float, float)
 
@@ -80,6 +81,7 @@ class ImageCanvas(FigureCanvasQTAgg):
         self.mpl_connect('motion_notify_event',  self._on_mouse_move)
         self.mpl_connect('button_press_event',   self._on_button_press)
         self.mpl_connect('button_release_event', self._on_button_release)
+        self.mpl_connect('pick_event',           self._on_pick)
 
     # ------------------------------------------------------------------
     # Public API
@@ -381,7 +383,7 @@ class ImageCanvas(FigureCanvasQTAgg):
         self.spaxel_locked.emit(xi, yi, spectrum)
 
     def draw_aperture_marker(self, cx, cy, shape, size,
-                             bg_inner=None, bg_outer=None):
+                             bg_inner=None, bg_outer=None, color=None):
         """
         Draw a persistent aperture marker on the image after extraction.
 
@@ -392,25 +394,26 @@ class ImageCanvas(FigureCanvasQTAgg):
         size     : int   — radius (circle) or half-width (square)
         bg_inner : int or None  — inner radius of background annulus
         bg_outer : int or None  — outer radius of background annulus
+        color    : str or None  — marker color; defaults to _SP_COLOR (yellow)
         """
         from matplotlib.patches import Circle, Rectangle as MplRect
 
-        src_color = _SP_COLOR    # yellow — source aperture
+        src_color = color if color is not None else _SP_COLOR
         bg_color  = '#74c7ec'    # sky blue — background annulus
 
         if shape == 'Circle':
             src = Circle((cx, cy), size, fill=False,
-                         edgecolor=src_color, lw=1.4, zorder=11)
+                         edgecolor=src_color, lw=1.4, zorder=11, picker=5)
         else:
             s = size + 0.5
             src = MplRect((cx - s, cy - s), 2 * s, 2 * s,
-                          fill=False, edgecolor=src_color, lw=1.4, zorder=11)
+                          fill=False, edgecolor=src_color, lw=1.4, zorder=11, picker=5)
         self._ax.add_patch(src)
         self._extraction_marks.append(src)
 
         # Centre cross
         mk, = self._ax.plot(cx, cy, '+', color=src_color,
-                            ms=8, mew=1.2, zorder=12)
+                            ms=8, mew=1.2, zorder=12, picker=5)
         self._extraction_marks.append(mk)
 
         # Background annulus
@@ -434,6 +437,38 @@ class ImageCanvas(FigureCanvasQTAgg):
             self._extraction_marks.extend([in_patch, out_patch])
 
         self.draw_idle()
+
+    def draw_region_shape(self, region, wcs, color):
+        """
+        Draw the actual ds9 region shape on the image canvas.
+
+        Uses ``spatial_mask.draw_region_overlay`` which returns a list of
+        matplotlib artists.  Every returned artist is registered in
+        ``_extraction_marks`` so it participates in pick events and highlight.
+
+        Parameters
+        ----------
+        region : dict  — from parse_ds9_regions()
+        wcs    : WCS or None
+        color  : str
+
+        Returns
+        -------
+        list of artists
+        """
+        from rbcodes.GUIs.ifuviewer.processing.spatial_mask import draw_region_overlay
+
+        artists = draw_region_overlay(region, self._ax, wcs,
+                                      color=color, draw_label=True)
+        for a in artists:
+            if a not in self._extraction_marks:
+                self._extraction_marks.append(a)
+        return artists
+
+    def _on_pick(self, event):
+        """Emit aperture_picked when user clicks on a marker artist."""
+        if event.artist in self._extraction_marks:
+            self.aperture_picked.emit(event.artist)
 
     def _handle_aperture_drag(self, x0, y0, x1, y1):
         """Lock an aperture rectangle on left-drag."""
@@ -460,7 +495,7 @@ class ImageCanvas(FigureCanvasQTAgg):
             (xi0 - 0.5, yi0 - 0.5),
             xi1 - xi0 + 1, yi1 - yi0 + 1,
             linewidth=1.2, edgecolor=_AP_COLOR, facecolor='none',
-            linestyle='--', zorder=11,
+            linestyle='--', zorder=11, picker=5,
         )
         self._ax.add_patch(rect)
         self._extraction_marks.append(rect)
