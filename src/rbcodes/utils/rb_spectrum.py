@@ -440,6 +440,18 @@ class rb_spectrum:
             'flux': str(self.units['flux'])
         })
 
+        # Explicit coordinate / provenance keywords for interoperability
+        m = self.meta if self.meta else {}
+        if m.get('ra') is not None:
+            hdu_list[0].header['RA']      = (float(m['ra']),  '[deg] J2000 right ascension')
+            hdu_list[0].header['DEC']     = (float(m['dec']), '[deg] J2000 declination')
+            hdu_list[0].header['EQUINOX'] = 2000.0
+            hdu_list[0].header['RADESYS'] = 'ICRS'
+        if m.get('instrume'):
+            hdu_list[0].header['INSTRUME'] = str(m['instrume'])
+        if m.get('object'):
+            hdu_list[0].header['OBJECT'] = str(m['object'])
+
         # Write
         hdulist = fits.HDUList(hdu_list)
         hdulist.writeto(filename, overwrite=clobber)
