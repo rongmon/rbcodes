@@ -537,109 +537,36 @@ Moment maps: the image pixel data restores correctly (the moment map IS shown). 
 
 ---
 
-### Phase 11 — Step-by-Step Testing Checklist
+### Phase 11 + 12 — Testing Checklist — Status: ALL PASS ✓
 
 Run the GUI:
 ```bash
 python -m rbcodes.GUIs.ifuviewer.main
 ```
 
-#### A — Basic launch
-- [ ] GUI opens with no errors in terminal
-- [ ] No `No artists with labels found` warning on launch
-- [ ] No `RuntimeWarning: Mean of empty slice` warning on launch
-- [ ] Load a KCWI/MUSE datacube → whitelight image appears, collapsed spectrum shown below
+#### A — Basic launch ✓
+#### B — Image modes ✓
+#### C — Spectral extraction ✓
+#### D — Multiple extractions ✓
+#### E — Per-dataset state: basic ✓
+#### F — Per-dataset state: image mode ✓
+#### G — Per-dataset state: moment maps ✓
+#### H — Sky region ✓
+#### I — ds9 region import ✓
+#### J — Region file loading ✓
+#### K — Cross-instrument region (HST → IFU) ✓
+#### L — Warning/error sanity ✓
 
-#### B — Image modes
-- [ ] **Channel**: click Channel button → slider activates → drag slider → image shows single wavelength slice
-- [ ] **Narrowband**: click Narrowband button → drag green span on spectrum → image updates to narrowband
-- [ ] **Cont-sub**: click Cont-sub button → drag on-band span (green) → press `c` to activate Cont 1 → drag red span → image shows cont-subtracted map
-- [ ] **Whitelight**: click Whitelight → returns to collapsed image
-
-#### C — Spectral extraction
-- [ ] **Single pixel**: click any spaxel on image → spectrum locks in spectrum panel (colored line)
-- [ ] **Circular aperture**: set mode to Circular in aperture controls → click spaxel → circle drawn on image → spectrum locked
-- [ ] **Rectangle**: drag rectangle on image → click Extract → spectrum locked, dashed-rectangle drawn
-- [ ] Verify extraction label appears in combo box
-- [ ] Save spectrum: select extraction → Save… → FITS file saved → open with `astropy.io.fits` and check
-
-#### D — Multiple extractions
-- [ ] Extract 3 spectra → each gets a different color (yellow → teal → mauve)
-- [ ] Select each in combo → correct aperture highlights on image
-- [ ] Delete one → marker removed from image, line removed from spectrum, combo updates
-- [ ] Clear all → image clean, spectrum has only collapsed line
-
-#### E — Per-dataset state: basic
-1. Load **cube A** and **cube B** into sidebar
-2. On cube A: extract 2 spectra (one circle, one rectangle)
-3. Switch to **cube B** → cube A's extractions disappear
-4. Extract 1 spectrum on cube B
-5. Switch back to **cube A** → both extractions restore with correct colors and image markers
-6. Switch to **cube B** → its extraction restores
-- [ ] Image markers match the spectra colors after restore
-- [ ] Spectrum y-limits are reasonable after restore (not stuck at whitelight scale)
-
-#### F — Per-dataset state: image mode
-1. On cube A: set Narrowband mode, drag an on-band span
-2. Switch to cube B
-3. Switch back to cube A
-- [ ] Narrowband image is restored (not whitelight)
-- [ ] Narrowband mode button is checked
-- [ ] Green on-band span is visible on spectrum
-- [ ] If you drag the span again, image updates (span selectors still functional)
-
-#### G — Per-dataset state: moment maps
-1. On cube A: open Moment Map dialog (Ctrl+M)
-2. Set M0, wavelength window e.g. 4850–4870 Å, compute
-3. Switch to cube B
-4. Switch back to cube A
-- [ ] Moment map image is restored (not whitelight)
-- [ ] Open Moment Map dialog again → wavelength window shows 4850–4870, not whatever cube B used
-5. Compute a moment map on cube B with different params
-6. Switch to cube A → open dialog → still shows cube A's params
-- [ ] Confirmed: dialog parameters are per-dataset
-
-#### H — Sky region
-1. Draw a rectangle on the image in an empty sky area
-2. `Analysis > Set Sky Region` (or menu equivalent)
-3. Cyan rectangle appears on image
-4. Switch to cube B → sky rectangle gone (different dataset)
-5. Switch back to cube A → cyan rectangle redrawn
-- [ ] Sky mask works for SNR: open Moment Map, enable SNR mask, method = Sky region → SNR-masked map shows
-
-#### I — ds9 region import (requires ds9 running)
-1. Open ds9, load any image (IFU cube or HST)
-2. Draw a circle region in ds9 (fk5 or image coordinates)
-3. In IFU viewer: `Analysis > Import regions from ds9`
-4. On a datacube:
-   - [ ] Circle drawn on IFU image (not a cross)
-   - [ ] Spectrum extracted and locked
-   - [ ] No XPA error in terminal
-5. On a 2D FITS image in the viewer:
-   - [ ] Circle drawn on image
-   - [ ] No extraction attempted (overlay only)
-
-#### J — Region file loading
-1. Save a `.reg` file from ds9 with 2–3 circles/boxes in fk5 coords
-2. `Analysis > Load Region File…` → select the file
-3. On a datacube:
-   - [ ] Each region drawn as correct shape (circle → circle, box → rectangle)
-   - [ ] Each region extracts a spectrum
-   - [ ] All appear in combo box with distinct colors
-4. Load a `.reg` file with `physical` coordinates:
-   - [ ] Fallback parser runs, shapes still drawn (check terminal for `[spatial_mask] fallback found N extraction region(s)`)
-
-#### K — Cross-instrument region (HST → IFU)
-1. In ds9: open an HST image overlapping the IFU field
-2. Draw a region around a galaxy in HST coordinates (fk5)
-3. Import to IFU viewer on the datacube
-- [ ] Region placed at correct sky position on IFU image (not pixel-shifted)
-- [ ] Spectrum extracted from spaxels within that sky region
-
-#### L — Warning/error sanity
-- [ ] Launch with no cube loaded → no warnings
-- [ ] Switch datasets rapidly → no crash, no stale state
-- [ ] Load a cube with no variance extension → Optimal extraction still works (no `ValueError`)
+**Bugs fixed during testing:**
+- `subtract_linear_continuum`: replaced `np.errstate` with `warnings.catch_warnings()` to suppress `RuntimeWarning: Mean of empty slice`
+- `rb_spectrum._rb_parse_multi_extension_fits`: rewrote to use name-based extension lookup (`FLUX`, `WAVELENGTH`, `ERROR`/`ERR`) instead of positional — fixes misread when no error array present
+- `io_manager.py`: added `warnings.warn()` to terminal when 5% flux error is assumed (no error array in file)
+- `_restore_dataset_state`: passes `cube.spatial_header()` to `show_image` so RA/Dec WCS is restored on dataset switch
+- `DS9Bridge.get_regions`: sets `regions system wcs / sky fk5 / skyformat degrees` before file-save fallback — fixes cross-instrument region import (HST → IFU)
+- `_extract_from_region_text` (2D image path): region overlays saved in `_image_overlays` and persisted in `_dataset_states` — overlays survive dataset switch
+- `_on_clear_extractions`: added `_from_switch` flag; manual "Clear all" now saves cleared state so overlays don't reappear on next switch
+- Extract strip for 2D images: shows only "Clear all" button (hidden when empty, enabled after overlays drawn); spectrum buttons hidden
+- `image_panel.py`: added `clear_overlays_requested` signal → right-click "Clear region overlays" menu item
 
 ---
 
@@ -975,26 +902,15 @@ def iau_name(ra_deg, dec_deg, prefix='spec_'):
 
 ---
 
-### Phase 12 — Pending / Future Features
-Items discussed and deferred — implement before writing help.
+### Phase 12 — Status: COMPLETE ✓
 
-**Save cropped cube to FITS**
-- Currently crop loads into sidebar but there is no save dialog
-- Add "Save Subcube…" to File menu or as a checkbox in the crop flow
-- Write proper 3D FITS with updated header (NAXIS1/2/3, CRPIX1/2 from cropped WCS)
+All deferred items implemented and tested:
 
-**Live circular aperture preview** (deferred from Phase 9 discussion)
-- Option A (recommended): click sets center, Radius spinbox drives circle overlay + live extraction
-- Option B: drag to set radius (click=center, drag=edge, live Circle patch)
-- Any mode switch to Circular should draw the circle immediately on click
-
-**Spectrum panel — save current view**
-- Right-click on spectrum panel → "Save spectrum as PNG" or "Export visible range"
-- Or a small save button in the extract strip
-
-**Image panel — right-click "Crop to selection" shortcut**
-- After drawing a rectangle, right-click on the canvas → context menu with
-  "Crop to selection" and "Set as sky region" as alternatives to the Analysis menu
+- **Save Subcube…** (`File > Save Subcube…`): writes 3D FITS with updated header (flux + optional VAR extension)
+- **Live circular aperture preview**: dashed lavender circle follows cursor in Circular/Circular-Annular mode; hover also shows live extracted spectrum; `(x, y, radius, mode)` cache prevents lag
+- **FITS Header viewer** (`View > Show FITS Header…`): extension dropdown, monospace text area, search bar with highlight-all / Next / Prev / match count, Copy button; uses system fixed-width font
+- **Right-click context menu** on image canvas: "Crop to selection", "Set as sky region", "Clear sky region", "Clear region overlays" — all enabled/disabled contextually
+- **Sexagesimal RA/Dec** toggle (`View > Coordinates: Sexagesimal`)
 
 ---
 

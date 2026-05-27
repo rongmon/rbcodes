@@ -122,9 +122,18 @@ class DS9Bridge:
             except Exception:
                 pass
 
-        # Approach 2: save to temp file (whatever coord system ds9 is currently in)
+        # Approach 2: set coordinate system to wcs/fk5, then save to temp file
         tmp = tempfile.mktemp(suffix='.reg')
         try:
+            # Ask ds9 to output in fk5 sky coords before saving
+            for set_cmd in ('regions system wcs',
+                            'regions sky fk5',
+                            'regions skyformat degrees'):
+                try:
+                    self._ds9.set(set_cmd)
+                except Exception:
+                    pass
+
             save_cmd = f'regions save {tmp} selected' if selected_only \
                        else f'regions save {tmp}'
             self._ds9.set(save_cmd)

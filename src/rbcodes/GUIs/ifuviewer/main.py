@@ -13,7 +13,8 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QStatusBar,
                               QCheckBox, QComboBox, QPushButton,
                               QRadioButton, QButtonGroup,
                               QGroupBox, QListWidget, QListWidgetItem,
-                              QProgressBar, QProgressDialog)
+                              QProgressBar, QProgressDialog,
+                              QPlainTextEdit, QTextEdit)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal as _Signal
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavToolbar
 
@@ -46,6 +47,7 @@ class MainWindow(QMainWindow):
         self._extraction_marker_groups = []  # per-extraction list of image artists
         self._extraction_colors    = []   # parallel color list for highlighting
         self._extraction_marker_info = [] # parallel: how to recreate each marker on restore
+        self._image_overlays       = []   # (reg_dict, color) for 2D-image-only overlays
         self._dataset_states       = {}   # id(cube) → saved per-dataset state
         self._sky_mask             = None  # 2-D bool array — sky region for SNR
         self._sky_rect             = None  # (x1, y1, x2, y2) pixel bounds
@@ -99,6 +101,10 @@ class MainWindow(QMainWindow):
         self._image_canvas.spaxel_locked.connect(self._on_spaxel_locked)
         self._image_canvas.aperture_drawn.connect(self._on_aperture_drawn)
         self._image_canvas.aperture_picked.connect(self._on_aperture_picked)
+        self._image_canvas.crop_requested.connect(self._on_crop_selection)
+        self._image_canvas.sky_region_requested.connect(self._on_set_sky_region)
+        self._image_canvas.clear_sky_requested.connect(self._on_clear_sky_region)
+        self._image_canvas.clear_overlays_requested.connect(self._on_clear_extractions)
 
         self._mpl_toolbar    = NavToolbar(self._image_canvas, self)
         self._image_canvas._nav_toolbar = self._mpl_toolbar  # for mode check
@@ -138,6 +144,9 @@ class MainWindow(QMainWindow):
 
         # Aperture + extraction controls [Phase 9]
         self._aperture_controls = ApertureControls()
+        self._aperture_controls.settings_changed.connect(self._on_aperture_settings_changed)
+        self._aperture_controls.extract_requested.connect(self._on_circular_extract)
+        self._aperture_controls.mode_changed.connect(self._on_aperture_mode_changed)
         self._extract_strip = self._build_extract_strip()
 
         # ds9 button strip [Phase 11]
@@ -189,6 +198,13 @@ class MainWindow(QMainWindow):
         save_frame_action.triggered.connect(self._on_save_current_frame)
         file_menu.addAction(save_frame_action)
 
+        save_subcube_action = QAction("Save Subcube…", self)
+        save_subcube_action.setToolTip(
+            "Save the active cube (or cropped subcube) as a 3D FITS file "
+            "with updated WCS header.  Includes VAR extension if present.")
+        save_subcube_action.triggered.connect(self._on_save_subcube)
+        file_menu.addAction(save_subcube_action)
+
         save_reg_action = QAction("Save Apertures as Region File…", self)
         save_reg_action.setToolTip(
             "Save all current aperture markers as a ds9 .reg file.")
@@ -217,6 +233,24 @@ class MainWindow(QMainWindow):
         spec_range_w.setVisible(False)
         spec_range_w.triggered.connect(self._on_set_spec_range)
         self.addAction(spec_range_w)   # window-level, not in menu
+
+        view_menu.addSeparator()
+
+        self._coord_sex_action = QAction("Coordinates: Sexagesimal (hh:mm:ss)", self)
+        self._coord_sex_action.setCheckable(True)
+        self._coord_sex_action.setToolTip(
+            "Toggle cursor RA/Dec display between decimal degrees and sexagesimal (hh:mm:ss / dd:mm:ss)")
+        self._coord_sex_action.toggled.connect(self._on_toggle_coord_fmt)
+        view_menu.addAction(self._coord_sex_action)
+
+        view_menu.addSeparator()
+
+        header_action = QAction("Show FITS Header…", self)
+        header_action.setToolTip(
+            "Show the FITS header of the active dataset.  "
+            "If the file has multiple extensions you can choose which one to inspect.")
+        header_action.triggered.connect(self._on_show_header)
+        view_menu.addAction(header_action)
 
         view_menu.addSeparator()
 
@@ -270,6 +304,14 @@ class MainWindow(QMainWindow):
             "Extract 1D spectra from all regions in a .reg file or from ds9.")
         batch_action.triggered.connect(self._on_batch_extract)
         analysis_menu.addAction(batch_action)
+
+        help_menu = menubar.addMenu("Help")
+
+        help_action = QAction("Help", self)
+        help_action.setShortcut("F1")
+        help_action.setToolTip("Open the IFU Viewer help dialog")
+        help_action.triggered.connect(self._on_show_help)
+        help_menu.addAction(help_action)
 
     def _build_extract_strip(self):
         """Build the extraction list bar (always shown when cube loaded)."""
@@ -356,6 +398,13 @@ class MainWindow(QMainWindow):
         self._ds9_status_label = QLabel("ds9: not connected")
         self._ds9_status_label.setStyleSheet("color: #585b70; font-size: 8pt;")
         layout.addWidget(self._ds9_status_label)
+
+        layout.addSpacing(12)
+        help_btn = QPushButton("?")
+        help_btn.setFixedWidth(26)
+        help_btn.setToolTip("Open help  (F1)")
+        help_btn.clicked.connect(self._on_show_help)
+        layout.addWidget(help_btn)
 
         return strip
 
@@ -447,8 +496,10 @@ class MainWindow(QMainWindow):
             locked.append({'label': label, 'color': color,
                            'wave': wave_d, 'flux': flux_d,
                            'rb_spec': rb_spec, 'marker_info': minfo})
-        im   = getattr(self._image_canvas, '_im', None)
-        norm = im.norm if im is not None else None
+        im           = getattr(self._image_canvas, '_im', None)
+        norm         = im.norm     if im is not None else None
+        clim         = im.get_clim() if im is not None else (None, None)
+        display_state = self._image_controls.get_display_state()
         sc   = self._spectrum_canvas
         # Snapshot MomentMapDialog class-level params so they restore per-dataset
         mm = MomentMapDialog
@@ -465,19 +516,24 @@ class MainWindow(QMainWindow):
             'snr_meth': mm._last_snr_meth,
         }
         self._dataset_states[id(cube)] = {
-            'image_data':    self._image_canvas._data_raw,
-            'image_norm':    norm,
-            'slider_mode':   self._channel_slider.current_mode,
-            'locked':        locked,
-            'color_idx':     sc._color_idx,
-            'sky_mask':      self._sky_mask,
-            'sky_rect':      self._sky_rect,
-            'onband_ext':    sc._onband_ext,
-            'cont1_ext':     sc._cont1_ext,
-            'cont2_ext':     sc._cont2_ext,
-            'spec_mode':     sc._mode,
-            'spec_ylim':     sc._ax.get_ylim(),
-            'moment_params': moment_params,
+            'image_data':     self._image_canvas._data_raw,
+            'image_norm':     norm,
+            'image_clim':     clim,
+            'display_state':  display_state,
+            'slider_mode':    self._channel_slider.current_mode,
+            'locked':         locked,
+            'color_idx':      sc._color_idx,
+            'sky_mask':       self._sky_mask,
+            'sky_rect':       self._sky_rect,
+            'onband_ext':     sc._onband_ext,
+            'cont1_ext':      sc._cont1_ext,
+            'cont2_ext':      sc._cont2_ext,
+            'spec_mode':      sc._mode,
+            'spec_xlim':      sc._ax.get_xlim(),
+            'spec_ylim':      sc._ax.get_ylim(),
+            'aperture_state': self._aperture_controls.get_state(),
+            'moment_params':  moment_params,
+            'image_overlays': list(self._image_overlays),
         }
 
     def _restore_dataset_state(self, cube):
@@ -485,10 +541,22 @@ class MainWindow(QMainWindow):
         state = self._dataset_states.get(id(cube))
         if not state:
             return False
-        # Override image with saved one (using saved norm to preserve colorscale)
+        # Override image with saved one, then restore full display state
         img = state.get('image_data')
         if img is not None:
-            self._image_canvas.show_image(img, norm=state.get('image_norm'))
+            import matplotlib.colors as mcolors
+            hdr  = cube.spatial_header() if cube is not None else None
+            # Rebuild norm from saved clim so vmin/vmax survive the round-trip
+            clim = state.get('image_clim', (None, None))
+            ds   = state.get('display_state', {})
+            cmap = ds.get('cmap', 'gray')
+            norm = None
+            if clim[0] is not None and clim[1] is not None:
+                norm = mcolors.Normalize(vmin=clim[0], vmax=clim[1])
+            self._image_canvas.show_image(img, header=hdr, cmap=cmap, norm=norm)
+            # Restore scale/norm/cmap controls (without triggering a reset)
+            if ds:
+                self._image_controls.set_display_state(ds)
         # Restore channel slider button (Narrowband / Cont-sub / etc.)
         slider_mode = state.get('slider_mode', 'Whitelight')
         btns = self._channel_slider._mode_btns
@@ -534,10 +602,24 @@ class MainWindow(QMainWindow):
             sc._ax.set_ylim(ylim)
         if state.get('locked'):
             sc.autoscale_y()
+        # Restore spectrum x-limits
+        xlim = state.get('spec_xlim')
+        if xlim is not None:
+            sc._ax.set_xlim(xlim)
+        # Restore aperture controls state
+        ap_state = state.get('aperture_state')
+        if ap_state:
+            self._aperture_controls.set_state(ap_state)
         # Redraw sky region overlay if one was set
         sky_rect = state.get('sky_rect')
         if sky_rect is not None:
             self._image_canvas.draw_sky_region(*sky_rect)
+        # Redraw 2D-image region overlays
+        self._image_overlays = list(state.get('image_overlays', []))
+        for reg, color in self._image_overlays:
+            self._image_canvas.draw_region_shape(reg, cube.wcs, color)
+        if self._image_overlays and isinstance(cube, FITSImage):
+            self._clear_btn.setEnabled(True)
         # Restore MomentMapDialog class-level params for this dataset
         mp = state.get('moment_params')
         if mp:
@@ -597,7 +679,7 @@ class MainWindow(QMainWindow):
         # Save current dataset's state before switching
         self._save_dataset_state()
         # Clear extraction UI (spectrum lines, image marks, combo)
-        self._on_clear_extractions()
+        self._on_clear_extractions(_from_switch=True)
 
         self._active_cube = cube
 
@@ -673,6 +755,38 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.warning(self, "Save failed", str(exc))
 
+    def _on_save_subcube(self):
+        """Save the active 3D cube (or cropped subcube) as a FITS file."""
+        from astropy.io import fits as _fits
+
+        cube = self._active_cube
+        if cube is None or isinstance(cube, FITSImage):
+            QMessageBox.information(self, "No cube",
+                                    "Load a cube before saving a subcube.")
+            return
+
+        default_name = cube.name + '.fits'
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Subcube", default_name,
+            "FITS files (*.fits);;All files (*)")
+        if not path:
+            return
+
+        try:
+            hdr = cube.header.copy() if cube.header is not None else _fits.Header()
+            primary = _fits.PrimaryHDU(cube.flux.astype('float32'), header=hdr)
+            hdul = _fits.HDUList([primary])
+            if cube.var is not None:
+                var_hdu = _fits.ImageHDU(cube.var.astype('float32'), name='VAR')
+                hdul.append(var_hdu)
+            hdul.writeto(path, overwrite=True)
+            var_note = ' + VAR' if cube.var is not None else ''
+            self.statusBar().showMessage(
+                f"Saved subcube{var_note} to {path}  "
+                f"({cube.flux.shape[0]} channels, {cube.ny}×{cube.nx} spaxels)", 6000)
+        except Exception as exc:
+            QMessageBox.warning(self, "Save failed", str(exc))
+
     # ------------------------------------------------------------------
     # Crop
     # ------------------------------------------------------------------
@@ -718,16 +832,6 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.warning(self, "Crop failed", str(exc))
             return
-        # Warn if sky region overlaps crop — it won't be valid anymore
-        if self._sky_rect is not None:
-            sx1, sy1, sx2, sy2 = self._sky_rect
-            if not (sx1 >= x1 and sx2 <= x2 and sy1 >= y1 and sy2 <= y2):
-                QMessageBox.information(
-                    self, "Sky region",
-                    "The sky region extends outside the crop area and has been cleared.")
-                self._sky_mask = None
-                self._sky_rect = None
-                self._image_canvas.clear_sky_region()
         self._sidebar.add_cube_object(cropped)
         self.statusBar().showMessage(
             f"Cropped '{cube.name}' [{x1}:{x2}, {y1}:{y2}] → '{cropped.name}'  "
@@ -900,6 +1004,9 @@ class MainWindow(QMainWindow):
         """Import regions from the live ds9 instance."""
         if not self._ds9_bridge or not self._ds9_bridge.available:
             return
+        if self._active_cube is None:
+            QMessageBox.information(self, "No data", "Load a cube or image first.")
+            return
         dlg = ImportRegionsDialog(source='ds9', parent=self)
         if not dlg.exec_():
             return
@@ -971,6 +1078,8 @@ class MainWindow(QMainWindow):
                     color = _EXTRACT_COLORS[_img_color_idx % len(_EXTRACT_COLORS)]
                     _img_color_idx += 1
                     self._image_canvas.draw_region_shape(reg, cube.wcs, color)
+                    self._image_overlays.append((reg, color))
+                    self._clear_btn.setEnabled(True)
                 else:
                     # IFU cube — extract spectrum with optimal (data profile) weighting
                     flux_arr, err_arr = extract_optimal_weighted(
@@ -1306,6 +1415,24 @@ class MainWindow(QMainWindow):
             + f"  ({units[order]})  — click any mode button to return",
             0)
 
+    def _on_show_help(self):
+        """Open the IFU Viewer help dialog (F1)."""
+        from rbcodes.GUIs.ifuviewer.help import show_help_dialog
+        show_help_dialog(self)
+
+    def _on_toggle_coord_fmt(self, checked):
+        """Toggle cursor RA/Dec display between decimal degrees and sexagesimal."""
+        self._image_canvas.coord_fmt = 'sex' if checked else 'deg'
+
+    def _on_show_header(self):
+        """Open the FITS header viewer for the active dataset."""
+        cube = self._active_cube
+        if cube is None:
+            QMessageBox.information(self, "No dataset", "Load a dataset first.")
+            return
+        dlg = HeaderDialog(cube, parent=self)
+        dlg.exec_()
+
     def _on_set_spec_range(self):
         """Open the spectrum X/Y range + scale dialog (Ctrl+R / Ctrl+W)."""
         wave = (self._active_cube.wave
@@ -1387,8 +1514,8 @@ class MainWindow(QMainWindow):
 
         # ---- Circular / Circular-Annular ---------------------------------
         else:
-            radius   = ac.radius
-            method   = ac.method
+            radius    = ac.radius
+            method    = ac.method
             weighting = ac.extraction_weighting
             src_mask  = make_circular_mask(ny, nx, x, y, radius)
             if src_mask.sum() == 0:
@@ -1446,6 +1573,28 @@ class MainWindow(QMainWindow):
         _inject_provenance(rb_spec, cube, x, y, mode, ac)
         self._register_extraction(label, rb_spec, new_markers, color=color,
                                   marker_info=marker_info)
+
+    def _on_aperture_settings_changed(self):
+        """Radius/bg spinbox changed — update live preview radius on canvas."""
+        ac = self._aperture_controls
+        ic = self._image_canvas
+        ic.preview_radius   = ac.radius
+        ic.preview_bg_inner = ac.bg_inner if ac.mode == 'Circular-Annular' else None
+        ic.preview_bg_outer = ac.bg_outer if ac.mode == 'Circular-Annular' else None
+
+    def _on_aperture_mode_changed(self, mode):
+        """Mode switched — enable/disable cursor-following preview circle."""
+        ic = self._image_canvas
+        if mode in ('Circular', 'Circular-Annular'):
+            ic.preview_mode = 'circle'
+            self._on_aperture_settings_changed()
+        else:
+            ic.preview_mode = None
+            ic.clear_preview_circle()
+
+    def _on_circular_extract(self):
+        """[Extract] button — no-op (kept for signal connection; click extracts directly)."""
+        pass
 
     def _on_aperture_drawn(self, mask):
         """Left-drag on image — extract over the drawn rectangle."""
@@ -1575,6 +1724,13 @@ class MainWindow(QMainWindow):
             return
 
         spec_list = [rb_spec for _, rb_spec in chosen]
+        no_err = [label for label, rb_spec in chosen
+                  if getattr(rb_spec, 'sig', None) is None]
+        if no_err:
+            self.statusBar().showMessage(
+                f"Note: {len(no_err)} spectrum/spectra sent without error array "
+                f"({', '.join(no_err[:3])}{'…' if len(no_err) > 3 else ''}) "
+                f"— error panel will be blank in rb_multispec", 8000)
         try:
             from rbcodes.GUIs.multispecviewer.rb_multispec import from_data
             win = from_data(spec_list, show=True)
@@ -1627,16 +1783,40 @@ class MainWindow(QMainWindow):
             return None, None
         return rb_spec, label
 
-    def _on_clear_extractions(self):
+    def _on_clear_extractions(self, _from_switch=False):
         self._spectrum_canvas.clear_locked()
         self._image_canvas.clear_extraction_marks()
+        self._image_canvas.clear_preview_circle()
         self._extract_combo.clear()
         self._extraction_marker_groups.clear()
         self._extraction_colors.clear()
         self._extraction_marker_info.clear()
+        self._image_overlays.clear()
         self._set_extract_strip_enabled(False)
+        # Persist the cleared state so overlays don't reappear on next switch
+        if not _from_switch and self._active_cube is not None:
+            self._save_dataset_state()
 
     def _on_spaxel_hovered(self, x, y, spectrum):
+        cube = self._active_cube
+        ac   = self._aperture_controls
+        if (cube is not None and not isinstance(cube, FITSImage)
+                and ac.mode in ('Circular', 'Circular-Annular')):
+            # Skip re-extraction if same pixel and same radius as last call
+            cache = getattr(self, '_hover_cache', None)
+            key   = (x, y, ac.radius, ac.mode)
+            if cache is not None and cache[0] == key:
+                spectrum = cache[1]
+            else:
+                try:
+                    mask = make_circular_mask(cube.ny, cube.nx, x, y, ac.radius)
+                    if mask.sum() > 0:
+                        spectrum = extract_with_method(cube.flux, mask, ac.method)
+                except Exception:
+                    pass
+                self._hover_cache = (key, spectrum)
+        else:
+            self._hover_cache = None
         self._spectrum_canvas.on_spaxel_hovered(x, y, spectrum)
 
     def _on_cursor_info(self, info):
@@ -2023,13 +2203,22 @@ class MainWindow(QMainWindow):
             self._spectrum_canvas.show()
             self._aperture_controls.show()
             self._aperture_controls.set_has_variance(cube.var is not None)
+            for w in (self._extract_combo, self._save_btn,
+                      self._multispec_btn, self._del_btn, self._clear_btn):
+                w.setVisible(True)
             self._extract_strip.show()
             self._set_extract_strip_enabled(False)   # empty state
         else:
             self._spectrum_canvas.hide()
             self._splitter.setSizes([800, 0])
             self._aperture_controls.hide()
-            self._extract_strip.hide()
+            # Show strip with only Clear all enabled (no spectra, but overlays can be cleared)
+            for w in (self._extract_combo, self._save_btn,
+                      self._multispec_btn, self._del_btn):
+                w.setVisible(False)
+            self._clear_btn.setVisible(True)
+            self._clear_btn.setEnabled(False)
+            self._extract_strip.show()
 
         # Channel slider: only for cubes
         if is_image:
@@ -3095,15 +3284,26 @@ class BatchExtractDialog(QDialog):
                 open_multispec, run_bg)
 
 
-def launch_viewer(fitsfile=None):
+def launch_viewer(files=None):
+    """
+    Start the IFU Viewer GUI.
+
+    Parameters
+    ----------
+    files : str or list of str or None
+        FITS file(s) to load on startup.
+    """
     app = QApplication.instance() or QApplication(sys.argv)
     win = MainWindow()
     win.setAttribute(Qt.WA_DeleteOnClose)
-    if fitsfile:
-        try:
-            win._sidebar.add_dataset(fitsfile)
-        except RuntimeError as exc:
-            print(f"[ifuviewer] {exc}")
+    if files:
+        if isinstance(files, str):
+            files = [files]
+        for f in files:
+            try:
+                win._sidebar.add_dataset(f)
+            except Exception as exc:
+                print(f"[rb_ifuview] could not load '{f}': {exc}")
     app.setStyleSheet(_QSS)
     win.show()
     sys.exit(app.exec_())
@@ -3513,14 +3713,182 @@ class MomentMapDialog(QDialog):
                 apply_snr, snr_thresh, snr_method)
 
 
-def main():
-    import argparse
-    parser = argparse.ArgumentParser(description="IFU Viewer")
-    parser.add_argument("fitsfile", nargs="?", default=None,
-                        help="FITS cube or image to open on startup")
-    args = parser.parse_args()
-    launch_viewer(fitsfile=args.fitsfile)
+class HeaderDialog(QDialog):
+    """
+    Show FITS header(s) for the active dataset.
+
+    If the source file is available and has multiple extensions, a dropdown
+    lets the user switch between them.  For cropped cubes (no file path) or
+    when the file is unavailable, the in-memory header is shown directly.
+    """
+
+    def __init__(self, cube, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"FITS Header — {cube.name}")
+        self.resize(700, 560)
+
+        self._headers = self._collect_headers(cube)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
+
+        # Extension selector (hidden when only one header)
+        self._ext_combo = QComboBox()
+        for label, _ in self._headers:
+            self._ext_combo.addItem(label)
+        if len(self._headers) > 1:
+            self._ext_combo.currentIndexChanged.connect(self._on_ext_changed)
+            layout.addWidget(self._ext_combo)
+
+        # Header text area
+        self._text = QPlainTextEdit()
+        self._text.setReadOnly(True)
+        self._text.setFont(_mono_font())
+        self._text.setLineWrapMode(QPlainTextEdit.NoWrap)
+        layout.addWidget(self._text)
+
+        # Search bar
+        search_row = QHBoxLayout()
+        self._search_box   = QLineEdit()
+        self._search_box.setPlaceholderText("Search header…")
+        self._search_box.returnPressed.connect(self._find_next)
+        self._match_label  = QLabel("")
+        prev_btn = QPushButton("Prev")
+        next_btn = QPushButton("Next")
+        prev_btn.setFixedWidth(48)
+        next_btn.setFixedWidth(48)
+        prev_btn.clicked.connect(self._find_prev)
+        next_btn.clicked.connect(self._find_next)
+        self._search_box.textChanged.connect(self._on_search_changed)
+        search_row.addWidget(self._search_box)
+        search_row.addWidget(prev_btn)
+        search_row.addWidget(next_btn)
+        search_row.addWidget(self._match_label)
+        layout.addLayout(search_row)
+
+        # Buttons
+        btn_row = QHBoxLayout()
+        copy_btn  = QPushButton("Copy to Clipboard")
+        close_btn = QPushButton("Close")
+        copy_btn.clicked.connect(self._copy)
+        close_btn.clicked.connect(self.accept)
+        btn_row.addWidget(copy_btn)
+        btn_row.addStretch()
+        btn_row.addWidget(close_btn)
+        layout.addLayout(btn_row)
+
+        self._show_header(0)
+
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _collect_headers(cube):
+        """
+        Return list of (label, header) pairs.
+
+        Tries to open cube.path first; falls back to cube.header.
+        """
+        from astropy.io import fits as _fits
+        import os
+
+        headers = []
+        path = getattr(cube, 'path', '')
+        if path and os.path.isfile(path):
+            try:
+                with _fits.open(path, memmap=False) as hdul:
+                    for i, hdu in enumerate(hdul):
+                        name = hdu.name or 'UNNAMED'
+                        label = f"[{i}]  {name}"
+                        if hasattr(hdu, 'data') and hdu.data is not None:
+                            shape = getattr(hdu.data, 'shape', '')
+                            if shape:
+                                label += f"  {shape}"
+                        headers.append((label, hdu.header.copy()))
+                if headers:
+                    return headers
+            except Exception:
+                pass
+
+        # Fallback: in-memory header only
+        hdr = getattr(cube, 'header', None)
+        label = f"[0]  {cube.name}"
+        if hdr is None:
+            from astropy.io import fits as _fits
+            hdr = _fits.Header()
+        return [(label, hdr)]
+
+    def _show_header(self, idx):
+        _, hdr = self._headers[idx]
+        lines = [f"{str(card)}" for card in hdr.cards]
+        self._text.setPlainText("\n".join(lines))
+
+    def _on_ext_changed(self, idx):
+        self._show_header(idx)
+        self._on_search_changed(self._search_box.text())
+
+    def _on_search_changed(self, text):
+        """Re-run search from top whenever the query changes."""
+        self._match_label.setText("")
+        if not text:
+            # Clear any existing highlights by resetting extra selections
+            self._text.setExtraSelections([])
+            return
+        self._highlight_all(text)
+        # Move cursor to first match
+        self._text.moveCursor(self._text.textCursor().Start)
+        self._find_next()
+
+    def _highlight_all(self, text):
+        """Highlight all occurrences with a yellow background."""
+        from PyQt5.QtGui import QTextCharFormat, QColor, QTextCursor
+        selections = []
+        fmt = QTextCharFormat()
+        fmt.setBackground(QColor('#f9e2af'))   # warm yellow (Catppuccin latte)
+        fmt.setForeground(QColor('#1e1e2e'))
+        cursor = self._text.document().find(text)
+        count = 0
+        while not cursor.isNull():
+            sel = QTextEdit.ExtraSelection()
+            sel.cursor = cursor
+            sel.format  = fmt
+            selections.append(sel)
+            count += 1
+            cursor = self._text.document().find(text, cursor)
+        self._text.setExtraSelections(selections)
+        self._match_label.setText(f"{count} match{'es' if count != 1 else ''}" if count else "Not found")
+
+    def _find_next(self):
+        text = self._search_box.text()
+        if not text:
+            return
+        found = self._text.find(text)
+        if not found:   # wrap around
+            self._text.moveCursor(self._text.textCursor().Start)
+            self._text.find(text)
+
+    def _find_prev(self):
+        from PyQt5.QtGui import QTextDocument
+        text = self._search_box.text()
+        if not text:
+            return
+        found = self._text.find(text, QTextDocument.FindBackward)
+        if not found:   # wrap around
+            self._text.moveCursor(self._text.textCursor().End)
+            self._text.find(text, QTextDocument.FindBackward)
+
+    def _copy(self):
+        from PyQt5.QtWidgets import QApplication
+        QApplication.clipboard().setText(self._text.toPlainText())
+
+
+def _mono_font():
+    from PyQt5.QtGui import QFont, QFontDatabase
+    f = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+    f.setPointSize(10)
+    return f
 
 
 if __name__ == "__main__":
+    from rbcodes.GUIs.ifuviewer.rb_ifuview import main
     main()

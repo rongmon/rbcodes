@@ -9,13 +9,14 @@ Four modes:
 
 Phase 9.
 """
-from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QLabel, QComboBox, QSpinBox)
+from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QLabel, QComboBox, QSpinBox,
+                             QPushButton)
 from PyQt5.QtCore import pyqtSignal, Qt
 
 
 MODES = ['Single pixel', 'Rectangle', 'Circular', 'Circular-Annular']
 
-WEIGHTINGS = ['None', 'Var-weighted', 'Optimal (Data)', 'Optimal (Gaussian)']
+WEIGHTINGS = ['None', 'Optimal (Data)', 'Optimal (Gaussian)', 'Var-weighted']
 
 
 class ApertureControls(QWidget):
@@ -29,7 +30,9 @@ class ApertureControls(QWidget):
     Method is hidden when any weighted mode is active (it is irrelevant then).
     """
 
-    settings_changed = pyqtSignal()
+    settings_changed  = pyqtSignal()
+    extract_requested = pyqtSignal()   # [Extract] button clicked in Circular mode
+    mode_changed      = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -128,6 +131,15 @@ class ApertureControls(QWidget):
         self._weight_box.currentIndexChanged.connect(self._on_weight_changed)
         layout.addWidget(self._weight_box)
 
+        # ---- Extract button (Circular modes only) ----
+        self._extract_btn = QPushButton("Extract")
+        self._extract_btn.setFixedWidth(68)
+        self._extract_btn.setToolTip(
+            "Extract spectrum from the previewed aperture.\n"
+            "Click the image first to set the aperture center.")
+        self._extract_btn.clicked.connect(self.extract_requested)
+        layout.addWidget(self._extract_btn)
+
         layout.addStretch()
 
         # Start in Single pixel mode
@@ -138,8 +150,10 @@ class ApertureControls(QWidget):
     # ------------------------------------------------------------------
 
     def _on_mode_changed(self):
-        self._apply_mode_visibility(self._mode_box.currentText())
+        mode = self._mode_box.currentText()
+        self._apply_mode_visibility(mode)
         self.settings_changed.emit()
+        self.mode_changed.emit(mode)
 
     def _on_weight_changed(self):
         self._update_method_visibility()
@@ -151,11 +165,14 @@ class ApertureControls(QWidget):
         is_annular  = mode == 'Circular-Annular'
 
         for w in (self._radius_label, self._radius_spin):
-            w.setVisible(is_circular)  # Rectangle has no radius spinbox
+            w.setVisible(is_circular)
 
         for w in (self._bg_inner_label, self._bg_inner_spin,
                   self._bg_outer_label, self._bg_outer_spin):
             w.setVisible(is_annular)
+
+        # Extract button only in circular modes
+        self._extract_btn.setVisible(is_circular)
 
         # Weighting is always visible — left-drag works in any mode
         # and optimal extraction should be available regardless of mode.
@@ -203,6 +220,46 @@ class ApertureControls(QWidget):
     def extraction_weighting(self):
         """'None', 'Var-weighted', 'Optimal (Data)', or 'Optimal (Gaussian)'."""
         return self._weight_box.currentText()
+
+    def get_state(self):
+        """Return a dict of all current settings for save/restore."""
+        return {
+            'mode':       self.mode,
+            'radius':     self.radius,
+            'bg_inner':   self.bg_inner,
+            'bg_outer':   self.bg_outer,
+            'method':     self.method,
+            'weighting':  self.extraction_weighting,
+        }
+
+    def set_state(self, state):
+        """Restore settings from a dict produced by get_state(). Suppresses signals."""
+        self._mode_box.blockSignals(True)
+        self._weight_box.blockSignals(True)
+        self._method_box.blockSignals(True)
+        self._radius_spin.blockSignals(True)
+        self._bg_inner_spin.blockSignals(True)
+        self._bg_outer_spin.blockSignals(True)
+
+        if state.get('mode') in MODES:
+            self._mode_box.setCurrentText(state['mode'])
+        self._radius_spin.setValue(state.get('radius', 3))
+        self._bg_inner_spin.setValue(state.get('bg_inner', 5))
+        self._bg_outer_spin.setValue(state.get('bg_outer', 8))
+        if state.get('method') in ('sum', 'mean', 'median'):
+            self._method_box.setCurrentText(state['method'])
+        if state.get('weighting') in WEIGHTINGS:
+            self._weight_box.setCurrentText(state['weighting'])
+
+        self._mode_box.blockSignals(False)
+        self._weight_box.blockSignals(False)
+        self._method_box.blockSignals(False)
+        self._radius_spin.blockSignals(False)
+        self._bg_inner_spin.blockSignals(False)
+        self._bg_outer_spin.blockSignals(False)
+
+        # Update visibility to match restored mode/weighting
+        self._apply_mode_visibility(self._mode_box.currentText())
 
     def set_has_variance(self, has_var):
         """

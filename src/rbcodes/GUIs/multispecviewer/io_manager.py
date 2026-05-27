@@ -3,6 +3,7 @@
 import os
 import json
 import datetime
+import warnings
 import pandas as pd
 import platform
 import getpass
@@ -112,8 +113,11 @@ class IOManager:
                             spec = XSpectrum1D.from_tuple(
                                 (spec.wavelength, spec.flux, sig_array), verbose=False)
                             spec.filename = file_path
+                            warnings.warn(
+                                f"{os.path.basename(file_path)}: no error array found — "
+                                f"assuming 5% of flux as error.", UserWarning, stacklevel=2)
                             self.show_message(
-                                f"No error spectrum found for {os.path.basename(file_path)}. " 
+                                f"No error spectrum found for {os.path.basename(file_path)}. "
                                 f"Using 5% of flux values as error.", "#FFA500")
                     else:
                         # rb_spectrum succeeded, add error array if missing
@@ -121,8 +125,11 @@ class IOManager:
                             sig_array = 0.05 * spec.flux.value
                             spec = rb_spectrum.from_tuple(
                                 (spec.wavelength, spec.flux, sig_array), filename=file_path)
+                            warnings.warn(
+                                f"{os.path.basename(file_path)}: no error array found — "
+                                f"assuming 5% of flux as error.", UserWarning, stacklevel=2)
                             self.show_message(
-                                f"No error spectrum found for {os.path.basename(file_path)}. " 
+                                f"No error spectrum found for {os.path.basename(file_path)}. "
                                 f"Using 5% of flux values as error.", "#FFA500")
                     
                     spectra.append(spec)

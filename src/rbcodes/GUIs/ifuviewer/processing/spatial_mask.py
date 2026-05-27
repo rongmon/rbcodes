@@ -70,8 +70,8 @@ def region_to_mask(region, wcs, ny, nx):
     if _HAS_REGIONS and reg_obj is not None:
         try:
             return _mask_from_reg_obj(reg_obj, wcs, ny, nx)
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"[spatial_mask] _mask_from_reg_obj failed: {exc}")
     # fallback
     return _mask_fallback(region, wcs, ny, nx)
 
@@ -333,6 +333,8 @@ def _mask_from_reg_obj(reg_obj, wcs, ny, nx):
     mask_obj = pix_reg.to_mask(mode='center')
     img = mask_obj.to_image((ny, nx))
     if img is None:
+        ctr = getattr(pix_reg, 'center', None)
+        print(f"[spatial_mask] to_image returned None — pixel center={ctr}, image size=({ny},{nx})")
         return np.zeros((ny, nx), dtype=bool)
     return np.asarray(img, dtype=bool)
 

@@ -3,6 +3,7 @@ Moment map computation for IFU cubes.
 
 Phase 10.
 """
+import warnings
 import numpy as np
 
 C_KMS = 2.998e5   # speed of light in km/s
@@ -166,7 +167,8 @@ def subtract_linear_continuum(flux, wave, bcont_min, bcont_max, rcont_min, rcont
     if lambda_b >= lambda_r:
         raise ValueError("Blue continuum window must be at shorter wavelength than red window.")
 
-    with np.errstate(all='ignore'):
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', RuntimeWarning)
         flux_b = np.nanmean(flux[bmask], axis=0)   # (ny, nx)
         flux_r = np.nanmean(flux[rmask], axis=0)   # (ny, nx)
 

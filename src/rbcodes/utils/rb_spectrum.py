@@ -948,29 +948,46 @@ def _rb_parse_fits_binary_table(hdulist, filename=None, **kwargs):
 
 
 def _rb_parse_multi_extension_fits(hdulist, filename=None, **kwargs):
-    """Parse multi-extension FITS"""
+    """Parse multi-extension FITS.
+
+    Looks up extensions by name first (FLUX/ERROR/WAVELENGTH/CONTINUUM as
+    written by rb_write_fits) then falls back to positional indexing for
+    files from other sources.
+    """
     try:
+        ext_names = [h.name.upper() for h in hdulist]
+
+        # Flux — always extension 0
         flux = hdulist[0].data
-        
-        # Look for error in extension 1
-        sig = None
-        if len(hdulist) > 1 and hdulist[1].data is not None:
-            sig = hdulist[1].data
-            
-        # Look for wavelength in extension 2
-        if len(hdulist) > 2 and hdulist[2].data is not None:
+
+        # Wavelength — by name, else position 2, else WCS header
+        if 'WAVELENGTH' in ext_names:
+            wave = hdulist[ext_names.index('WAVELENGTH')].data
+        elif len(hdulist) > 2 and hdulist[2].data is not None:
             wave = hdulist[2].data
         else:
-            # Generate wavelength from header keywords
             wave = _rb_setwave(hdulist[0].header)
-            
-        # Look for continuum in extension 3
+
+        # Error — by name, else position 1 only if it isn't the wavelength ext
+        sig = None
+        for name in ('ERROR', 'ERR', 'SIG', 'SIGMA'):
+            if name in ext_names:
+                sig = hdulist[ext_names.index(name)].data
+                break
+        if sig is None and len(hdulist) > 1:
+            # Positional fallback: use ext 1 as sig only if it's not the wavelength
+            if ext_names[1] not in ('WAVELENGTH',):
+                sig = hdulist[1].data
+
+        # Continuum — by name, else position 3
         co = None
-        if len(hdulist) > 3 and hdulist[3].data is not None:
+        if 'CONTINUUM' in ext_names:
+            co = hdulist[ext_names.index('CONTINUUM')].data
+        elif len(hdulist) > 3 and hdulist[3].data is not None:
             co = hdulist[3].data
-            
+
         return rb_spectrum(wave, flux, sig, co, filename=filename)
-    
+
     except Exception as e:
         print(f"rb_spectrum multi-extension parsing failed: {str(e)}")
         return rb_spectrum(None, None, _read_failed=True, filename=filename)

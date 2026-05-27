@@ -42,8 +42,12 @@ class ImageCanvas(FigureCanvasQTAgg):
     aperture_drawn  = pyqtSignal(object)             # boolean mask
     region_selected = pyqtSignal(int, int, int, int) # x1, y1, x2, y2
     aperture_picked = pyqtSignal(object)             # artist that was clicked
-    cursor_info     = pyqtSignal(str)
-    clim_changed    = pyqtSignal(float, float)
+    cursor_info          = pyqtSignal(str)
+    clim_changed         = pyqtSignal(float, float)
+    crop_requested          = pyqtSignal()   # right-click context menu → Crop to selection
+    sky_region_requested    = pyqtSignal()   # right-click context menu → Set as sky region
+    clear_sky_requested     = pyqtSignal()   # right-click context menu → Clear sky region
+    clear_overlays_requested = pyqtSignal()  # right-click context menu → Clear region overlays
 
     def __init__(self, parent=None, dpi=100):
         self._fig = Figure(dpi=dpi, facecolor='#1e1e2e')
@@ -58,13 +62,15 @@ class ImageCanvas(FigureCanvasQTAgg):
         self._cbar       = None   # current Colorbar
         self._cube       = None   # active IFUCube (set by MainWindow)
         self._wcs        = None   # 2D WCS for sky coordinate lookup
+        self.coord_fmt   = 'deg'  # 'deg' = decimal degrees, 'sex' = sexagesimal
         self._data_shape = None   # (ny, nx)
         self._data_raw   = None   # raw (unscaled) float64 array
 
         # Right-click drag state (contrast/bias)
-        self._drag_start    = None   # (x_pixel, y_pixel) at button-press
-        self._drag_vmin     = None
-        self._drag_vmax     = None
+        self._drag_start       = None   # (x_pixel, y_pixel) at button-press
+        self._drag_vmin        = None
+        self._drag_vmax        = None
+        self._right_drag_moved = False  # True once mouse moves during right-drag
 
         # Left-click / aperture drag state
         self._left_press       = None   # (canvas_x, canvas_y, data_x, data_y)
@@ -72,6 +78,11 @@ class ImageCanvas(FigureCanvasQTAgg):
         self._extraction_marks = []     # permanent markers (lines/patches)
         self._last_rect        = None   # (x1, y1, x2, y2) last drag bounds
         self._sky_patch        = None   # cyan rectangle for sky region
+        self._preview_artists  = []     # dashed preview circle (cursor-following)
+        self.preview_mode      = None   # None or 'circle'
+        self.preview_radius    = 3
+        self.preview_bg_inner  = None
+        self.preview_bg_outer  = None
 
         # Reference to NavigationToolbar2QT — set by MainWindow after creation.
         # When toolbar is in zoom/pan mode we skip left-click handling.
@@ -143,6 +154,7 @@ class ImageCanvas(FigureCanvasQTAgg):
 
         self._apply_label_colors()
         self._fig.tight_layout(pad=0.5)
+        self._ax.autoscale(False)   # prevent overlay artists from expanding the view
         self.draw_idle()
 
     def show_slice(self, i_wave):
@@ -286,22 +298,33 @@ class ImageCanvas(FigureCanvasQTAgg):
         if self._wcs is not None:
             try:
                 sky = self._wcs.pixel_to_world(x, y)
-                parts.append(f"RA={sky.ra.deg:.5f}°  Dec={sky.dec.deg:.5f}°")
+                if self.coord_fmt == 'sex':
+                    ra_str  = sky.ra.to_string(unit='hour', sep=':', precision=2, pad=True)
+                    dec_str = sky.dec.to_string(sep=':', precision=1, alwayssign=True)
+                    parts.append(f"RA={ra_str}  Dec={dec_str}")
+                else:
+                    parts.append(f"RA={sky.ra.deg:.5f}°  Dec={sky.dec.deg:.5f}°")
             except Exception:
                 pass
 
         self.cursor_info.emit("    ".join(parts))
+
+        # Live circular aperture preview — follows cursor
+        if self.preview_mode == 'circle' and 0 <= xi < nx and 0 <= yi < ny:
+            self.draw_preview_circle(xi, yi, self.preview_radius,
+                                     self.preview_bg_inner, self.preview_bg_outer)
 
     # ------------------------------------------------------------------
     # Mouse: right-click drag → contrast / bias
     # ------------------------------------------------------------------
 
     def _on_button_press(self, event):
-        if event.button == 3 and self._im is not None:  # right click → contrast drag
+        if event.button == 3 and self._im is not None:  # right click
             self._drag_start = (event.x, event.y)
             vmin, vmax = self._im.get_clim()
             self._drag_vmin = vmin
             self._drag_vmax = vmax
+            self._right_drag_moved = False   # reset drag flag
 
         elif event.button == 1 and self._cube is not None and event.inaxes:
             # Left-click: only handle when nav toolbar is idle
@@ -311,7 +334,12 @@ class ImageCanvas(FigureCanvasQTAgg):
 
     def _on_button_release(self, event):
         if event.button == 3:
+            was_drag = getattr(self, '_right_drag_moved', False)
             self._drag_start = None
+            self._right_drag_moved = False
+            if not was_drag:
+                self._show_context_menu(event)
+            return
 
         elif event.button == 1 and self._left_press is not None:
             px0, py0, dx0, dy0 = self._left_press
@@ -342,6 +370,7 @@ class ImageCanvas(FigureCanvasQTAgg):
         if self._im is None or event.x is None:
             return
 
+        self._right_drag_moved = True   # mark that a real drag occurred
         dx = event.x  - self._drag_start[0]   # horizontal → bias (shift)
         dy = event.y  - self._drag_start[1]   # vertical   → contrast (stretch)
 
@@ -361,6 +390,43 @@ class ImageCanvas(FigureCanvasQTAgg):
         self._im.set_clim(new_vmin, new_vmax)
         self.draw_idle()
         self.clim_changed.emit(float(new_vmin), float(new_vmax))
+
+    def _show_context_menu(self, event):
+        """Show right-click context menu at current cursor position."""
+        from PyQt5.QtWidgets import QMenu
+        from PyQt5.QtGui import QCursor
+
+        has_rect = self._last_rect is not None
+        menu = QMenu(self)
+
+        crop_action = menu.addAction("Crop to selection")
+        crop_action.setEnabled(has_rect)
+        crop_action.setToolTip("Crop the cube to the drawn rectangle  (Ctrl+K)")
+
+        sky_action = menu.addAction("Set as sky region")
+        sky_action.setEnabled(has_rect)
+        sky_action.setToolTip("Use the drawn rectangle as the sky/background region")
+
+        has_sky = self._sky_patch is not None
+        menu.addSeparator()
+        clear_sky_action = menu.addAction("Clear sky region")
+        clear_sky_action.setEnabled(has_sky)
+        clear_sky_action.setToolTip("Remove the current sky region")
+
+        has_overlays = len(self._extraction_marks) > 0
+        clear_overlays_action = menu.addAction("Clear region overlays")
+        clear_overlays_action.setEnabled(has_overlays)
+        clear_overlays_action.setToolTip("Remove all drawn region overlays from this image")
+
+        chosen = menu.exec_(QCursor.pos())
+        if chosen == crop_action:
+            self.crop_requested.emit()
+        elif chosen == sky_action:
+            self.sky_region_requested.emit()
+        elif chosen == clear_sky_action:
+            self.clear_sky_requested.emit()
+        elif chosen == clear_overlays_action:
+            self.clear_overlays_requested.emit()
 
     # ------------------------------------------------------------------
     # Left-click / aperture handlers
@@ -436,6 +502,49 @@ class ImageCanvas(FigureCanvasQTAgg):
             self._ax.add_patch(out_patch)
             self._extraction_marks.extend([in_patch, out_patch])
 
+        self.draw_idle()
+
+    def draw_preview_circle(self, cx, cy, radius, bg_inner=None, bg_outer=None):
+        """
+        Draw a dashed preview circle at (cx, cy) with given radius.
+
+        Replaces any existing preview without an intermediate draw_idle so
+        the cursor-following update is a single redraw per mouse move.
+        Not added to _extraction_marks — cleared by clear_preview_circle().
+        """
+        from matplotlib.patches import Circle
+        # Remove old artists without redrawing yet
+        for a in self._preview_artists:
+            try:
+                a.remove()
+            except Exception:
+                pass
+        self._preview_artists.clear()
+
+        clr = '#cdd6f4'   # lavender-white
+        src = Circle((cx, cy), radius, fill=False,
+                     edgecolor=clr, lw=1.4, linestyle='--', zorder=13)
+        self._ax.add_patch(src)
+        mk, = self._ax.plot(cx, cy, '+', color=clr, ms=8, mew=1.2, zorder=14)
+        self._preview_artists.extend([src, mk])
+        if bg_inner is not None and bg_outer is not None:
+            for r in (bg_inner, bg_outer):
+                ring = Circle((cx, cy), r, fill=False,
+                              edgecolor='#89dceb', lw=1, linestyle=':', zorder=13)
+                self._ax.add_patch(ring)
+                self._preview_artists.append(ring)
+        self.draw_idle()
+
+    def clear_preview_circle(self):
+        """Remove the dashed preview circle from the image."""
+        if not self._preview_artists:
+            return
+        for a in self._preview_artists:
+            try:
+                a.remove()
+            except Exception:
+                pass
+        self._preview_artists.clear()
         self.draw_idle()
 
     def draw_region_shape(self, region, wcs, color):

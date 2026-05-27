@@ -11,8 +11,14 @@ from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QLabel,
 from PyQt5.QtCore import Qt
 
 
-COLORMAPS = ['gray', 'gray_r', 'viridis', 'plasma', 'inferno',
-             'hot', 'RdBu_r', 'cubehelix']
+COLORMAPS = [
+    'gray', 'gray_r',
+    'viridis', 'plasma', 'inferno', 'magma',
+    'cividis', 'turbo',
+    'hot', 'cubehelix', 'gnuplot2',
+    'coolwarm', 'RdBu_r', 'seismic',
+    'twilight', 'jet',
+]
 
 SCALES = ['Linear', 'Log', 'Sqrt', 'Square']
 
@@ -80,6 +86,7 @@ class ImageControls(QWidget):
         self._cmap_box = QComboBox()
         self._cmap_box.addItems(COLORMAPS)
         self._cmap_box.setFixedWidth(100)
+        self._cmap_box.setMaxVisibleItems(10)
         self._cmap_box.currentTextChanged.connect(self._on_cmap_changed)
         layout.addWidget(self._cmap_box)
 
@@ -141,6 +148,53 @@ class ImageControls(QWidget):
         self._invert_cb.setChecked(inverted)
         self._updating = False
         self._canvas.update_cmap(cmap_name)
+
+    def get_display_state(self):
+        """
+        Return a dict capturing the current display settings for later restore.
+        Keys: scale, norm, cmap, vmin, vmax.
+        """
+        return {
+            'scale': self._scale_box.currentText(),
+            'norm':  self._norm_box.currentText(),
+            'cmap':  self.current_cmap,
+            'vmin':  self._min_box.text(),
+            'vmax':  self._max_box.text(),
+        }
+
+    def set_display_state(self, state):
+        """
+        Restore display settings from a dict produced by get_display_state().
+        Updates controls and canvas without triggering a full reset.
+        """
+        self._updating = True
+        scale = state.get('scale', 'Linear')
+        norm  = state.get('norm',  'ZScale')
+        cmap  = state.get('cmap',  'gray')
+        vmin  = state.get('vmin',  '')
+        vmax  = state.get('vmax',  '')
+
+        if scale in SCALES:
+            self._scale_box.setCurrentText(scale)
+        if norm in NORMS:
+            self._norm_box.setCurrentText(norm)
+        self._min_box.setText(vmin)
+        self._max_box.setText(vmax)
+
+        inverted = cmap.endswith('_r')
+        base     = cmap[:-2] if inverted else cmap
+        if base in COLORMAPS:
+            self._cmap_box.setCurrentText(base)
+        self._invert_cb.setChecked(inverted)
+        self._updating = False
+
+        # Apply to canvas
+        self._canvas.update_cmap(cmap)
+        if norm == 'Manual' and vmin and vmax:
+            try:
+                self._canvas.update_clim(float(vmin), float(vmax))
+            except ValueError:
+                pass
 
     # ------------------------------------------------------------------
     # Slots — controls → canvas
