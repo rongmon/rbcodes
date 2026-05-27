@@ -92,6 +92,7 @@ class MainWindow(QMainWindow):
 		self.toolbar.send_fitsobj.connect(self.sc._on_sent_fitsobj)
 		self.toolbar.send_frame.connect(self.sc._on_frame_selected)
 		self.toolbar.send_message.connect(lambda s,c='#ff0000': self.mbox.on_sent_message(s, c))
+		self.toolbar.send_launch_zfind.connect(self._on_launch_zfind)
 		
 		# Widget_z signals
 		self.widget_z.send_linelist.connect(self.sc.on_linelist_slot)
@@ -112,6 +113,56 @@ class MainWindow(QMainWindow):
 		
 		# Table signals
 		self.table_z.send_dictdata.connect(self.widget_z._on_sent_dictdata)
+
+	def _on_launch_zfind(self):
+		"""Open ZFindDialog with the currently loaded 1-D spectrum."""
+		from rbcodes.GUIs.zfind.dialog import ZFindDialog
+		from rbcodes.GUIs.zfind.io import to_rb_spectrum
+
+		fitsobj = self.fitsobj
+
+		# Prefer fitsobj.flux (1D loaded directly or from 2D+1D combined file).
+		# Fall back to toolbar.extract1d for pure-2D files where the user has
+		# extracted a 1D via the canvas box tool.
+		wave = error = flux = None
+		if fitsobj is not None and fitsobj.flux is not None and len(fitsobj.flux) > 0:
+			wave  = fitsobj.wave
+			flux  = fitsobj.flux
+			error = fitsobj.error
+		elif self.toolbar.extract1d is not None:
+			ext   = self.toolbar.extract1d
+			wave  = ext.get('WAVELENGTH')
+			flux  = ext.get('FLUX')
+			error = ext.get('ERROR')
+
+		if wave is None or flux is None or len(flux) == 0:
+			self.mbox.on_sent_message(
+				'No 1D spectrum available. Load a 1D file or extract a 1D '
+				'from the 2D spectrum first.', '#e74c3c')
+			return
+
+		try:
+			spec = to_rb_spectrum((wave, flux, error))
+		except Exception as exc:
+			self.mbox.on_sent_message(
+				f'Could not build spectrum for zfind: {exc}', '#e74c3c')
+			return
+
+		# Pre-select the linelist that is currently active in widget_z
+		default_ll = self.widget_z.l_lln.currentText()
+		if default_ll in ('NONE', ''):
+			default_ll = None
+
+		dialog = ZFindDialog(
+			spec=spec,
+			mode='emission',
+			default_linelist=default_ll,
+			parent=self,
+		)
+		# Wire acceptance signal → LineListWidget z slot
+		dialog.accepted_z.connect(self.widget_z._on_estZ_changed)
+
+		dialog.exec_()   # modal — blocks toolbar, main window stays visible
 
 	def on_fitsobj_slot(self, sent_fitsobj):
 		self.fitsobj = sent_fitsobj

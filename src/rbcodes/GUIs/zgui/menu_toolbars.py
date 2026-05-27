@@ -23,6 +23,7 @@ class Custom_ToolBar(QToolBar):
 	send_filenames = pyqtSignal(list)
 	send_message = pyqtSignal(str)
 	send_frame = pyqtSignal(str)  # Emit frame name when user selects different frame
+	send_launch_zfind = pyqtSignal()  # request to open ZFindDialog
 
 	#Our personalized custom Toolbar
 	def __init__(self, mainWindow):
@@ -149,6 +150,13 @@ class Custom_ToolBar(QToolBar):
 
 		self.addSeparator()
 
+		# "Find z" button — opens the semi-automated redshift finder
+		btn_zfind = self._create_button('Find z', 'Open semi-automated redshift finder (rb_zfind)')
+		self.addAction(btn_zfind)
+		btn_zfind.triggered.connect(self._on_find_z)
+
+		self.addSeparator()
+
 		# "Advanced" Option
 		btn_adv = self._create_button('Advanced', 'More 2D inspection')
 		self.addAction(btn_adv)
@@ -176,6 +184,9 @@ class Custom_ToolBar(QToolBar):
 			self.manual = UserManualDialog(method=1)
 		self.manual.show()
 
+	def _on_find_z(self):
+		"""Emit signal requesting ZFindDialog — handled by MainWindow."""
+		self.send_launch_zfind.emit()
 
 	def _load_specs(self):
 		# This function corresponds to the action of "Read FITS" button

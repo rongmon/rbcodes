@@ -31,6 +31,9 @@ launch_specgui
 # View and compare multiple spectra
 rb_multispec
 
+# View IFU datacubes and extract spectra
+rb_ifuview
+
 # Fit Lyman Limit Systems
 rb_llsfitter
 
@@ -98,8 +101,12 @@ For more installation options and troubleshooting, see [INSTALLATION.md](../INST
   - corner >= 2.0
   - scikit-learn >= 1.5.0
   - tqdm >= 4.65.0
+  - regions >= 0.5
   - pytest >= 6.0
   - pytest-cov >= 2.0
+
+- Optional (install separately):
+  - pyds9 — live ds9 bridge for `rb_ifuview` (run `rb_ifuview --install` for instructions)
 
 ## Contents
 
@@ -143,13 +150,19 @@ See the [full documentation](/docs/GUIs/rb_spec/rb_spec.md) for the complete API
 #### Active Tools
 1. [launch_specgui](/docs/GUIs/rb_spec/rb_spec.md): **GUI launcher** for `rb_spec` — provides a point-and-click interface around the core pipeline; supports single-spectrum and batch modes
 2. [multispecviewer](/docs/GUIs/multispec/multispec.md): Enhanced spectrum viewer for handling multiple 1D spectra simultaneously with advanced line identification and absorber cataloging capabilities.
-3. [interactive_continuum_fit.py](/docs/GUIs/interactive_continuum_fit.md): **Recommended continuum fitter** - Interactive tool with polynomial and spline methods, manual masking, and real-time feedback
-4. [rb_zgui (zgui/main.py)](/docs/GUIs/zgui/Tutorial_for_Emission_Line_Redshift_Estimator_GUI.pdf): Redshift measurement GUI (PDF tutorial)
+3. **rb_ifuview** (`rb_ifuview cube.fits`): QFitsView-style IFU datacube viewer — load KCWI, MUSE, or any 3-axis FITS cube; extract 1D spectra interactively; compute moment maps; import ds9 regions; send spectra to `rb_multispec`.
+   - Supports Single pixel / Rectangular / Circular / Circular-Annular apertures
+   - Variance-weighted and optimal (data/Gaussian) spectral extraction
+   - M0 / M1 / M2 moment maps with continuum subtraction and SNR masking
+   - Per-dataset state persistence (extractions, image mode, moment params, sky region)
+   - Optional ds9 bridge: `rb_ifuview --install` for setup instructions
+4. [interactive_continuum_fit.py](/docs/GUIs/interactive_continuum_fit.md): **Recommended continuum fitter** - Interactive tool with polynomial and spline methods, manual masking, and real-time feedback
+5. [rb_zgui (zgui/main.py)](/docs/GUIs/zgui/Tutorial_for_Emission_Line_Redshift_Estimator_GUI.pdf): Redshift measurement GUI (PDF tutorial)
    - Supports 1D and 2D spectra
    - Optimized for JWST NIRCam/Grism spectroscopy
-5. [LLSFitter_GUI.py](/docs/GUIs/LLSFitter/LLSFitter.md): GUI to fit Lyman Limit System column densities
-6. [AbsTools](/docs/GUIs/AbsTools/README.md): ⚠️ **LEGACY** - Complex absorption line analysis GUI with batch processing capabilities (use `launch_specgui` in batch mode instead for new analyses)
-7. [rb_cont.py](/docs/GUIs/rb_cont.md): ⚠️ **LEGACY** - Older continuum fitter (use `interactive_continuum_fit.py` instead)
+6. [LLSFitter_GUI.py](/docs/GUIs/LLSFitter/LLSFitter.md): GUI to fit Lyman Limit System column densities
+7. [AbsTools](/docs/GUIs/AbsTools/README.md): ⚠️ **LEGACY** - Complex absorption line analysis GUI with batch processing capabilities (use `launch_specgui` in batch mode instead for new analyses)
+8. [rb_cont.py](/docs/GUIs/rb_cont.md): ⚠️ **LEGACY** - Older continuum fitter (use `interactive_continuum_fit.py` instead)
 
 ### Intergalactic Medium (IGM) Tools
 
