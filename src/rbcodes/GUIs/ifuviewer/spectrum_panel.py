@@ -44,6 +44,8 @@ class SpectrumCanvas(FigureCanvasQTAgg):
     window_cleared   = pyqtSignal(str)    # 'onband' | 'cont1' | 'cont2'
     spaxel_locked    = pyqtSignal(int, int)
     cursor_info      = pyqtSignal(str)
+    xlim_changed     = pyqtSignal(float, float)
+    ylim_changed     = pyqtSignal(float, float)
 
     def __init__(self, parent=None, dpi=100):
         self._fig = Figure(dpi=dpi, facecolor='#1e1e2e')
@@ -52,7 +54,7 @@ class SpectrumCanvas(FigureCanvasQTAgg):
         self.setParent(parent)
 
         self._ax   = self._fig.add_subplot(111)
-        self._style_axes()
+        self._style_axes()   # also connects xlim/ylim callbacks
 
         self._line        = None   # collapsed spectrum
         self._wave        = None
@@ -629,3 +631,8 @@ class SpectrumCanvas(FigureCanvasQTAgg):
         self._ax.yaxis.label.set_color(c)
         for spine in self._ax.spines.values():
             spine.set_edgecolor('#45475a')
+        # Reconnect limit-change callbacks (cla() wipes them)
+        self._ax.callbacks.connect('xlim_changed',
+            lambda ax: self.xlim_changed.emit(*ax.get_xlim()))
+        self._ax.callbacks.connect('ylim_changed',
+            lambda ax: self.ylim_changed.emit(*ax.get_ylim()))

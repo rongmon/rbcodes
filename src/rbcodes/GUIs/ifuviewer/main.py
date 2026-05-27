@@ -120,6 +120,8 @@ class MainWindow(QMainWindow):
         self._spectrum_canvas.onband_changed.connect(self._on_onband_changed)
         self._spectrum_canvas.contband_changed.connect(self._on_contband_changed)
         self._spectrum_canvas.window_cleared.connect(self._on_window_cleared)
+        self._spectrum_canvas.xlim_changed.connect(self._sync_spec_range_strip)
+        self._spectrum_canvas.ylim_changed.connect(self._sync_spec_range_strip)
 
         self._placeholder = QLabel("Load a cube to begin")
         self._placeholder.setAlignment(Qt.AlignCenter)
@@ -210,6 +212,16 @@ class MainWindow(QMainWindow):
             "Save all current aperture markers as a ds9 .reg file.")
         save_reg_action.triggered.connect(self._on_save_apertures_as_region)
         file_menu.addAction(save_reg_action)
+
+        save_figure_action = QAction("Save Figure…", self)
+        save_figure_action.setShortcut("Ctrl+Shift+S")
+        save_figure_action.setToolTip(
+            "Save a publication-quality PNG or PDF figure.\n"
+            "Cube: image panel + extracted spectra (color-matched).\n"
+            "2D image: image + region overlays.\n"
+            "Uses the exact colormap, clim, and axis limits currently shown.")
+        save_figure_action.triggered.connect(self._on_save_figure)
+        file_menu.addAction(save_figure_action)
 
         file_menu.addSeparator()
 
@@ -755,6 +767,180 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.warning(self, "Save failed", str(exc))
 
+    def _on_save_figure(self):
+        """
+        Save a publication-quality PNG or PDF figure (Ctrl+Shift+S).
+
+        Cube with locked spectra  → 2-panel: image top, extracted spectra bottom.
+        Cube with no extractions  → 1-panel: image only.
+        2D image                  → 1-panel: image + region overlays.
+
+        Exact colormap, clim, and axis limits from the current display are used.
+        """
+        import matplotlib
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
+        from matplotlib.patches import Circle, Rectangle as MplRect
+
+        cube = self._active_cube
+        if cube is None:
+            self.statusBar().showMessage("No data loaded.", 3000)
+            return
+
+        # ---- ask for path ------------------------------------------------
+        default = (cube.name or 'figure') + '.pdf'
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Figure", default,
+            "PDF (*.pdf);;PNG (*.png);;All files (*)")
+        if not path:
+            return
+
+        # ---- gather current display state --------------------------------
+        ic   = self._image_canvas
+        sc   = self._spectrum_canvas
+        im   = ic._im
+        if im is None:
+            self.statusBar().showMessage("No image to save.", 3000)
+            return
+
+        cmap_name  = im.get_cmap().name
+        vmin, vmax = im.get_clim()
+        img_xlim   = ic._ax.get_xlim()
+        img_ylim   = ic._ax.get_ylim()
+        wcs        = ic._wcs
+        data2d     = ic._data_raw
+
+        is_image   = isinstance(cube, FITSImage)
+        locked     = sc._locked_lines          # list of Line2D
+        locked_specs = sc.locked_spectra       # list of (label, rb_spec)
+        has_spectra  = len(locked) > 0 and not is_image
+
+        onband = sc._onband_ext
+        cont1  = sc._cont1_ext
+        cont2  = sc._cont2_ext
+        spec_xlim = sc._ax.get_xlim()
+        spec_ylim = sc._ax.get_ylim()
+
+        # ---- build figure ------------------------------------------------
+        if has_spectra:
+            fig = plt.figure(figsize=(8, 6), constrained_layout=True)
+            gs  = fig.add_gridspec(2, 1, height_ratios=[2.5, 1])
+            ax_im   = fig.add_subplot(gs[0], projection=wcs) if wcs else fig.add_subplot(gs[0])
+            ax_spec = fig.add_subplot(gs[1])
+        else:
+            fig_h = 5 if is_image else 4.5
+            fig   = plt.figure(figsize=(6, fig_h), constrained_layout=True)
+            ax_im = fig.add_subplot(111, projection=wcs) if wcs else fig.add_subplot(111)
+            ax_spec = None
+
+        # ---- image panel -------------------------------------------------
+        ax_im.imshow(data2d, origin='lower', interpolation='nearest',
+                     cmap=cmap_name, vmin=vmin, vmax=vmax, aspect='auto')
+        ax_im.set_xlim(img_xlim)
+        ax_im.set_ylim(img_ylim)
+
+        # colorbar
+        sm = plt.cm.ScalarMappable(
+            cmap=cmap_name,
+            norm=mcolors.Normalize(vmin=vmin, vmax=vmax))
+        sm.set_array([])
+        fig.colorbar(sm, ax=ax_im, pad=0.02, fraction=0.046)
+
+        # axis labels
+        if wcs:
+            ax_im.set_xlabel('RA', fontsize=9)
+            ax_im.set_ylabel('Dec', fontsize=9)
+        else:
+            ax_im.set_xlabel('x (px)', fontsize=9)
+            ax_im.set_ylabel('y (px)', fontsize=9)
+
+        # aperture / region markers
+        for i, minfo in enumerate(self._extraction_marker_info):
+            color = (self._extraction_colors[i]
+                     if i < len(self._extraction_colors) else '#888888')
+            mtype = minfo.get('type')
+            if mtype == 'spaxel':
+                ax_im.plot(minfo['x'], minfo['y'], '+',
+                           color=color, ms=9, mew=1.4, zorder=12)
+            elif mtype == 'circle':
+                cx, cy, r = minfo['cx'], minfo['cy'], minfo['radius']
+                ax_im.add_patch(Circle((cx, cy), r,
+                                       edgecolor=color, facecolor='none',
+                                       lw=1.2, zorder=11))
+                ax_im.plot(cx, cy, '+', color=color, ms=6, mew=1.2, zorder=12)
+                bg_in  = minfo.get('bg_inner')
+                bg_out = minfo.get('bg_outer')
+                if bg_in and bg_out:
+                    ax_im.add_patch(Circle((cx, cy), bg_in,
+                                           edgecolor=color, facecolor='none',
+                                           lw=0.8, linestyle='--', zorder=11))
+                    ax_im.add_patch(Circle((cx, cy), bg_out,
+                                           edgecolor=color, facecolor='none',
+                                           lw=0.8, linestyle='--', zorder=11))
+            elif mtype == 'rect':
+                xi0, yi0 = minfo['xi0'], minfo['yi0']
+                xi1, yi1 = minfo['xi1'], minfo['yi1']
+                ax_im.add_patch(MplRect(
+                    (xi0 - 0.5, yi0 - 0.5), xi1 - xi0, yi1 - yi0,
+                    edgecolor=color, facecolor='none',
+                    lw=1.2, linestyle='--', zorder=11))
+
+        # 2D-image region overlays
+        if is_image:
+            for reg, color in self._image_overlays:
+                try:
+                    pixel_region = reg.to_pixel(wcs) if wcs else None
+                    if pixel_region is not None:
+                        patch = pixel_region.as_artist(
+                            edgecolor=color, facecolor='none', lw=1.2)
+                        ax_im.add_patch(patch)
+                except Exception:
+                    pass
+
+        # title
+        mode_label = self._channel_slider.current_mode if not is_image else '2D Image'
+        ax_im.set_title(f"{cube.name}  —  {mode_label}", fontsize=9, pad=4)
+
+        # ---- spectrum panel (cube with extractions only) -----------------
+        if ax_spec is not None:
+            for line, (label, _) in zip(locked, locked_specs):
+                wave = line.get_xdata()
+                flux = line.get_ydata()
+                ax_spec.plot(wave, flux,
+                             color=line.get_color(), lw=0.9, alpha=0.9,
+                             label=label)
+
+            # band spans
+            if not (np.isnan(onband[0]) or np.isnan(onband[1])):
+                ax_spec.axvspan(onband[0], onband[1],
+                                color='#40a040', alpha=0.15, zorder=0)
+            if not (np.isnan(cont1[0]) or np.isnan(cont1[1])):
+                ax_spec.axvspan(cont1[0], cont1[1],
+                                color='#c04040', alpha=0.15, zorder=0)
+            if not (np.isnan(cont2[0]) or np.isnan(cont2[1])):
+                ax_spec.axvspan(cont2[0], cont2[1],
+                                color='#c08020', alpha=0.15, zorder=0)
+
+            ax_spec.set_xlim(spec_xlim)
+            ax_spec.set_ylim(spec_ylim)
+            ax_spec.set_xlabel('Wavelength (Å)', fontsize=9)
+            ax_spec.set_ylabel('Flux', fontsize=9)
+            ax_spec.tick_params(labelsize=8)
+            if locked:
+                ncol = max(1, min(4, len(locked) // 4 + 1))
+                ax_spec.legend(fontsize=6, framealpha=0.8,
+                               loc='upper right', ncol=ncol)
+
+        # ---- save --------------------------------------------------------
+        try:
+            dpi = 150 if path.lower().endswith('.png') else None
+            fig.savefig(path, dpi=dpi)
+            plt.close(fig)
+            self.statusBar().showMessage(f"Figure saved to {path}", 4000)
+        except Exception as exc:
+            plt.close(fig)
+            QMessageBox.warning(self, "Save failed", str(exc))
+
     def _on_save_subcube(self):
         """Save the active 3D cube (or cropped subcube) as a FITS file."""
         from astropy.io import fits as _fits
@@ -883,8 +1069,7 @@ class MainWindow(QMainWindow):
             selected = (i == idx)
             for artist in artists:
                 try:
-                    artist.set_linewidth(2.4 if selected else 1.0)
-                    artist.set_alpha(1.0 if selected else 0.4)
+                    artist.set_linewidth(3.5 if selected else 2.0)
                 except AttributeError:
                     pass
         self._image_canvas.draw_idle()
@@ -2110,7 +2295,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
         return strip
 
-    def _sync_spec_range_strip(self):
+    def _sync_spec_range_strip(self, *_):
         """Populate X/Y text boxes from current spectrum axes limits."""
         try:
             ax = self._spectrum_canvas._ax

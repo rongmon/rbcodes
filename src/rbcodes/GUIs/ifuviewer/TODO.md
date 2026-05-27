@@ -570,6 +570,36 @@ python -m rbcodes.GUIs.ifuviewer.main
 
 ---
 
+### Post-testing Polish — Status: COMPLETE ✓
+
+Additional fixes and improvements after all phases passed testing:
+
+**Per-dataset state persistence (extended)**
+- `image_controls.py`: added `get_display_state()` / `set_display_state()` — saves and restores colormap, scale type (Linear/Log/Sqrt/Square), normalization, and manual vmin/vmax
+- `aperture_controls.py`: added `get_state()` / `set_state()` — saves and restores aperture mode, radius, bg inner/outer, method, and weighting; all signals blocked during restore
+- `_save_dataset_state`: now captures `display_state`, `image_clim`, `spec_xlim`, and `aperture_state`
+- `_restore_dataset_state`: rebuilds `Normalize(vmin, vmax)` from saved clim; restores scale/norm/cmap via `set_display_state()`; restores spectrum x-limits; restores aperture controls via `set_state()`
+
+**Image panel autoscale fix**
+- `image_panel.py` `show_image()`: calls `ax.autoscale(False)` after `tight_layout` — prevents circle/annulus preview artists near the image edge from causing the axes to zoom out
+
+**Aperture controls**
+- Weighting order changed: `None | Optimal (Data) | Optimal (Gaussian) | Var-weighted` — Var-weighted moved to last since it requires a variance cube and is less commonly used
+
+**Colormap list expanded**
+- `image_controls.py`: 16 colormaps: `gray`, `gray_r`, `viridis`, `plasma`, `inferno`, `magma`, `cividis`, `turbo`, `hot`, `cubehelix`, `gnuplot2`, `coolwarm`, `RdBu_r`, `seismic`, `twilight`, `jet`
+- Dropdown set to `maxVisibleItems(10)` — scrollable
+
+**CLI entry point**
+- `rb_ifuview.py`: argparse wrapper; `files` positional nargs=`*`; `--install` flag prints pyds9/XPA setup instructions
+- `setup.cfg`: `rb_ifuview = rbcodes.GUIs.ifuviewer.rb_ifuview:main` console_scripts entry point
+- `regions >= 0.5` added to `install_requires` (required for ds9 region import)
+
+**Documentation**
+- `docs/main_readme.md`: added `rb_ifuview` to Quick Start, full feature bullet list in GUIs section, `regions` dependency, pyds9 optional note
+
+---
+
 ### Phase 11 — ds9 Bridge + Region I/O + Batch Extraction (original spec)
 **Goal**: send images to ds9, import/export region files, batch-extract spectra from regions, highlight apertures interactively, add RA/Dec provenance to extracted spectra.
 

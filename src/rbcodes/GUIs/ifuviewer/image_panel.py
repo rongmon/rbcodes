@@ -469,34 +469,34 @@ class ImageCanvas(FigureCanvasQTAgg):
 
         if shape == 'Circle':
             src = Circle((cx, cy), size, fill=False,
-                         edgecolor=src_color, lw=1.4, zorder=11, picker=5)
+                         edgecolor=src_color, lw=2.0, zorder=11, picker=5)
         else:
             s = size + 0.5
             src = MplRect((cx - s, cy - s), 2 * s, 2 * s,
-                          fill=False, edgecolor=src_color, lw=1.4, zorder=11, picker=5)
+                          fill=False, edgecolor=src_color, lw=2.0, zorder=11, picker=5)
         self._ax.add_patch(src)
         self._extraction_marks.append(src)
 
         # Centre cross
         mk, = self._ax.plot(cx, cy, '+', color=src_color,
-                            ms=8, mew=1.2, zorder=12, picker=5)
+                            ms=10, mew=1.8, zorder=12, picker=5)
         self._extraction_marks.append(mk)
 
         # Background annulus
         if bg_inner is not None and bg_outer is not None:
             if shape == 'Circle':
                 in_patch  = Circle((cx, cy), bg_inner, fill=False,
-                                   edgecolor=bg_color, lw=1, linestyle='--', zorder=11)
+                                   edgecolor=bg_color, lw=1.4, linestyle='--', zorder=11)
                 out_patch = Circle((cx, cy), bg_outer, fill=False,
-                                   edgecolor=bg_color, lw=1, linestyle='--', zorder=11)
+                                   edgecolor=bg_color, lw=1.4, linestyle='--', zorder=11)
             else:
                 si = bg_inner + 0.5
                 so = bg_outer + 0.5
                 in_patch  = MplRect((cx - si, cy - si), 2*si, 2*si,
-                                    fill=False, edgecolor=bg_color, lw=1,
+                                    fill=False, edgecolor=bg_color, lw=1.4,
                                     linestyle='--', zorder=11)
                 out_patch = MplRect((cx - so, cy - so), 2*so, 2*so,
-                                    fill=False, edgecolor=bg_color, lw=1,
+                                    fill=False, edgecolor=bg_color, lw=1.4,
                                     linestyle='--', zorder=11)
             self._ax.add_patch(in_patch)
             self._ax.add_patch(out_patch)
@@ -603,7 +603,7 @@ class ImageCanvas(FigureCanvasQTAgg):
         rect = Rectangle(
             (xi0 - 0.5, yi0 - 0.5),
             xi1 - xi0 + 1, yi1 - yi0 + 1,
-            linewidth=1.2, edgecolor=_AP_COLOR, facecolor='none',
+            linewidth=2.0, edgecolor=_AP_COLOR, facecolor='none',
             linestyle='--', zorder=11, picker=5,
         )
         self._ax.add_patch(rect)
