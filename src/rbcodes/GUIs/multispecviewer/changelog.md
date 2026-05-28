@@ -1,6 +1,31 @@
 # Changelog
 All notable changes to MultispecViewer will be documented in this file.
 
+## [1.6.0] - 2026-05-28
+
+### Added
+- **Quick Gaussian fit** (`g`+`g`): Two-keystroke line fitting on the panel under the cursor. The two clicked positions define the fit window and a linear continuum (tilted continuum supported, half-profile fits supported). Fits an unweighted Gaussian, draws an orange model overlay, identifies the nearest line in the active line list, and auto-updates z. Reports centroid, FWHM (Å and km/s), amplitude, and Δv in the message box.
+- **Quick CoM centroid** (`c`+`c`): Same two-keystroke interaction as `g`+`g` but uses centre-of-mass centroiding. Draws a cyan centroid marker. More robust than Gaussian fitting on asymmetric or blended profiles.
+- **Z revert** (`Z` key): Swaps the current z with the one set before the last quick fit. Press again to toggle back. Single-level undo for z.
+- **Advanced multi-Gaussian fitting dialog** (`G`+`G`): The two keypresses define a wavelength window; the dialog opens zoomed to that window. Features:
+  - 1–5 Gaussian components with a shared redshift; returns z ± error from the covariance matrix
+  - **Lines to fit** spinbox (1–5, default 2): only the active ion dropdowns are shown; unused slots are hidden and reset
+  - Ion dropdowns auto-populate subsequent slots when Ion 1 is selected
+  - Optional Box1D smoothing kernel (odd values, applied to display only)
+  - Auto continuum from median of N edge pixels per side (default 15, adjustable)
+  - Manual continuum via `d`→`d` anchor keypresses on the dialog canvas
+  - Optional error-weighted fitting (checkbox)
+  - **Advanced…** constraints dialog: edit initial guesses/bounds, toggle tie-sigma, toggle fix-z
+  - Results: z ± error, per-component σ/FWHM (Å, km/s)/amplitude/EW, amplitude and EW ratios for multi-component fits
+  - **Apply z + linelist to main**: pushes fitted z and linelist back to the main GUI
+  - **Add to absorbers**: adds the fit result directly to the absorber manager
+  - Copy to clipboard / export to file for results text
+  - Canvas keystrokes: Shift+C (set z_guess from cursor), d→d (manual continuum), x/X/[/]/t/b/r (navigation)
+- `R` key now also clears any quick-fit overlay artists and cancels pending fit keystrokes
+- New `LineFitter.py` module: pure fitting engine (`fit_gaussian`, `fit_com`) with no Qt dependency
+- New `AdvancedFitDialog.py` module: `MultiGauss` model class, `FittingConstraintDialog`, and `AdvancedFitDialog`
+- Help dialog: added **Quick Fit** and **Advanced Fit** tabs
+
 ## [1.5.0] - 2026-05-07
 
 ### Added

@@ -1,4 +1,4 @@
-# MultispecViewer v1.5.0
+# MultispecViewer v1.6.0
 
 A tool for visualizing and analyzing multiple spectroscopic datasets simultaneously.
 
@@ -9,6 +9,8 @@ MultispecViewer is a PyQt-based GUI tool that allows users to:
 - Load and display multiple FITS spectra simultaneously
 - Apply redshifts and identify spectral features
 - Perform quick identification of common ionic species
+- Fit spectral lines with one-keystroke Gaussian or centre-of-mass centroiding
+- Open a multi-Gaussian advanced fitting dialog for precise z ± error measurements
 - Adjust view limits interactively
 - Catalog multiple absorber systems at different redshifts
 - Use velocity plots (vStack) for detailed line analysis
@@ -136,7 +138,7 @@ MultispecViewer supports the following keyboard shortcuts for navigating the dis
 | `]` | Shift view right by one viewport width |
 | `o` | Zoom out (x-axis) |
 | `r` | Reset view to original state |
-| `R` | Clear all line identifications |
+| `R` | Clear all line identifications and any fit overlays |
 | `h` / `H` | Show help window |
 | `?` button | Show help window (toolbar button) |
 | `q` | Quit application |
@@ -152,6 +154,85 @@ MultispecViewer supports the following keyboard shortcuts for navigating the dis
 | `U` | Decrease smoothing (convolution kernel size) |
 
 The `a`/`A` autoscale keys work like IRAF's `y` key: they compute the min/max flux within the currently visible x-range and rescale the y-axis accordingly, rather than using the global flux range.
+
+### Quick Line Fitting
+
+Line profiles can be fit with two keystrokes directly on the canvas. Both methods require two cursor clicks that define the fit window **and** the local continuum: the flux values at the two clicked positions set the left and right continuum levels, so a tilted continuum is fully supported. The fit runs on the panel under the cursor.
+
+| Keys | Action |
+|------|--------|
+| `g` → `g` | Gaussian fit. Click left edge, then right edge of the line. Draws an orange model overlay and updates z in the main widget (if a line list is active). |
+| `c` → `c` | Centre-of-mass (CoM) centroid. Same two-click interaction. Draws a cyan marker at the centroid and updates z. |
+| `Z` | Revert to the previous z (before the last quick fit). Press again to toggle back. |
+| `R` | Clear the fit overlay and cancel any pending fit keystroke. |
+
+**Notes:**
+- Pressing any key other than the pending one (e.g. `g` while a `c` fit is pending) cancels the pending fit and shows a message.
+- If no line list is selected when the fit completes, the centroid and FWHM are still reported, but z is not updated.
+- Half-profile fits are supported: the two anchor points can bracket just one side of a line.
+- Absorption vs emission is detected automatically from the sign of the continuum-subtracted flux sum.
+
+### Advanced Line Fitting
+
+Press `G` → `G` to open the **Advanced Fit dialog** for multi-Gaussian fitting with z ± error output. The two `G` keypresses define the wavelength window that is zoomed into when the dialog opens.
+
+#### Opening the dialog
+
+Position the cursor to the left edge of the region of interest and press `G`, then move to the right edge and press `G` again. The dialog opens showing only the selected window.
+
+#### Dialog controls
+
+| Control | Description |
+|---------|-------------|
+| **Smooth (kernel)** spinbox | Convolve the displayed spectrum with a Box1D kernel before fitting. Odd values only; use 1 for no smoothing. |
+| **Linelist** dropdown | Select or change the line list. The choice is transmitted back to the main GUI when "Apply" is clicked. |
+| **z guess** field | Starting redshift for the fit. Edit directly or use **Shift+C** on the canvas to set it from the cursor (uses Ion 1 rest wavelength). |
+| **Lines to fit** spinbox | Number of Gaussian components (1–5). Only that many ion dropdowns are shown; unused slots are hidden. |
+| **Ion 1…N** dropdowns | Select the ionic transitions to fit. Choosing Ion 1 auto-populates subsequent slots with the next entries in the line list. |
+| **Auto continuum** | Continuum from the median of the first and last N edge pixels in the current view (default N = 15). |
+| **Manual continuum** | Press `d` → `d` on the canvas to set two anchor points for a linear continuum. |
+| **Edge pixels** spinbox | Number of pixels used per side for the auto-continuum median. |
+| **Weight by flux errors** checkbox | Use the error spectrum as inverse-variance weights in the fit. Uncheck for unweighted least-squares. |
+| **Fit** button | Run the fit. Enabled once at least one ion is selected. |
+| **Advanced…** button | Open the constraints dialog to edit initial guesses, bounds, and toggle tie-sigma / fix-z options. |
+
+#### Canvas keystrokes inside the dialog
+
+| Key | Action |
+|-----|--------|
+| `Shift+C` | Set z_guess from cursor wavelength (divides by Ion 1 rest wavelength) |
+| `d` → `d` | Set two manual continuum anchor points |
+| `x` / `X` | Set left / right x-limit |
+| `[` / `]` | Pan left / right by one viewport width |
+| `t` / `b` | Set y max / y min to cursor position |
+| `r` | Reset view to full spectrum |
+
+#### Fitting constraints dialog (Advanced…)
+
+Accessible after an initial fit. Allows editing:
+- Initial parameter guesses, lower bounds, and upper bounds for each parameter
+- **Tie sigmas** — all components share a single σ
+- **Fix z** — z is held at z_guess; only amplitudes and σ are free
+
+#### Results
+
+Results appear in the text area below the fit button. For each component:
+- σ (rest frame, Å) ± error
+- FWHM (Å and km/s in the observed frame)
+- Amplitude ± error
+- Equivalent width (Å, observed frame, trapezoidal integration)
+
+When two or more components are fit, amplitude and EW ratios are reported.
+
+#### Action buttons
+
+| Button | Action |
+|--------|--------|
+| **Copy to clipboard** | Copy the full results text to the clipboard |
+| **Export to file** | Save results text to a `.txt` file |
+| **Apply z + linelist to main** | Push the fitted z and the current linelist back to the main GUI (also saves z for `Z`-key revert) |
+| **Add to absorbers** | Add the fitted z and linelist as a new entry in the absorber manager |
+| **Close** | Dismiss the dialog |
 
 ### Quick Line Identification
 
@@ -214,8 +295,13 @@ Press `h`/`H` or click the `?` button in the toolbar to open the help dialog. Th
 - **Navigation** — x/y limit controls, pan keys, reset, quit
 - **Display** — smoothing, autoscale (`a`/`A`), label toggle (`L`)
 - **Quick Line ID** — one-key line identification shortcuts
+- **Quick Fit** — `g`+`g`, `c`+`c`, and `Z` key reference
+- **Advanced Fit** — `G`+`G` dialog usage summary
 - **vStack** — velocity plot controls
 - **Overview** — general usage notes
+
+![Help dialog](images/help_dialog.png)
+*Figure 13: Tabbed help dialog showing the Overview tab.*
 
 ### Action Buttons
 
@@ -271,6 +357,43 @@ Here's a typical workflow for identifying and cataloging an absorber:
    - Add optional metadata when prompted
 
 
+### Measuring a Line Centroid or Fitting a Gaussian
+
+Quick workflow for measuring the centre wavelength of a spectral line and updating the current redshift:
+
+1. Zoom into the line of interest using `x`/`X` and press `a` to rescale y.
+2. Press `g` at the left edge of the line (at the appropriate continuum flux level) — a status message confirms the first anchor.
+3. Press `g` again at the right edge. The Gaussian fit runs automatically:
+   - An orange model overlay is drawn.
+   - If a line list is active, the nearest line is identified and z is updated in the main widget.
+   - The message box reports centroid, FWHM (Å and km/s), and Δv from the previous z.
+4. Press `Z` to revert z if the identification is wrong; press `Z` again to toggle back.
+5. Press `R` to remove the overlay and clear any pending fit state.
+
+Use `c`+`c` instead of `g`+`g` for a centre-of-mass centroid (no Gaussian assumption; more robust on asymmetric profiles).
+
+![Quick Gaussian fit overlay](images/quick_fit_gaussian.png)
+*Figure 10: Quick Gaussian fit (`g`+`g`) showing the orange model overlay, linear continuum, and fit results in the message box.*
+
+![Quick CoM centroid](images/quick_fit_com.png)
+*Figure 11: Quick centre-of-mass centroid (`c`+`c`) showing the cyan centroid marker.*
+
+### Advanced Gaussian Fitting with z ± Error
+
+For a precise redshift measurement from one or more lines simultaneously:
+
+1. Position the cursor to the left of the region of interest and press `G`; move to the right edge and press `G` again.
+2. The Advanced Fit dialog opens, zoomed to your selected window.
+3. Set the number of lines in the **Lines to fit** spinbox and choose the ionic transitions from the dropdowns. Selecting Ion 1 auto-populates the remaining slots.
+4. Adjust the z_guess field or use **Shift+C** on the dialog canvas to set it from the cursor position.
+5. Optionally adjust the continuum: switch to Manual and press `d`→`d` to define two anchor points, or tune the edge-pixel count for the auto median.
+6. Click **Fit**. Results appear in the text area showing z ± error, σ, FWHM, amplitude, and EW per component.
+7. Click **Advanced…** to fine-tune bounds or enable tie-sigma / fix-z before re-fitting.
+8. Click **Apply z + linelist to main** to push the result back to the main GUI, or **Add to absorbers** to catalog the system.
+
+![Advanced Fit dialog](images/advanced_fit_dialog.png)
+*Figure 12: Advanced Fit dialog showing multi-Gaussian fit overlay, ion dropdowns, and z ± error results.*
+
 ### Identifying Multiple Systems
 
 To identify multiple absorber systems:
@@ -324,6 +447,8 @@ The new version adds several enhancements:
 - Enhanced metadata display
 - Improved performance and error handling
 - Action buttons for common tasks (Load, Save, Show, List)
+- Quick line fitting with `g`+`g` (Gaussian) and `c`+`c` (CoM) keystrokes
+- Advanced multi-Gaussian fitting dialog (`G`+`G`) with z ± error output
 
 ![New Version](images/interface_components.png)
 *Figure 9: New version of MultispecViewer with enhanced features.*
@@ -384,6 +509,17 @@ print(f"Identified {len(absorber_systems)} distinct absorber systems")
 - If uncertain about a feature, use vStack (`v` or `V`) for detailed analysis
 - The status bar shows Δv from the nearest line as you move the cursor — useful for quickly checking if a feature matches your current redshift
 
+### Line Fitting
+
+- The two anchor clicks for `g`+`g` and `c`+`c` set both the window boundaries **and** the continuum level — place them at the expected continuum flux on each side of the line.
+- A tilted continuum is fully supported; clicking at different y-values on each side defines a sloped baseline.
+- You can fit half of a line profile by placing one anchor at the line peak — useful when the other wing is blended.
+- Pressing any unrelated key while a fit is pending (e.g. pressing `x` after the first `g`) cancels the pending fit.
+- `Z` is a single-level undo for z; it swaps the current z with the one before the last fit. A second `Z` toggles back.
+- In the Advanced Fit dialog, use **Shift+C** to quickly anchor z_guess to a visible feature rather than typing it.
+- For noisy spectra, smooth with the kernel spinbox before fitting; the results box labels smoothed fits with a warning.
+- After a successful fit, click **Advanced…** to tighten bounds or tie sigmas before re-fitting — the previous popt is used as the new starting point.
+
 ### vStack Analysis
 
 - Use `V` to specify custom velocity limits for better visualizing line profiles
@@ -438,6 +574,9 @@ MultispecViewer is part of the rbcodes package for spectroscopic analysis. It ut
 - **No lines visible after applying redshift**: Check that the selected line list contains lines within your wavelength range
 - **vStack not launching**: Ensure you have a redshift and line list selected before pressing `v` or `V`
 - **Absorbers not visible after loading a JSON**: Check the absorber manager — absorbers are restored with their saved visibility state. Check the checkbox next to each system to display it.
+- **Quick fit "Only N finite pixels" error**: The fit window is too narrow or lands in a masked/NaN region. Widen the window by moving the second anchor further from the first.
+- **Quick fit z not updated after fit**: No line list is selected, or the fit centroid does not match any line in the current list within the search tolerance. The centroid is still reported in the message box.
+- **Advanced Fit "Fit failed" message**: The initial guesses or bounds may be too tight. Click **Advanced…** to inspect and relax them, or adjust z_guess with Shift+C before re-fitting.
 
 ### Error Messages
 

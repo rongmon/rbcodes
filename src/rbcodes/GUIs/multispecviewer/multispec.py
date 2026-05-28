@@ -72,6 +72,11 @@ class SpectralPlot(FigureCanvas):
         self.redshift_lines = []  # Store references to plotted lines
         self.quickid_lines = []  # New list to store quick line ID markers
         self.labels_visible = True  # Toggle state for line text labels
+
+        # Quick-fit state
+        self._fit_state = {}   # pending keystroke state: {key_char: (x1, y1, ax_index)}
+        self._last_z = None    # previous z for Z-key revert (swapped on each use)
+        self._fit_overlay = [] # matplotlib artists from the last quick fit
         self.line_list = pd.DataFrame(columns=['Name', 'Wave_obs', 'Zabs'])
 
         
@@ -283,10 +288,42 @@ class SpectralPlot(FigureCanvas):
         if event.key == 'R':
             self.clear_quickid_lines()
             self.clear_redshift_lines()
+            self.clear_fit_overlay()
+            self._fit_state.clear()
             self.draw()
             if self.message_box:
                 self.message_box.on_sent_message("Cleared all line identifications", "#008000")
             return
+
+        # Z key: revert to previous z (swap current <-> _last_z so pressing twice toggles)
+        if event.key == 'Z':
+            if self._last_z is not None:
+                try:
+                    current_z = float(self.parent_window.redshift_widget.redshift_input.text().strip())
+                except ValueError:
+                    current_z = 0.0
+                self.parent_window.redshift_widget.set_redshift(self._last_z)
+                self.redshift = self._last_z
+                self._last_z = current_z
+                self.plot_redshift_lines()
+                if self.message_box:
+                    self.message_box.on_sent_message(
+                        f"Reverted to z = {self.redshift:.6f}   (press Z again to toggle back)",
+                        "#8AB4F8")
+            else:
+                if self.message_box:
+                    self.message_box.on_sent_message("No previous z to revert to", "#FFA500")
+            return
+
+        # Cancel any pending fit if a different key is pressed
+        _fit_method_names = {'g': 'Gaussian', 'c': 'CoM', 'G': 'Advanced Fit'}
+        if self._fit_state:
+            for pending_key in list(self._fit_state.keys()):
+                if event.key != pending_key:
+                    self._fit_state.pop(pending_key)
+                    method = _fit_method_names.get(pending_key, pending_key)
+                    if self.message_box:
+                        self.message_box.on_sent_message(f"[{method}] Fit cancelled", "#FFA500")
 
         if x is None or y is None:
             print("No valid coordinates at cursor position")
@@ -524,6 +561,256 @@ class SpectralPlot(FigureCanvas):
                 if self.message_box:
                     self.message_box.on_sent_message("Set a redshift and line list first before using vStack", "#FF0000")
 
+        # Quick-fit: Gaussian (g+g), Centre-of-Mass (c+c), Advanced dialog (G+G)
+        elif event.key in ('g', 'c', 'G'):
+            self._handle_fit_keystroke(event.key, x, y, ax_index)
+
+    def _handle_fit_keystroke(self, key, x, y, ax_index):
+        """
+        First press stores the left anchor; second press runs the fit.
+        g/c: y-positions also define the linear continuum.
+        G:   x-positions only define the analysis window sent to the dialog.
+        """
+        _method_names = {'g': 'Gaussian', 'c': 'CoM', 'G': 'Advanced Fit'}
+        method = _method_names.get(key, key)
+        if key not in self._fit_state:
+            self._fit_state[key] = (x, y, ax_index)
+            if self.message_box:
+                self.message_box.on_sent_message(
+                    f"[{method}] Left edge at {x:.2f} Å — press {key} again at right edge",
+                    "#FFA500")
+        else:
+            x1, y1, ax1 = self._fit_state.pop(key)
+            if key == 'g':
+                self._run_gaussian_fit(x1, y1, x, y, ax_index)
+            elif key == 'c':
+                self._run_com_fit(x1, y1, x, y, ax_index)
+            elif key == 'G':
+                self._launch_advanced_fit(ax_index, x1, x)
+
+    def _launch_advanced_fit(self, ax_index, x1=None, x2=None):
+        """Open the AdvancedFitDialog for the given panel (G+G keystroke).
+
+        x1, x2 — wavelength limits set by the two G keypresses; the dialog
+                  opens pre-zoomed to this window.
+        """
+        from rbcodes.GUIs.multispecviewer.AdvancedFitDialog import AdvancedFitDialog
+        import os
+
+        spec = self.spectra[ax_index]
+        wave  = spec.wavelength.value
+        flux  = spec.flux.value
+        error = spec.sig.value if getattr(spec, 'sig', None) is not None else None
+        filename = os.path.basename(getattr(spec, 'filename', f'Panel {ax_index+1}'))
+
+        try:
+            current_z = float(
+                self.parent_window.redshift_widget.redshift_input.text().strip())
+        except (ValueError, AttributeError):
+            current_z = 0.0
+
+        current_linelist = 'LLS'
+        if hasattr(self.parent_window, 'redshift_widget'):
+            current_linelist = (
+                self.parent_window.redshift_widget.linelist_combo.currentText()
+                or 'LLS')
+
+        # Ensure x1 < x2
+        if x1 is not None and x2 is not None and x1 > x2:
+            x1, x2 = x2, x1
+        xlim = (x1, x2) if (x1 is not None and x2 is not None) else None
+
+        # Keep a reference so the dialog isn't garbage-collected
+        self._advanced_fit_dialog = AdvancedFitDialog(
+            wave, flux, error,
+            current_z, current_linelist,
+            self.parent_window,
+            panel_index=ax_index,
+            filename=filename,
+            xlim=xlim)
+        self._advanced_fit_dialog.show()
+
+        if self.message_box:
+            win_str = (f'{x1:.2f} – {x2:.2f} Å' if xlim else 'full view')
+            self.message_box.on_sent_message(
+                f'Advanced fit opened — panel {ax_index+1}: {filename}  '
+                f'[{win_str}]', '#FF6B35')
+
+    def _identify_nearest_line(self, centroid_wave):
+        """
+        Return (ion_name, rest_wave) of the nearest line in the current linelist
+        to centroid_wave (projected using the current redshift).
+        Returns (None, None) if no linelist is set.
+        """
+        if not hasattr(self.parent_window, 'redshift_widget'):
+            return None, None
+
+        linelist = self.parent_window.redshift_widget.linelist_combo.currentText()
+        if not linelist or linelist == 'None':
+            return None, None
+
+        try:
+            z_current = float(self.parent_window.redshift_widget.redshift_input.text().strip())
+        except ValueError:
+            z_current = 0.0
+
+        try:
+            line_data = rb_setline.read_line_list(linelist)
+        except Exception:
+            return None, None
+
+        if not line_data:
+            return None, None
+
+        c_kms = 2.998e5
+        best_dv = None
+        best_name = None
+        best_rest = None
+
+        for entry in line_data:
+            wave_exp = entry['wrest'] * (1.0 + z_current)
+            dv = abs(c_kms * (centroid_wave - wave_exp) / wave_exp)
+            if best_dv is None or dv < best_dv:
+                best_dv = dv
+                best_name = entry['ion']
+                best_rest = entry['wrest']
+
+        return best_name, best_rest
+
+    def _run_gaussian_fit(self, x1, y1, x2, y2, ax_index):
+        """Execute gaussian fit, draw overlay, update z if a linelist is set."""
+        from rbcodes.GUIs.multispecviewer.LineFitter import fit_gaussian
+
+        spec = self.spectra[ax_index]
+        wave = spec.wavelength.value
+        flux = spec.flux.value
+
+        try:
+            result = fit_gaussian(wave, flux, x1, y1, x2, y2)
+        except Exception as exc:
+            if self.message_box:
+                self.message_box.on_sent_message(f"[Gauss] Fit failed: {exc}", "#FF0000")
+            return
+
+        # Draw overlay
+        self.clear_fit_overlay()
+        ax = self.axes[ax_index]
+        fit_line, = ax.plot(result['fit_wave'], result['fit_flux'],
+                            color='#FF6B35', lw=1.5, alpha=0.9, zorder=5)
+        cont_line, = ax.plot(result['cont_wave'], result['cont_flux'],
+                             color='#FFD700', lw=1.0, linestyle='--', alpha=0.7, zorder=4)
+        cen_line = ax.axvline(x=result['centroid'], color='#FF6B35',
+                              linestyle=':', lw=1.0, alpha=0.8, zorder=4)
+        self._fit_overlay.extend([fit_line, cont_line, cen_line])
+
+        # Build message components
+        amp_label = ('Depth' if result['direction'] < 0 else 'Height')
+        asym_note = "  *asymm — FWHM unreliable" if result['asymmetric'] else ""
+        panel_str = f"panel {ax_index + 1}"
+
+        ion_name, rest_wave = self._identify_nearest_line(result['centroid'])
+
+        if ion_name and rest_wave:
+            try:
+                self._last_z = float(self.parent_window.redshift_widget.redshift_input.text().strip())
+            except ValueError:
+                self._last_z = 0.0
+            z_new = result['centroid'] / rest_wave - 1.0
+            z_prev = self._last_z
+            dv = (z_new - z_prev) / (1.0 + z_prev) * 2.998e5
+            sign = '+' if dv >= 0 else ''
+            self.parent_window.redshift_widget.set_redshift(z_new)
+            self.redshift = z_new
+            self.plot_redshift_lines()
+            if self.message_box:
+                self.message_box.on_sent_message(
+                    f"[Gauss|{panel_str}]  Centroid: {result['centroid']:.2f} Å  "
+                    f"FWHM: {result['fwhm_ang']:.2f} Å ({result['fwhm_kms']:.0f} km/s)  "
+                    f"{amp_label}: {result['amplitude']:+.3f}{asym_note}", "#FF6B35")
+                self.message_box.append_message(
+                    f"{ion_name} {rest_wave:.2f} Å  →  z = {z_new:.6f}   "
+                    f"Δv = {sign}{dv:.0f} km/s from z_prev = {z_prev:.6f}", "#FF6B35")
+        else:
+            if self.message_box:
+                self.message_box.on_sent_message(
+                    f"[Gauss|{panel_str}]  Centroid: {result['centroid']:.2f} Å  "
+                    f"FWHM: {result['fwhm_ang']:.2f} Å ({result['fwhm_kms']:.0f} km/s)  "
+                    f"{amp_label}: {result['amplitude']:+.3f}{asym_note}", "#FF6B35")
+                self.message_box.append_message("No linelist set — z not updated", "#FFA500")
+
+        self.draw()
+
+    def _run_com_fit(self, x1, y1, x2, y2, ax_index):
+        """Execute centre-of-mass fit, draw centroid marker, update z if a linelist is set."""
+        from rbcodes.GUIs.multispecviewer.LineFitter import fit_com
+
+        spec = self.spectra[ax_index]
+        wave = spec.wavelength.value
+        flux = spec.flux.value
+
+        try:
+            result = fit_com(wave, flux, x1, y1, x2, y2)
+        except Exception as exc:
+            if self.message_box:
+                self.message_box.on_sent_message(f"[CoM] Fit failed: {exc}", "#FF0000")
+            return
+
+        # Draw overlay: continuum segment + centroid marker
+        self.clear_fit_overlay()
+        ax = self.axes[ax_index]
+        cont_line, = ax.plot([x1, x2], [y1, y2],
+                             color='#FFD700', lw=1.0, linestyle='--', alpha=0.7, zorder=4)
+        cen_line = ax.axvline(x=result['centroid'], color='#00BFFF',
+                              linestyle=':', lw=1.5, alpha=0.9, zorder=5)
+        self._fit_overlay.extend([cont_line, cen_line])
+
+        amp_label = ('Depth' if result['direction'] < 0 else 'Height')
+        asym_note = "  *asymm" if result['asymmetric'] else ""
+        panel_str = f"panel {ax_index + 1}"
+
+        ion_name, rest_wave = self._identify_nearest_line(result['centroid'])
+
+        if ion_name and rest_wave:
+            try:
+                self._last_z = float(self.parent_window.redshift_widget.redshift_input.text().strip())
+            except ValueError:
+                self._last_z = 0.0
+            z_new = result['centroid'] / rest_wave - 1.0
+            z_prev = self._last_z
+            dv = (z_new - z_prev) / (1.0 + z_prev) * 2.998e5
+            sign = '+' if dv >= 0 else ''
+            self.parent_window.redshift_widget.set_redshift(z_new)
+            self.redshift = z_new
+            self.plot_redshift_lines()
+            if self.message_box:
+                self.message_box.on_sent_message(
+                    f"[CoM|{panel_str}]  Centroid: {result['centroid']:.2f} Å  "
+                    f"σ: {result['sigma_ang']:.2f} Å ({result['sigma_kms']:.0f} km/s)  "
+                    f"FWHM≈: {result['fwhm_equiv_ang']:.2f} Å ({result['fwhm_kms']:.0f} km/s)  "
+                    f"{amp_label}: {result['amplitude']:+.3f}{asym_note}", "#00BFFF")
+                self.message_box.append_message(
+                    f"{ion_name} {rest_wave:.2f} Å  →  z = {z_new:.6f}   "
+                    f"Δv = {sign}{dv:.0f} km/s from z_prev = {z_prev:.6f}", "#00BFFF")
+        else:
+            if self.message_box:
+                self.message_box.on_sent_message(
+                    f"[CoM|{panel_str}]  Centroid: {result['centroid']:.2f} Å  "
+                    f"σ: {result['sigma_ang']:.2f} Å ({result['sigma_kms']:.0f} km/s)  "
+                    f"FWHM≈: {result['fwhm_equiv_ang']:.2f} Å ({result['fwhm_kms']:.0f} km/s)  "
+                    f"{amp_label}: {result['amplitude']:+.3f}{asym_note}", "#00BFFF")
+                self.message_box.append_message("No linelist set — z not updated", "#FFA500")
+
+        self.draw()
+
+    def clear_fit_overlay(self):
+        """Remove any plotted quick-fit overlay artists from the canvas."""
+        for artist in self._fit_overlay:
+            try:
+                artist.remove()
+            except Exception:
+                pass
+        self._fit_overlay = []
+
     def reset_view(self):
         """
         Resets the view to original x and y limits and removes all lines.
@@ -538,10 +825,12 @@ class SpectralPlot(FigureCanvas):
             current_redshift = self.redshift
             current_linelist = self.linelist
             
-        # Clear any redshift and quick ID lines
+        # Clear any redshift, quick ID lines, and fit overlay
         self.clear_redshift_lines()
         self.clear_quickid_lines()
-        
+        self.clear_fit_overlay()
+        self._fit_state.clear()
+
         # Reset the scale to default
         self.scale = 1.0
         
