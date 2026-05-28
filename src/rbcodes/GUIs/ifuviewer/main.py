@@ -405,6 +405,14 @@ class MainWindow(QMainWindow):
         self._ds9_import_btn.clicked.connect(self._on_ds9_import_regions)
         layout.addWidget(self._ds9_import_btn)
 
+        self._ds9_push_btn = QPushButton("→ Push regions")
+        self._ds9_push_btn.setFixedWidth(110)
+        self._ds9_push_btn.setToolTip(
+            "Push current apertures to ds9 as regions (adds to ds9, does not replace)")
+        self._ds9_push_btn.setEnabled(False)
+        self._ds9_push_btn.clicked.connect(self._on_push_regions_to_ds9)
+        layout.addWidget(self._ds9_push_btn)
+
         layout.addStretch()
 
         self._ds9_status_label = QLabel("ds9: not connected")
@@ -566,6 +574,8 @@ class MainWindow(QMainWindow):
             if clim[0] is not None and clim[1] is not None:
                 norm = mcolors.Normalize(vmin=clim[0], vmax=clim[1])
             self._image_canvas.show_image(img, header=hdr, cmap=cmap, norm=norm)
+            # show_image calls ax.cla() which removes all artists; sync the marks list
+            self._image_canvas._extraction_marks.clear()
             # Restore scale/norm/cmap controls (without triggering a reset)
             if ds:
                 self._image_controls.set_display_state(ds)
@@ -1098,6 +1108,7 @@ class MainWindow(QMainWindow):
             self._ds9_status_label.setStyleSheet("color: #585b70; font-size: 8pt;")
             self._ds9_send_btn.setEnabled(False)
             self._ds9_import_btn.setEnabled(False)
+            self._ds9_push_btn.setEnabled(False)
             self._ds9_queue_panel.hide()
             return
 
@@ -1122,6 +1133,7 @@ class MainWindow(QMainWindow):
             "color: #a6e3a1; font-size: 8pt; font-weight: bold;")
         self._ds9_send_btn.setEnabled(True)
         self._ds9_import_btn.setEnabled(True)
+        self._ds9_push_btn.setEnabled(True)
         self._ds9_queue_panel.show()
         self.statusBar().showMessage("ds9 connected.", 3000)
 
@@ -1185,6 +1197,58 @@ class MainWindow(QMainWindow):
             self._ds9_bridge.match_wcs()
             self.statusBar().showMessage("ds9 frames WCS-matched.", 3000)
 
+    def _on_push_regions_to_ds9(self):
+        """Push all current apertures to the live ds9 instance as region overlays."""
+        if not self._ds9_bridge or not self._ds9_bridge.available:
+            return
+        from rbcodes.GUIs.ifuviewer.processing.spatial_mask import regions_to_ds9_text
+
+        cube  = self._active_cube
+        wcs   = cube.wcs if cube is not None else None
+
+        # Build aperture list from marker_info
+        ap_list = []
+        for i, minfo in enumerate(self._extraction_marker_info):
+            label = ''
+            specs = self._spectrum_canvas.locked_spectra
+            if i < len(specs):
+                label = specs[i][0]
+            mtype = minfo.get('type', 'single')
+            if mtype == 'spaxel':
+                ap_list.append({'type': 'single', 'label': label,
+                                'cx': minfo['x'], 'cy': minfo['y']})
+            elif mtype == 'circle':
+                ap_list.append({'type': 'circle', 'label': label,
+                                'cx': minfo['cx'], 'cy': minfo['cy'],
+                                'radius': minfo['radius'],
+                                'bg_inner': minfo.get('bg_inner'),
+                                'bg_outer': minfo.get('bg_outer')})
+            elif mtype == 'annulus':
+                ap_list.append({'type': 'annulus', 'label': label,
+                                'cx': minfo['cx'], 'cy': minfo['cy'],
+                                'bg_inner': minfo.get('bg_inner', minfo.get('radius', 3)),
+                                'bg_outer': minfo.get('bg_outer', minfo.get('radius', 3) + 3)})
+            elif mtype == 'rect':
+                ap_list.append({'type': 'rect', 'label': label,
+                                'x1': minfo['xi0'], 'y1': minfo['yi0'],
+                                'x2': minfo['xi1'], 'y2': minfo['yi1']})
+            # mtype == 'region': skip — these already came from ds9
+
+        if not ap_list:
+            QMessageBox.information(self, "Nothing to push",
+                                    "No apertures have been defined.")
+            return
+
+        reg_text = regions_to_ds9_text(ap_list, wcs=wcs)
+        ok = self._ds9_bridge.push_regions(reg_text)
+        if ok:
+            self.statusBar().showMessage(
+                f"Pushed {len(ap_list)} aperture(s) to ds9.", 4000)
+        else:
+            QMessageBox.warning(self, "Push failed",
+                                "Could not push regions to ds9.\n"
+                                "Try saving the region file and loading it manually in ds9.")
+
     def _on_ds9_import_regions(self):
         """Import regions from the live ds9 instance."""
         if not self._ds9_bridge or not self._ds9_bridge.available:
@@ -1243,7 +1307,7 @@ class MainWindow(QMainWindow):
         regions = parse_ds9_regions(reg_text)
         if not regions:
             QMessageBox.information(self, "No regions",
-                                    "No extractable regions found in the file.")
+                                    "No regions found in the file.")
             return
 
         # Color cycle for image-only overlays (no spectrum panel involvement)
@@ -1254,45 +1318,49 @@ class MainWindow(QMainWindow):
         n_ok   = 0
         for i, reg in enumerate(regions):
             try:
-                mask = region_to_mask(reg, cube.wcs, cube.ny, cube.nx)
-                if not mask.any():
-                    continue
+                extractable = reg.get('extract', True)
 
-                if is_image:
-                    # 2D image — just draw the shape overlay, no spectrum
+                if is_image or not extractable:
+                    # 2D image OR annotation shape — draw shape overlay, no spectrum
                     color = _EXTRACT_COLORS[_img_color_idx % len(_EXTRACT_COLORS)]
                     _img_color_idx += 1
                     self._image_canvas.draw_region_shape(reg, cube.wcs, color)
                     self._image_overlays.append((reg, color))
-                    self._clear_btn.setEnabled(True)
-                else:
-                    # IFU cube — extract spectrum with optimal (data profile) weighting
-                    flux_arr, err_arr = extract_optimal_weighted(
-                        cube.flux, cube.var, mask, method='data')
-                    name  = reg.get('name') or f"region_{i+1:03d}"
-                    label = f"[{reg['shape']}] {name}"
-                    rb_spec = _make_rb_spectrum(cube.wave, flux_arr, err_arr, label)
-                    ra, dec = region_center_sky(reg, cube.wcs)
-                    if rb_spec is not None and ra is not None:
-                        rb_spec.meta['ra']  = ra
-                        rb_spec.meta['dec'] = dec
-                        rb_spec.meta['object']   = cube.header.get('OBJECT', '') if cube.header else ''
-                        rb_spec.meta['instrume'] = cube.header.get('INSTRUME', '') if cube.header else ''
-                    color = self._spectrum_canvas.lock_spectrum(
-                        cube.wave, flux_arr, err_arr, label, rb_spec=rb_spec)
-                    new_markers = self._image_canvas.draw_region_shape(
-                        reg, cube.wcs, color)
-                    if not new_markers:
-                        yy, xx = np.mgrid[0:cube.ny, 0:cube.nx]
-                        cx = int(np.round(np.mean(xx[mask])))
-                        cy = int(np.round(np.mean(yy[mask])))
-                        mk, = self._image_canvas._ax.plot(
-                            cx, cy, '+', color=color, ms=9, mew=1.4, zorder=12, picker=5)
-                        self._image_canvas._extraction_marks.append(mk)
-                        new_markers = [mk]
-                    self._register_extraction(label, rb_spec, new_markers, color=color,
-                                              marker_info={'type': 'region', 'region': reg})
+                    if is_image:
+                        self._clear_btn.setEnabled(True)
+                    n_ok += 1
+                    continue
 
+                # IFU cube with extractable shape — extract spectrum
+                mask = region_to_mask(reg, cube.wcs, cube.ny, cube.nx)
+                if not mask.any():
+                    continue
+
+                flux_arr, err_arr = extract_optimal_weighted(
+                    cube.flux, cube.var, mask, method='data')
+                name  = reg.get('name') or f"region_{i+1:03d}"
+                label = f"[{reg['shape']}] {name}"
+                rb_spec = _make_rb_spectrum(cube.wave, flux_arr, err_arr, label)
+                ra, dec = region_center_sky(reg, cube.wcs)
+                if rb_spec is not None and ra is not None:
+                    rb_spec.meta['ra']  = ra
+                    rb_spec.meta['dec'] = dec
+                    rb_spec.meta['object']   = cube.header.get('OBJECT', '') if cube.header else ''
+                    rb_spec.meta['instrume'] = cube.header.get('INSTRUME', '') if cube.header else ''
+                color = self._spectrum_canvas.lock_spectrum(
+                    cube.wave, flux_arr, err_arr, label, rb_spec=rb_spec)
+                new_markers = self._image_canvas.draw_region_shape(
+                    reg, cube.wcs, color)
+                if not new_markers:
+                    yy, xx = np.mgrid[0:cube.ny, 0:cube.nx]
+                    cx = int(np.round(np.mean(xx[mask])))
+                    cy = int(np.round(np.mean(yy[mask])))
+                    mk, = self._image_canvas._ax.plot(
+                        cx, cy, '+', color=color, ms=9, mew=1.4, zorder=12, picker=5)
+                    self._image_canvas._extraction_marks.append(mk)
+                    new_markers = [mk]
+                self._register_extraction(label, rb_spec, new_markers, color=color,
+                                          marker_info={'type': 'region', 'region': reg})
                 n_ok += 1
             except Exception as e:
                 import traceback
@@ -1300,8 +1368,7 @@ class MainWindow(QMainWindow):
                 traceback.print_exc()
 
         self._image_canvas.draw_idle()
-        action = "overlaid" if is_image else "extracted"
-        msg = f"{action.capitalize()} {n_ok} region(s)."
+        msg = f"Imported {n_ok} region(s)."
         if errors:
             msg += f"  {len(errors)} error(s) — see console."
             for e in errors:
@@ -1322,16 +1389,28 @@ class MainWindow(QMainWindow):
         spectra = self._spectrum_canvas.locked_spectra
 
         ap_list = []
-        for i, (label, rb_spec) in enumerate(spectra):
-            meta = (rb_spec.meta if rb_spec is not None and rb_spec.meta else {})
-            ap = {'type': 'single', 'label': label,
-                  'cx': int(meta.get('extr_x', 0)),
-                  'cy': int(meta.get('extr_y', 0))}
-            rad = meta.get('extr_rad', None)
-            if isinstance(rad, (int, float)) and rad > 1:
-                ap['type'] = 'circle'
-                ap['radius'] = rad
-            ap_list.append(ap)
+        for i, minfo in enumerate(self._extraction_marker_info):
+            label = spectra[i][0] if i < len(spectra) else ''
+            mtype = minfo.get('type', 'single')
+            if mtype == 'spaxel':
+                ap_list.append({'type': 'single', 'label': label,
+                                'cx': minfo['x'], 'cy': minfo['y']})
+            elif mtype == 'circle':
+                ap_list.append({'type': 'circle', 'label': label,
+                                'cx': minfo['cx'], 'cy': minfo['cy'],
+                                'radius': minfo['radius'],
+                                'bg_inner': minfo.get('bg_inner'),
+                                'bg_outer': minfo.get('bg_outer')})
+            elif mtype == 'annulus':
+                ap_list.append({'type': 'annulus', 'label': label,
+                                'cx': minfo['cx'], 'cy': minfo['cy'],
+                                'bg_inner': minfo.get('bg_inner', minfo.get('radius', 3)),
+                                'bg_outer': minfo.get('bg_outer', minfo.get('radius', 3) + 3)})
+            elif mtype == 'rect':
+                ap_list.append({'type': 'rect', 'label': label,
+                                'x1': minfo['xi0'], 'y1': minfo['yi0'],
+                                'x2': minfo['xi1'], 'y2': minfo['yi1']})
+            # mtype == 'region': skip — these came from ds9, not user-drawn apertures
 
         reg_text = regions_to_ds9_text(ap_list, wcs=wcs)
 
