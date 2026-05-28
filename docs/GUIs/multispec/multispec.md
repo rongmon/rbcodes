@@ -16,7 +16,7 @@ MultispecViewer is a PyQt-based GUI tool that allows users to:
 - Use velocity plots (vStack) for detailed line analysis
 - Save and load line identifications and absorber systems
 
-![MultispecViewer Main Interface](images/main_interface.png)
+<img src="images/main_interface.png" width="700" alt="MultispecViewer Main Interface">
 *Figure 1: Main interface of MultispecViewer showing spectrum display, absorber manager, and control panels.*
 
 ## Usage
@@ -98,7 +98,7 @@ The MultispecViewer interface consists of several components:
 - An absorber manager for cataloging multiple systems
 - Action buttons for loading, saving, and displaying identified lines
 
-![Interface Components](images/interface_components.png)
+<img src="images/interface_components.png" width="700" alt="Interface Components">
 *Figure 2: Key components of the MultispecViewer interface.*
 
 ### Spectral Coordinates Status Bar
@@ -249,12 +249,12 @@ Press the following keys with the cursor positioned at a spectral feature to ide
 | `2` | Lyb/Lya |
 | `1` | Lya/Lyb |
 
-![Quick Line Identification](images/quick_id.png)
+<img src="images/quick_id.png" width="700" alt="Quick Line Identification">
 *Figure 3: Example of quick line identification using keyboard shortcuts.*
 
 Right-clicking anywhere on the spectrum opens a dialog with a complete list of lines from the selected line list at the clicked wavelength.
 
-![Right-Click Line Identification](images/right_click_id.png)
+<img src="images/right_click_id.png" width="700" alt="Right-Click Line Identification">
 *Figure 4: Line identification dialog from right-clicking on a feature.*
 
 ### Redshift Controls
@@ -266,7 +266,7 @@ Right-clicking anywhere on the spectrum opens a dialog with a complete list of l
 
 Clicking "Catalog" adds the current redshift to the absorber manager for reference.
 
-![Redshift Controls](images/redshift_controls.png)
+<img src="images/redshift_controls.png" width="700" alt="Redshift Controls">
 *Figure 5: Redshift input widget and absorber cataloging.*
 
 ### Velocity Plot Analysis with vStack
@@ -285,7 +285,7 @@ The vStack feature allows you to analyze absorption lines in velocity space:
 
 vStack replaces the spectrum display in the main window. Pressing `S` saves all flagged detections to the line list and restores the original spectral view.
 
-![vStack Interface](images/vstack.png)
+<img src="images/vstack.png" width="700" alt="vStack Interface">
 *Figure 6: vStack interface for analyzing absorber lines in velocity space.*
 
 ### Help Dialog
@@ -300,7 +300,7 @@ Press `h`/`H` or click the `?` button in the toolbar to open the help dialog. Th
 - **vStack** — velocity plot controls
 - **Overview** — general usage notes
 
-![Help dialog](images/help_dialog.png)
+<img src="images/help_dialog.png" width="700" alt="Help dialog">
 *Figure 13: Tabbed help dialog showing the Overview tab.*
 
 ### Action Buttons
@@ -372,10 +372,10 @@ Quick workflow for measuring the centre wavelength of a spectral line and updati
 
 Use `c`+`c` instead of `g`+`g` for a centre-of-mass centroid (no Gaussian assumption; more robust on asymmetric profiles).
 
-![Quick Gaussian fit overlay](images/quick_fit_gaussian.png)
+<img src="images/quick_fit_gaussian.png" width="700" alt="Quick Gaussian fit overlay">
 *Figure 10: Quick Gaussian fit (`g`+`g`) showing the orange model overlay, linear continuum, and fit results in the message box.*
 
-![Quick CoM centroid](images/quick_fit_com.png)
+<img src="images/quick_fit_com.png" width="700" alt="Quick CoM centroid">
 *Figure 11: Quick centre-of-mass centroid (`c`+`c`) showing the cyan centroid marker.*
 
 ### Advanced Gaussian Fitting with z ± Error
@@ -391,7 +391,7 @@ For a precise redshift measurement from one or more lines simultaneously:
 7. Click **Advanced…** to fine-tune bounds or enable tie-sigma / fix-z before re-fitting.
 8. Click **Apply z + linelist to main** to push the result back to the main GUI, or **Add to absorbers** to catalog the system.
 
-![Advanced Fit dialog](images/advanced_fit_dialog.png)
+<img src="images/advanced_fit_dialog.png" width="700" alt="Advanced Fit dialog">
 *Figure 12: Advanced Fit dialog showing multi-Gaussian fit overlay, ion dropdowns, and z ± error results.*
 
 ### Identifying Multiple Systems
@@ -417,7 +417,7 @@ After identifying multiple systems:
 3. Use the absorber manager checkboxes to control which systems are displayed
 4. Click the "Save" button to save all identifications
 
-![Line List Dialog](images/line_list_dialog.png)
+<img src="images/line_list_dialog.png" width="700" alt="Line List Dialog">
 *Figure 7: Line list dialog showing all identified lines.*
 
 
@@ -431,7 +431,7 @@ The classic version provides the core functionality in a streamlined interface:
 - Line identification
 - Basic navigation
 
-![Classic Version](images/classic_version.png)
+<img src="images/classic_version.png" width="700" alt="Classic Version">
 *Figure 8: Classic version of MultispecViewer.*
 
 ### New Version
@@ -450,7 +450,7 @@ The new version adds several enhancements:
 - Quick line fitting with `g`+`g` (Gaussian) and `c`+`c` (CoM) keystrokes
 - Advanced multi-Gaussian fitting dialog (`G`+`G`) with z ± error output
 
-![New Version](images/interface_components.png)
+<img src="images/interface_components.png" width="700" alt="New Version">
 *Figure 9: New version of MultispecViewer with enhanced features.*
 
 

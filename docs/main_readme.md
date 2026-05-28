@@ -150,7 +150,7 @@ See the [full documentation](/docs/GUIs/rb_spec/rb_spec.md) for the complete API
 #### Active Tools
 1. [launch_specgui](/docs/GUIs/rb_spec/rb_spec.md): **GUI launcher** for `rb_spec` — provides a point-and-click interface around the core pipeline; supports single-spectrum and batch modes
 2. [multispecviewer](/docs/GUIs/multispec/multispec.md): Enhanced spectrum viewer for handling multiple 1D spectra simultaneously with advanced line identification and absorber cataloging capabilities.
-3. **rb_ifuview** (`rb_ifuview cube.fits`): QFitsView-style IFU datacube viewer — load KCWI, MUSE, or any 3-axis FITS cube; extract 1D spectra interactively; compute moment maps; import ds9 regions; send spectra to `rb_multispec`.
+3. [rb_ifuview](/docs/GUIs/ifuview/rb_ifuview.md) (`rb_ifuview cube.fits`): QFitsView-style IFU datacube viewer — load KCWI, MUSE, or any 3-axis FITS cube; extract 1D spectra interactively; compute moment maps; import ds9 regions; send spectra to `rb_multispec`.
    - Supports Single pixel / Rectangular / Circular / Circular-Annular apertures
    - Variance-weighted and optimal (data/Gaussian) spectral extraction
    - M0 / M1 / M2 moment maps with continuum subtraction and SNR masking
