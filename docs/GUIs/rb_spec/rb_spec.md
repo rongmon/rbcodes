@@ -106,7 +106,7 @@ spec.compute_EW(transition, vmin=-80, vmax=55, plot=True)
 spec.save_slice('analysis_results.json', file_format='json')
 ```
 
-![Continuum Fitting Example](images/continuum_fitting_example.png)
+<img src="images/continuum_fitting_example.png" width="700" alt="Continuum Fitting Example">
 
 ### Creating from Numpy Arrays
 
@@ -137,7 +137,7 @@ Interactive controls:
 - **w**: Save continuum and exit
 - **q**: Quit without saving
 
-![Interactive Continuum Fitting](images/interactive_continuum.png)
+<img src="images/interactive_continuum.png" width="700" alt="Interactive Continuum Fitting">
 
 #### 2. Interactive Masking and Continuum Fitting
 ```python
@@ -164,7 +164,7 @@ This newer method provides a comprehensive GUI for masking and continuum fitting
   - **m**: Manual mask entry
   - **c/Esc**: Cancel
 
-![Interactive Masking GUI](images/interactive_masking_gui.png)
+<img src="images/interactive_masking_gui.png" width="700" alt="Interactive Masking GUI">
 
 #### 3. Automatic Polynomial Fitting
 ```python
@@ -196,7 +196,7 @@ if hasattr(spec, 'cont_err'):
     print(f"Mean continuum error: {np.mean(spec.cont_err):.3f}")
 ```
 
-![Polynomial Fit Comparison](images/polynomial_fit_comparison.png)
+<img src="images/polynomial_fit_comparison.png" width="700" alt="Polynomial Fit Comparison">
 
 #### 4. RANSAC-Based Fitting
 ```python
@@ -226,7 +226,7 @@ print(f"log N = {np.log10(spec.logN):.2f} ± {spec.logN_e:.2f}")
 print(f"Velocity centroid = {spec.vel_centroid:.1f} km/s")
 ```
 
-![Equivalent Width Measurement](images/ew_measurement.png)
+<img src="images/ew_measurement.png" width="700" alt="Equivalent Width Measurement">
 
 ### Signal-to-Noise Estimation
 
@@ -327,7 +327,7 @@ spec.plot_slice()
 spec.plot_doublet(1548.2, 1550.8, vmin=-600, vmax=600)
 ```
 
-![Spectrum Visualization](images/spectrum_visualization.png)
+<img src="images/spectrum_visualization.png" width="700" alt="Spectrum Visualization">
 
 ## 🎓 Example Applications
 

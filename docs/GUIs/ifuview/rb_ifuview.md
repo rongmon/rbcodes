@@ -53,33 +53,6 @@ This prints installation instructions for `pyds9` and the `XPA` message system. 
 <img src="images/main_interface.png" width="700" alt="Main interface">
 *Figure 1: rb_ifuview main window with a loaded datacube, showing the sidebar, image panel, spectrum panel, and all controls.*
 
-```
-┌─ Menubar ─────────────────────────────────────────────────┐
-│  File   View   Analysis   Help                            │
-├───────────────────────────────────────────────────────────┤
-│ [?]  [Connect ds9]  [→ Send image]  [← Import regions]   │  ← toolbar
-├────────────┬──────────────────────────────────────────────┤
-│  Datasets  │  Image panel (2D display)                    │
-│            │                                              │
-│  [+ Add]   │  ┌── Image controls ─────────────────────┐  │
-│  [- Remove]│  │ Scale | Norm | Min | Max | Cmap | Inv  │  │
-│            │  └────────────────────────────────────────┘  │
-│            ├──────────────────────────────────────────────┤
-│            │ [Channel][Whitelight][Narrowband][Cont-sub]  │
-│            │ Method: [mean▾]   ◄  ──────────────  ►  λ   │
-│            ├──────────────────────────────────────────────┤
-│            │  Spectrum panel (1D spectrum + spans)        │
-│            │  [Auto X]  λmin ── λmax  [Auto Y]  Ymin Ymax │
-│            ├──────────────────────────────────────────────┤
-│            │  Mode | Radius | BG inner/outer | Method     │
-│            │  Weighting | [Extract]                       │
-│            ├──────────────────────────────────────────────┤
-│            │  [Extractions▾] [Save] [→multispec] [Del]   │
-├────────────┴──────────────────────────────────────────────┤
-│  Status bar                                               │
-└───────────────────────────────────────────────────────────┘
-```
-
 ---
 
 ## Features

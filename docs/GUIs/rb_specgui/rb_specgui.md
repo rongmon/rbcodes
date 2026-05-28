@@ -105,7 +105,7 @@ The main window consists of three primary sections:
 2. **Center Panel**: Main spectral display canvas
 3. **Bottom Panel**: Active redshift manager and controls
 
-![Main GUI Window Layout](images/main_gui_layout.png)
+<img src="images/main_gui_layout.png" width="700" alt="Main GUI Window Layout">
 
 ### Main Canvas Keyboard Controls
 
@@ -156,7 +156,7 @@ The left panel of the GUI contains the Absorber Manager, which allows you to:
 - Plot or hide transition lines
 - Remove absorbers from the catalog
 
-![Absorber Manager Panel](images/absorber_manager.png)
+<img src="images/absorber_manager.png" width="700" alt="Absorber Manager Panel">
 
 #### Absorber Manager Controls
 - **Line Lists**: Select from predefined line lists (LLS, DLA, etc.)
@@ -170,7 +170,7 @@ The left panel of the GUI contains the Absorber Manager, which allows you to:
 
 The Velocity Stack (VStack) GUI provides a velocity-space view of all possible absorption features at a given redshift. This view is activated by pressing `v` or `V` in the main canvas.
 
-![Velocity Stack GUI](images/vstack_gui.png)
+<img src="images/vstack_gui.png" width="700" alt="Velocity Stack GUI">
 
 #### VStack Keyboard Controls
 - `>`: Navigate to next page of absorption lines
@@ -196,7 +196,7 @@ The Velocity Stack (VStack) GUI provides a velocity-space view of all possible a
    - etc.
 3. The GUI will mark the corresponding doublet and display the calculated redshift
 
-![Example of CIV Doublet Identification](images/civ_identification.png)
+<img src="images/civ_identification.png" width="700" alt="Example of CIV Doublet Identification">
 
 ### Manual Transition Identification
 1. Position the cursor over a suspected absorption feature
@@ -242,7 +242,7 @@ The Velocity Stack (VStack) GUI provides a velocity-space view of all possible a
 3. Click at the end of the feature
 4. The equivalent width and, if applicable, column density will be displayed
 
-![Equivalent Width Measurement Example](images/ew_measurement.png)
+<img src="images/ew_measurement.png" width="700" alt="Equivalent Width Measurement Example">
 
 ### Gaussian Fitting
 1. Press `G` to initiate Gaussian fitting

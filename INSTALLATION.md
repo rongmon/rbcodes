@@ -61,6 +61,7 @@ python -c "import rbcodes; print(rbcodes.__version__)"
 # Test 2: Check console entry points
 which launch_specgui
 which rb_multispec
+which rb_ifuview
 which rb_llsfitter
 which rb_zgui
 
@@ -85,9 +86,16 @@ photutils>=1.0          # Astronomy photometry
 corner>=2.0             # MCMC visualization
 scikit-learn>=1.5.0     # Machine learning
 tqdm>=4.65.0            # Progress bars
+regions>=0.5            # ds9 region file I/O (used by rb_ifuview)
 pytest>=6.0             # Testing framework
 pytest-cov>=2.0         # Test coverage reporting
 ```
+
+### Optional Dependencies
+
+| Package | Purpose | Install |
+|---------|---------|---------|
+| `pyds9` | Live ds9 bridge for `rb_ifuview` | `rb_ifuview --install` for instructions |
 
 ## Troubleshooting
 

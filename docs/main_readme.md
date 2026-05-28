@@ -58,9 +58,29 @@ For more details, see the individual tool documentation below.
 
 ### 📖 Citation
 
-If you use this package, please cite it using the following DOI:
+If you use rbcodes in your research, please cite the following DOI:
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6079263.svg)](https://doi.org/10.5281/zenodo.6079263)
+
+<details>
+<summary>📄 BibTeX for version 2.0.0</summary>
+
+```bibtex
+@software{bordoloi_2025_15723701,
+  author       = {Bordoloi, Rongmon and
+                  Liu, Bin and
+                  Clark, Sean and
+                  Higginson, Jack and
+                  Flores, Derick},
+  title        = {rongmon/rbcodes: rbcodes v2.0.0},
+  year         = 2025,
+  publisher    = {Zenodo},
+  version      = {v2.0.0},
+  doi          = {10.5281/zenodo.6079263},
+  url          = {https://doi.org/10.5281/zenodo.6079263}
+}
+```
+</details>
 
 
 ## Overview
@@ -101,7 +121,7 @@ For more installation options and troubleshooting, see [INSTALLATION.md](../INST
   - corner >= 2.0
   - scikit-learn >= 1.5.0
   - tqdm >= 4.65.0
-  - regions >= 0.5
+  - regions >= 0.5  *(ds9 region file I/O for rb_ifuview)*
   - pytest >= 6.0
   - pytest-cov >= 2.0
 
