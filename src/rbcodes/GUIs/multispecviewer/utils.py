@@ -88,6 +88,11 @@ def show_help_dialog(parent=None):
             ("1",          "Mark Lya/Lyb"),
             ("Right-Click","Line ID dialog: shows all lines at cursor wavelength"),
         ],
+        "zfind": [
+            ("K",   "Launch zfind redshift finder on the hovered panel"),
+            ("",    "Run Picket Fence / Template / PCA search, click Accept to send z back"),
+            ("",    "Accepted z updates the redshift widget; previous z saved for Shift+Z revert"),
+        ],
         "Quick Fit": [
             ("g → g",  "Gaussian fit: press g at left edge, g again at right edge"),
             ("c → c",  "Centre-of-mass fit: press c at left edge, c again at right edge"),

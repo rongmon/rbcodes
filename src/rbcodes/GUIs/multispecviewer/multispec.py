@@ -561,9 +561,52 @@ class SpectralPlot(FigureCanvas):
                 if self.message_box:
                     self.message_box.on_sent_message("Set a redshift and line list first before using vStack", "#FF0000")
 
+        # K (Shift+k) — launch zfind on the hovered panel, accept z back into GUI
+        elif event.key == 'K':
+            self._launch_zfind(ax_index)
+
         # Quick-fit: Gaussian (g+g), Centre-of-Mass (c+c), Advanced dialog (G+G)
         elif event.key in ('g', 'c', 'G'):
             self._handle_fit_keystroke(event.key, x, y, ax_index)
+
+    def _launch_zfind(self, ax_index):
+        """Open ZFindDialog on the spectrum in ax_index; accept z back into GUI."""
+        if ax_index >= len(self.spectra):
+            ax_index = 0
+        spec = self.spectra[ax_index]
+        filename = os.path.basename(spec.filename) if hasattr(spec, 'filename') else f'Spectrum {ax_index+1}'
+
+        try:
+            from rbcodes.GUIs.zfind.dialog import ZFindDialog
+        except ImportError as e:
+            if self.message_box:
+                self.message_box.on_sent_message(f'zfind not available: {e}', '#FF0000')
+            return
+
+        dialog = ZFindDialog(spec=spec, parent=self.parent_window, dark_theme=True)
+
+        def _on_accepted_z(payload):
+            z_new = float(payload[0])
+            # Save current z so Shift+Z can revert
+            try:
+                self._last_z = float(
+                    self.parent_window.redshift_widget.redshift_input.text().strip())
+            except (ValueError, AttributeError):
+                self._last_z = None
+            self.parent_window.redshift_widget.set_redshift(z_new)
+            self.redshift = z_new
+            self.plot_redshift_lines()
+            if self.message_box:
+                self.message_box.on_sent_message(
+                    f'zfind: accepted z = {z_new:.6f} for {filename}', '#008000')
+
+        dialog.accepted_z.connect(_on_accepted_z)
+
+        if self.message_box:
+            self.message_box.on_sent_message(
+                f'Launching zfind for {filename} …', '#8AB4F8')
+
+        dialog.exec_()
 
     def _handle_fit_keystroke(self, key, x, y, ax_index):
         """

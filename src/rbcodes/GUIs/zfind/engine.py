@@ -157,6 +157,11 @@ def line_search(spec, linelist_df, z_min=0.0, z_max=6.0, n_steps=10000,
     """
     Scan redshift by matching emission or absorption lines to a spectrum.
 
+    NOTE: This function is for programmatic / headless use.  The dialog uses
+    picket_fence_search() instead, which wraps the more capable PicketFenceZ
+    class.  line_search() remains available for lightweight scripting where
+    PicketFenceZ is not needed.
+
     Parameters
     ----------
     spec : rb_spectrum
@@ -259,8 +264,8 @@ def line_search(spec, linelist_df, z_min=0.0, z_max=6.0, n_steps=10000,
                 S = np.sum(-fw * iv)  # positive when flux < baseline (absorbed)
                 # Sign check: only count when feature is genuinely in absorption.
                 if S > 0:
-                        accum_chi2 -= (S ** 2) / iv_sum
-                        n_used += 1
+                    accum_chi2 -= (S ** 2) / iv_sum
+                    n_used += 1
 
         if n_used > 0:
             # Normalise by sqrt(n_used) → SNR-like statistic.
@@ -300,15 +305,15 @@ def line_search(spec, linelist_df, z_min=0.0, z_max=6.0, n_steps=10000,
     else:  # absorption
         # convert chi2 to significance (invert and normalize)
         finite = chi2_array[np.isfinite(chi2_array)]
-        if len(finite) == 0:
-            candidates = []
-        else:
+        # Always initialise so the return is safe even when finite is empty
+        significance_curve = np.zeros_like(z_array)
+        candidates = []
+        if len(finite) > 0:
             noise = np.std(finite)
             baseline = np.median(finite)
             significance_curve = (baseline - chi2_array) / (noise + 1e-10)
 
             top_idx_abs = _find_top_minima(z_array, chi2_array, n=20)
-            candidates = []
             for idx in top_idx_abs:
                 obs = rest_waves * (1.0 + z_array[idx])
                 matched_mask = (obs > wmin) & (obs < wmax)
@@ -328,11 +333,140 @@ def line_search(spec, linelist_df, z_min=0.0, z_max=6.0, n_steps=10000,
 
         return AbsorberResult(
             z_array=z_array,
-            significance_curve=significance_curve if len(finite) > 0 else np.zeros_like(z_array),
+            significance_curve=significance_curve,
             candidates=candidates,
             input_spec=spec,
             warnings=warn_list
         )
+
+
+# ---------------------------------------------------------------------------
+# Mode 1b: Picket Fence search (wraps PicketFenceZ)
+# ---------------------------------------------------------------------------
+
+def picket_fence_search(spec, linelist_df, z_min=0.0, z_max=6.0, n_steps=10000,
+                        fwhm_ang=0.0, smooth_fwhm_pix=None, window_pixels=5,
+                        window_fwhm=1.5, use_error='auto',
+                        fit_continuum=True, data_norm='subtract',
+                        wave_min=None, wave_max=None,
+                        res_kwargs=None, pf_mode='direct',
+                        prominence_sigma=3.0):
+    """
+    Weighted picket-fence redshift scan via PicketFenceZ.
+
+    Parameters
+    ----------
+    spec          : rb_spectrum
+    linelist_df   : DataFrame with columns ['wave', 'name'] and optionally
+                    ['weight', 'type'].  Use get_curated_df() for best results.
+    z_min, z_max  : float
+    n_steps       : int
+    fwhm_ang      : float   — legacy; instrument LSF FWHM in Å (use res_kwargs instead)
+    smooth_fwhm_pix : float or None — Gaussian pre-smoothing FWHM in pixels; None=off
+    window_pixels : int     — fallback window half-width when no resolution specified
+    window_fwhm   : float   — window half-width in units of fwhm_pix (default 1.5)
+    use_error     : str     — 'auto' | True | False  (ivar handling in PicketFenceZ)
+    fit_continuum : bool    — fit polynomial continuum if spec has none
+    data_norm     : str     — 'subtract' (default) | 'normalize' | 'raw'
+    wave_min, wave_max : float or None — observed-frame Å mask
+    res_kwargs    : dict or None — resolution specification, e.g.
+                    {'fwhm_ang': 3.0} | {'R': 2000} | {'fwhm_kms': 50} | {'fwhm_pix': 2}
+                    Overrides fwhm_ang when provided.
+    pf_mode       : str — 'direct' (Mode A, default) or 'detect_match' (Mode B)
+    prominence_sigma : float — peak detection threshold in σ for Mode B (default 3.0)
+
+    Returns
+    -------
+    ZFindResult
+    """
+    from rbcodes.GUIs.zfind.picket_fence import PicketFenceZ
+
+    wave, flux, ivar, continuum, warn_list = _preprocess(
+        spec, fit_continuum=fit_continuum
+    )
+
+    if wave_min is not None:
+        ivar[wave < wave_min] = 0.0
+    if wave_max is not None:
+        ivar[wave > wave_max] = 0.0
+
+    # Continuum handling — PicketFenceZ expects continuum-subtracted/normalised flux
+    cont_safe = np.where(np.abs(continuum) > 1e-10, continuum, 1.0)
+    if data_norm == 'normalize':
+        flux_work = flux / cont_safe - 1.0   # fractional deviation
+    elif data_norm == 'raw':
+        flux_work = flux
+    else:  # 'subtract' (default)
+        flux_work = flux - continuum
+
+    # Resolve resolution kwargs: res_kwargs takes priority over legacy fwhm_ang
+    _res = {}
+    if res_kwargs:
+        _res = res_kwargs
+    elif fwhm_ang > 0.0:
+        _res = {'fwhm_ang': fwhm_ang}
+
+    pf = PicketFenceZ(
+        wave, flux_work, ivar, linelist_df,
+        smooth_fwhm_pix=smooth_fwhm_pix,
+        window_fwhm=window_fwhm,
+        window_pixels=window_pixels,
+        use_error=use_error,
+        prominence_sigma=prominence_sigma,
+        **_res
+    )
+    warn_list.extend(pf.warnings)
+
+    method_label = f'PicketFence:{linelist_df.attrs.get("name", "custom")}'
+    wmin, wmax   = wave.min(), wave.max()
+    rest_waves   = linelist_df['wave'].values.astype(float)
+
+    # Always compute the direct score curve for visualization
+    z_array     = np.linspace(z_min, z_max, n_steps)
+    score_array = pf.run(z_array)
+
+    if pf_mode == 'detect_match':
+        # Mode B: solutions come from peak detection + matching
+        candidates = pf.match_peaks()
+        solutions  = []
+        for cand in candidates[:10]:   # keep top 10
+            zc = float(cand['z'])
+            # z_err: estimate from score curve curvature near this z
+            nearest = int(np.argmin(np.abs(z_array - zc)))
+            z_err = _z_err_from_curvature(z_array, score_array, nearest)
+            score_at_z = float(score_array[nearest]) if np.isfinite(score_array[nearest]) else 0.0
+            solutions.append(ZSolution(
+                z=zc,
+                z_err=z_err,
+                chi2_dof=score_at_z,
+                method=method_label + ':ModeB',
+                template_type='Unknown',
+                n_features=int(cand['n_matches']),
+            ))
+        warn_list.append(f'Mode B: {len(candidates)} peak-match candidates found.')
+    else:
+        # Mode A: solutions from direct score curve minima
+        top_idx   = _find_top_minima(z_array, score_array, n=10)
+        solutions = []
+        for idx in top_idx:
+            obs    = rest_waves * (1.0 + z_array[idx])
+            n_lines = int(np.sum((obs > wmin) & (obs < wmax)))
+            solutions.append(ZSolution(
+                z=float(z_array[idx]),
+                z_err=_z_err_from_curvature(z_array, score_array, idx),
+                chi2_dof=float(score_array[idx]),
+                method=method_label,
+                template_type='Unknown',
+                n_features=n_lines,
+            ))
+
+    return ZFindResult(
+        z_array=z_array,
+        chi2_curves=[{'label': method_label, 'chi2': score_array.copy()}],
+        solutions=solutions,
+        input_spec=spec,
+        warnings=warn_list,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -346,7 +480,6 @@ TEMPLATE_FILES = {
     'LateTypeEmission': 'LateTypeEmission.fits',
     'Composite':        'Composite.fits',
     'QSO':              'QSO.fits',
-    'HighZSFG':         'HighZSFG.fits',
 }
 TEMPLATE_NAMES = list(TEMPLATE_FILES.keys())
 
@@ -354,10 +487,9 @@ TEMPLATE_NAMES = list(TEMPLATE_FILES.keys())
 _TEMPLATE_Z_RANGE = {
     'EarlyType':        (0.0, 1.5),
     'Intermediate':     (0.0, 1.5),
-    'LateTypeEmission': (0.0, 2.0),
+    'LateTypeEmission': (0.0, 7.0),
     'Composite':        (0.0, 1.5),
     'QSO':              (0.0, 5.5),
-    'HighZSFG':         (1.5, 6.0),
 }
 
 
@@ -403,7 +535,8 @@ def template_search(spec, template_name='LateTypeEmission',
                     fit_continuum=True,
                     data_norm='normalize', model_norm='normalize',
                     smooth_pixels=1,
-                    wave_min=None, wave_max=None):
+                    wave_min=None, wave_max=None,
+                    template_res_kwargs=None):
     """
     Chi-square scan of *spec* against a bundled MARZ template.
 
@@ -485,6 +618,20 @@ def template_search(spec, template_name='LateTypeEmission',
         except Exception:
             pass
 
+    # Convolve template to instrument resolution so line widths match the
+    # observed spectrum.  MARZ templates are high-resolution; degrading them
+    # to the instrument LSF before comparison improves chi².
+    if template_res_kwargs:
+        try:
+            from rbcodes.GUIs.zfind.picket_fence import _to_fwhm_pix
+            from scipy.ndimage import gaussian_filter1d
+            fwhm_pix = _to_fwhm_pix(t_wave, **template_res_kwargs)
+            if fwhm_pix and fwhm_pix > 0.5:
+                sigma = fwhm_pix / 2.3548
+                t_flux_work = gaussian_filter1d(t_flux_work, sigma)
+        except Exception:
+            pass
+
     # z range defaults
     z_lo, z_hi = _TEMPLATE_Z_RANGE.get(template_name, (0.0, 6.0))
     if z_min is None:
@@ -535,13 +682,17 @@ def template_search(spec, template_name='LateTypeEmission',
     method_label = f'Template:{template_name}'
     solutions = []
     for idx in top_idx:
+        # Count observed pixels that overlap the template at this z
+        t_obs = t_wave * (1.0 + z_array[idx])
+        T_at_z = np.interp(wave, t_obs, t_flux_work, left=0.0, right=0.0)
+        n_pix = int(np.sum((ivar > 0) & (T_at_z != 0.0)))
         solutions.append(ZSolution(
             z=float(z_array[idx]),
             z_err=_z_err_from_curvature(z_array, chi2_array, idx),
             chi2_dof=float(chi2_array[idx]),
             method=method_label,
             template_type=template_name,
-            n_features=0,
+            n_features=n_pix,
         ))
 
     return ZFindResult(
@@ -556,7 +707,8 @@ def template_search(spec, template_name='LateTypeEmission',
 def multi_template_search(spec, templates=None, z_min=None, z_max=None,
                            n_steps=5000, fit_continuum=True,
                            data_norm='normalize', model_norm='normalize',
-                           smooth_pixels=1, wave_min=None, wave_max=None):
+                           smooth_pixels=1, wave_min=None, wave_max=None,
+                           template_res_kwargs=None):
     """
     Run template_search for every template in *templates* (default: all),
     combine chi2 curves onto a common z grid, return the best-fitting
@@ -581,7 +733,8 @@ def multi_template_search(spec, templates=None, z_min=None, z_max=None,
                                 fit_continuum=fit_continuum,
                                 data_norm=data_norm, model_norm=model_norm,
                                 smooth_pixels=smooth_pixels,
-                                wave_min=wave_min, wave_max=wave_max)
+                                wave_min=wave_min, wave_max=wave_max,
+                                template_res_kwargs=template_res_kwargs)
             all_results[tname] = r
             warn_all.extend(r.warnings)
         except Exception as e:
@@ -706,7 +859,8 @@ def _load_pca(template_set: str):
 def pca_search(spec, template_set='galaxy', z_min=None, z_max=None, n_steps=5000,
                fit_continuum=True,
                data_norm='normalize', model_norm='normalize',
-               smooth_pixels=1, wave_min=None, wave_max=None):
+               smooth_pixels=1, wave_min=None, wave_max=None,
+               pca_res_kwargs=None):
     """
     Chi-square scan using DESI redrock PCA eigenvectors (no redrock required).
 
@@ -735,6 +889,10 @@ def pca_search(spec, template_set='galaxy', z_min=None, z_max=None, n_steps=5000
                            'raw' = use as-is)
     smooth_pixels : int  — boxcar pre-smoothing of flux_work; 1=off
     wave_min, wave_max : float or None — observed-frame Å mask (ivar→0 outside)
+    pca_res_kwargs : dict or None — instrument resolution for eigenvector convolution,
+                    e.g. {'R': 2000} | {'fwhm_ang': 3.0} | {'fwhm_kms': 150}
+                    Convolves each eigenvector to match the instrument LSF before
+                    the chi² scan.  None = no convolution.
 
     Returns
     -------
@@ -778,6 +936,21 @@ def pca_search(spec, template_set='galaxy', z_min=None, z_max=None, n_steps=5000
         # Mean-center each eigenvector (remove DC offset)
         eigenvecs = eigenvecs - eigenvecs.mean(axis=1, keepdims=True)
     # 'raw': use eigenvectors as loaded
+
+    # Convolve eigenvectors to instrument resolution so line widths match the
+    # observed spectrum before chi² comparison.  Applied once here (before the
+    # z loop) for performance.
+    if pca_res_kwargs:
+        try:
+            from rbcodes.GUIs.zfind.picket_fence import _to_fwhm_pix
+            from scipy.ndimage import gaussian_filter1d
+            fwhm_pix = _to_fwhm_pix(t_wave, **pca_res_kwargs)
+            if fwhm_pix and fwhm_pix > 0.5:
+                sigma = fwhm_pix / 2.3548
+                eigenvecs = np.array([gaussian_filter1d(ev, sigma)
+                                      for ev in eigenvecs])
+        except Exception:
+            pass
 
     z_lo, z_hi = _PCA_Z_RANGE.get(template_set, (0.0, 6.0))
     if z_min is None:
@@ -853,7 +1026,8 @@ def pca_search(spec, template_set='galaxy', z_min=None, z_max=None, n_steps=5000
 def multi_pca_search(spec, template_sets=None, z_min=None, z_max=None,
                      n_steps=5000, fit_continuum=True,
                      data_norm='normalize', model_norm='normalize',
-                     smooth_pixels=1, wave_min=None, wave_max=None):
+                     smooth_pixels=1, wave_min=None, wave_max=None,
+                     pca_res_kwargs=None):
     """
     Run pca_search for every set in *template_sets* (default: all),
     return combined ZFindResult with one chi2 curve per set.
@@ -875,7 +1049,8 @@ def multi_pca_search(spec, template_sets=None, z_min=None, z_max=None,
                            fit_continuum=fit_continuum,
                            data_norm=data_norm, model_norm=model_norm,
                            smooth_pixels=smooth_pixels,
-                           wave_min=wave_min, wave_max=wave_max)
+                           wave_min=wave_min, wave_max=wave_max,
+                           pca_res_kwargs=pca_res_kwargs)
             all_results[tset] = r
             warn_all.extend(r.warnings)
         except Exception as e:
