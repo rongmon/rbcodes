@@ -28,6 +28,7 @@ def zfind_to_zgui_z(result: ZFindResult, idx: int = 0) -> list:
     """
     if not result.solutions:
         return [float('nan'), float('nan')]
+    idx = min(max(idx, 0), len(result.solutions) - 1)
     s = result.solutions[idx]
     return [s.z, s.z_err]
 
