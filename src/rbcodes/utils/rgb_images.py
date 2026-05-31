@@ -6,6 +6,7 @@ def stiff_rgb(r, g, b,
               min_percent=0.01, max_percent=99.99,
               gamma=2.2,
               color_balance=True,
+              figsize=None,
               savefile=None, dpi=300):
     """
     Emulate STIFF's RGB image generation using gamma + percentile stretch.
@@ -21,6 +22,8 @@ def stiff_rgb(r, g, b,
         Gamma correction value (e.g., 2.2).
     color_balance : bool
         Whether to normalize each channel by its median.
+    figsize : tuple, optional
+        Figure size (width, height) in inches for saved image. If None, uses imsave.
     savefile : str
         If provided, save the RGB image to this path.
     dpi : int
@@ -30,34 +33,35 @@ def stiff_rgb(r, g, b,
     rgb : 3D numpy array
         RGB image array in shape (height, width, 3).
     """
-    # Stack to handle percentile clipping together
+    # Stack to handle percentile clipping together (NaN-safe)
     all_data = np.stack([r, g, b], axis=0)
-    vmin = np.percentile(all_data, min_percent)
-    vmax = np.percentile(all_data, max_percent)
-    
+    vmin = np.nanpercentile(all_data, min_percent)
+    vmax = np.nanpercentile(all_data, max_percent)
+
     def stretch(img):
+        img = np.where(np.isfinite(img), img, 0.0)
         img = np.clip(img, vmin, vmax)
         img = (img - vmin) / (vmax - vmin)
         img = img ** (1 / gamma)
         return img
-    
+
     r_s = stretch(r)
     g_s = stretch(g)
     b_s = stretch(b)
-    
+
     # Optional color balance (normalize each channel)
     if color_balance:
-        r_s /= np.median(r_s)
-        g_s /= np.median(g_s)
-        b_s /= np.median(b_s)
-    
+        r_s /= np.nanmedian(r_s)
+        g_s /= np.nanmedian(g_s)
+        b_s /= np.nanmedian(b_s)
+
     # Re-normalize to [0, 1] after color balance
     rgb_stack = np.stack([r_s, g_s, b_s], axis=-1)
-    rgb_stack /= np.max(rgb_stack)
-    
+    rgb_stack /= np.nanmax(rgb_stack)
+    rgb_stack = np.clip(rgb_stack, 0, 1)
+
     if savefile:
         if figsize is not None:
-            # Use matplotlib figure for custom size control
             fig, ax = plt.subplots(figsize=figsize)
             ax.imshow(rgb_stack, origin='lower')
             ax.axis('off')
@@ -65,9 +69,8 @@ def stiff_rgb(r, g, b,
             plt.savefig(savefile, dpi=dpi, bbox_inches='tight', pad_inches=0)
             plt.close()
         else:
-            # Use simple imsave (default behavior)
             plt.imsave(savefile, rgb_stack, dpi=dpi)
-    
+
     return rgb_stack
 
 
@@ -114,11 +117,11 @@ def lupton_rgb(r, g, b,
     Szalay, A., & Wherry, N. (2004). Preparing red-green-blue images 
     from CCD data. PASP, 116, 133-137.
     """
-    # Subtract minimum (background) from all channels
-    r = np.array(r, dtype=float) - minimum
-    g = np.array(g, dtype=float) - minimum  
-    b = np.array(b, dtype=float) - minimum
-    
+    # Subtract minimum (background) from all channels; replace NaNs with 0
+    r = np.where(np.isfinite(r), np.array(r, dtype=float) - minimum, 0.0)
+    g = np.where(np.isfinite(g), np.array(g, dtype=float) - minimum, 0.0)
+    b = np.where(np.isfinite(b), np.array(b, dtype=float) - minimum, 0.0)
+
     # Set negative values to small positive number
     r = np.maximum(r, 1e-10)
     g = np.maximum(g, 1e-10)
@@ -127,34 +130,32 @@ def lupton_rgb(r, g, b,
     # Color balance: normalize channels so they contribute equally in bright regions
     if color_balance:
         # Use 99th percentile for normalization to avoid outliers
-        r_norm = np.percentile(r, 99)
-        g_norm = np.percentile(g, 99)
-        b_norm = np.percentile(b, 99)
-        
-        # Avoid division by zero
+        r_norm = np.nanpercentile(r, 99)
+        g_norm = np.nanpercentile(g, 99)
+        b_norm = np.nanpercentile(b, 99)
+
         if r_norm <= 0: r_norm = 1
-        if g_norm <= 0: g_norm = 1  
+        if g_norm <= 0: g_norm = 1
         if b_norm <= 0: b_norm = 1
-        
+
         r = r / r_norm
         g = g / g_norm
         b = b / b_norm
-    
+
     # Calculate intensity (luminance)
     I = (r + g + b) / 3.0
-    
-    # Apply asinh stretch
-    # The key insight: stretch factor alpha depends on intensity
-    alpha = stretch * I / Q
-    
-    # Avoid division by zero in the stretch
-    I_safe = np.maximum(I, 1e-10)
-    
+
+    # Lupton (2004) asinh stretch: alpha = Q / stretch (fixed multiplier on I)
+    # f(I) = arcsinh(Q * I / stretch) / (Q * I / stretch)
+    # This makes asinh linear for faint pixels (I << stretch/Q)
+    # and logarithmic for bright ones (I >> stretch/Q)
+    alpha = Q * I / stretch
+
     # Lupton asinh stretch formula
-    f = np.arcsinh(alpha) / alpha
-    
-    # Handle alpha=0 case (set f=1 for very low intensity regions)
-    f = np.where(alpha <= 0, 1, f)
+    f = np.arcsinh(alpha) / np.where(alpha > 0, alpha, 1.0)
+
+    # Handle zero/negative intensity regions (f → 1 as alpha → 0)
+    f = np.where(alpha <= 0, 1.0, f)
     
     # Apply stretch to each channel
     r_stretched = f * r

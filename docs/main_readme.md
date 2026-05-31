@@ -129,6 +129,7 @@ For full installation options, platform notes, and troubleshooting see [INSTALLA
 | **rb_zgui** | `rb_zgui` | Redshift measurement GUI optimized for JWST NIRCam/grism spectroscopy | [PDF tutorial](GUIs/zgui/Tutorial_for_Emission_Line_Redshift_Estimator_GUI.pdf) |
 | **rb_llsfitter** | `rb_llsfitter` | GUI to fit Lyman Limit System column densities | [docs](GUIs/LLSFitter/LLSFitter.md) |
 | **interactive_continuum_fit** | (import) | Recommended continuum fitter — polynomial and spline methods with interactive masking | [docs](GUIs/interactive_continuum_fit.md) |
+| **rb_align** | (import) | Astrometry alignment — align IFU cubes and 2D images to a reference frame with interactive or automated source matching and full WCS fitting | [docs](GUIs/rb_align/rb_align.md) |
 
 **rb_ifuview** extraction and analysis features:
 - Single pixel / Rectangle / Circular / Circular-Annular apertures
