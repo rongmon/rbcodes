@@ -209,9 +209,10 @@ class wcs_align:
     def find_sources(self,
                      strategy: str = 'interactive',
                      stretch: str = 'zscale',
-                     box: int = 15,
+                     box: int = 5,
                      save_catalog: Optional[str] = None,
-                     catalog: Optional[str] = None):
+                     catalog: Optional[str] = None,
+                     **kwargs):
         """
         Detect and match sources between reference and target(s).
 
@@ -228,10 +229,16 @@ class wcs_align:
             Path to save FITS catalog after interactive session.
         catalog : str or None
             Path to existing FITS catalog (batch strategy).
+        **kwargs
+            Extra per-strategy options forwarded to the detection function:
+            fwhm, threshold_sigma, max_sources  (cross_corr, dao)
+            threshold_sigma, max_knots           (knots)
+            radius_deg, max_stars                (gaia)
         """
         from .sources import _run_strategy
         _run_strategy(self, strategy=strategy, stretch=stretch,
-                      box=box, save_catalog=save_catalog, catalog=catalog)
+                      box=box, save_catalog=save_catalog, catalog=catalog,
+                      **kwargs)
 
     # ------------------------------------------------------------------
     # Alignment (delegates to align.py)
@@ -349,6 +356,27 @@ class wcs_align:
         """Remove the last stored pair (undo)."""
         if self.pairs:
             self.pairs.pop()
+
+    def remove_pair(self, index: int):
+        """
+        Remove a specific pair by index (0-based).
+
+        Negative indices work as usual (e.g. -1 removes the last pair).
+
+        Example
+        -------
+        c.find_sources(strategy='cross_corr')
+        print(c.pairs)        # inspect — decide pair 1 is wrong
+        c.remove_pair(1)      # remove it
+        c.find_sources(strategy='interactive')   # refine the rest
+        """
+        if not self.pairs:
+            raise IndexError("No pairs to remove.")
+        try:
+            del self.pairs[index]
+        except IndexError:
+            raise IndexError(
+                f"Pair index {index} out of range (0–{len(self.pairs)-1}).")
 
     def clear_pairs(self):
         """Remove all stored pairs."""

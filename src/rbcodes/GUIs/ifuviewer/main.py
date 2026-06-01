@@ -317,6 +317,17 @@ class MainWindow(QMainWindow):
         batch_action.triggered.connect(self._on_batch_extract)
         analysis_menu.addAction(batch_action)
 
+        analysis_menu.addSeparator()
+
+        align_action = QAction("Align to Reference…", self)
+        align_action.setShortcut("Ctrl+Shift+A")
+        align_action.setToolTip(
+            "Open the interactive WCS alignment dialog.\n"
+            "Pick matched sources on a reference image and the active cube;\n"
+            "rb_align fits the WCS correction and optionally writes _wcsfix.fits.")
+        align_action.triggered.connect(self._on_align_to_reference)
+        analysis_menu.addAction(align_action)
+
         help_menu = menubar.addMenu("Help")
 
         help_action = QAction("Help", self)
@@ -1598,6 +1609,74 @@ class MainWindow(QMainWindow):
                 self._specgui_windows.append(win)
             except Exception as exc:
                 print(f"[batch extract] rb_multispec launch failed: {exc}")
+
+    # ------------------------------------------------------------------
+    # WCS Alignment (rb_align integration)
+    # ------------------------------------------------------------------
+
+    def _on_align_to_reference(self):
+        """Open the interactive WCS alignment dialog (Ctrl+Shift+A)."""
+        cube = self._active_cube
+        if cube is None:
+            QMessageBox.information(self, "No dataset",
+                                    "Load a cube or image before running alignment.")
+            return
+
+        target_image = self._image_canvas._data_raw
+        if target_image is None:
+            QMessageBox.information(self, "No image displayed",
+                                    "Display an image in the viewer first.")
+            return
+
+        # Use current image mode as the label for the target panel
+        target_label = self._channel_slider.current_mode
+
+        from rbcodes.GUIs.ifuviewer.align_dialog import AlignDialog
+        dlg = AlignDialog(cube, target_image=target_image,
+                          target_label=target_label, parent=self)
+        if not dlg.exec_():
+            return   # user closed without applying
+
+        new_wcs = dlg.corrected_wcs
+        if new_wcs is None:
+            return
+
+        # --- Apply corrected WCS to the active dataset in memory ---
+        cube.wcs = new_wcs
+
+        # Patch header: spatial-only for 3D cubes; full WCS for 2D images
+        is_3d = hasattr(cube, 'flux') and cube.flux.ndim == 3
+        if is_3d:
+            from rbcodes.rb_align.io import _update_3d_header
+            _update_3d_header(cube.header, new_wcs)
+        else:
+            for key, val in new_wcs.to_header().items():
+                try:
+                    cube.header[key] = val
+                except Exception:
+                    pass
+
+        # Rebuild image panel axes with corrected WCS, preserving current
+        # display settings (colormap and clim so the image looks the same)
+        ic = self._image_canvas
+        if ic._data_raw is not None:
+            import matplotlib.colors as mcolors
+            saved_cmap = ic._im.get_cmap().name if ic._im is not None else 'gray'
+            saved_norm = None
+            if ic._im is not None:
+                vmin, vmax = ic._im.get_clim()
+                saved_norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+            ic.show_image(ic._data_raw,
+                          header=cube.spatial_header(),
+                          cmap=saved_cmap,
+                          norm=saved_norm)
+
+        fit_type = dlg.aligner.fit_type[0] if dlg.aligner else '?'
+        rms      = (f"{dlg.aligner.rms_residuals[0]:.3f}\""
+                    if dlg.aligner and dlg.aligner.rms_residuals else '?')
+        self.statusBar().showMessage(
+            f"WCS corrected — fit: {fit_type}  RMS: {rms}  |  "
+            f"Header updated in memory.  Use File > Save Subcube… to write.", 8000)
 
     def _on_moment_map(self):
         """Open the Moment Map dialog (Ctrl+M)."""

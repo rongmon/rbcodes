@@ -21,6 +21,7 @@ from .core import Frame
 def _preprocess_frame(frame: Frame,
                       method: str = 'whitelight',
                       wl_range=None,
+                      collapse: str = 'mean',
                       func: Optional[Callable] = None) -> None:
     """
     Collapse one Frame's 3D cube to a 2D image and store as frame.image2d.
@@ -32,6 +33,8 @@ def _preprocess_frame(frame: Frame,
         'whitelight' | 'narrowband'
     wl_range : [wmin, wmax] or None
         Wavelength range in Angstroms; required for 'narrowband'.
+    collapse : str
+        'mean' | 'median' | 'sum'  — how to combine flux along wavelength.
     func : callable or None
         Custom collapse: func(flux_3d) -> image_2d. Bypasses built-ins.
     """
@@ -53,9 +56,9 @@ def _preprocess_frame(frame: Frame,
                 "preprocess(method='narrowband') requires wl_range=[wmin, wmax]."
             )
         wmin, wmax = float(wl_range[0]), float(wl_range[1])
-        result = build_narrowband(flux, wave, wmin, wmax)
+        result = build_narrowband(flux, wave, wmin, wmax, method=collapse)
     else:
-        # Default: whitelight
-        result = build_whitelight(flux, wave)
+        # Default: whitelight (full wavelength range)
+        result = build_whitelight(flux, wave, method=collapse)
 
     frame.image2d = np.asarray(result, dtype=np.float64)

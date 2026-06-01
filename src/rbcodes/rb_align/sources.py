@@ -342,11 +342,24 @@ def _interactive(aligner, stretch='zscale', box=15, save_catalog=None):
     # ---- Key handler ---------------------------------------------------------
     def _on_key(event):
         if event.key == 'u':
-            # Undo last confirmed pair
-            if aligner.pairs:
+            if not aligner.pairs:
+                return
+            # Delete the pair whose reference marker is nearest to the cursor.
+            # Falls back to the last pair if the cursor is not over an axes.
+            if (event.inaxes in (ax_ref, ax_tgt)
+                    and event.xdata is not None and event.ydata is not None):
+                cx, cy = event.xdata, event.ydata
+                if event.inaxes is ax_ref:
+                    dists = [np.sqrt((p[0]-cx)**2 + (p[1]-cy)**2)
+                             for p in aligner.pairs]
+                else:  # ax_tgt
+                    dists = [np.sqrt((p[4]-cx)**2 + (p[5]-cy)**2)
+                             for p in aligner.pairs]
+                del aligner.pairs[int(np.argmin(dists))]
+            else:
                 aligner.pairs.pop()
-                _redraw_all_confirmed()
-                fig.canvas.draw_idle()
+            _redraw_all_confirmed()
+            fig.canvas.draw_idle()
         elif event.key == ' ':
             # Spacebar — auto-accept around predicted position
             if state['mode'] == 'PENDING':
@@ -422,7 +435,8 @@ def _batch(aligner, catalog: str, box: int = 15):
 # Gaia strategy
 # ---------------------------------------------------------------------------
 
-def _gaia(aligner, box: int = 15):
+def _gaia(aligner, box: int = 5, radius_deg: float = 0.5,
+          max_stars: int = 50):
     """
     Match Gaia DR3 catalog to reference image, then project to target.
 
@@ -451,7 +465,7 @@ def _gaia(aligner, box: int = 15):
         corner_sky = ref.wcs.all_pix2world([[0, 0]], 0)
         dra = abs(float(corner_sky[0, 0]) - ra_c)
         ddec = abs(float(corner_sky[0, 1]) - dec_c)
-        radius_deg = min(max(dra, ddec) * 1.5, 0.5)   # cap at 0.5 deg
+        radius_deg = min(max(dra, ddec) * 1.5, radius_deg)
     except Exception:
         raise RuntimeError("Reference WCS is not valid — cannot query Gaia.")
 
@@ -470,7 +484,7 @@ def _gaia(aligner, box: int = 15):
     # Filter bright, well-measured stars
     mag_col = 'phot_g_mean_mag' if 'phot_g_mean_mag' in result.colnames else result.colnames[0]
     result.sort(mag_col)
-    result = result[:50]   # use up to 50 brightest
+    result = result[:max_stars]
 
     tgt = aligner.targets[0]
     tgt_img = tgt.image2d
@@ -511,11 +525,12 @@ def _gaia(aligner, box: int = 15):
 # DAO strategy
 # ---------------------------------------------------------------------------
 
-def _dao(aligner, box: int = 15):
+def _dao(aligner, box: int = 5, fwhm: float = 0.0,
+         threshold_sigma: float = 3.0, max_sources: int = 50):
     """
     Detect point sources with DAOStarFinder, then match between images.
 
-    Requires photutils; falls back to SExtractor-style peak finding if absent.
+    Requires photutils; falls back to peak finding if absent.
     """
     ref = aligner.reference
     tgt = aligner.targets[0]
@@ -524,9 +539,17 @@ def _dao(aligner, box: int = 15):
     if ref_img is None or tgt_img is None:
         raise RuntimeError("Call preprocess() before find_sources(strategy='dao').")
 
-    ref_sources = _detect_dao_sources(ref_img, box)
+    ref_sources = _detect_dao_sources(ref_img, box, fwhm=fwhm,
+                                       threshold_sigma=threshold_sigma)
     if len(ref_sources) == 0:
         raise RuntimeError("DAOStarFinder found no sources in reference image.")
+
+    # Sort by brightness and cap
+    ref_sources = sorted(
+        ref_sources,
+        key=lambda xy: -float(ref_img[min(int(round(xy[1])), ref_img.shape[0]-1),
+                                       min(int(round(xy[0])), ref_img.shape[1]-1)])
+    )[:max_sources]
 
     tgt_ny, tgt_nx = tgt_img.shape
     aligner.pairs.clear()
@@ -544,14 +567,29 @@ def _dao(aligner, box: int = 15):
         aligner.pairs.append((rx, ry, ra, dec, tx_r, ty_r))
 
 
-def _detect_dao_sources(img: np.ndarray, box: int):
-    """Return list of (x, y) source positions from DAOStarFinder or fallback."""
+def _detect_dao_sources(img: np.ndarray, box: int,
+                        fwhm: float = 0.0,
+                        threshold_sigma: float = 3.0):
+    """
+    Return list of (x, y) source positions from DAOStarFinder or fallback.
+
+    Parameters
+    ----------
+    fwhm : float
+        Expected source FWHM in pixels.  0 → auto as ``box * 0.5``.
+    threshold_sigma : float
+        Detection threshold in units of image σ.
+    """
+    if fwhm <= 0:
+        fwhm = max(2.0, box * 0.5)
+
     if HAS_PHOTUTILS:
         try:
             from photutils.detection import DAOStarFinder
             from astropy.stats import sigma_clipped_stats
-            _, median, std = sigma_clipped_stats(img[np.isfinite(img)])
-            finder = DAOStarFinder(fwhm=2.5, threshold=5.0 * std)
+            finite = img[np.isfinite(img)]
+            _, median, std = sigma_clipped_stats(finite)
+            finder = DAOStarFinder(fwhm=fwhm, threshold=threshold_sigma * std)
             sources = finder(img - median)
             if sources is None or len(sources) == 0:
                 return []
@@ -562,19 +600,34 @@ def _detect_dao_sources(img: np.ndarray, box: int):
         except Exception:
             pass
     # Fallback: simple peak finding via scipy
-    return _simple_peak_find(img, box)
+    return _simple_peak_find(img, box, threshold_sigma=threshold_sigma)
 
 
-def _simple_peak_find(img: np.ndarray, box: int, n_max: int = 30):
-    """Basic peak finding: find local maxima above 3-sigma threshold."""
+def _simple_peak_find(img: np.ndarray, box: int, n_max: int = 30,
+                      threshold_sigma: float = 3.0):
+    """
+    Basic peak finding: local maxima above threshold_sigma × σ_background.
+
+    Uses sigma-clipped stats to estimate background and noise, matching
+    the behaviour of the DAOStarFinder path.
+    """
     from scipy.ndimage import maximum_filter, label
     clean = np.nan_to_num(img, nan=0.0)
-    flat = clean.ravel()
-    flat_finite = flat[np.isfinite(flat)]
-    threshold = np.median(flat_finite) + 3.0 * np.std(flat_finite)
-    local_max = maximum_filter(clean, size=box) == clean
-    above_thresh = clean > threshold
-    peaks = local_max & above_thresh
+    finite = clean.ravel()
+    finite = finite[np.isfinite(finite)]
+
+    # Sigma-clipped background estimate (2 iterations, 3-sigma clip)
+    bg = finite.copy()
+    for _ in range(2):
+        med = np.median(bg)
+        std = np.std(bg)
+        bg = bg[np.abs(bg - med) < 3.0 * std]
+    bg_median = float(np.median(bg))
+    bg_std    = float(np.std(bg))
+
+    threshold = bg_median + threshold_sigma * bg_std
+    local_max = maximum_filter(clean, size=max(3, box)) == clean
+    peaks = local_max & (clean > threshold)
     labeled, n = label(peaks)
     sources = []
     for i in range(1, min(n + 1, n_max + 1)):
@@ -587,7 +640,8 @@ def _simple_peak_find(img: np.ndarray, box: int, n_max: int = 30):
 # Knots strategy
 # ---------------------------------------------------------------------------
 
-def _knots(aligner, box: int = 15):
+def _knots(aligner, box: int = 5, threshold_sigma: float = 2.0,
+           max_knots: int = 10):
     """
     Detect bright knots in reference via segmentation, project to target.
 
@@ -600,7 +654,8 @@ def _knots(aligner, box: int = 15):
     if ref_img is None or tgt_img is None:
         raise RuntimeError("Call preprocess() before find_sources(strategy='knots').")
 
-    knot_positions = _detect_knots(ref_img, box)
+    knot_positions = _detect_knots(ref_img, box, n_knots=max_knots,
+                                    threshold_sigma=threshold_sigma)
     if len(knot_positions) == 0:
         raise RuntimeError("No knots detected in reference image.")
 
@@ -620,7 +675,8 @@ def _knots(aligner, box: int = 15):
         aligner.pairs.append((rx, ry, ra, dec, tx_r, ty_r))
 
 
-def _detect_knots(img: np.ndarray, box: int, n_knots: int = 10):
+def _detect_knots(img: np.ndarray, box: int, n_knots: int = 10,
+                  threshold_sigma: float = 2.0):
     """Segment image and return centroids of brightest segments."""
     if HAS_PHOTUTILS:
         try:
@@ -628,9 +684,10 @@ def _detect_knots(img: np.ndarray, box: int, n_knots: int = 10):
             from astropy.stats import sigma_clipped_stats
             _, _, std = sigma_clipped_stats(img[np.isfinite(img)])
             seg = detect_sources(np.nan_to_num(img, nan=0.0),
-                                  threshold=2.0 * std, npixels=5)
+                                  threshold=threshold_sigma * std, npixels=5)
             if seg is None:
-                return _simple_peak_find(img, box, n_max=n_knots)
+                return _simple_peak_find(img, box, n_max=n_knots,
+                                          threshold_sigma=threshold_sigma)
             cat = SourceCatalog(np.nan_to_num(img, nan=0.0), seg)
             tbl = cat.to_table()
             tbl.sort('segment_flux', reverse=True)
@@ -641,19 +698,36 @@ def _detect_knots(img: np.ndarray, box: int, n_knots: int = 10):
             ))
         except Exception:
             pass
-    return _simple_peak_find(img, box, n_max=n_knots)
+    return _simple_peak_find(img, box, n_max=n_knots,
+                              threshold_sigma=threshold_sigma)
 
 
 # ---------------------------------------------------------------------------
 # Cross-correlation strategy
 # ---------------------------------------------------------------------------
 
-def _cross_corr(aligner):
-    """
-    Find the shift between reference and target via cross-correlation.
+def _estimate_pixel_scale_arcsec(frame, img: np.ndarray) -> float:
+    """Estimate pixel scale in arcsec/px from the frame's WCS."""
+    try:
+        ny, nx = img.shape
+        sky0 = frame.wcs.all_pix2world([[nx / 2,     ny / 2    ]], 0)[0]
+        sky1 = frame.wcs.all_pix2world([[nx / 2 + 1, ny / 2    ]], 0)[0]
+        sky2 = frame.wcs.all_pix2world([[nx / 2,     ny / 2 + 1]], 0)[0]
+        cos_dec = np.cos(np.deg2rad(sky0[1]))
+        dx = abs(sky1[0] - sky0[0]) * cos_dec * 3600.0
+        dy = abs(sky2[1] - sky0[1]) * 3600.0
+        return float((dx + dy) / 2.0)
+    except Exception:
+        return 0.3   # fallback: KCWI-like scale
 
-    Works best for same-instrument pairs with similar PSFs.
-    Returns one pair representing the centre of the reference after shift.
+
+def _cross_corr_image_fallback(aligner):
+    """
+    Single-pair shift via FFT image cross-correlation.
+
+    Fallback used when source detection yields nothing in either image.
+    Only reliable for same pixel-scale images. Returns 1 pair at the
+    reference centre displaced by the measured shift.
     """
     from scipy.signal import fftconvolve
 
@@ -661,10 +735,7 @@ def _cross_corr(aligner):
     tgt = aligner.targets[0]
     ref_img = ref.image2d
     tgt_img = tgt.image2d
-    if ref_img is None or tgt_img is None:
-        raise RuntimeError("Call preprocess() before find_sources(strategy='cross_corr').")
 
-    # Pad/crop to same size for correlation
     r_ny, r_nx = ref_img.shape
     t_ny, t_nx = tgt_img.shape
     ny = max(r_ny, t_ny)
@@ -672,24 +743,19 @@ def _cross_corr(aligner):
 
     def _pad(arr, out_ny, out_nx):
         padded = np.zeros((out_ny, out_nx), dtype=np.float64)
-        src_ny, src_nx = arr.shape
-        padded[:src_ny, :src_nx] = np.nan_to_num(arr, nan=0.0)
+        padded[:arr.shape[0], :arr.shape[1]] = np.nan_to_num(arr, nan=0.0)
         return padded
 
-    ref_pad = _pad(ref_img, ny, nx)
-    tgt_pad = _pad(tgt_img, ny, nx)
+    ref_norm = _pad(ref_img, ny, nx)
+    tgt_norm = _pad(tgt_img, ny, nx)
+    ref_norm -= ref_norm.mean()
+    tgt_norm -= tgt_norm.mean()
 
-    # Normalise
-    ref_norm = ref_pad - ref_pad.mean()
-    tgt_norm = tgt_pad - tgt_pad.mean()
-
-    # Cross-correlate: convolve with flipped target
     xcorr = fftconvolve(ref_norm, tgt_norm[::-1, ::-1], mode='full')
-    peak = np.unravel_index(np.argmax(xcorr), xcorr.shape)
-    dy = peak[0] - (ny - 1)
-    dx = peak[1] - (nx - 1)
+    peak  = np.unravel_index(np.argmax(xcorr), xcorr.shape)
+    dy    = peak[0] - (ny - 1)
+    dx    = peak[1] - (nx - 1)
 
-    # Build one synthetic pair: centre of reference shifted by (dx, dy)
     ref_cx = r_nx / 2.0
     ref_cy = r_ny / 2.0
     tgt_cx = ref_cx - dx
@@ -700,6 +766,172 @@ def _cross_corr(aligner):
 
     aligner.pairs.clear()
     aligner.pairs.append((ref_cx, ref_cy, ra, dec, tgt_cx, tgt_cy))
+
+
+def _cross_corr(aligner, box: int = 5, fwhm: float = 0.0,
+                threshold_sigma: float = 3.0, max_sources: int = 50):
+    """
+    Multi-source cross-match via Hough-style catalog voting.
+
+    Algorithm
+    ---------
+    1. Detect sources in each image independently (in their own pixel space).
+    2. Convert pixel positions to sky (RA/Dec) via each frame's own WCS.
+    3. Build all pairwise (ref_i, tgt_j) sky-shift votes → 2-D histogram.
+    4. The peak bin gives the best (ΔRA, ΔDec) offset between the catalogs.
+    5. Match sources within that offset and recentroid each → N pairs.
+
+    Works for different pixel scales and FoVs. Falls back to single-pair
+    image FFT cross-correlation if either image yields no detectable sources.
+
+    Parameters
+    ----------
+    box : int
+        Centroid box half-width (px); also sets the Hough bin size as
+        ``clip(box × pixel_scale, 1.5, 10)`` arcsec.
+    """
+    ref = aligner.reference
+    tgt = aligner.targets[0]
+    ref_img = ref.image2d
+    tgt_img = tgt.image2d
+    if ref_img is None or tgt_img is None:
+        raise RuntimeError(
+            "Call preprocess() before find_sources(strategy='cross_corr').")
+
+    r_ny, r_nx = ref_img.shape
+    t_ny, t_nx = tgt_img.shape
+
+    # ------------------------------------------------------------------
+    # Step 1: source detection — keep up to 50 brightest per image
+    # ------------------------------------------------------------------
+    ref_sources = _detect_dao_sources(ref_img, box, fwhm=fwhm,
+                                       threshold_sigma=threshold_sigma)
+    tgt_sources = _detect_dao_sources(tgt_img, box, fwhm=fwhm,
+                                       threshold_sigma=threshold_sigma)
+
+    if not ref_sources or not tgt_sources:
+        print("[rb_align] cross_corr: source detection failed; "
+              "falling back to image FFT cross-correlation (1 pair).")
+        _cross_corr_image_fallback(aligner)
+        return
+
+    def _brightest(img, sources, n_max=50):
+        ny_, nx_ = img.shape
+        vals = []
+        for x, y in sources:
+            xi, yi = int(round(x)), int(round(y))
+            xi = max(0, min(nx_ - 1, xi))
+            yi = max(0, min(ny_ - 1, yi))
+            vals.append(float(img[yi, xi]))
+        order = np.argsort(vals)[::-1][:n_max]
+        return [sources[i] for i in order]
+
+    ref_sources = _brightest(ref_img, ref_sources, n_max=max_sources)
+    tgt_sources = _brightest(tgt_img, tgt_sources, n_max=max_sources)
+
+    # ------------------------------------------------------------------
+    # Step 2: pixel → sky for each catalog independently
+    # ------------------------------------------------------------------
+    try:
+        ref_sky = ref.wcs.all_pix2world(np.array(ref_sources, dtype=np.float64), 0)
+        tgt_sky = tgt.wcs.all_pix2world(np.array(tgt_sources, dtype=np.float64), 0)
+    except Exception as e:
+        print(f"[rb_align] cross_corr: WCS projection failed ({e}); "
+              "falling back to image FFT cross-correlation.")
+        _cross_corr_image_fallback(aligner)
+        return
+
+    ref_ra  = ref_sky[:, 0]
+    ref_dec = ref_sky[:, 1]
+    tgt_ra  = tgt_sky[:, 0]
+    tgt_dec = tgt_sky[:, 1]
+
+    mean_dec = float(np.mean(np.concatenate([ref_dec, tgt_dec])))
+    cos_dec  = np.cos(np.deg2rad(mean_dec))
+
+    # ------------------------------------------------------------------
+    # Step 3: Hough vote — all pairwise (tgt_j − ref_i) shifts in arcsec
+    # ------------------------------------------------------------------
+    dra_all  = ((tgt_ra[:, None]  - ref_ra[None, :])  * cos_dec * 3600.0).ravel()
+    ddec_all = ((tgt_dec[:, None] - ref_dec[None, :]) *           3600.0).ravel()
+
+    px_scale   = _estimate_pixel_scale_arcsec(ref, ref_img)
+    bin_arcsec = float(np.clip(box * px_scale, 1.5, 10.0))
+
+    dra_lo,  dra_hi  = dra_all.min()  - bin_arcsec, dra_all.max()  + bin_arcsec
+    ddec_lo, ddec_hi = ddec_all.min() - bin_arcsec, ddec_all.max() + bin_arcsec
+
+    n_bins_ra  = max(3, int((dra_hi  - dra_lo)  / bin_arcsec) + 1)
+    n_bins_dec = max(3, int((ddec_hi - ddec_lo) / bin_arcsec) + 1)
+
+    hist, dra_edges, ddec_edges = np.histogram2d(
+        dra_all, ddec_all,
+        bins=[n_bins_ra, n_bins_dec],
+        range=[[dra_lo, dra_hi], [ddec_lo, ddec_hi]],
+    )
+
+    peak_idx   = np.unravel_index(np.argmax(hist), hist.shape)
+    peak_votes = int(hist[peak_idx])
+    best_dra   = (dra_edges[peak_idx[0]]     + dra_edges[peak_idx[0] + 1])  / 2.0
+    best_ddec  = (ddec_edges[peak_idx[1]]    + ddec_edges[peak_idx[1] + 1]) / 2.0
+
+    print(f"[rb_align] cross_corr: Hough peak = {peak_votes} vote(s), "
+          f"ΔRA={best_dra:.2f}\", ΔDec={best_ddec:.2f}\"  "
+          f"(bin={bin_arcsec:.1f}\", "
+          f"N_ref={len(ref_sources)}, N_tgt={len(tgt_sources)})")
+
+    if peak_votes < 2 and len(ref_sources) > 3 and len(tgt_sources) > 3:
+        print("[rb_align] cross_corr: weak Hough peak — shift may be unreliable.")
+
+    # ------------------------------------------------------------------
+    # Step 4: match sources under the best shift; recentroid each pair
+    # ------------------------------------------------------------------
+    match_tol_arcsec = bin_arcsec * 1.5
+
+    aligner.pairs.clear()
+    used_tgt = set()
+
+    for i in range(len(ref_sources)):
+        rx, ry   = ref_sources[i]
+        ra_r     = float(ref_ra[i])
+        dec_r    = float(ref_dec[i])
+
+        # Expected sky position of this source in the target frame
+        exp_ra  = ra_r  + best_dra  / (cos_dec * 3600.0)
+        exp_dec = dec_r + best_ddec / 3600.0
+
+        # Distance from every target source to the expected position
+        dra_t  = (tgt_ra  - exp_ra)  * cos_dec * 3600.0
+        ddec_t = (tgt_dec - exp_dec) * 3600.0
+        sep    = np.sqrt(dra_t**2 + ddec_t**2)
+
+        for j_used in used_tgt:
+            sep[j_used] = np.inf
+
+        j = int(np.argmin(sep))
+        if sep[j] > match_tol_arcsec:
+            continue
+
+        used_tgt.add(j)
+        tx, ty = tgt_sources[j]
+
+        if not (0 <= rx < r_nx and 0 <= ry < r_ny):
+            continue
+        if not (0 <= tx < t_nx and 0 <= ty < t_ny):
+            continue
+
+        rx_r, ry_r = _refine_centroid(ref_img, rx, ry, box)
+        tx_r, ty_r = _refine_centroid(tgt_img, tx, ty, box)
+
+        sky = ref.wcs.all_pix2world([[rx_r, ry_r]], 0)
+        ra, dec = float(sky[0, 0]), float(sky[0, 1])
+
+        aligner.pairs.append((rx_r, ry_r, ra, dec, tx_r, ty_r))
+
+    if not aligner.pairs:
+        print("[rb_align] cross_corr: no source matches after Hough vote; "
+              "falling back to image FFT cross-correlation (1 pair).")
+        _cross_corr_image_fallback(aligner)
 
 
 # ---------------------------------------------------------------------------
@@ -716,7 +948,7 @@ def _auto(aligner, stretch='zscale', box=15):
         ('gaia', lambda: _gaia(aligner, box=box)),
         ('dao',  lambda: _dao(aligner, box=box)),
         ('knots', lambda: _knots(aligner, box=box)),
-        ('cross_corr', lambda: _cross_corr(aligner)),
+        ('cross_corr', lambda: _cross_corr(aligner, box=box)),
         ('interactive', lambda: _interactive(aligner, stretch=stretch, box=box)),
     ]
     for name, fn in strategies:
@@ -770,9 +1002,18 @@ def _save_pairs_catalog(pairs, path: str):
 def _run_strategy(aligner,
                   strategy: str = 'interactive',
                   stretch='zscale',
-                  box: int = 15,
+                  box: int = 5,
                   save_catalog: Optional[str] = None,
-                  catalog: Optional[str] = None):
+                  catalog: Optional[str] = None,
+                  # cross_corr / dao options
+                  fwhm: float = 0.0,
+                  threshold_sigma: float = 3.0,
+                  max_sources: int = 50,
+                  # knots options
+                  max_knots: int = 10,
+                  # gaia options
+                  radius_deg: float = 0.5,
+                  max_stars: int = 50):
     """Dispatch to the selected source detection strategy."""
 
     strategy = strategy.lower()
@@ -781,22 +1022,25 @@ def _run_strategy(aligner,
         _interactive(aligner, stretch=stretch, box=box, save_catalog=save_catalog)
 
     elif strategy == 'gaia':
-        _gaia(aligner, box=box)
+        _gaia(aligner, box=box, radius_deg=radius_deg, max_stars=max_stars)
         if save_catalog is not None:
             _save_pairs_catalog(aligner.pairs, save_catalog)
 
     elif strategy == 'dao':
-        _dao(aligner, box=box)
+        _dao(aligner, box=box, fwhm=fwhm,
+             threshold_sigma=threshold_sigma, max_sources=max_sources)
         if save_catalog is not None:
             _save_pairs_catalog(aligner.pairs, save_catalog)
 
     elif strategy == 'knots':
-        _knots(aligner, box=box)
+        _knots(aligner, box=box, threshold_sigma=threshold_sigma,
+               max_knots=max_knots)
         if save_catalog is not None:
             _save_pairs_catalog(aligner.pairs, save_catalog)
 
     elif strategy == 'cross_corr':
-        _cross_corr(aligner)
+        _cross_corr(aligner, box=box, fwhm=fwhm,
+                    threshold_sigma=threshold_sigma, max_sources=max_sources)
         if save_catalog is not None:
             _save_pairs_catalog(aligner.pairs, save_catalog)
 
