@@ -32,8 +32,8 @@ class DS9Bridge:
         """
         try:
             import pyds9
-        except ImportError:
-            return False, 'no_pyds9'
+        except ImportError as _e:
+            return False, f'no_pyds9: {_e}'
         try:
             self._ds9 = pyds9.DS9()
             return True, ''

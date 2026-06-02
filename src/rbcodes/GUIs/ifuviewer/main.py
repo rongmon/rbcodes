@@ -1127,10 +1127,11 @@ class MainWindow(QMainWindow):
         ok, reason = bridge.connect()
 
         if not ok:
-            if reason == 'no_pyds9':
+            if reason.startswith('no_pyds9'):
                 QMessageBox.warning(
                     self, "pyds9 not found",
-                    "pyds9 is not installed.\n\nInstall with:\n    pip install pyds9")
+                    f"pyds9 could not be imported.\n\nDetails: {reason}\n\n"
+                    "Install with:\n    pip install pyds9")
             else:
                 QMessageBox.warning(
                     self, "ds9 not running",
