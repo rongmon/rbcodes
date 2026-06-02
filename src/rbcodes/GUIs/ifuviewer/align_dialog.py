@@ -28,7 +28,7 @@ import numpy as np
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGroupBox,
     QLabel, QPushButton, QComboBox, QDoubleSpinBox, QSpinBox,
-    QFileDialog, QMessageBox, QSizePolicy, QWidget,
+    QFileDialog, QMessageBox, QSizePolicy, QWidget, QLineEdit,
 )
 from PyQt5.QtCore import Qt
 
@@ -37,7 +37,8 @@ from matplotlib.backends.backend_qt5agg import (
     FigureCanvasQTAgg, NavigationToolbar2QT as NavToolbar)
 
 from rbcodes.rb_align import wcs_align
-from rbcodes.rb_align.sources import _refine_centroid, _compute_norm
+from rbcodes.rb_align.sources import (_refine_centroid, _compute_norm,
+                                       _box_to_pixels)
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +114,7 @@ class StrategyOptionsDialog(QDialog):
             w.setSuffix(" σ")
             w.setValue(current_opts.get('threshold_sigma', 3.0))
             _add_row("Detection threshold:", w,
-                     "Minimum source brightness in units of image σ.\n"
+                     "Minimum source brightness in units of background σ.\n"
                      "Lower = more sources found (but more false positives).")
             self._widgets['threshold_sigma'] = w
 
@@ -124,6 +125,16 @@ class StrategyOptionsDialog(QDialog):
                      "Maximum number of sources to use from each image.")
             self._widgets['max_sources'] = w
 
+            w = QComboBox()
+            w.addItems(['sigma_clip', 'mad'])
+            w.setCurrentText(current_opts.get('bg_method', 'sigma_clip'))
+            _add_row("BG estimator:", w,
+                     "sigma_clip — iterative sigma-clipped std (default).\n"
+                     "mad        — median absolute deviation × 1.4826.\n"
+                     "Use 'mad' for IFU data with correlated noise or\n"
+                     "when the source fraction is high (e.g. QSO fields).")
+            self._widgets['bg_method'] = w
+
         elif strategy == 'knots':
             w = QDoubleSpinBox()
             w.setRange(0.5, 20.0)
@@ -131,7 +142,7 @@ class StrategyOptionsDialog(QDialog):
             w.setSuffix(" σ")
             w.setValue(current_opts.get('threshold_sigma', 2.0))
             _add_row("Detection threshold:", w,
-                     "Segmentation threshold in units of image σ.\n"
+                     "Segmentation threshold in units of background σ.\n"
                      "Lower = more knots detected.")
             self._widgets['threshold_sigma'] = w
 
@@ -141,6 +152,14 @@ class StrategyOptionsDialog(QDialog):
             _add_row("Max knots:", w,
                      "Maximum number of knots/segments to return.")
             self._widgets['max_knots'] = w
+
+            w = QComboBox()
+            w.addItems(['sigma_clip', 'mad'])
+            w.setCurrentText(current_opts.get('bg_method', 'sigma_clip'))
+            _add_row("BG estimator:", w,
+                     "sigma_clip — iterative sigma-clipped std (default).\n"
+                     "mad        — median absolute deviation × 1.4826.")
+            self._widgets['bg_method'] = w
 
         elif strategy == 'gaia':
             w = QDoubleSpinBox()
@@ -173,8 +192,18 @@ class StrategyOptionsDialog(QDialog):
         layout.addLayout(btn_row)
 
     def get_options(self) -> dict:
-        return {key: w.value() for key, w in self._widgets.items()}
+        result = {}
+        for key, w in self._widgets.items():
+            if isinstance(w, QComboBox):
+                result[key] = w.currentText()
+            else:
+                result[key] = w.value()
+        return result
 
+
+# ---------------------------------------------------------------------------
+# Canvas key filter — catches key events even when the canvas has focus
+# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # AlignDialog
@@ -197,6 +226,10 @@ class AlignDialog(QDialog):
     parent : QWidget or None
     """
 
+    # Class-level: persists across dialog instances within the same app session
+    _session_ref_path: str = None
+    _session_catalog_path: str = None
+
     def __init__(self, cube, target_image: np.ndarray,
                  target_label: str = '', parent=None):
         super().__init__(parent)
@@ -208,16 +241,26 @@ class AlignDialog(QDialog):
         self._target_label = target_label
         self._aligner      = None
         self._state        = 'NO_REF'
-        self._box          = 5
+        self._box          = 0.1
         self._ref_stretch  = 'zscale'
+        self._ref_scale    = 'linear'
+        self._ref_vmin     = None     # used only when stretch == 'manual'
+        self._ref_vmax     = None
         self._tgt_stretch  = 'zscale'
+        self._tgt_scale    = 'linear'
+        self._tgt_vmin     = None
+        self._tgt_vmax     = None
+        self._last_ref_path = None   # for Reload button
 
         # Per-strategy detection options (populated by StrategyOptionsDialog)
         self._strategy_opts = {
-            'cross_corr': dict(fwhm=0.0, threshold_sigma=3.0, max_sources=50),
-            'dao':        dict(fwhm=0.0, threshold_sigma=3.0, max_sources=50),
-            'knots':      dict(threshold_sigma=2.0, max_knots=10),
-            'gaia':       dict(radius_deg=0.5,  max_stars=50),
+            'cross_corr': dict(fwhm=0.0, threshold_sigma=3.0, max_sources=50,
+                               bg_method='sigma_clip'),
+            'dao':        dict(fwhm=0.0, threshold_sigma=3.0, max_sources=50,
+                               bg_method='sigma_clip'),
+            'knots':      dict(threshold_sigma=2.0, max_knots=10,
+                               bg_method='sigma_clip'),
+            'gaia':       dict(radius_deg=0.5, max_stars=50),
             'interactive': {},
             'batch':       {},
         }
@@ -236,15 +279,22 @@ class AlignDialog(QDialog):
         self._pending_ref_artist = None
         self._pending_tgt_circle = None
 
+        # Edit mode: {pair_idx: (circle_patch, label_text)}
+        # Pairs in edit mode show a cyan circle on the target instead of red cross
+        self._edit_mode_circles: dict = {}
+
 
         # Results — set after align()
         self.corrected_wcs = None
         self.aligner       = None
 
         self._build_ui()
-        # Display target image immediately (stretch combos default to 'zscale')
-        self._show_image(self._tgt_ax, self._tgt_canvas,
-                         self._tgt_img, self._tgt_stretch)
+        # Display target image immediately
+        self._refresh_tgt_image()
+
+        # Auto-load reference from previous session if available
+        if AlignDialog._session_ref_path:
+            self._load_reference_from_path(AlignDialog._session_ref_path)
 
     # ------------------------------------------------------------------
     # UI construction
@@ -266,44 +316,109 @@ class AlignDialog(QDialog):
         ctrl.addWidget(QLabel("Reference:"))
         ctrl.addWidget(self._ref_btn)
 
+        self._reload_ref_btn = QPushButton("Reload")
+        self._reload_ref_btn.setToolTip(
+            "Reload the same reference file without browsing.\n"
+            "Clears all pairs and resets the aligner.")
+        self._reload_ref_btn.clicked.connect(self._on_reload_reference)
+        self._reload_ref_btn.setEnabled(False)
+        ctrl.addWidget(self._reload_ref_btn)
+
         ctrl.addSpacing(16)
 
-        # Reference stretch (independent)
-        ctrl.addWidget(QLabel("Ref stretch:"))
+        # ---- Reference display controls ----
+        ctrl.addWidget(QLabel("Ref:"))
+
         self._ref_stretch_combo = QComboBox()
         self._ref_stretch_combo.addItems(
-            ['zscale', '99.5%', '99%', '98%', '95%', 'minmax'])
+            ['zscale', '99.5%', '99%', '98%', '95%', 'minmax', 'manual'])
         self._ref_stretch_combo.setToolTip(
-            "Display normalization for the reference panel only.")
-        self._ref_stretch_combo.setFixedWidth(80)
+            "Normalization for the reference panel.\n"
+            "'manual' reveals vmin/vmax fields for exact control.")
+        self._ref_stretch_combo.setFixedWidth(72)
         self._ref_stretch_combo.currentTextChanged.connect(self._on_ref_stretch_changed)
         ctrl.addWidget(self._ref_stretch_combo)
 
-        ctrl.addSpacing(8)
+        self._ref_scale_combo = QComboBox()
+        self._ref_scale_combo.addItems(['linear', 'log', 'sqrt'])
+        self._ref_scale_combo.setToolTip(
+            "Transfer function for the reference panel.\n"
+            "log: compress bright features; sqrt: intermediate.")
+        self._ref_scale_combo.setFixedWidth(62)
+        self._ref_scale_combo.currentTextChanged.connect(self._on_ref_scale_changed)
+        ctrl.addWidget(self._ref_scale_combo)
 
-        # Target stretch (independent)
-        ctrl.addWidget(QLabel("Tgt stretch:"))
+        self._ref_vmin_edit = QLineEdit()
+        self._ref_vmin_edit.setPlaceholderText("vmin")
+        self._ref_vmin_edit.setFixedWidth(68)
+        self._ref_vmin_edit.setToolTip("Lower display limit (any float or sci notation, e.g. 1e-18)")
+        self._ref_vmin_edit.setVisible(False)
+        self._ref_vmin_edit.editingFinished.connect(self._refresh_ref_image)
+        ctrl.addWidget(self._ref_vmin_edit)
+
+        self._ref_vmax_edit = QLineEdit()
+        self._ref_vmax_edit.setPlaceholderText("vmax")
+        self._ref_vmax_edit.setFixedWidth(68)
+        self._ref_vmax_edit.setToolTip("Upper display limit (any float or sci notation)")
+        self._ref_vmax_edit.setVisible(False)
+        self._ref_vmax_edit.editingFinished.connect(self._refresh_ref_image)
+        ctrl.addWidget(self._ref_vmax_edit)
+
+        ctrl.addSpacing(12)
+
+        # ---- Target display controls ----
+        ctrl.addWidget(QLabel("Tgt:"))
+
         self._tgt_stretch_combo = QComboBox()
         self._tgt_stretch_combo.addItems(
-            ['zscale', '99.5%', '99%', '98%', '95%', 'minmax'])
+            ['zscale', '99.5%', '99%', '98%', '95%', 'minmax', 'manual'])
         self._tgt_stretch_combo.setToolTip(
-            "Display normalization for the target panel only.")
-        self._tgt_stretch_combo.setFixedWidth(80)
+            "Normalization for the target panel.\n"
+            "'manual' reveals vmin/vmax fields for exact control.")
+        self._tgt_stretch_combo.setFixedWidth(72)
         self._tgt_stretch_combo.currentTextChanged.connect(self._on_tgt_stretch_changed)
         ctrl.addWidget(self._tgt_stretch_combo)
+
+        self._tgt_scale_combo = QComboBox()
+        self._tgt_scale_combo.addItems(['linear', 'log', 'sqrt'])
+        self._tgt_scale_combo.setToolTip(
+            "Transfer function for the target panel.\n"
+            "log: compress bright features; sqrt: intermediate.")
+        self._tgt_scale_combo.setFixedWidth(62)
+        self._tgt_scale_combo.currentTextChanged.connect(self._on_tgt_scale_changed)
+        ctrl.addWidget(self._tgt_scale_combo)
+
+        self._tgt_vmin_edit = QLineEdit()
+        self._tgt_vmin_edit.setPlaceholderText("vmin")
+        self._tgt_vmin_edit.setFixedWidth(68)
+        self._tgt_vmin_edit.setToolTip("Lower display limit (any float or sci notation)")
+        self._tgt_vmin_edit.setVisible(False)
+        self._tgt_vmin_edit.editingFinished.connect(self._refresh_tgt_image)
+        ctrl.addWidget(self._tgt_vmin_edit)
+
+        self._tgt_vmax_edit = QLineEdit()
+        self._tgt_vmax_edit.setPlaceholderText("vmax")
+        self._tgt_vmax_edit.setFixedWidth(68)
+        self._tgt_vmax_edit.setToolTip("Upper display limit (any float or sci notation)")
+        self._tgt_vmax_edit.setVisible(False)
+        self._tgt_vmax_edit.editingFinished.connect(self._refresh_tgt_image)
+        ctrl.addWidget(self._tgt_vmax_edit)
 
         ctrl.addSpacing(16)
 
         # Centroid box
         ctrl.addWidget(QLabel("Box:"))
-        self._box_spin = QSpinBox()
-        self._box_spin.setRange(1, 100)
+        self._box_spin = QDoubleSpinBox()
+        self._box_spin.setRange(0.01, 30.0)
+        self._box_spin.setDecimals(2)
+        self._box_spin.setSingleStep(0.05)
         self._box_spin.setValue(self._box)
-        self._box_spin.setSuffix(" px")
-        self._box_spin.setFixedWidth(68)
+        self._box_spin.setSuffix(" \"")
+        self._box_spin.setFixedWidth(80)
         self._box_spin.setToolTip(
-            "Half-width in pixels of the centroid refinement window.\n"
-            "Increase for faint/diffuse sources, decrease for crowded fields.")
+            "Half-width in arcsec of the centroid refinement window.\n"
+            "Converted to pixels internally using the WCS pixel scale.\n"
+            "Typical values: 0.05–0.5\" for HST, 0.3–1.0\" for KCWI/MUSE.")
         self._box_spin.valueChanged.connect(lambda v: setattr(self, '_box', v))
         ctrl.addWidget(self._box_spin)
 
@@ -426,8 +541,10 @@ class AlignDialog(QDialog):
         layout.addWidget(strat_row_widget)
 
         # State: track catalog path for batch strategy
-        self._catalog_path = None
+        self._catalog_path = AlignDialog._session_catalog_path  # restore last used
         self._set_catalog_visible(False)
+        if self._catalog_path:
+            self._catalog_path_label.setText(self._catalog_path.split('/')[-1])
 
         # ---- Two-panel area ----
         panels = QHBoxLayout()
@@ -445,6 +562,7 @@ class AlignDialog(QDialog):
         self._ref_toolbar = NavToolbar(self._ref_canvas, self)
         self._ref_canvas.mpl_connect('button_press_event', self._on_ref_click)
         self._ref_canvas.mpl_connect('button_press_event', self._on_right_click_delete)
+        self._ref_canvas.mpl_connect('button_press_event', self._on_double_click)
         _connect_scroll_zoom(self._ref_ax, self._ref_canvas)
         ref_vbox.addWidget(self._ref_toolbar)
         ref_vbox.addWidget(self._ref_canvas)
@@ -466,6 +584,7 @@ class AlignDialog(QDialog):
         self._tgt_toolbar = NavToolbar(self._tgt_canvas, self)
         self._tgt_canvas.mpl_connect('button_press_event', self._on_tgt_click)
         self._tgt_canvas.mpl_connect('button_press_event', self._on_right_click_delete)
+        self._tgt_canvas.mpl_connect('button_press_event', self._on_double_click)
         _connect_scroll_zoom(self._tgt_ax, self._tgt_canvas)
         tgt_vbox.addWidget(self._tgt_toolbar)
         tgt_vbox.addWidget(self._tgt_canvas)
@@ -495,6 +614,13 @@ class AlignDialog(QDialog):
         self._clear_btn.clicked.connect(self._on_clear)
         self._clear_btn.setEnabled(False)
 
+        self._save_catalog_btn = QPushButton("Save Catalog…")
+        self._save_catalog_btn.setToolTip(
+            "Save current source pairs to a FITS catalog.\n"
+            "Reload later with the 'batch' strategy to skip re-detection.")
+        self._save_catalog_btn.clicked.connect(self._on_save_catalog)
+        self._save_catalog_btn.setEnabled(False)
+
         self._align_btn = QPushButton("Align")
         self._align_btn.setToolTip(
             "Fit WCS correction from stored pairs.\n"
@@ -518,15 +644,25 @@ class AlignDialog(QDialog):
         self._write_btn.clicked.connect(self._on_write)
         self._write_btn.setEnabled(False)
 
+        self._apply_to_btn = QPushButton("Apply WCS to file…")
+        self._apply_to_btn.setToolTip(
+            "Apply the same WCS correction to another FITS file\n"
+            "(e.g. a variance cube, mask, or second exposure).\n"
+            "Run Align first.")
+        self._apply_to_btn.clicked.connect(self._on_apply_to)
+        self._apply_to_btn.setEnabled(False)
+
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(self.reject)
 
         btn_row.addWidget(self._undo_btn)
         btn_row.addWidget(self._clear_btn)
+        btn_row.addWidget(self._save_catalog_btn)
         btn_row.addStretch()
         btn_row.addWidget(self._align_btn)
         btn_row.addWidget(self._apply_btn)
         btn_row.addWidget(self._write_btn)
+        btn_row.addWidget(self._apply_to_btn)
         btn_row.addWidget(close_btn)
         layout.addLayout(btn_row)
 
@@ -540,7 +676,15 @@ class AlignDialog(QDialog):
             filter="FITS files (*.fits *.fit *.fts);;All files (*)")
         if not path:
             return
+        self._load_reference_from_path(path)
 
+    def _on_reload_reference(self):
+        """Reload the last-used reference path without a file dialog."""
+        if self._last_ref_path:
+            self._load_reference_from_path(self._last_ref_path)
+
+    def _load_reference_from_path(self, path: str):
+        """Shared logic for initial load and reload."""
         try:
             from rbcodes.rb_align.io import _load_frame_from_file
             from rbcodes.rb_align.preprocess import _preprocess_frame
@@ -550,8 +694,11 @@ class AlignDialog(QDialog):
             QMessageBox.critical(self, "Load failed", str(e))
             return
 
-        self._ref_frame = ref_frame
+        self._ref_frame     = ref_frame
+        self._last_ref_path = path
+        AlignDialog._session_ref_path = path   # persist across dialog instances
         self._ref_btn.setText(path.split('/')[-1])
+        self._reload_ref_btn.setEnabled(True)
 
         # Show/hide reference preprocess row depending on whether it's a cube
         is_cube = (ref_frame.input_type == 'ifu' and ref_frame.data.ndim == 3)
@@ -563,17 +710,24 @@ class AlignDialog(QDialog):
         self._set_ref_narrowband_visible(False)
 
         self._init_aligner()
+        # Reset manual fields when loading a new reference so they get re-initialised
+        self._ref_vmin_edit.clear()
+        self._ref_vmax_edit.clear()
         self._show_image(self._ref_ax, self._ref_canvas,
-                         ref_frame.image2d, self._ref_stretch)
+                         ref_frame.image2d,
+                         stretch=self._ref_stretch, scale=self._ref_scale,
+                         reset_zoom=True)
 
         self._clear_markers()
         self._state = 'IDLE'
         self._update_state_label()
         self._undo_btn.setEnabled(False)
         self._clear_btn.setEnabled(False)
+        self._save_catalog_btn.setEnabled(False)
         self._align_btn.setEnabled(False)
         self._apply_btn.setEnabled(False)
         self._write_btn.setEnabled(False)
+        self._apply_to_btn.setEnabled(False)
         self._info_label.setText("")
         # Enable Find Sources now that a reference is loaded
         strategy = self._strategy_combo.currentText()
@@ -641,8 +795,12 @@ class AlignDialog(QDialog):
         if self._aligner is not None:
             self._aligner.reference.image2d = ref.image2d
 
+        self._ref_vmin_edit.clear()
+        self._ref_vmax_edit.clear()
         self._show_image(self._ref_ax, self._ref_canvas,
-                         ref.image2d, self._ref_stretch)
+                         ref.image2d,
+                         stretch=self._ref_stretch, scale=self._ref_scale,
+                         reset_zoom=False)   # same image size, preserve zoom
         self._on_clear()
 
     # ------------------------------------------------------------------
@@ -677,6 +835,7 @@ class AlignDialog(QDialog):
             filter="FITS files (*.fits *.fit);;All files (*)")
         if path:
             self._catalog_path = path
+            AlignDialog._session_catalog_path = path   # persist across dialog instances
             self._catalog_path_label.setText(path.split('/')[-1])
 
     def _on_find_sources(self):
@@ -706,7 +865,8 @@ class AlignDialog(QDialog):
                 self._aligner.find_sources(
                     strategy='batch',
                     catalog=self._catalog_path,
-                    box=self._box)
+                    box=self._box,
+                    headless=True)
             else:
                 self._aligner.find_sources(
                     strategy=strategy,
@@ -728,6 +888,7 @@ class AlignDialog(QDialog):
 
         self._undo_btn.setEnabled(True)
         self._clear_btn.setEnabled(True)
+        self._save_catalog_btn.setEnabled(True)
         self._align_btn.setEnabled(True)
         self._update_info_label()
         self._state_label.setText(
@@ -735,32 +896,106 @@ class AlignDialog(QDialog):
             "You can still click to add more or Undo to remove the last one.")
 
     # ------------------------------------------------------------------
-    # Stretch
+    # Display controls (stretch, scale, manual vmin/vmax)
     # ------------------------------------------------------------------
 
     def _on_ref_stretch_changed(self, text):
         self._ref_stretch = text
-        if hasattr(self, '_ref_frame'):
-            self._show_image(self._ref_ax, self._ref_canvas,
-                             self._ref_frame.image2d, self._ref_stretch)
-        self._redraw_all_markers()
+        is_manual = (text == 'manual')
+        self._ref_vmin_edit.setVisible(is_manual)
+        self._ref_vmax_edit.setVisible(is_manual)
+        if is_manual:
+            self._init_manual_fields(
+                self._ref_vmin_edit, self._ref_vmax_edit,
+                getattr(self, '_ref_frame', None) and self._ref_frame.image2d,
+                self._ref_scale)
+        self._refresh_ref_image()
 
     def _on_tgt_stretch_changed(self, text):
         self._tgt_stretch = text
-        self._show_image(self._tgt_ax, self._tgt_canvas,
-                         self._tgt_img, self._tgt_stretch)
+        is_manual = (text == 'manual')
+        self._tgt_vmin_edit.setVisible(is_manual)
+        self._tgt_vmax_edit.setVisible(is_manual)
+        if is_manual:
+            self._init_manual_fields(
+                self._tgt_vmin_edit, self._tgt_vmax_edit,
+                self._tgt_img, self._tgt_scale)
+        self._refresh_tgt_image()
+
+    def _on_ref_scale_changed(self, text):
+        self._ref_scale = text
+        self._refresh_ref_image()
+
+    def _on_tgt_scale_changed(self, text):
+        self._tgt_scale = text
+        self._refresh_tgt_image()
+
+    def _init_manual_fields(self, vmin_edit, vmax_edit, img2d, scale):
+        """Pre-fill vmin/vmax fields with current zscale limits when first entering manual mode."""
+        if img2d is None or not isinstance(img2d, np.ndarray):
+            return
+        if vmin_edit.text() and vmax_edit.text():
+            return   # already set by user — don't overwrite
+        try:
+            norm = _compute_norm(img2d, 'zscale', scale=scale)
+            lo = norm.vmin if norm.vmin is not None else float(np.nanmin(img2d))
+            hi = norm.vmax if norm.vmax is not None else float(np.nanmax(img2d))
+            vmin_edit.setText(f"{lo:.4g}")
+            vmax_edit.setText(f"{hi:.4g}")
+        except Exception:
+            pass
+
+    def _parse_manual(self, vmin_edit, vmax_edit):
+        """Return (vmin, vmax) floats from the edit fields, or (None, None) on error."""
+        try:
+            lo = float(vmin_edit.text())
+            hi = float(vmax_edit.text())
+            return lo, hi
+        except (ValueError, AttributeError):
+            return None, None
+
+    def _refresh_ref_image(self):
+        """Redisplay the reference panel with current stretch/scale/vmin/vmax."""
+        if not hasattr(self, '_ref_frame') or self._ref_frame is None:
+            return
+        img = self._ref_frame.image2d
+        if img is None:
+            return
+        vmin, vmax = self._parse_manual(self._ref_vmin_edit, self._ref_vmax_edit) \
+            if self._ref_stretch == 'manual' else (None, None)
+        self._show_image(self._ref_ax, self._ref_canvas, img,
+                         stretch=self._ref_stretch, scale=self._ref_scale,
+                         vmin=vmin, vmax=vmax)
+        self._redraw_all_markers()
+
+    def _refresh_tgt_image(self):
+        """Redisplay the target panel with current stretch/scale/vmin/vmax."""
+        vmin, vmax = self._parse_manual(self._tgt_vmin_edit, self._tgt_vmax_edit) \
+            if self._tgt_stretch == 'manual' else (None, None)
+        self._show_image(self._tgt_ax, self._tgt_canvas, self._tgt_img,
+                         stretch=self._tgt_stretch, scale=self._tgt_scale,
+                         vmin=vmin, vmax=vmax)
         self._redraw_all_markers()
 
     # ------------------------------------------------------------------
     # Image display
     # ------------------------------------------------------------------
 
-    def _show_image(self, ax, canvas, img2d, stretch='zscale'):
+    def _show_image(self, ax, canvas, img2d, stretch='zscale', scale='linear',
+                    vmin=None, vmax=None, reset_zoom: bool = False):
         """
         Display img2d on ax, preserving the current zoom window.
 
-        stretch is applied only to this panel; the other panel is unaffected.
-        After imshow, autoscale is locked so markers never expand the view.
+        Parameters
+        ----------
+        stretch : str
+            Normalization: 'zscale' | percentile string | 'minmax' | 'manual'
+        scale : str
+            Transfer function: 'linear' | 'log' | 'sqrt'
+        vmin, vmax : float or None
+            Manual limits — used only when stretch == 'manual'.
+        reset_zoom : bool
+            True → discard saved zoom (use when loading a new reference).
         """
         if img2d is None:
             return
@@ -768,12 +1003,15 @@ class AlignDialog(QDialog):
         ny, nx = img2d.shape
         xlim_saved = ax.get_xlim()
         ylim_saved = ax.get_ylim()
-        zoomed = (bool(ax.images)
+        zoomed = (not reset_zoom
+                  and bool(ax.images)
                   and xlim_saved != (0.0, 1.0)
-                  and xlim_saved != (-0.5, nx - 0.5))
+                  and xlim_saved != (-0.5, nx - 0.5)
+                  and abs(ylim_saved[1] - ylim_saved[0]) < 2 * ny)
 
         ax.cla()
-        norm = _compute_norm(img2d, stretch)
+        norm = _compute_norm(img2d, stretch=stretch, scale=scale,
+                             vmin=vmin, vmax=vmax)
         ax.imshow(img2d, origin='lower', norm=norm, cmap='gray',
                   interpolation='nearest', aspect='auto')
         ax.set_xlabel('x (px)', fontsize=8)
@@ -802,6 +1040,64 @@ class AlignDialog(QDialog):
     # Right-click to delete nearest pair (works on either panel)
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # Hover tracking and 'e' key edit mode
+    # ------------------------------------------------------------------
+
+    def _on_double_click(self, event):
+        """Double-click on either panel → toggle edit mode for nearest pair."""
+        if not event.dblclick or event.button != 1:
+            return
+        if self._toolbar_active(self._ref_toolbar) or \
+           self._toolbar_active(self._tgt_toolbar):
+            return
+        if self._state != 'IDLE':
+            return
+        if self._aligner is None or not self._aligner.pairs:
+            return
+        if event.xdata is None or event.ydata is None:
+            return
+
+        cx, cy = event.xdata, event.ydata
+        if event.inaxes is self._ref_ax:
+            dists = [np.sqrt((p[0]-cx)**2 + (p[1]-cy)**2)
+                     for p in self._aligner.pairs]
+        elif event.inaxes is self._tgt_ax:
+            dists = [np.sqrt((p[4]-cx)**2 + (p[5]-cy)**2)
+                     for p in self._aligner.pairs]
+        else:
+            return
+        self._toggle_edit_pair(int(np.argmin(dists)))
+
+    def _toggle_edit_pair(self, pair_idx: int):
+        """Enter or exit edit mode for a specific pair index."""
+        if pair_idx in self._edit_mode_circles:
+            # Toggle off: remove the artist BEFORE deleting from dict,
+            # otherwise _redraw_all_markers can't find it to clean up
+            val = self._edit_mode_circles.pop(pair_idx)
+            if isinstance(val, tuple):
+                for a in val:
+                    try:
+                        a.remove()
+                    except Exception:
+                        pass
+        else:
+            # Enter edit mode (placeholder rebuilt in _redraw_all_markers)
+            self._edit_mode_circles[pair_idx] = True
+        self._redraw_all_markers()
+
+    def _clear_edit_mode(self):
+        """Remove all edit-mode circles and reset the dict."""
+        for val in self._edit_mode_circles.values():
+            if isinstance(val, tuple):
+                circ, lbl = val
+                for a in (circ, lbl):
+                    try:
+                        a.remove()
+                    except Exception:
+                        pass
+        self._edit_mode_circles.clear()
+
     def _on_right_click_delete(self, event):
         """Right-click near a marker on either panel → delete nearest pair."""
         if event.button != 3:
@@ -827,10 +1123,13 @@ class AlignDialog(QDialog):
             return
 
         self._aligner.remove_pair(int(np.argmin(dists)))
+        # Indices shifted after deletion — remove artists then clear dict
+        self._clear_edit_mode()
         self._redraw_all_markers()
         n = len(self._aligner.pairs)
         self._undo_btn.setEnabled(n > 0)
         self._clear_btn.setEnabled(n > 0)
+        self._save_catalog_btn.setEnabled(n > 0)
         self._align_btn.setEnabled(n > 0)
         self._update_info_label()
 
@@ -841,13 +1140,17 @@ class AlignDialog(QDialog):
             return
         if event.button != 1:
             return
+        if event.dblclick:
+            return   # handled by _on_double_click
         if self._state != 'IDLE':
             return
         if self._aligner is None:
             return
 
-        ref_img = self._aligner.reference.image2d
-        cx, cy = _refine_centroid(ref_img, event.xdata, event.ydata, self._box)
+        ref_frame = self._aligner.reference
+        ref_img   = ref_frame.image2d
+        ref_box_px = _box_to_pixels(self._box, ref_frame, ref_img)
+        cx, cy = _refine_centroid(ref_img, event.xdata, event.ydata, ref_box_px)
 
         art, = self._ref_ax.plot(cx, cy, 'r+', markersize=14, mew=2,
                                   linestyle='none', zorder=10)
@@ -857,7 +1160,7 @@ class AlignDialog(QDialog):
         # Predict position on target via WCS chain
         tx_pred, ty_pred = None, None
         try:
-            sky = self._aligner.reference.wcs.all_pix2world([[cx, cy]], 0)
+            sky = ref_frame.wcs.all_pix2world([[cx, cy]], 0)
             ra, dec = float(sky[0, 0]), float(sky[0, 1])
             pix = self._aligner.targets[0].wcs.all_world2pix([[ra, dec]], 0)
             tx_pred, ty_pred = float(pix[0, 0]), float(pix[0, 1])
@@ -868,7 +1171,9 @@ class AlignDialog(QDialog):
             ny, nx = self._tgt_img.shape
             if -nx < tx_pred < 2 * nx and -ny < ty_pred < 2 * ny:
                 from matplotlib.patches import Circle
-                circ = Circle((tx_pred, ty_pred), radius=self._box,
+                tgt_frame  = self._aligner.targets[0]
+                tgt_box_px = _box_to_pixels(self._box, tgt_frame, self._tgt_img)
+                circ = Circle((tx_pred, ty_pred), radius=tgt_box_px,
                               edgecolor='cyan', facecolor='none',
                               linestyle='--', linewidth=1.5, zorder=9)
                 self._tgt_ax.add_patch(circ)
@@ -885,8 +1190,6 @@ class AlignDialog(QDialog):
             return
         if event.inaxes is not self._tgt_ax:
             return
-        if self._state != 'PENDING':
-            return
         if self._aligner is None:
             return
 
@@ -895,9 +1198,50 @@ class AlignDialog(QDialog):
             return
         if event.button != 1:
             return
+        if event.dblclick:
+            return   # handled by _on_double_click
+        if event.xdata is None or event.ydata is None:
+            return
 
-        tgt_img = self._aligner.targets[0].image2d
-        cx, cy = _refine_centroid(tgt_img, event.xdata, event.ydata, self._box)
+        # ---- Edit mode: re-place the nearest edit circle --------------------
+        if self._state == 'IDLE' and self._edit_mode_circles:
+            cx, cy = event.xdata, event.ydata
+            # Find nearest edit circle by its stored center
+            dists = {}
+            for idx, val in self._edit_mode_circles.items():
+                if isinstance(val, tuple):
+                    circ, _ = val
+                    ccx, ccy = circ.center
+                else:
+                    # placeholder — use current pair position
+                    ccx, ccy = self._aligner.pairs[idx][4], self._aligner.pairs[idx][5]
+                dists[idx] = np.sqrt((ccx - cx)**2 + (ccy - cy)**2)
+            nearest_idx = min(dists, key=dists.get)
+            tgt_frame  = self._aligner.targets[0]
+            tgt_img    = tgt_frame.image2d
+            tgt_box_px = _box_to_pixels(self._box, tgt_frame, tgt_img)
+            new_tx, new_ty = _refine_centroid(tgt_img, cx, cy, tgt_box_px)
+            rx, ry, ra, dec, _, _ = self._aligner.pairs[nearest_idx]
+            self._aligner.pairs[nearest_idx] = (rx, ry, ra, dec, new_tx, new_ty)
+            # Remove artist before popping from dict
+            val = self._edit_mode_circles.pop(nearest_idx)
+            if isinstance(val, tuple):
+                for a in val:
+                    try:
+                        a.remove()
+                    except Exception:
+                        pass
+            self._redraw_all_markers()
+            self._update_info_label()
+            return
+
+        if self._state != 'PENDING':
+            return
+
+        tgt_frame  = self._aligner.targets[0]
+        tgt_img    = tgt_frame.image2d
+        tgt_box_px = _box_to_pixels(self._box, tgt_frame, tgt_img)
+        cx, cy = _refine_centroid(tgt_img, event.xdata, event.ydata, tgt_box_px)
 
         ref_x, ref_y = self._pending_ref_xy
         self._aligner.add_pair(ref_x, ref_y, cx, cy)
@@ -958,6 +1302,7 @@ class AlignDialog(QDialog):
 
         self._undo_btn.setEnabled(True)
         self._clear_btn.setEnabled(True)
+        self._save_catalog_btn.setEnabled(True)
         self._align_btn.setEnabled(True)
         self._update_info_label()
 
@@ -989,6 +1334,7 @@ class AlignDialog(QDialog):
         n = len(self._aligner.pairs)
         self._undo_btn.setEnabled(n > 0)
         self._clear_btn.setEnabled(n > 0)
+        self._save_catalog_btn.setEnabled(n > 0)
         self._align_btn.setEnabled(n > 0)
         self._update_info_label()
 
@@ -1001,6 +1347,7 @@ class AlignDialog(QDialog):
         self._clear_markers()
         self._undo_btn.setEnabled(False)
         self._clear_btn.setEnabled(False)
+        self._save_catalog_btn.setEnabled(False)
         self._align_btn.setEnabled(False)
         self._info_label.setText("")
         if self._state == 'PENDING':
@@ -1015,11 +1362,15 @@ class AlignDialog(QDialog):
             (self._tgt_labels,  self._tgt_canvas),
         ):
             for art in lst:
-                try:
-                    art.remove()
-                except ValueError:
-                    pass
+                if art is not None:
+                    try:
+                        art.remove()
+                    except ValueError:
+                        pass
             lst.clear()
+
+        # Clear edit-mode circles
+        self._clear_edit_mode()
 
         self._ref_canvas.draw_idle()
         self._tgt_canvas.draw_idle()
@@ -1038,32 +1389,66 @@ class AlignDialog(QDialog):
         self._pending_tgt_pred = None
 
     def _redraw_all_markers(self):
-        """Redraw confirmed-pair markers after stretch change."""
+        """Redraw confirmed-pair markers.
+        Pairs in edit mode show a numbered cyan circle on the target instead of red cross."""
         if self._aligner is None:
             return
+
+        from matplotlib.patches import Circle
+
+        # Remove old confirmed artists
         for art_list in (self._ref_crosses, self._ref_labels,
                           self._tgt_crosses, self._tgt_labels):
             for art in art_list:
-                try:
-                    art.remove()
-                except ValueError:
-                    pass
+                if art is not None:
+                    try:
+                        art.remove()
+                    except Exception:
+                        pass
             art_list.clear()
 
-        for i, (rx, ry, ra, dec, tx, ty) in enumerate(self._aligner.pairs, 1):
+        # Remove old edit circles (will be re-created below)
+        for val in self._edit_mode_circles.values():
+            if isinstance(val, tuple):
+                for a in val:
+                    try:
+                        a.remove()
+                    except Exception:
+                        pass
+
+        # Compute target box in pixels once for circle radii
+        tgt_frame  = self._aligner.targets[0]
+        tgt_box_px = _box_to_pixels(self._box, tgt_frame,
+                                    tgt_frame.image2d if tgt_frame.image2d is not None
+                                    else self._tgt_img)
+
+        for i, (rx, ry, ra, dec, tx, ty) in enumerate(self._aligner.pairs):
+            n = i + 1   # 1-based label
             art_r, = self._ref_ax.plot(rx, ry, 'r+', markersize=14, mew=2,
                                         linestyle='none', zorder=10)
-            lbl_r = self._ref_ax.text(rx + 3, ry + 3, str(i),
+            lbl_r = self._ref_ax.text(rx + 3, ry + 3, str(n),
                                        color='red', fontsize=8, zorder=11)
             self._ref_crosses.append(art_r)
             self._ref_labels.append(lbl_r)
 
-            art_t, = self._tgt_ax.plot(tx, ty, 'r+', markersize=14, mew=2,
-                                        linestyle='none', zorder=10)
-            lbl_t = self._tgt_ax.text(tx + 3, ty + 3, str(i),
-                                       color='red', fontsize=8, zorder=11)
-            self._tgt_crosses.append(art_t)
-            self._tgt_labels.append(lbl_t)
+            if i in self._edit_mode_circles:
+                # Draw cyan circle instead of red cross on target
+                circ = Circle((tx, ty), radius=tgt_box_px,
+                              edgecolor='cyan', facecolor='none',
+                              linestyle='--', linewidth=1.5, zorder=9)
+                self._tgt_ax.add_patch(circ)
+                lbl_c = self._tgt_ax.text(tx + tgt_box_px + 2, ty + tgt_box_px + 2,
+                                           str(n), color='cyan', fontsize=8, zorder=10)
+                self._edit_mode_circles[i] = (circ, lbl_c)
+                self._tgt_crosses.append(None)
+                self._tgt_labels.append(None)
+            else:
+                art_t, = self._tgt_ax.plot(tx, ty, 'r+', markersize=14, mew=2,
+                                            linestyle='none', zorder=10)
+                lbl_t = self._tgt_ax.text(tx + 3, ty + 3, str(n),
+                                           color='red', fontsize=8, zorder=11)
+                self._tgt_crosses.append(art_t)
+                self._tgt_labels.append(lbl_t)
 
         self._ref_canvas.draw_idle()
         self._tgt_canvas.draw_idle()
@@ -1100,6 +1485,7 @@ class AlignDialog(QDialog):
             f"|   RMS: {rms:.3f}\"")
         self._apply_btn.setEnabled(True)
         self._write_btn.setEnabled(True)
+        self._apply_to_btn.setEnabled(True)
 
     # ------------------------------------------------------------------
     # Apply / Write
@@ -1150,6 +1536,55 @@ class AlignDialog(QDialog):
         QMessageBox.information(self, "Saved",
                                 f"Corrected FITS written to:\n{out_path}")
 
+    def _on_save_catalog(self):
+        """Save current source pairs to a FITS catalog for later batch reuse."""
+        if self._aligner is None or not self._aligner.pairs:
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Source Pairs Catalog", "sources.fits",
+            filter="FITS files (*.fits *.fit);;All files (*)")
+        if not path:
+            return
+
+        try:
+            from rbcodes.rb_align.sources import _save_pairs_catalog
+            _save_pairs_catalog(self._aligner.pairs, path)
+        except Exception as e:
+            QMessageBox.critical(self, "Save failed", str(e))
+            return
+
+        QMessageBox.information(self, "Saved",
+                                f"Catalog written to:\n{path}\n\n"
+                                "Load it with strategy='batch' to skip re-detection.")
+
+    def _on_apply_to(self):
+        """Apply the corrected WCS to one or more external FITS files."""
+        if self.corrected_wcs is None:
+            return
+
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Select FITS file(s) to patch",
+            filter="FITS files (*.fits *.fit *.fts);;All files (*)")
+        if not paths:
+            return
+
+        try:
+            from rbcodes.rb_align.io import _apply_wcs_to_files
+            _apply_wcs_to_files(self.corrected_wcs,
+                                paths,
+                                [None] * len(paths),
+                                suffix='_wcsfix')
+        except Exception as e:
+            QMessageBox.critical(self, "Apply failed", str(e))
+            return
+
+        written = '\n'.join(
+            str(p).replace('.fits', '_wcsfix.fits').replace('.fit', '_wcsfix.fit')
+            for p in paths)
+        QMessageBox.information(self, "Done",
+                                f"WCS patched and written to:\n{written}")
+
     # ------------------------------------------------------------------
     # Status / info labels
     # ------------------------------------------------------------------
@@ -1158,9 +1593,10 @@ class AlignDialog(QDialog):
         n_pending = (len(self._aligner.pairs) + 1 if self._aligner else 1)
         msgs = {
             'NO_REF':  "Load a reference image to begin.",
-            'IDLE':    ("Left-click on the reference panel to select a source.  "
-                        "Right-click near a marker on either panel to delete that pair.  "
-                        "Use the toolbar or scroll wheel to zoom/pan each panel."),
+            'IDLE':    ("Left-click ref: add pair.  "
+                        "Double-click any marker: toggle edit mode (cyan circle on target).  "
+                        "Left-click near circle: re-place.  "
+                        "Right-click: delete pair."),
             'PENDING': (f"Source {n_pending} pending — "
                         f"left-click on the target panel to confirm.  "
                         f"Right-click to cancel."),

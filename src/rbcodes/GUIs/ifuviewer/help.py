@@ -220,6 +220,87 @@ DS9 INTEGRATION
   cross-instrument region import (e.g. HST → IFU), and sending images.
 """
 
+    alignment_text = """\
+WCS ALIGNMENT  (Ctrl+Shift+A)
+==============================
+
+Opens the interactive alignment dialog (rb_align integration).
+Use it to correct the WCS of an IFU cube or 2-D image by matching
+sources against an external reference image.
+
+OPENING THE DIALOG
+  Analysis > Align to Reference…  or  Ctrl+Shift+A.
+  The active dataset (current image panel view) is used as the target.
+
+WORKFLOW
+  1. Load Reference
+       Click [Load Reference…] to select a 2-D FITS image or IFU cube.
+       The reference auto-reloads next time the dialog opens (remembered
+       for the whole app session).
+       [Reload] repeats the last load without browsing.
+
+  2. Box size (arcsec)
+       The "Box" spin box sets the centroid refinement half-width in arcsec.
+       It is converted to pixels independently for each frame via the WCS
+       pixel scale, so the same value works for both HST and KCWI.
+         • HST (~0.05"/px)      → 0.05–0.3"
+         • KCWI/MUSE (~0.15"/px) → 0.1–1.0"
+
+  3. Choose strategy and run
+       interactive   — click pairs manually (always works, see controls below)
+       cross_corr    — automated source detection + Hough shift voting
+       dao           — DAOStarFinder point-source detection (photutils)
+       knots         — segmentation centroids for arcs / extended sources
+       gaia          — Gaia DR3 catalog matching (wide fields, astroquery)
+       batch         — load a saved FITS catalog; reprojected pairs appear
+                       as numbered red markers; edit interactively in-place
+
+       Click [Options…] for per-strategy tuning (FWHM, threshold, etc.).
+       Click [Find Sources] to run the selected automated strategy.
+       Results appear immediately as numbered red markers on both panels.
+
+  4. Interactive controls (apply to both interactive strategy and post-batch editing)
+       Left-click reference    — pick a source (auto-recentroids within Box)
+       Left-click target       — confirm position for pending source
+       Double-click any marker — toggle edit mode (cyan dashed circle on target)
+       Left-click near circle  — re-place that source (recentroids)
+       Right-click marker      — delete nearest pair (on either panel)
+       [Undo]                  — remove last pair
+       [Clear all]             — remove all pairs
+
+  5. Align
+       Click [Align] to fit the WCS correction from stored pairs:
+         1 pair  → translation only
+         2 pairs → translation + rotation
+         3+ pairs → full affine (translation, rotation, scale)
+       RMS residual is shown in the info bar.
+
+  6. Save / Apply
+       [Save Catalog…]       — save current pairs as a FITS catalog for
+                               later reuse with strategy='batch'
+       [Apply WCS]           — update the active dataset's WCS in memory
+                               and close the dialog (use File > Save to persist)
+       [Write corrected FITS…] — write a new FITS file with the corrected
+                               WCS header; original is never modified
+       [Apply WCS to file…]  — apply the same correction to one or more
+                               external files (e.g. variance, mask cubes)
+
+BATCH MODE WORKFLOW
+  1. Run strategy='interactive' once with [Save Catalog…] → sources.fits
+  2. Load next target in the sidebar; open alignment dialog again
+     (reference auto-reloads, catalog path is remembered too)
+  3. Select strategy='batch', [Load catalog…] → sources.fits
+  4. Click [Find Sources] — pairs appear immediately as numbered markers
+  5. Double-click any marker whose position looks wrong → cyan circle appears
+     Left-click near the circle → re-place with fresh centroid
+     Right-click → delete pair entirely
+  6. Click [Align] then [Write corrected FITS…] or [Apply WCS]
+
+STRETCH CONTROLS
+  Ref stretch / Tgt stretch — independent normalization for each panel
+  (zscale, percentile, minmax); does not affect markers.
+"""
+
     ds9_text = """\
 DS9 BRIDGE  (optional)
 ======================
@@ -292,6 +373,7 @@ SAVING APERTURES AS REGION FILE
         ("Ctrl+M",          "Open Moment Map dialog"),
         ("Ctrl+K",          "Crop to drawn rectangle"),
         ("Ctrl+B",          "Open Band Range dialog"),
+        ("Ctrl+Shift+A",    "Open WCS Alignment dialog (rb_align)"),
         ("Ctrl+R / Ctrl+W", "Open Spectrum Range & Scale dialog"),
         ("Del / Backspace", "Delete selected extraction"),
         ("Ctrl+Q",          "Quit"),
@@ -351,6 +433,8 @@ SAVING APERTURES AS REGION FILE
     tabs.addTab(make_text_tab(moment_maps_text),  "Moment Maps")
     # Tab: Crop & Analysis
     tabs.addTab(make_text_tab(crop_text),         "Crop & Analysis")
+    # Tab: WCS Alignment
+    tabs.addTab(make_text_tab(alignment_text),    "WCS Alignment")
     # Tab: ds9 Bridge
     tabs.addTab(make_text_tab(ds9_text),          "ds9 Bridge")
     # Tab: Keyboard Shortcuts (split into two sub-sections via a combined table)

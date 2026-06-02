@@ -284,6 +284,7 @@ Manages all extracted spectra.
 | `Ctrl+K` | Crop cube to drawn rectangle |
 | `Ctrl+B` | Open Band Range dialog |
 | `Ctrl+R` / `Ctrl+W` | Open Spectrum Range & Scale dialog |
+| `Ctrl+Shift+A` | Open WCS Alignment dialog |
 | `Del` / `Backspace` | Delete selected extraction |
 | `Ctrl+Q` | Quit |
 | `F1` | Open help dialog |
@@ -323,6 +324,7 @@ Manages all extracted spectra.
 | Clear Sky Region | | Remove sky region |
 | Batch Extract from Regions… | | Extract multiple spectra from a region file or ds9 |
 | Import regions from ds9 | | Import region shapes from a live ds9 session |
+| WCS Alignment… | Ctrl+Shift+A | Align the current cube to a 2D reference image via rb_align |
 
 ---
 
@@ -499,6 +501,25 @@ Requires `pyds9` to be installed (see `rb_ifuview --install`).
 
 - Load a flux cube and its variance cube separately, then right-click the variance in the sidebar to assign it. This enables **Var-weighted** extraction on the flux cube.
 - Each dataset maintains completely independent state — image scale, extraction markers, band ranges, etc. — so you can compare results between cubes freely.
+
+### WCS Alignment
+
+Open with **Analysis > WCS Alignment…** or `Ctrl+Shift+A`. Requires a loaded IFU cube.
+
+1. Click **Load Reference** and choose a 2D FITS image (HST, ground-based, or another IFU whitelight).
+2. Set **Box** (arcsec) — centroid refinement half-width. Typical values: 0.05–0.5" for HST, 0.3–1.0" for KCWI/MUSE.
+3. Select a **Strategy** (`interactive` for manual pair picking; `batch` to reload a saved catalog).
+4. Click **Find Sources** — a two-panel window opens (reference left, target right).
+   - Left-click reference → pick source; left-click target → confirm pair.
+   - Double-click a numbered marker → toggle edit mode (cyan circle); left-click to re-place.
+   - Right-click → delete nearest pair (IDLE) or cancel pending (PENDING).
+   - `u` → delete nearest pair; `Space` → auto-accept prediction; `Enter` → finish.
+5. Click **Align** to fit the WCS correction.
+6. Click **Apply & Write** to save the corrected cube (`_wcsfix.fits`), or **Apply to…** for a co-spatial variance cube.
+
+Display stretch (zscale/percentile/manual) and scale (linear/log/sqrt) are independently adjustable per panel.
+
+See [rb_align docs](../rb_align/rb_align.md) for the full Python API.
 
 ---
 

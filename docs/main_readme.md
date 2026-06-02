@@ -79,7 +79,7 @@ For full installation options, platform notes, and troubleshooting see [INSTALLA
 | Package | Version | Notes |
 |---------|---------|-------|
 | PyQt5 | ≥ 5.15.7 | GUI framework |
-| numpy | ≥ 1.22.3, < 1.24 | Upper bound required — 1.24+ breaks compatibility |
+| numpy | ≥ 1.22.3 | |
 | matplotlib | ≥ 3.5.0 | Plotting |
 | astropy | ≥ 5.3.3 | Astronomy utilities |
 | linetools | ≥ 0.3 | Spectroscopy tools |
@@ -125,8 +125,9 @@ For full installation options, platform notes, and troubleshooting see [INSTALLA
 |------|---------|-------------|------|
 | **launch_specgui** | `launch_specgui` | Point-and-click interface for `rb_spec`; single-spectrum and batch modes | [docs](GUIs/rb_spec/rb_spec.md) |
 | **rb_multispec** | `rb_multispec` | Multi-spectrum viewer with line identification, redshift overlay, absorber cataloging, vStack, and quick/advanced line fitting | [docs](GUIs/multispec/multispec.md) |
-| **rb_ifuview** | `rb_ifuview cube.fits` | IFU datacube viewer — load KCWI/MUSE/generic cubes, extract spectra, compute moment maps, import ds9 regions | [docs](GUIs/ifuview/rb_ifuview.md) |
+| **rb_ifuview** | `rb_ifuview cube.fits` | IFU datacube viewer — load KCWI/MUSE/generic cubes, extract spectra, compute moment maps, WCS alignment via rb_align, import ds9 regions | [docs](GUIs/ifuview/rb_ifuview.md) |
 | **rb_zgui** | `rb_zgui` | Redshift measurement GUI optimized for JWST NIRCam/grism spectroscopy | [PDF tutorial](GUIs/zgui/Tutorial_for_Emission_Line_Redshift_Estimator_GUI.pdf) |
+| **rb_zfind** | `rb_zfind` | Semi-automated redshift finder — PCA, template, and picket-fence chi2 search; integrates with rb_zgui | [docs](GUIs/zfind/rb_zfind.md) |
 | **rb_llsfitter** | `rb_llsfitter` | GUI to fit Lyman Limit System column densities | [docs](GUIs/LLSFitter/LLSFitter.md) |
 | **interactive_continuum_fit** | (import) | Recommended continuum fitter — polynomial and spline methods with interactive masking | [docs](GUIs/interactive_continuum_fit.md) |
 | **rb_align** | (import) | Astrometry alignment — align IFU cubes and 2D images to a reference frame with interactive or automated source matching and full WCS fitting | [docs](GUIs/rb_align/rb_align.md) |
@@ -135,6 +136,7 @@ For full installation options, platform notes, and troubleshooting see [INSTALLA
 - Single pixel / Rectangle / Circular / Circular-Annular apertures
 - Optimal (data/Gaussian) and variance-weighted spectral extraction
 - M0 / M1 / M2 moment maps with optional continuum subtraction and SNR masking
+- WCS alignment to a 2D reference image via rb_align (Ctrl+Shift+A)
 - Per-dataset state persistence; optional live ds9 bridge (`rb_ifuview --install`)
 
 #### Legacy Tools

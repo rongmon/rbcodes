@@ -115,7 +115,7 @@ c.preprocess(func=my_collapse_func)                # inject your own function
 ```python
 c.find_sources(strategy='interactive')             # two-panel click interface
 c.find_sources(strategy='interactive',
-               stretch='zscale', box=5,
+               stretch='zscale', box=0.1,          # arcsec
                save_catalog='sources.fits')        # save catalog for reuse
 ```
 
@@ -136,6 +136,8 @@ c.find_sources(strategy='interactive',
 > **Cross-instrument warning:** do NOT use `cross_corr` between HST and
 > MUSE/KCWI without PSF-matching. PSF mismatch (HST ~0.05" vs MUSE ~0.6–1")
 > will bias the correlation peak. Use `interactive`, `dao`, or `knots` instead.
+
+**`box`** — centroid refinement half-width in **arcsec** (default `0.1`). Converted to pixels per-frame via the WCS pixel scale (minimum 3 px). Typical values: 0.05–0.5" for HST, 0.3–1.0" for KCWI/MUSE.
 
 **Display stretch options** (`stretch=` parameter):
 
@@ -203,13 +205,16 @@ Original files are never overwritten.
 |--------|--------|
 | Left-click on reference | Pick source → centroid refined, cyan prediction circle appears on target |
 | Left-click on target | Confirm pair → recentroid on target |
+| Double-click a numbered marker | Toggle edit mode — cyan circle on target; left-click to re-place |
 | `Space` | Auto-accept prediction (useful when WCS is already close) |
-| Right-click | Cancel pending reference click |
-| `u` | Undo last pair |
+| Right-click | IDLE: delete nearest pair — PENDING: cancel |
+| `u` | Delete nearest pair (hover cursor near it) |
 | `Enter` / close window | Finalise and return |
 | Scroll wheel | Zoom in/out on each panel independently |
 
 Aim for **4–6 sources spread across the field** for a stable affine fit.
+
+> **Batch strategy:** loads RA/Dec from a saved FITS catalog, reprojects onto the current WCS, recentroids, then opens the interactive window for inspection and editing before returning.
 
 ---
 
@@ -224,7 +229,7 @@ c = wcs_align.from_file(reference='hst_f814w.fits',
                          targets=['kcwi_obs.fits'],
                          input_type='ifu')
 c.preprocess(method='narrowband', wl_range=[4860, 4870])
-c.find_sources(strategy='interactive', stretch='zscale', box=5,
+c.find_sources(strategy='interactive', stretch='zscale', box=0.1,  # arcsec
                save_catalog='sources.fits')
 c.align()
 c.qa(plot=True)

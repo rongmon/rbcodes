@@ -42,7 +42,8 @@ except ImportError:
 # Display normalisation helper
 # ---------------------------------------------------------------------------
 
-def _compute_norm(data2d: np.ndarray, stretch='zscale'):
+def _compute_norm(data2d: np.ndarray, stretch='zscale',
+                  scale='linear', vmin=None, vmax=None):
     """
     Build a matplotlib Normalize object for the given 2D array.
 
@@ -50,8 +51,13 @@ def _compute_norm(data2d: np.ndarray, stretch='zscale'):
     ----------
     data2d : np.ndarray
     stretch : str or (vmin, vmax)
-        'zscale' | '99.5%' | '99%' | '98%' | '97%' | '95%' | 'minmax'
+        'zscale' | percentile string | 'minmax' | 'manual'
         or a (vmin, vmax) tuple/list for manual limits.
+    scale : str
+        'linear' (default) | 'log' | 'sqrt'
+        Transfer function applied after the stretch limits are determined.
+    vmin, vmax : float or None
+        Explicit limits; used when stretch == 'manual' or a tuple is passed.
     """
     import matplotlib.colors as mcolors
     from astropy.visualization import ZScaleInterval
@@ -60,21 +66,35 @@ def _compute_norm(data2d: np.ndarray, stretch='zscale'):
     if len(finite) == 0:
         return mcolors.Normalize(vmin=0, vmax=1)
 
-    if isinstance(stretch, (tuple, list)):
-        vmin, vmax = float(stretch[0]), float(stretch[1])
+    # Step 1 — determine lo/hi from stretch
+    if stretch == 'manual' and vmin is not None and vmax is not None:
+        lo, hi = float(vmin), float(vmax)
+    elif isinstance(stretch, (tuple, list)):
+        lo, hi = float(stretch[0]), float(stretch[1])
     elif stretch == 'zscale':
         try:
-            vmin, vmax = ZScaleInterval().get_limits(finite)
+            lo, hi = ZScaleInterval().get_limits(finite)
         except Exception:
-            vmin, vmax = np.nanpercentile(finite, [1, 99])
+            lo, hi = np.nanpercentile(finite, [1, 99])
     elif stretch == 'minmax':
-        vmin, vmax = float(finite.min()), float(finite.max())
-    else:
+        lo, hi = float(finite.min()), float(finite.max())
+    else:  # percentile string like '99%'
         pct = float(str(stretch).rstrip('%'))
-        lo = 100.0 - pct
-        vmin, vmax = np.nanpercentile(finite, [lo, pct])
+        lo, hi = np.nanpercentile(finite, [100.0 - pct, pct])
 
-    return mcolors.Normalize(vmin=vmin, vmax=vmax)
+    # Step 2 — build norm for the requested scale type
+    if scale == 'log':
+        pos = finite[finite > 0]
+        if lo <= 0:
+            lo = float(pos.min()) if len(pos) else 1e-10
+        if hi <= lo:
+            hi = lo * 1000
+        return mcolors.LogNorm(vmin=lo, vmax=hi)
+    elif scale == 'sqrt':
+        lo = max(lo, 0.0)   # sqrt of negative is undefined
+        return mcolors.PowerNorm(gamma=0.5, vmin=lo, vmax=hi)
+    else:  # linear
+        return mcolors.Normalize(vmin=lo, vmax=hi)
 
 
 # ---------------------------------------------------------------------------
@@ -102,22 +122,24 @@ def _refine_centroid(image2d: np.ndarray,
     if cutout.size == 0:
         return cx, cy
 
-    # Replace NaNs/infs with local minimum
+    # Replace NaNs/infs with local median
     bad = ~np.isfinite(cutout)
     if bad.all():
         return cx, cy
-    cutout[bad] = np.nanmin(cutout[~bad])
+    finite = cutout[~bad]
+    bg_median = float(np.median(finite))
+    bg_std    = float(1.4826 * np.median(np.abs(finite - bg_median)))
+    cutout[bad] = bg_median
 
-    # Clip negatives
-    cutout = np.clip(cutout - np.nanmin(cutout), 0, None)
+    # Subtract background and keep only signal above 1σ
+    cutout = np.clip(cutout - (bg_median + bg_std), 0, None)
+    if cutout.sum() == 0:
+        return cx, cy
 
     try:
-        rcx, rcy = centroid_2dg(cutout)
+        rcx, rcy = centroid_com(cutout)
     except Exception:
-        try:
-            rcx, rcy = centroid_com(cutout)
-        except Exception:
-            return cx, cy
+        return cx, cy
 
     # Sanity check — stay inside cutout
     if not (0 <= rcx < cutout.shape[1] and 0 <= rcy < cutout.shape[0]):
@@ -130,20 +152,38 @@ def _refine_centroid(image2d: np.ndarray,
 # Interactive strategy
 # ---------------------------------------------------------------------------
 
-def _interactive(aligner, stretch='zscale', box=15, save_catalog=None):
+def _interactive(aligner, stretch='zscale', box=0.1, save_catalog=None):
     """
     Open a two-panel matplotlib window for interactive source matching.
 
+    Parameters
+    ----------
+    box : float
+        Centroid box half-width in arcsec (converted to pixels per frame via WCS).
+        Default 1.0".
+
     State machine:
-        IDLE    — left-click reference panel selects a source
-        PENDING — left-click target panel confirms it (right-click cancels)
+        IDLE    — left-click reference panel selects a new source
+                  left-click target panel re-places an edit-mode circle
+        PENDING — left-click target panel confirms pending source
+
+    Keyboard / mouse:
+        double-click — toggle edit mode for nearest pair
+                       (target marker becomes a numbered cyan dashed circle;
+                        left-click on target re-places it)
+        u            — hover over any marker → delete nearest pair
+        right-click  — IDLE: delete nearest pair  |  PENDING: cancel
+        Space        — PENDING: auto-accept centroid at predicted position
+        Enter        — close window, keep all confirmed pairs
+
+    If existing pairs are in aligner.pairs when called, they are drawn
+    immediately — useful after strategy='batch' or remove_pair().
     """
-    import matplotlib
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
 
     ref_frame = aligner.reference
-    tgt_frame = aligner.targets[0]   # interactive always acts on first target
+    tgt_frame = aligner.targets[0]
 
     ref_img = ref_frame.image2d
     tgt_img = tgt_frame.image2d
@@ -151,11 +191,12 @@ def _interactive(aligner, stretch='zscale', box=15, save_catalog=None):
         raise RuntimeError(
             "Call preprocess() before find_sources(strategy='interactive').")
 
+    # Convert box from arcsec to pixels for each frame independently
+    ref_box_px = _box_to_pixels(box, ref_frame, ref_img)
+    tgt_box_px = _box_to_pixels(box, tgt_frame, tgt_img)
+
     # ---- Figure setup -------------------------------------------------------
     fig, (ax_ref, ax_tgt) = plt.subplots(1, 2, figsize=(12, 6))
-    fig.suptitle(
-        'Left-click reference to select source  |  u: undo  |  Enter: done',
-        fontsize=10)
 
     ax_ref.imshow(ref_img, origin='lower', cmap='gray',
                   norm=_compute_norm(ref_img, stretch), interpolation='nearest')
@@ -165,100 +206,154 @@ def _interactive(aligner, stretch='zscale', box=15, save_catalog=None):
     ax_tgt.set_title('Target')
 
     # ---- State ---------------------------------------------------------------
-    state = {'mode': 'IDLE'}           # 'IDLE' | 'PENDING'
+    state = {'mode': 'IDLE'}
     pending = {
         'ref_x': None, 'ref_y': None,
         'ra': None,    'dec': None,
-        'pred_x': None,'pred_y': None,
-        'marker_ref': [],              # matplotlib artists on ax_ref
-        'marker_tgt': [],              # matplotlib artists on ax_tgt
+        'pred_x': None, 'pred_y': None,
+        'marker_ref': [],
+        'marker_tgt': [],
     }
-    confirmed_markers_ref = []         # list of lists (one per stored pair)
+
+    # confirmed_markers_ref/tgt: list of artist-lists, one per pair (parallel to aligner.pairs)
+    confirmed_markers_ref = []
     confirmed_markers_tgt = []
 
-    # ---- Helper: draw confirmed pair markers --------------------------------
-    def _draw_confirmed(ax, x, y, n, container):
-        m1, = ax.plot(x, y, 'r+', ms=14, mew=2)
-        m2 = ax.text(x + 3, y + 3, str(n), color='red', fontsize=9)
-        container.append([m1, m2])
+    # edit_mode: {pair_idx: {'circle': patch, 'label': text}}
+    # pairs in edit_mode have their target red-cross hidden and a cyan circle shown instead
+    edit_mode = {}
 
-    def _remove_markers(mlist):
-        for artist in mlist:
+    # ---- Marker helpers ------------------------------------------------------
+    def _remove_artists(alist):
+        for a in alist:
             try:
-                artist.remove()
+                a.remove()
             except Exception:
                 pass
 
-    def _remove_all_confirmed():
+    def _clear_edit_mode():
+        for info in edit_mode.values():
+            try:
+                info['circle'].remove()
+                info['label'].remove()
+            except Exception:
+                pass
+        edit_mode.clear()
+
+    def _redraw_all_confirmed():
+        """Rebuild all confirmed markers from aligner.pairs.
+        Pairs in edit_mode get a cyan circle on the target instead of a red cross."""
         for grp in confirmed_markers_ref:
-            _remove_markers(grp)
+            _remove_artists(grp)
         for grp in confirmed_markers_tgt:
-            _remove_markers(grp)
+            _remove_artists(grp)
         confirmed_markers_ref.clear()
         confirmed_markers_tgt.clear()
 
-    def _redraw_all_confirmed():
-        _remove_all_confirmed()
-        for i, pair in enumerate(aligner.pairs):
-            rx, ry, ra, dec, tx, ty = pair
-            grp_r = []
-            m1, = ax_ref.plot(rx, ry, 'r+', ms=14, mew=2)
-            m2 = ax_ref.text(rx + 3, ry + 3, str(i + 1),
-                              color='red', fontsize=9)
-            grp_r.extend([m1, m2])
-            confirmed_markers_ref.append(grp_r)
+        # Also remove old edit circles — will be re-created below
+        for info in edit_mode.values():
+            try:
+                info['circle'].remove()
+                info['label'].remove()
+            except Exception:
+                pass
 
-            grp_t = []
-            m3, = ax_tgt.plot(tx, ty, 'r+', ms=14, mew=2)
-            m4 = ax_tgt.text(tx + 3, ty + 3, str(i + 1),
-                              color='red', fontsize=9)
-            grp_t.extend([m3, m4])
-            confirmed_markers_tgt.append(grp_t)
+        for i, (rx, ry, ra, dec, tx, ty) in enumerate(aligner.pairs):
+            n = i + 1
+            m1, = ax_ref.plot(rx, ry, 'r+', ms=14, mew=2)
+            m2 = ax_ref.text(rx + 3, ry + 3, str(n), color='red', fontsize=9)
+            confirmed_markers_ref.append([m1, m2])
+
+            if i in edit_mode:
+                # Re-draw cyan circle (artists were removed above)
+                circ = mpatches.Circle((tx, ty), radius=tgt_box_px,
+                                       edgecolor='cyan', facecolor='none',
+                                       linestyle='--', linewidth=1.5, zorder=5)
+                ax_tgt.add_patch(circ)
+                lbl = ax_tgt.text(tx + tgt_box_px + 2, ty + tgt_box_px + 2, str(n),
+                                  color='cyan', fontsize=9, zorder=6)
+                edit_mode[i]['circle'] = circ
+                edit_mode[i]['label']  = lbl
+                confirmed_markers_tgt.append([])   # placeholder — no red cross
+            else:
+                m3, = ax_tgt.plot(tx, ty, 'r+', ms=14, mew=2)
+                m4 = ax_tgt.text(tx + 3, ty + 3, str(n), color='red', fontsize=9)
+                confirmed_markers_tgt.append([m3, m4])
+
+    def _enter_edit_mode(idx):
+        """Toggle edit mode for pair idx."""
+        if idx in edit_mode:
+            # Toggle off: remove circle, restore red cross
+            try:
+                edit_mode[idx]['circle'].remove()
+                edit_mode[idx]['label'].remove()
+            except Exception:
+                pass
+            del edit_mode[idx]
+            _redraw_all_confirmed()
+            fig.canvas.draw_idle()
+            return
+
+        # Enter edit mode: hide red target cross, show cyan circle
+        tx, ty = aligner.pairs[idx][4], aligner.pairs[idx][5]
+        if idx < len(confirmed_markers_tgt):
+            _remove_artists(confirmed_markers_tgt[idx])
+            confirmed_markers_tgt[idx] = []
+
+        circ = mpatches.Circle((tx, ty), radius=tgt_box_px,
+                               edgecolor='cyan', facecolor='none',
+                               linestyle='--', linewidth=1.5, zorder=5)
+        ax_tgt.add_patch(circ)
+        lbl = ax_tgt.text(tx + tgt_box_px + 2, ty + tgt_box_px + 2, str(idx + 1),
+                          color='cyan', fontsize=9, zorder=6)
+        edit_mode[idx] = {'circle': circ, 'label': lbl}
+        fig.canvas.draw_idle()
+
+    def _delete_pair(idx):
+        """Delete pair at idx, clear all edit mode (indices shift)."""
+        del aligner.pairs[idx]
+        _clear_edit_mode()
+        _redraw_all_confirmed()
+        fig.canvas.draw_idle()
 
     def _set_title():
         if state['mode'] == 'IDLE':
+            n_edit = len(edit_mode)
+            edit_hint = f'  |  {n_edit} pair(s) in edit mode' if n_edit else ''
             fig.suptitle(
-                'Left-click reference to select source  |  u: undo  |  Enter: done',
-                fontsize=10)
+                'Left-click ref: add pair  |  double-click: edit/un-edit pair  |  '
+                'u / right-click: delete  |  Enter: done' + edit_hint,
+                fontsize=9)
         else:
             n = len(aligner.pairs) + 1
             fig.suptitle(
                 f'Source {n} pending — click target to confirm  '
-                '|  Space: accept prediction  |  Right-click: cancel',
+                '|  Space: accept  |  Right-click: cancel',
                 fontsize=10)
 
     # ---- Scroll zoom ---------------------------------------------------------
     def _on_scroll(event):
-        ax = None
-        if event.inaxes is ax_ref:
-            ax = ax_ref
-        elif event.inaxes is ax_tgt:
-            ax = ax_tgt
-        if ax is None or event.xdata is None or event.ydata is None:
+        ax = event.inaxes
+        if ax not in (ax_ref, ax_tgt) or event.xdata is None:
             return
         factor = 0.85 if event.button == 'up' else 1.15
-        xlim = ax.get_xlim()
-        ylim = ax.get_ylim()
+        xlim, ylim = ax.get_xlim(), ax.get_ylim()
         cx, cy = event.xdata, event.ydata
         ax.set_xlim([cx + (x - cx) * factor for x in xlim])
         ax.set_ylim([cy + (y - cy) * factor for y in ylim])
         fig.canvas.draw_idle()
 
-    # ---- Accept pair (shared between click and spacebar) --------------------
-    def _accept_pair(tgt_x_refined, tgt_y_refined):
-        rx = pending['ref_x']
-        ry = pending['ref_y']
-        ra = pending['ra']
-        dec = pending['dec']
-        aligner.pairs.append((rx, ry, ra, dec, tgt_x_refined, tgt_y_refined))
+    # ---- Accept new pair (PENDING → IDLE) ------------------------------------
+    def _accept_pair(tx, ty):
+        rx, ry = pending['ref_x'], pending['ref_y']
+        ra, dec = pending['ra'], pending['dec']
+        aligner.pairs.append((rx, ry, ra, dec, tx, ty))
         if aligner.on_pair_callback is not None:
-            aligner.on_pair_callback(rx, ry, tgt_x_refined, tgt_y_refined, ra, dec)
-        # Remove pending markers
+            aligner.on_pair_callback(rx, ry, tx, ty, ra, dec)
         for m in pending['marker_ref'] + pending['marker_tgt']:
-            _remove_markers(m if isinstance(m, list) else [m])
+            _remove_artists(m if isinstance(m, list) else [m])
         pending['marker_ref'].clear()
         pending['marker_tgt'].clear()
-        # Redraw all confirmed
         _redraw_all_confirmed()
         state['mode'] = 'IDLE'
         _set_title()
@@ -266,7 +361,6 @@ def _interactive(aligner, stretch='zscale', box=15, save_catalog=None):
 
     # ---- Click handler -------------------------------------------------------
     def _on_click(event):
-        # Ignore clicks during zoom/pan
         try:
             if fig.canvas.toolbar is not None and fig.canvas.toolbar.mode != '':
                 return
@@ -277,37 +371,89 @@ def _interactive(aligner, stretch='zscale', box=15, save_catalog=None):
         if event.inaxes not in (ax_ref, ax_tgt):
             return
 
-        if state['mode'] == 'IDLE':
-            if event.inaxes is not ax_ref:
+        cx, cy = event.xdata, event.ydata
+
+        # ---- Double-click: toggle edit mode for nearest pair ----------------
+        if event.dblclick and event.button == 1:
+            if aligner.pairs and state['mode'] == 'IDLE':
+                if event.inaxes is ax_ref:
+                    dists = [np.sqrt((p[0]-cx)**2 + (p[1]-cy)**2)
+                             for p in aligner.pairs]
+                else:
+                    dists = [np.sqrt((p[4]-cx)**2 + (p[5]-cy)**2)
+                             for p in aligner.pairs]
+                _enter_edit_mode(int(np.argmin(dists)))
+                _set_title()
+            return
+
+        # ---- Right-click ------------------------------------------------
+        if event.button == 3:
+            if state['mode'] == 'PENDING':
+                # Cancel pending
+                for m in pending['marker_ref'] + pending['marker_tgt']:
+                    _remove_artists(m if isinstance(m, list) else [m])
+                pending['marker_ref'].clear()
+                pending['marker_tgt'].clear()
+                state['mode'] = 'IDLE'
+                _set_title()
+                fig.canvas.draw_idle()
                 return
-            if event.button != 1:
+            # IDLE: delete nearest pair
+            if not aligner.pairs:
                 return
-            # Centroid on reference
-            cx, cy = _refine_centroid(ref_img, event.xdata, event.ydata, box)
-            # Convert to sky
+            if event.inaxes is ax_ref:
+                dists = [np.sqrt((p[0]-cx)**2 + (p[1]-cy)**2) for p in aligner.pairs]
+            else:
+                dists = [np.sqrt((p[4]-cx)**2 + (p[5]-cy)**2) for p in aligner.pairs]
+            _delete_pair(int(np.argmin(dists)))
+            _set_title()
+            return
+
+        if event.button != 1:
+            return
+
+        # ---- IDLE left-click on target: re-place nearest edit circle --------
+        if state['mode'] == 'IDLE' and event.inaxes is ax_tgt and edit_mode:
+            dists = {idx: np.sqrt((info['circle'].center[0] - cx)**2 +
+                                  (info['circle'].center[1] - cy)**2)
+                     for idx, info in edit_mode.items()}
+            nearest_idx = min(dists, key=dists.get)
+            tx, ty = _refine_centroid(tgt_img, cx, cy, tgt_box_px)
+            rx, ry, ra, dec, _, _ = aligner.pairs[nearest_idx]
+            aligner.pairs[nearest_idx] = (rx, ry, ra, dec, tx, ty)
+            # Remove artist BEFORE deleting from dict so _redraw_all_confirmed
+            # doesn't encounter a missing key and leave a ghost circle on canvas
+            info = edit_mode.pop(nearest_idx)
+            try:
+                info['circle'].remove()
+                info['label'].remove()
+            except Exception:
+                pass
+            _redraw_all_confirmed()
+            _set_title()
+            fig.canvas.draw_idle()
+            return
+
+        # ---- IDLE left-click on reference: start new pair -------------------
+        if state['mode'] == 'IDLE' and event.inaxes is ax_ref:
+            cx, cy = _refine_centroid(ref_img, cx, cy, ref_box_px)
             sky = ref_frame.wcs.all_pix2world([[cx, cy]], 0)
             ra, dec = float(sky[0, 0]), float(sky[0, 1])
-            # Project to target
             try:
                 tgt_pred = tgt_frame.wcs.all_world2pix([[ra, dec]], 0)
                 px, py = float(tgt_pred[0, 0]), float(tgt_pred[0, 1])
             except Exception:
                 px, py = tgt_img.shape[1] / 2, tgt_img.shape[0] / 2
 
-            pending['ref_x'] = cx
-            pending['ref_y'] = cy
-            pending['ra'] = ra
-            pending['dec'] = dec
-            pending['pred_x'] = px
-            pending['pred_y'] = py
+            pending['ref_x'], pending['ref_y'] = cx, cy
+            pending['ra'], pending['dec'] = ra, dec
+            pending['pred_x'], pending['pred_y'] = px, py
 
-            # Draw solid red + on reference
             m1, = ax_ref.plot(cx, cy, 'r+', ms=14, mew=2)
             pending['marker_ref'].clear()
             pending['marker_ref'].append(m1)
 
-            # Draw dashed cyan circle on target at predicted position
-            circ = mpatches.Circle((px, py), radius=box,
+            circ = mpatches.Circle((px, py), radius=tgt_box_px,
                                    edgecolor='cyan', facecolor='none',
                                    linestyle='--', linewidth=1.5)
             ax_tgt.add_patch(circ)
@@ -318,61 +464,58 @@ def _interactive(aligner, stretch='zscale', box=15, save_catalog=None):
             _set_title()
             fig.canvas.draw_idle()
 
-        elif state['mode'] == 'PENDING':
-            if event.button == 3:          # right-click → cancel
-                for m in pending['marker_ref']:
-                    _remove_markers(m if isinstance(m, list) else [m])
-                for m in pending['marker_tgt']:
-                    _remove_markers(m if isinstance(m, list) else [m])
-                pending['marker_ref'].clear()
-                pending['marker_tgt'].clear()
-                state['mode'] = 'IDLE'
-                _set_title()
-                fig.canvas.draw_idle()
-                return
-
-            if event.button != 1:
-                return
-            if event.inaxes is not ax_tgt:
-                return
-            # Centroid on target
-            tx, ty = _refine_centroid(tgt_img, event.xdata, event.ydata, box)
+        # ---- PENDING left-click on target: confirm pair ---------------------
+        elif state['mode'] == 'PENDING' and event.inaxes is ax_tgt:
+            tx, ty = _refine_centroid(tgt_img, cx, cy, tgt_box_px)
             _accept_pair(tx, ty)
 
     # ---- Key handler ---------------------------------------------------------
     def _on_key(event):
-        if event.key == 'u':
+        if event.key == 'e':
+            if not aligner.pairs or state['mode'] != 'IDLE':
+                return
+            if event.xdata is None or event.ydata is None:
+                return
+            cx, cy = event.xdata, event.ydata
+            if event.inaxes is ax_ref:
+                dists = [np.sqrt((p[0]-cx)**2 + (p[1]-cy)**2) for p in aligner.pairs]
+            elif event.inaxes is ax_tgt:
+                dists = [np.sqrt((p[4]-cx)**2 + (p[5]-cy)**2) for p in aligner.pairs]
+            else:
+                return
+            _enter_edit_mode(int(np.argmin(dists)))
+            _set_title()
+
+        elif event.key == 'u':
             if not aligner.pairs:
                 return
-            # Delete the pair whose reference marker is nearest to the cursor.
-            # Falls back to the last pair if the cursor is not over an axes.
             if (event.inaxes in (ax_ref, ax_tgt)
                     and event.xdata is not None and event.ydata is not None):
                 cx, cy = event.xdata, event.ydata
                 if event.inaxes is ax_ref:
                     dists = [np.sqrt((p[0]-cx)**2 + (p[1]-cy)**2)
                              for p in aligner.pairs]
-                else:  # ax_tgt
+                else:
                     dists = [np.sqrt((p[4]-cx)**2 + (p[5]-cy)**2)
                              for p in aligner.pairs]
-                del aligner.pairs[int(np.argmin(dists))]
+                _delete_pair(int(np.argmin(dists)))
             else:
-                aligner.pairs.pop()
-            _redraw_all_confirmed()
-            fig.canvas.draw_idle()
+                _delete_pair(len(aligner.pairs) - 1)
+            _set_title()
+
         elif event.key == ' ':
-            # Spacebar — auto-accept around predicted position
             if state['mode'] == 'PENDING':
-                px = pending['pred_x']
-                py = pending['pred_y']
-                tx, ty = _refine_centroid(tgt_img, px, py, box)
+                tx, ty = _refine_centroid(tgt_img,
+                                          pending['pred_x'], pending['pred_y'], tgt_box_px)
                 _accept_pair(tx, ty)
+
         elif event.key == 'enter':
+            _clear_edit_mode()
             plt.close(fig)
 
     # ---- Window close --------------------------------------------------------
     def _on_close(event):
-        pass  # pairs already stored in aligner.pairs
+        pass
 
     # ---- Connect events -------------------------------------------------------
     fig.canvas.mpl_connect('button_press_event', _on_click)
@@ -380,6 +523,11 @@ def _interactive(aligner, stretch='zscale', box=15, save_catalog=None):
     fig.canvas.mpl_connect('close_event', _on_close)
     fig.canvas.mpl_connect('scroll_event', _on_scroll)
 
+    # Draw any pairs already in aligner.pairs (e.g. loaded by batch)
+    if aligner.pairs:
+        _redraw_all_confirmed()
+
+    _set_title()
     plt.tight_layout()
     plt.show()
 
@@ -392,50 +540,81 @@ def _interactive(aligner, stretch='zscale', box=15, save_catalog=None):
 # Batch strategy
 # ---------------------------------------------------------------------------
 
-def _batch(aligner, catalog: str, box: int = 15):
+def _batch(aligner, catalog: str, box: float = 0.1,
+           stretch: str = 'zscale', save_catalog=None, headless: bool = False):
     """
-    Load a saved pairs catalog and recentroid on each target frame.
+    Load a saved pairs catalog, recentroid on current reference+target, then
+    open the interactive window so the user can inspect and edit any pairs.
 
-    The catalog provides (ra, dec) sky positions (truth from reference WCS).
-    For each target, these are projected to pixels and recentroided.
+    The catalog's (ra, dec) sky positions are re-projected onto whatever reference
+    and target are currently loaded — so the catalog is reusable across different
+    reference files (e.g. HST vs KCWI, or two different HST pointings).
+    Stored x_ref/y_ref values are ignored; positions are always recomputed from WCS.
+
+    After loading, the interactive window opens with all pairs shown as numbered
+    red markers.  Press 'e' near a target marker to toggle edit mode (cyan circle);
+    left-click to re-place it.  Right-click or 'u' to delete.  Enter to finish.
     """
     from astropy.table import Table
 
     tbl = Table.read(catalog)
     ras  = np.asarray(tbl['ra'])
     decs = np.asarray(tbl['dec'])
-    rxs  = np.asarray(tbl['x_ref'])
-    rys  = np.asarray(tbl['y_ref'])
 
-    # We operate on target 0 by default for single-target, but for
-    # align_many the per-frame recentroiding happens in align.py.
-    # Here we populate aligner.pairs for target 0.
     if not aligner.targets:
         raise RuntimeError("No targets loaded.")
+
+    ref = aligner.reference
     tgt = aligner.targets[0]
-    img = tgt.image2d
-    if img is None:
+
+    ref_img = ref.image2d
+    tgt_img = tgt.image2d
+    if ref_img is None or tgt_img is None:
         raise RuntimeError("Call preprocess() before find_sources(strategy='batch').")
-    ny, nx = img.shape
+
+    ref_ny, ref_nx = ref_img.shape
+    tgt_ny, tgt_nx = tgt_img.shape
+
+    # Convert box from arcsec to pixels for each frame independently
+    ref_box_px = _box_to_pixels(box, ref, ref_img)
+    tgt_box_px = _box_to_pixels(box, tgt, tgt_img)
 
     aligner.pairs.clear()
-    for rx, ry, ra, dec in zip(rxs, rys, ras, decs):
+    for ra, dec in zip(ras, decs):
+        # Re-project onto current reference WCS
         try:
-            px_arr = tgt.wcs.all_world2pix([[ra, dec]], 0)
-            px, py = float(px_arr[0, 0]), float(px_arr[0, 1])
+            ref_pix = ref.wcs.all_world2pix([[ra, dec]], 0)
+            ref_px, ref_py = float(ref_pix[0, 0]), float(ref_pix[0, 1])
         except Exception:
             continue
-        if not (0 <= px < nx and 0 <= py < ny):
+        if not (0 <= ref_px < ref_nx and 0 <= ref_py < ref_ny):
             continue
-        tx, ty = _refine_centroid(img, px, py, box)
+        rx, ry = _refine_centroid(ref_img, ref_px, ref_py, ref_box_px)
+
+        # Re-project onto current target WCS
+        try:
+            tgt_pix = tgt.wcs.all_world2pix([[ra, dec]], 0)
+            tgt_px, tgt_py = float(tgt_pix[0, 0]), float(tgt_pix[0, 1])
+        except Exception:
+            continue
+        if not (0 <= tgt_px < tgt_nx and 0 <= tgt_py < tgt_ny):
+            continue
+        tx, ty = _refine_centroid(tgt_img, tgt_px, tgt_py, tgt_box_px)
+
         aligner.pairs.append((rx, ry, ra, dec, tx, ty))
+
+    print(f"[rb_align] batch: loaded {len(aligner.pairs)} pair(s) from '{catalog}'.")
+
+    # Open interactive window for inspection / editing (skipped when called from GUI)
+    if not headless:
+        _interactive(aligner, stretch=stretch, box=box, save_catalog=save_catalog)
 
 
 # ---------------------------------------------------------------------------
 # Gaia strategy
 # ---------------------------------------------------------------------------
 
-def _gaia(aligner, box: int = 5, radius_deg: float = 0.5,
+def _gaia(aligner, box: float = 0.1, radius_deg: float = 0.5,
           max_stars: int = 50):
     """
     Match Gaia DR3 catalog to reference image, then project to target.
@@ -492,6 +671,10 @@ def _gaia(aligner, box: int = 5, radius_deg: float = 0.5,
         raise RuntimeError("Call preprocess() first.")
     t_ny, t_nx = tgt_img.shape
 
+    # Convert box from arcsec to pixels for each frame
+    ref_box_px = _box_to_pixels(box, ref, img)
+    tgt_box_px = _box_to_pixels(box, tgt, tgt_img)
+
     aligner.pairs.clear()
     for row in result:
         ra = float(row['ra'])
@@ -505,7 +688,7 @@ def _gaia(aligner, box: int = 5, radius_deg: float = 0.5,
         if not (0 <= rx < nx and 0 <= ry < ny):
             continue
         # Refine on reference
-        rx_r, ry_r = _refine_centroid(img, rx, ry, box)
+        rx_r, ry_r = _refine_centroid(img, rx, ry, ref_box_px)
         # Project to target
         try:
             t_pix = tgt.wcs.all_world2pix([[ra, dec]], 0)
@@ -514,7 +697,7 @@ def _gaia(aligner, box: int = 5, radius_deg: float = 0.5,
             continue
         if not (0 <= tx < t_nx and 0 <= ty < t_ny):
             continue
-        tx_r, ty_r = _refine_centroid(tgt_img, tx, ty, box)
+        tx_r, ty_r = _refine_centroid(tgt_img, tx, ty, tgt_box_px)
         aligner.pairs.append((rx_r, ry_r, ra, dec, tx_r, ty_r))
 
     if not aligner.pairs:
@@ -525,8 +708,9 @@ def _gaia(aligner, box: int = 5, radius_deg: float = 0.5,
 # DAO strategy
 # ---------------------------------------------------------------------------
 
-def _dao(aligner, box: int = 5, fwhm: float = 0.0,
-         threshold_sigma: float = 3.0, max_sources: int = 50):
+def _dao(aligner, box: float = 0.1, fwhm: float = 0.0,
+         threshold_sigma: float = 3.0, max_sources: int = 50,
+         bg_method: str = 'sigma_clip'):
     """
     Detect point sources with DAOStarFinder, then match between images.
 
@@ -539,8 +723,13 @@ def _dao(aligner, box: int = 5, fwhm: float = 0.0,
     if ref_img is None or tgt_img is None:
         raise RuntimeError("Call preprocess() before find_sources(strategy='dao').")
 
-    ref_sources = _detect_dao_sources(ref_img, box, fwhm=fwhm,
-                                       threshold_sigma=threshold_sigma)
+    # Convert box from arcsec to pixels for each frame
+    ref_box_px = _box_to_pixels(box, ref, ref_img)
+    tgt_box_px = _box_to_pixels(box, tgt, tgt_img)
+
+    ref_sources = _detect_dao_sources(ref_img, ref_box_px, fwhm=fwhm,
+                                       threshold_sigma=threshold_sigma,
+                                       bg_method=bg_method)
     if len(ref_sources) == 0:
         raise RuntimeError("DAOStarFinder found no sources in reference image.")
 
@@ -563,13 +752,40 @@ def _dao(aligner, box: int = 5, fwhm: float = 0.0,
             continue
         if not (0 <= tx < tgt_nx and 0 <= ty < tgt_ny):
             continue
-        tx_r, ty_r = _refine_centroid(tgt_img, tx, ty, box)
+        tx_r, ty_r = _refine_centroid(tgt_img, tx, ty, tgt_box_px)
         aligner.pairs.append((rx, ry, ra, dec, tx_r, ty_r))
+
+
+def _bg_stats(finite: np.ndarray, bg_method: str = 'sigma_clip'):
+    """
+    Estimate background median and noise std from a 1-D array of finite values.
+
+    Parameters
+    ----------
+    bg_method : 'sigma_clip' | 'mad'
+        'sigma_clip' — iterative sigma-clipped mean/std (astropy).
+        'mad'        — median + 1.4826 × MAD (more robust for IFU data with
+                       correlated noise, non-Gaussian backgrounds, or many sources).
+    Returns
+    -------
+    bg_median, bg_std : float
+    """
+    if bg_method == 'mad':
+        from astropy.stats import mad_std
+        bg_median = float(np.median(finite))
+        bg_std    = float(mad_std(finite))
+    else:
+        from astropy.stats import sigma_clipped_stats
+        _, bg_median, bg_std = sigma_clipped_stats(finite)
+        bg_median = float(bg_median)
+        bg_std    = float(bg_std)
+    return bg_median, bg_std
 
 
 def _detect_dao_sources(img: np.ndarray, box: int,
                         fwhm: float = 0.0,
-                        threshold_sigma: float = 3.0):
+                        threshold_sigma: float = 3.0,
+                        bg_method: str = 'sigma_clip'):
     """
     Return list of (x, y) source positions from DAOStarFinder or fallback.
 
@@ -578,19 +794,22 @@ def _detect_dao_sources(img: np.ndarray, box: int,
     fwhm : float
         Expected source FWHM in pixels.  0 → auto as ``box * 0.5``.
     threshold_sigma : float
-        Detection threshold in units of image σ.
+        Detection threshold in units of background σ.
+    bg_method : 'sigma_clip' | 'mad'
+        Background noise estimator.  'mad' is more robust for IFU whitelight
+        images with correlated noise or a high source fraction.
     """
     if fwhm <= 0:
         fwhm = max(2.0, box * 0.5)
 
+    finite = img[np.isfinite(img)]
+    bg_median, bg_std = _bg_stats(finite, bg_method)
+
     if HAS_PHOTUTILS:
         try:
             from photutils.detection import DAOStarFinder
-            from astropy.stats import sigma_clipped_stats
-            finite = img[np.isfinite(img)]
-            _, median, std = sigma_clipped_stats(finite)
-            finder = DAOStarFinder(fwhm=fwhm, threshold=threshold_sigma * std)
-            sources = finder(img - median)
+            finder = DAOStarFinder(fwhm=fwhm, threshold=threshold_sigma * bg_std)
+            sources = finder(img - bg_median)
             if sources is None or len(sources) == 0:
                 return []
             return list(zip(
@@ -600,30 +819,28 @@ def _detect_dao_sources(img: np.ndarray, box: int,
         except Exception:
             pass
     # Fallback: simple peak finding via scipy
-    return _simple_peak_find(img, box, threshold_sigma=threshold_sigma)
+    return _simple_peak_find(img, box, threshold_sigma=threshold_sigma,
+                              bg_median=bg_median, bg_std=bg_std)
 
 
 def _simple_peak_find(img: np.ndarray, box: int, n_max: int = 30,
-                      threshold_sigma: float = 3.0):
+                      threshold_sigma: float = 3.0,
+                      bg_method: str = 'sigma_clip',
+                      bg_median: float = None,
+                      bg_std: float = None):
     """
     Basic peak finding: local maxima above threshold_sigma × σ_background.
 
-    Uses sigma-clipped stats to estimate background and noise, matching
-    the behaviour of the DAOStarFinder path.
+    bg_median / bg_std may be passed in pre-computed (from _detect_dao_sources)
+    to avoid re-estimating.  If None, estimated here using bg_method.
     """
     from scipy.ndimage import maximum_filter, label
     clean = np.nan_to_num(img, nan=0.0)
-    finite = clean.ravel()
-    finite = finite[np.isfinite(finite)]
 
-    # Sigma-clipped background estimate (2 iterations, 3-sigma clip)
-    bg = finite.copy()
-    for _ in range(2):
-        med = np.median(bg)
-        std = np.std(bg)
-        bg = bg[np.abs(bg - med) < 3.0 * std]
-    bg_median = float(np.median(bg))
-    bg_std    = float(np.std(bg))
+    if bg_median is None or bg_std is None:
+        finite = clean.ravel()
+        finite = finite[np.isfinite(finite)]
+        bg_median, bg_std = _bg_stats(finite, bg_method)
 
     threshold = bg_median + threshold_sigma * bg_std
     local_max = maximum_filter(clean, size=max(3, box)) == clean
@@ -640,8 +857,8 @@ def _simple_peak_find(img: np.ndarray, box: int, n_max: int = 30,
 # Knots strategy
 # ---------------------------------------------------------------------------
 
-def _knots(aligner, box: int = 5, threshold_sigma: float = 2.0,
-           max_knots: int = 10):
+def _knots(aligner, box: float = 0.1, threshold_sigma: float = 2.0,
+           max_knots: int = 10, bg_method: str = 'sigma_clip'):
     """
     Detect bright knots in reference via segmentation, project to target.
 
@@ -654,8 +871,13 @@ def _knots(aligner, box: int = 5, threshold_sigma: float = 2.0,
     if ref_img is None or tgt_img is None:
         raise RuntimeError("Call preprocess() before find_sources(strategy='knots').")
 
-    knot_positions = _detect_knots(ref_img, box, n_knots=max_knots,
-                                    threshold_sigma=threshold_sigma)
+    # Convert box from arcsec to pixels for each frame
+    ref_box_px = _box_to_pixels(box, ref, ref_img)
+    tgt_box_px = _box_to_pixels(box, tgt, tgt_img)
+
+    knot_positions = _detect_knots(ref_img, ref_box_px, n_knots=max_knots,
+                                    threshold_sigma=threshold_sigma,
+                                    bg_method=bg_method)
     if len(knot_positions) == 0:
         raise RuntimeError("No knots detected in reference image.")
 
@@ -671,23 +893,27 @@ def _knots(aligner, box: int = 5, threshold_sigma: float = 2.0,
             continue
         if not (0 <= tx < tgt_nx and 0 <= ty < tgt_ny):
             continue
-        tx_r, ty_r = _refine_centroid(tgt_img, tx, ty, box)
+        tx_r, ty_r = _refine_centroid(tgt_img, tx, ty, tgt_box_px)
         aligner.pairs.append((rx, ry, ra, dec, tx_r, ty_r))
 
 
 def _detect_knots(img: np.ndarray, box: int, n_knots: int = 10,
-                  threshold_sigma: float = 2.0):
+                  threshold_sigma: float = 2.0,
+                  bg_method: str = 'sigma_clip'):
     """Segment image and return centroids of brightest segments."""
+    finite = img[np.isfinite(img)]
+    bg_median, bg_std = _bg_stats(finite, bg_method)
+
     if HAS_PHOTUTILS:
         try:
             from photutils.segmentation import detect_sources, SourceCatalog
-            from astropy.stats import sigma_clipped_stats
-            _, _, std = sigma_clipped_stats(img[np.isfinite(img)])
             seg = detect_sources(np.nan_to_num(img, nan=0.0),
-                                  threshold=threshold_sigma * std, npixels=5)
+                                  threshold=bg_median + threshold_sigma * bg_std,
+                                  npixels=5)
             if seg is None:
                 return _simple_peak_find(img, box, n_max=n_knots,
-                                          threshold_sigma=threshold_sigma)
+                                          threshold_sigma=threshold_sigma,
+                                          bg_median=bg_median, bg_std=bg_std)
             cat = SourceCatalog(np.nan_to_num(img, nan=0.0), seg)
             tbl = cat.to_table()
             tbl.sort('segment_flux', reverse=True)
@@ -699,7 +925,8 @@ def _detect_knots(img: np.ndarray, box: int, n_knots: int = 10,
         except Exception:
             pass
     return _simple_peak_find(img, box, n_max=n_knots,
-                              threshold_sigma=threshold_sigma)
+                              threshold_sigma=threshold_sigma,
+                              bg_median=bg_median, bg_std=bg_std)
 
 
 # ---------------------------------------------------------------------------
@@ -719,6 +946,34 @@ def _estimate_pixel_scale_arcsec(frame, img: np.ndarray) -> float:
         return float((dx + dy) / 2.0)
     except Exception:
         return 0.3   # fallback: KCWI-like scale
+
+
+def _box_to_pixels(box_arcsec: float, frame, img: np.ndarray,
+                   minimum: int = 3) -> int:
+    """
+    Convert a centroid box size from arcsec to pixels for a given frame.
+
+    Parameters
+    ----------
+    box_arcsec : float
+        Half-width of the centroid box in arcsec.
+    frame : Frame
+        The frame whose WCS pixel scale is used.
+    img : np.ndarray
+        The 2D image (used for pixel scale estimation).
+    minimum : int
+        Minimum box size in pixels (default 3).
+
+    Returns
+    -------
+    int
+        Box half-width in pixels, at least ``minimum``.
+    """
+    scale = _estimate_pixel_scale_arcsec(frame, img)   # arcsec/px
+    if scale <= 0:
+        scale = 0.3
+    px = max(minimum, int(round(box_arcsec / scale)))
+    return px
 
 
 def _cross_corr_image_fallback(aligner):
@@ -768,8 +1023,9 @@ def _cross_corr_image_fallback(aligner):
     aligner.pairs.append((ref_cx, ref_cy, ra, dec, tgt_cx, tgt_cy))
 
 
-def _cross_corr(aligner, box: int = 5, fwhm: float = 0.0,
-                threshold_sigma: float = 3.0, max_sources: int = 50):
+def _cross_corr(aligner, box: float = 0.1, fwhm: float = 0.0,
+                threshold_sigma: float = 3.0, max_sources: int = 50,
+                bg_method: str = 'sigma_clip'):
     """
     Multi-source cross-match via Hough-style catalog voting.
 
@@ -787,8 +1043,8 @@ def _cross_corr(aligner, box: int = 5, fwhm: float = 0.0,
     Parameters
     ----------
     box : int
-        Centroid box half-width (px); also sets the Hough bin size as
-        ``clip(box × pixel_scale, 1.5, 10)`` arcsec.
+        Centroid box half-width in arcsec; also used directly as the Hough
+        bin size (clipped to 1.5–10 arcsec).
     """
     ref = aligner.reference
     tgt = aligner.targets[0]
@@ -801,13 +1057,19 @@ def _cross_corr(aligner, box: int = 5, fwhm: float = 0.0,
     r_ny, r_nx = ref_img.shape
     t_ny, t_nx = tgt_img.shape
 
+    # Convert box from arcsec to pixels for each frame independently
+    ref_box_px = _box_to_pixels(box, ref, ref_img)
+    tgt_box_px = _box_to_pixels(box, tgt, tgt_img)
+
     # ------------------------------------------------------------------
     # Step 1: source detection — keep up to 50 brightest per image
     # ------------------------------------------------------------------
-    ref_sources = _detect_dao_sources(ref_img, box, fwhm=fwhm,
-                                       threshold_sigma=threshold_sigma)
-    tgt_sources = _detect_dao_sources(tgt_img, box, fwhm=fwhm,
-                                       threshold_sigma=threshold_sigma)
+    ref_sources = _detect_dao_sources(ref_img, ref_box_px, fwhm=fwhm,
+                                       threshold_sigma=threshold_sigma,
+                                       bg_method=bg_method)
+    tgt_sources = _detect_dao_sources(tgt_img, tgt_box_px, fwhm=fwhm,
+                                       threshold_sigma=threshold_sigma,
+                                       bg_method=bg_method)
 
     if not ref_sources or not tgt_sources:
         print("[rb_align] cross_corr: source detection failed; "
@@ -855,8 +1117,8 @@ def _cross_corr(aligner, box: int = 5, fwhm: float = 0.0,
     dra_all  = ((tgt_ra[:, None]  - ref_ra[None, :])  * cos_dec * 3600.0).ravel()
     ddec_all = ((tgt_dec[:, None] - ref_dec[None, :]) *           3600.0).ravel()
 
-    px_scale   = _estimate_pixel_scale_arcsec(ref, ref_img)
-    bin_arcsec = float(np.clip(box * px_scale, 1.5, 10.0))
+    # box is already in arcsec — use directly as the Hough bin size
+    bin_arcsec = float(np.clip(box, 1.5, 10.0))
 
     dra_lo,  dra_hi  = dra_all.min()  - bin_arcsec, dra_all.max()  + bin_arcsec
     ddec_lo, ddec_hi = ddec_all.min() - bin_arcsec, ddec_all.max() + bin_arcsec
@@ -920,8 +1182,8 @@ def _cross_corr(aligner, box: int = 5, fwhm: float = 0.0,
         if not (0 <= tx < t_nx and 0 <= ty < t_ny):
             continue
 
-        rx_r, ry_r = _refine_centroid(ref_img, rx, ry, box)
-        tx_r, ty_r = _refine_centroid(tgt_img, tx, ty, box)
+        rx_r, ry_r = _refine_centroid(ref_img, rx, ry, ref_box_px)
+        tx_r, ty_r = _refine_centroid(tgt_img, tx, ty, tgt_box_px)
 
         sky = ref.wcs.all_pix2world([[rx_r, ry_r]], 0)
         ra, dec = float(sky[0, 0]), float(sky[0, 1])
@@ -938,7 +1200,7 @@ def _cross_corr(aligner, box: int = 5, fwhm: float = 0.0,
 # Auto cascade
 # ---------------------------------------------------------------------------
 
-def _auto(aligner, stretch='zscale', box=15):
+def _auto(aligner, stretch='zscale', box=0.1):
     """
     Try strategies in cascade order, fall back gracefully.
 
@@ -1002,18 +1264,21 @@ def _save_pairs_catalog(pairs, path: str):
 def _run_strategy(aligner,
                   strategy: str = 'interactive',
                   stretch='zscale',
-                  box: int = 5,
+                  box: float = 0.1,
                   save_catalog: Optional[str] = None,
                   catalog: Optional[str] = None,
-                  # cross_corr / dao options
+                  # cross_corr / dao / knots options
                   fwhm: float = 0.0,
                   threshold_sigma: float = 3.0,
                   max_sources: int = 50,
+                  bg_method: str = 'sigma_clip',
                   # knots options
                   max_knots: int = 10,
                   # gaia options
                   radius_deg: float = 0.5,
-                  max_stars: int = 50):
+                  max_stars: int = 50,
+                  # batch options
+                  headless: bool = False):
     """Dispatch to the selected source detection strategy."""
 
     strategy = strategy.lower()
@@ -1028,26 +1293,29 @@ def _run_strategy(aligner,
 
     elif strategy == 'dao':
         _dao(aligner, box=box, fwhm=fwhm,
-             threshold_sigma=threshold_sigma, max_sources=max_sources)
+             threshold_sigma=threshold_sigma, max_sources=max_sources,
+             bg_method=bg_method)
         if save_catalog is not None:
             _save_pairs_catalog(aligner.pairs, save_catalog)
 
     elif strategy == 'knots':
         _knots(aligner, box=box, threshold_sigma=threshold_sigma,
-               max_knots=max_knots)
+               max_knots=max_knots, bg_method=bg_method)
         if save_catalog is not None:
             _save_pairs_catalog(aligner.pairs, save_catalog)
 
     elif strategy == 'cross_corr':
         _cross_corr(aligner, box=box, fwhm=fwhm,
-                    threshold_sigma=threshold_sigma, max_sources=max_sources)
+                    threshold_sigma=threshold_sigma, max_sources=max_sources,
+                    bg_method=bg_method)
         if save_catalog is not None:
             _save_pairs_catalog(aligner.pairs, save_catalog)
 
     elif strategy == 'batch':
         if catalog is None:
             raise ValueError("strategy='batch' requires catalog='path/to/catalog.fits'.")
-        _batch(aligner, catalog=catalog, box=box)
+        _batch(aligner, catalog=catalog, box=box,
+               stretch=stretch, save_catalog=save_catalog, headless=headless)
 
     elif strategy == 'auto':
         _auto(aligner, stretch=stretch, box=box)

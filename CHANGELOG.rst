@@ -2,6 +2,33 @@
 Changelog
 =========
 
+Version 2.4.0 (2026-06-01)
+==========================
+
+New Features
+------------
+* ``rb_align`` — new astrometry alignment module: interactive and batch WCS alignment
+  of IFU datacubes and 2D images via chi2-matched source pairs and ``astropy`` WCS fitting.
+  Supports interactive, batch, DAO, Gaia, knots, cross-correlation, and auto strategies.
+  ``box`` parameter is in arcsec (default 0.1"), converted per-frame via WCS pixel scale.
+  Integrated into ``rb_ifuview`` via **Analysis > WCS Alignment** (``Ctrl+Shift+A``).
+
+* ``rb_zfind`` — semi-automated redshift finder: PCA, template, and picket-fence chi2
+  search against a spectrum. Curated linelist presets (``zfind_em``, ``zfind_galaxy``,
+  ``zfind_igm``, ``zfind_qso``, ``zfind_stellar``). Integrates with ``rb_zgui`` via
+  **Find z** button. Standalone CLI: ``rb_zfind spectrum.fits``.
+
+Bug Fixes
+---------
+* ``rb_align`` interactive window: orphaned cyan edit-mode circle remained visible
+  after right-click delete or double-click toggle-off. Fixed by removing matplotlib
+  artists explicitly before clearing the tracking dict.
+
+Documentation
+-------------
+* Added ``docs/GUIs/rb_align/rb_align.md`` and ``docs/GUIs/zfind/rb_zfind.md``.
+* ``rb_ifuview`` docs updated with WCS Alignment workflow, keyboard shortcut, and menu entry.
+
 Version 2.3.0 (2026-05-07)
 ==========================
 

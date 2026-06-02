@@ -252,3 +252,52 @@ def _update_header_inplace(aligner, target_idx: int) -> None:
                     pass
         hdul.flush()
     print(f"[rb_align] updated header in {path}")
+
+
+# ---------------------------------------------------------------------------
+# Apply corrected WCS to arbitrary external files
+# ---------------------------------------------------------------------------
+
+def _apply_wcs_to_files(new_wcs, paths: list, outputs: list,
+                         suffix: str = '_wcsfix') -> None:
+    """
+    Patch the spatial WCS from *new_wcs* into each file in *paths* and write
+    to the corresponding entry in *outputs* (None → auto-name with *suffix*).
+
+    The data arrays are never modified — only header keywords are patched.
+    All extensions are preserved.  Auto-detects 2D vs 3D from NAXIS.
+    """
+    for path, out in zip(paths, outputs):
+        p = Path(path)
+        if not p.exists():
+            print(f"[rb_align] apply_to: '{path}' not found — skipping.")
+            continue
+
+        out_path = Path(out) if out is not None else _output_path(path, suffix)
+
+        with fits.open(p) as hdul:
+            hdul_out = copy.deepcopy(hdul)
+
+        # Patch every extension that has data (covers multi-extension FITS)
+        patched = False
+        for ext in hdul_out:
+            if ext.data is None:
+                continue
+            ndim = ext.data.ndim
+            if ndim == 3:
+                _update_3d_header(ext.header, new_wcs)
+                patched = True
+            elif ndim == 2:
+                for key, val in new_wcs.to_header().items():
+                    try:
+                        ext.header[key] = val
+                    except Exception:
+                        pass
+                patched = True
+
+        if not patched:
+            print(f"[rb_align] apply_to: no data extensions found in '{path}' — skipping.")
+            continue
+
+        hdul_out.writeto(str(out_path), overwrite=True)
+        print(f"[rb_align] apply_to: wrote {out_path}")

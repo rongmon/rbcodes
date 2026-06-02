@@ -9,6 +9,7 @@
 | **rb_multispec** | Multi-spectrum viewer with line ID, redshift overlay, and fitting | [multispec docs](multispec/multispec.md) |
 | **rb_ifuview** | IFU datacube viewer — KCWI/MUSE/generic, spectra, moment maps, ds9 | [ifuview docs](ifuview/rb_ifuview.md) |
 | **rb_zgui** | Redshift measurement GUI for JWST NIRCam/grism spectroscopy | [PDF tutorial](zgui/Tutorial_for_Emission_Line_Redshift_Estimator_GUI.pdf) |
+| **rb_zfind** | Semi-automated redshift finder — PCA, template, and picket-fence chi2 search; integrates with rb_zgui | [docs](zfind/rb_zfind.md) |
 | **rb_llsfitter** | GUI for Lyman Limit System column density fitting | [LLSFitter docs](LLSFitter/LLSFitter.md) |
 | **interactive_continuum_fit** | Polynomial and spline continuum fitter with interactive masking | [docs](interactive_continuum_fit.md) |
 | **rb_align** | Astrometry alignment — IFU cubes and 2D images to a reference frame | [rb_align docs](rb_align/rb_align.md) |

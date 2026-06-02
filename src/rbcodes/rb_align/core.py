@@ -209,7 +209,7 @@ class wcs_align:
     def find_sources(self,
                      strategy: str = 'interactive',
                      stretch: str = 'zscale',
-                     box: int = 5,
+                     box: float = 0.1,
                      save_catalog: Optional[str] = None,
                      catalog: Optional[str] = None,
                      **kwargs):
@@ -223,8 +223,9 @@ class wcs_align:
             'cross_corr' | 'batch' | 'auto'
         stretch : str or (vmin, vmax)
             Display stretch for interactive mode.
-        box : int
-            Half-width in pixels for centroid refinement.
+        box : float
+            Half-width in arcsec for centroid refinement (converted to pixels
+            per-frame using the WCS pixel scale).  Default 1.0".
         save_catalog : str or None
             Path to save FITS catalog after interactive session.
         catalog : str or None
@@ -299,6 +300,80 @@ class wcs_align:
     # ------------------------------------------------------------------
     # Output (delegates to io.py)
     # ------------------------------------------------------------------
+
+    @property
+    def corrected_wcs(self):
+        """
+        Corrected 2-D WCS for target 0 after align() has run.
+
+        For multi-target workflows use ``get_corrected_wcs(target_idx)``.
+
+        Raises
+        ------
+        RuntimeError
+            If align() has not been called yet.
+        """
+        return self.get_corrected_wcs(0)
+
+    def get_corrected_wcs(self, target_idx: int = 0):
+        """
+        Return the corrected 2-D WCS for target *target_idx*.
+
+        Raises
+        ------
+        RuntimeError
+            If align() has not been run for this target.
+        """
+        if (not self._new_wcs
+                or target_idx >= len(self._new_wcs)
+                or self._new_wcs[target_idx] is None):
+            raise RuntimeError(
+                f"No corrected WCS for target {target_idx}. "
+                "Call align() first.")
+        return self._new_wcs[target_idx]
+
+    def apply_to(self, paths, output=None, target_idx: int = 0,
+                 suffix: str = '_wcsfix'):
+        """
+        Apply the corrected WCS from target_idx to one or more external files.
+
+        Use this to propagate the alignment solution to associated files that
+        share the same spatial WCS — e.g. variance cubes, mask cubes, or
+        other exposures of the same field.
+
+        Parameters
+        ----------
+        paths : str or list of str
+            Path(s) to FITS file(s) to patch.
+        output : str or list of str or None
+            Output path(s).  If None, appends *suffix* before the extension.
+            Must match *paths* in length when given as a list.
+        target_idx : int
+            Which alignment solution to use (default 0).
+        suffix : str
+            Appended to the stem when output is auto-named (default '_wcsfix').
+
+        Examples
+        --------
+        c.align()
+        c.apply_to('kcwi_var.fits')                        # → kcwi_var_wcsfix.fits
+        c.apply_to('kcwi_var.fits', output='kcwi_var_corr.fits')
+        c.apply_to(['kcwi_var.fits', 'kcwi_mask.fits'])    # batch
+        """
+        from .io import _apply_wcs_to_files
+        new_wcs = self.corrected_wcs   # raises if not yet solved
+
+        if isinstance(paths, str):
+            paths = [paths]
+        if output is None:
+            output = [None] * len(paths)
+        elif isinstance(output, str):
+            output = [output]
+        if len(output) != len(paths):
+            raise ValueError(
+                f"paths has {len(paths)} entries but output has {len(output)}.")
+
+        _apply_wcs_to_files(new_wcs, paths, output, suffix=suffix)
 
     def write_output(self, suffix: str = '_wcsfix'):
         """

@@ -47,13 +47,16 @@ print('  Done.')
 # 3. Interactive source selection
 #
 #    A two-panel window opens (reference left, target right).
-#    - Left-click on reference to pick a source.
-#    - Left-click near the cyan prediction circle on the target to confirm.
-#    - Space  : auto-accept prediction (good when WCS is already close).
-#    - Right-click : cancel pending reference click.
-#    - u      : undo last pair.
-#    - Enter  : done.
+#    - Left-click on reference  → pick a source (auto-recentroids).
+#    - Left-click on target     → confirm position for pending source.
+#    - Double-click any marker  → toggle edit mode (cyan circle on target;
+#                                 left-click near circle to re-place).
+#    - Right-click              → IDLE: delete nearest  |  PENDING: cancel.
+#    - u                        → delete nearest pair (hover cursor near it).
+#    - Space                    → auto-accept predicted target position.
+#    - Enter                    → finish and close.
 #
+#    box is in arcsec; 0.1" ≈ 2 px on HST, ~0.7 px on KCWI.
 #    Aim for 4–6 sources spread across the field for a good affine fit.
 #    The catalog is saved so you can skip this step next time (see 3b).
 # ---------------------------------------------------------------------------
@@ -61,13 +64,20 @@ print('Opening interactive alignment window...')
 c.find_sources(
     strategy='interactive',
     stretch='zscale',               # 'zscale' | '99%' | 'minmax' | (vmin, vmax)
-    box=5,                          # centroid refinement half-width in pixels
+    box=0.1,                        # centroid refinement half-width in arcsec
     save_catalog='J1004_sources.fits',
 )
 print(f'  {len(c.pairs)} source pairs selected.')
 
-# -- 3b. Skip interactive next time by loading the saved catalog:
-# c.find_sources(strategy='batch', catalog='J1004_sources.fits')
+# -- 3b. Reload catalog for a new target — opens interactive for inspection:
+#    Double-click any marker to toggle edit mode (cyan circle on target);
+#    left-click near circle to re-place.  Enter when done.
+# c.find_sources(strategy='batch', catalog='J1004_sources.fits', box=0.1)
+
+# -- 3c. Fully automated (no interaction) — just reproject + recentroid:
+# c.find_sources(strategy='batch', catalog='J1004_sources.fits', box=0.1)
+# c.align()
+# c.write_output()
 
 # ---------------------------------------------------------------------------
 # 4. Align
