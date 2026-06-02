@@ -2,21 +2,6 @@
 
 An interactive PyQt5 GUI for visualizing and extracting spectra from IFU datacubes and 2D FITS images.
 
-## Overview
-
-rb_ifuview allows you to:
-
-- Load one or more FITS datacubes (KCWI, MUSE, or generic) and 2D images simultaneously
-- Display whitelight, channel, narrowband, and continuum-subtracted images
-- Browse wavelength slices interactively with a channel slider
-- Extract spectra from single spaxels, rectangles, circular apertures, or circular-annular apertures
-- Apply profile-based or variance-based weighting for optimal extraction
-- Compute moment maps (M0 flux, M1 velocity, M2 dispersion)
-- Crop datacubes spatially and send sub-cubes to file
-- Interface with a running ds9 instance to push images and import region overlays
-- Batch-extract spectra from a ds9 region file
-- Send extracted spectra directly to rb_multispec for further analysis
-
 ## Usage
 
 ```bash
@@ -469,38 +454,14 @@ Requires `pyds9` to be installed (see `rb_ifuview --install`).
 
 ---
 
-## Tips
+## Notes
 
-### Image display
-
-- **ZScale** (default normalization) works well for most data. Switch to a percentile clip (e.g. 99%) for images with bright point sources.
-- **Right-click drag** on the image is the fastest way to fine-tune contrast and bias — no typing required.
-- For emission line maps use the **RdBu_r** colormap with **M1** moment maps: blue spaxels are approaching, red are receding.
-- Click **[Reset]** in the image controls to immediately restore defaults if the display becomes unusable.
-
-### Extraction
-
-- In **Single pixel** mode the hover spectrum (pink line in the spectrum panel) previews the spaxel spectrum in real time before you click — use this to find the brightest spaxel before locking.
-- **Optimal (Data)** weighting usually gives the best S/N for point-like sources; **Optimal (Gaussian)** is more robust when the PSF is slightly off-center.
-- **Var-weighted** extraction requires a variance cube — right-click the variance file in the sidebar and choose **"Use as variance for '…'"** to assign it.
-- Use **[→ rb_multispec]** to compare multiple extracted spectra side by side.
-
-### Narrowband and continuum subtraction
-
-- Drag the **edges** of a drawn span (not the center) to adjust its width without redrawing from scratch.
-- In **Cont-sub** mode pressing the same key twice (e.g. `c` → `c`) clears that window and lets you redraw it.
-- The **Band Range Dialog** (Ctrl+B) lets you type precise wavelength values for all three windows.
-
-### Moment maps
-
-- Always define a **sky region** before computing M1/M2 with SNR masking — the sky median and RMS are used to set the threshold.
-- M1 and M2 are only meaningful inside the emission-line window. Make sure the on-band span covers the full line profile.
-- The moment map is cached per-dataset; switch to another dataset and back to restore it without recomputing.
-
-### Multiple datasets
-
-- Load a flux cube and its variance cube separately, then right-click the variance in the sidebar to assign it. This enables **Var-weighted** extraction on the flux cube.
-- Each dataset maintains completely independent state — image scale, extraction markers, band ranges, etc. — so you can compare results between cubes freely.
+- **Hover spectrum** (pink line): in Single pixel mode previews the spaxel under the cursor in real time before clicking.
+- **Var-weighted** extraction requires a variance cube — right-click it in the sidebar → "Use as variance for '…'" to assign it.
+- **Right-click drag** on the image adjusts contrast (vertical) and bias (horizontal) without typing.
+- In **Cont-sub** mode press the same key twice (e.g. `c` → `c`) to clear and redraw a span.
+- Define a **sky region** before computing M1/M2 with SNR masking — the sky median and RMS set the threshold.
+- The moment map is cached per-dataset; switch datasets and back to restore without recomputing.
 
 ### WCS Alignment
 

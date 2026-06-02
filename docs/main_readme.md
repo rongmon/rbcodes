@@ -74,28 +74,7 @@ conda install -c conda-forge --file requirements_simple.txt
 
 For full installation options, platform notes, and troubleshooting see [INSTALLATION.md](../INSTALLATION.md).
 
-### Dependencies
-
-| Package | Version | Notes |
-|---------|---------|-------|
-| PyQt5 | ≥ 5.15.7 | GUI framework |
-| numpy | ≥ 1.22.3 | |
-| matplotlib | ≥ 3.5.0 | Plotting |
-| astropy | ≥ 5.3.3 | Astronomy utilities |
-| linetools | ≥ 0.3 | Spectroscopy tools |
-| scipy | ≥ 1.7.3 | Scientific computing |
-| pandas | == 1.3.5 | Pinned — newer versions not yet tested |
-| emcee | ≥ 3.0 | MCMC sampling |
-| photutils | ≥ 1.0 | Aperture photometry |
-| corner | ≥ 2.0 | MCMC visualization |
-| scikit-learn | ≥ 1.5.0 | Machine learning utilities |
-| tqdm | ≥ 4.65.0 | Progress bars |
-| regions | ≥ 0.5 | ds9 region file I/O (rb_ifuview) |
-| pytest | ≥ 6.0 | Testing |
-| pytest-cov | ≥ 2.0 | Test coverage |
-
-**Optional:**
-- `pyds9` — live ds9 bridge for `rb_ifuview`. Run `rb_ifuview --install` for setup instructions.
+Core dependencies: `numpy`, `astropy`, `matplotlib`, `PyQt5`, `linetools`, `scipy`. See [INSTALLATION.md](../INSTALLATION.md) for the full list and optional packages.
 
 ---
 
@@ -103,17 +82,12 @@ For full installation options, platform notes, and troubleshooting see [INSTALLA
 
 ### Core Pipeline — rb_spec
 
-[Full Documentation](GUIs/rb_spec/rb_spec.md)
+| | |
+|-|-|
+| **Command** | `from rbcodes.GUIs.rb_spec import rb_spec as r` |
+| **Docs** | [Full Documentation](GUIs/rb_spec/rb_spec.md) |
 
-`rb_spec` is the central Python class in rbcodes and the backbone behind `launch_specgui`. Use it for all absorption line analysis, scripted or interactive.
-
-**Capabilities:**
-- Load spectra from FITS, ASCII, XSpectrum1D, or numpy arrays
-- Shift to absorber rest frame and slice around any transition
-- Continuum fitting: interactive spline/masking GUI, iterative Legendre polynomial, RANSAC, BIC-optimized order
-- Equivalent width and column density (AOD) with full error propagation
-- Saturation detection, SNR, velocity centroid and dispersion
-- Save/load full analysis state to JSON
+Central Python class for absorption line spectroscopy — load, shift, slice, fit continuum, measure EW and column density, save results. Backbone behind `launch_specgui`.
 
 ---
 
@@ -132,19 +106,7 @@ For full installation options, platform notes, and troubleshooting see [INSTALLA
 | **interactive_continuum_fit** | (import) | Recommended continuum fitter — polynomial and spline methods with interactive masking | [docs](GUIs/interactive_continuum_fit.md) |
 | **rb_align** | (import) | Astrometry alignment — align IFU cubes and 2D images to a reference frame with interactive or automated source matching and full WCS fitting | [docs](GUIs/rb_align/rb_align.md) |
 
-**rb_ifuview** extraction and analysis features:
-- Single pixel / Rectangle / Circular / Circular-Annular apertures
-- Optimal (data/Gaussian) and variance-weighted spectral extraction
-- M0 / M1 / M2 moment maps with optional continuum subtraction and SNR masking
-- WCS alignment to a 2D reference image via rb_align (Ctrl+Shift+A)
-- Per-dataset state persistence; optional live ds9 bridge (`rb_ifuview --install`)
-
-#### Legacy Tools
-
-| Tool | Replacement |
-|------|------------|
-| [AbsTools](GUIs/AbsTools/README.md) | Use `launch_specgui` in batch mode |
-| [rb_cont.py](GUIs/rb_cont.md) | Use `interactive_continuum_fit` |
+**Legacy tools:** `AbsTools` and `rb_cont.py` are superseded by `launch_specgui` (batch mode) and `interactive_continuum_fit` respectively.
 
 ---
 
@@ -156,8 +118,7 @@ For full installation options, platform notes, and troubleshooting see [INSTALLA
 |--------|-------------|
 | [compute_EW.py](IGM/compute_EW_readme.md) | Equivalent width and column density with saturation detection |
 | [rb_setline.py](IGM/rb_setline.md) | Atomic transition and f-value lookup (12+ line lists) |
-| [rb_iter_contfit.py](IGM/rb_iter_contfit.md) | Iterative polynomial continuum fitting with sigma clipping and BIC order selection |
-| [fit_continuum_full_spec.py](IGM/rb_iter_contfit.md) | Full-spectrum continuum fitting using the iterative polynomial approach |
+| [rb_iter_contfit.py](IGM/rb_iter_contfit.md) | Iterative polynomial continuum fitting with sigma clipping and BIC order selection; `fit_continuum_full_spec.py` applies this to a full spectrum |
 | [rb_specbin.py](IGM/rb_specbin.md) | Spectrum rebinning utility |
 | [ransac_contfit.py](IGM/) | RANSAC-based continuum fitting |
 | [lens_sep_to_kpc.py](IGM/lens_sep_to_kpc.md) | Sightline separation in physical units |

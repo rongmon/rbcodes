@@ -185,12 +185,68 @@ c.flagged_frames     # frames that failed or degraded
 ### 5 — Write output
 
 ```python
-c.write_output()                    # writes {name}_wcsfix.fits
+c.write_output()                    # writes {name}_wcsfix.fits for all targets
 c.write_output(suffix='_wcsfix')    # explicit suffix
-c.update_header(target_idx=0)       # patch header in-place (no copy)
+c.update_header(target_idx=0)       # patch WCS keywords in original file in-place
 ```
 
-Original files are never overwritten.
+`write_output()` copies the original file (all FITS extensions preserved),
+patches only the spatial WCS keywords in the copy, and writes it with the
+suffix appended before the file extension.  The original is never overwritten.
+
+`update_header()` modifies the original file directly — use with care.
+
+---
+
+## WCS output — accessing and applying the corrected solution
+
+After `align()` has run, the corrected WCS is stored internally and is
+accessible without writing anything to disk.
+
+### Accessing the corrected WCS object
+
+```python
+c.corrected_wcs           # astropy.wcs.WCS — corrected 2D spatial WCS for target 0
+c.get_corrected_wcs(i)    # same, for target i (use after align_many())
+```
+
+Both return an `astropy.wcs.WCS` object you can use directly — for example to
+convert pixel coordinates to sky coordinates, overlay on a plot, or pass to
+another pipeline step.  A `RuntimeError` is raised if `align()` has not been
+called first.
+
+### Applying the solution to companion files
+
+`apply_to()` takes the corrected WCS from `align()` and patches it into one or
+more external FITS files.  The pixel data is never modified — only the spatial
+WCS header keywords are updated.  All FITS extensions are preserved.  The
+method auto-detects 2D vs 3D data in each extension and patches accordingly.
+
+The typical use-case is propagating the alignment to associated files — for
+example a variance cube or mask cube — that were not part of the alignment run
+but must share the same WCS.
+
+```python
+# Single companion file — output written to kcwi_var_wcsfix.fits
+c.apply_to('kcwi_var.fits')
+
+# Custom output path
+c.apply_to('kcwi_var.fits', output='kcwi_var_corr.fits')
+
+# Multiple files in one call
+c.apply_to(['kcwi_var.fits', 'kcwi_mask.fits'])
+
+# Multiple files with explicit output paths (lists must be the same length)
+c.apply_to(['kcwi_var.fits', 'kcwi_mask.fits'],
+            output=['kcwi_var_corr.fits', 'kcwi_mask_corr.fits'])
+
+# Use the solution from a specific target (batch mode only)
+c.apply_to('kcwi_00_var.fits', target_idx=2)
+```
+
+**Output naming:** when `output` is not given, the suffix `_wcsfix` is
+inserted before the file extension (e.g. `kcwi_var.fits` →
+`kcwi_var_wcsfix.fits`).  Pass `suffix=` to change it.
 
 ---
 
@@ -313,21 +369,3 @@ Full runnable scripts are in `rbcodes/rb_align/examples/`:
 |--------|-------------|
 | `example_generic.py` | Generic placeholder-path script covering all five workflows |
 | `example_J1004_kcwi_hst.py` | Real-data example: KCWI blue aligned to KCWI red for J1004+4112 |
-
----
-
-## Module layout
-
-```
-src/rbcodes/rb_align/
-├── __init__.py     # wcs_align, Frame, help()
-├── core.py         # wcs_align class, pipeline orchestration, GUI hooks
-├── io.py           # load/write wrappers (reuses ifuviewer IO)
-├── preprocess.py   # white-light / narrowband collapse (reuses ifuviewer)
-├── sources.py      # source detection and interactive matplotlib session
-├── align.py        # WCS fitting via fit_wcs_from_points, fallbacks
-├── qa.py           # residuals, overlay figures, QA summary
-└── examples/
-    ├── example_generic.py
-    └── example_J1004_kcwi_hst.py
-```
