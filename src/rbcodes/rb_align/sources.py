@@ -1197,6 +1197,670 @@ def _cross_corr(aligner, box: float = 0.1, fwhm: float = 0.0,
 
 
 # ---------------------------------------------------------------------------
+# Arc NCC strategy — NCC template matching on a user-selected region
+# ---------------------------------------------------------------------------
+
+def _apply_log(img: np.ndarray, sigma: float) -> np.ndarray:
+    """
+    Negated Laplacian-of-Gaussian filter.
+
+    Suppresses smooth/diffuse emission (seeing halos, continuum gradients)
+    and enhances compact structures (arc knots, emission peaks).
+    The negation makes brightness peaks positive.
+
+    Parameters
+    ----------
+    img : np.ndarray
+        2D image array.
+    sigma : float
+        Gaussian smoothing scale in pixels.  Match to expected knot size.
+
+    Returns
+    -------
+    np.ndarray
+        LoG-filtered image, same shape as input.
+    """
+    from scipy.ndimage import gaussian_laplace
+    return -gaussian_laplace(np.nan_to_num(img, nan=0.0), sigma=sigma)
+
+
+def _ncc_subpixel_peak(surface: np.ndarray):
+    """
+    Locate the peak of a 2D NCC surface with sub-pixel precision.
+
+    Uses independent 1-D parabolic interpolation along each axis through
+    the integer-pixel maximum.
+
+    Parameters
+    ----------
+    surface : np.ndarray
+        2D NCC surface.
+
+    Returns
+    -------
+    (sub_row, sub_col) : (float, float)
+        Sub-pixel peak position in array coordinates.
+    """
+    peak_idx = np.unravel_index(np.argmax(surface), surface.shape)
+    py, px = int(peak_idx[0]), int(peak_idx[1])
+    ny, nx = surface.shape
+
+    # Parabolic sub-pixel in y
+    if 0 < py < ny - 1:
+        vy = (surface[py - 1, px], surface[py, px], surface[py + 1, px])
+        denom = vy[0] - 2.0 * vy[1] + vy[2]
+        sub_y = py - 0.5 * (vy[0] - vy[2]) / denom if abs(denom) > 1e-10 else float(py)
+    else:
+        sub_y = float(py)
+
+    # Parabolic sub-pixel in x
+    if 0 < px < nx - 1:
+        vx = (surface[py, px - 1], surface[py, px], surface[py, px + 1])
+        denom = vx[0] - 2.0 * vx[1] + vx[2]
+        sub_x = px - 0.5 * (vx[0] - vx[2]) / denom if abs(denom) > 1e-10 else float(px)
+    else:
+        sub_x = float(px)
+
+    return sub_y, sub_x
+
+
+def _arc_ncc_interactive(aligner,
+                         search_radius: float = 5.0,
+                         use_LoG: bool = False,
+                         LoG_sigma: float = 0.0,
+                         bg_method: str = 'mad',
+                         stretch: str = 'zscale'):
+    """
+    Interactive version of arc_ncc: click-drag on the reference panel to draw
+    a bounding box, then NCC runs automatically on mouse release.
+
+    Controls
+    --------
+    Click-drag on reference  — draw box, run NCC immediately on release
+    r                        — clear result and draw a new box
+    Enter                    — accept current result and close
+    Escape / close window    — close without saving any pair
+
+    The NCC result is shown as:
+      - a cyan rectangle on the reference panel (selected box)
+      - a red cross on the target panel (matched position)
+      - a third panel showing the NCC surface (peak = best shift)
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mpatches
+    import matplotlib.gridspec as gridspec
+
+    ref_frame = aligner.reference
+    tgt_frame = aligner.targets[0]
+    ref_img   = ref_frame.image2d
+    tgt_img   = tgt_frame.image2d
+    if ref_img is None or tgt_img is None:
+        raise RuntimeError(
+            "Call preprocess() before find_sources(strategy='arc_ncc').")
+
+    ref_norm = _compute_norm(ref_img, stretch)
+    tgt_norm = _compute_norm(tgt_img, stretch)
+
+    # ---- Figure: reference | target | NCC surface ---------------------------
+    fig = plt.figure(figsize=(15, 5))
+    gs  = gridspec.GridSpec(1, 3, width_ratios=[1, 1, 1], wspace=0.35)
+    ax_ref = fig.add_subplot(gs[0])
+    ax_tgt = fig.add_subplot(gs[1])
+    ax_ncc = fig.add_subplot(gs[2])
+
+    ax_ref.imshow(ref_img, origin='lower', cmap='gray',
+                  norm=ref_norm, interpolation='nearest')
+    ax_tgt.imshow(tgt_img, origin='lower', cmap='gray',
+                  norm=tgt_norm, interpolation='nearest')
+    ax_ref.set_title('Reference — click-drag to select region')
+    ax_tgt.set_title('Target — NCC match')
+    ax_ncc.set_title('NCC surface')
+    ax_ncc.set_visible(False)
+
+    state = {
+        'press_xy':            None,   # (x, y) where mouse button went down on ref
+        'rect':                None,   # cyan box on reference panel
+        'tgt_rect':            None,   # cyan box on target panel (same size, at match)
+        'tgt_mark':            None,   # red cross on target panel
+        'ncc_im':              None,   # imshow on ax_ncc
+        'result':              None,   # (bx0, by0, bx1, by1) if a box has been drawn
+        'edit_mode':           False,  # True after double-click on target
+        'seed_xy':             None,   # (x, y) manual search seed in target (or None → WCS)
+        'ignore_next_release': False,  # swallow the release that follows a double-click
+    }
+
+    def _clear_artists():
+        for key in ('rect', 'tgt_rect', 'tgt_mark', 'ncc_im'):
+            if state[key] is not None:
+                try:
+                    state[key].remove()
+                except Exception:
+                    pass
+                state[key] = None
+        ax_ncc.cla()
+        ax_ncc.set_visible(False)
+        state['result']    = None
+        state['edit_mode'] = False
+        state['seed_xy']   = None
+
+    def _set_title():
+        if state['edit_mode']:
+            fig.suptitle(
+                'Edit mode — left-click on target to set new search centre',
+                fontsize=10, color='cyan')
+        elif state['result'] is not None:
+            bx0, by0, bx1, by1 = state['result']
+            if aligner.pairs:
+                rx, ry, ra, dec, tgt_cx, tgt_cy = aligner.pairs[0]
+                tgt_scale = _estimate_pixel_scale_arcsec(tgt_frame, tgt_img)
+                try:
+                    pred = tgt_frame.wcs.all_world2pix([[ra, dec]], 0)
+                    shift_dx = tgt_cx - float(pred[0, 0])
+                    shift_dy = tgt_cy - float(pred[0, 1])
+                except Exception:
+                    shift_dx = shift_dy = 0.0
+                shift_as = np.sqrt((shift_dx * tgt_scale)**2 +
+                                   (shift_dy * tgt_scale)**2)
+                seed_note = '  [manual seed]' if state['seed_xy'] else ''
+                fig.suptitle(
+                    f'NCC shift = ({shift_dx:+.2f}, {shift_dy:+.2f}) px'
+                    f' = {shift_as:.2f}"{seed_note}'
+                    '  |  double-click target: re-seed  |  r: redo  |  Enter: accept',
+                    fontsize=9)
+            else:
+                fig.suptitle('NCC failed.  r: redo', fontsize=10, color='red')
+        else:
+            fig.suptitle(
+                'Click-drag on reference to select a region'
+                '  |  r: redo  |  Enter: accept  |  Esc: cancel',
+                fontsize=10)
+
+    def _run_ncc(bx0, by0, bx1, by1, seed_xy=None):
+        """Run NCC for the given reference box, optionally with a manual seed."""
+        # Remove old NCC result artists but keep the ref box if already drawn
+        for key in ('tgt_rect', 'tgt_mark', 'ncc_im'):
+            if state[key] is not None:
+                try:
+                    state[key].remove()
+                except Exception:
+                    pass
+                state[key] = None
+        ax_ncc.cla()
+        ax_ncc.set_visible(False)
+        state['edit_mode'] = False
+        aligner.pairs.clear()
+
+        try:
+            _arc_ncc(aligner, box_ref=(bx0, by0, bx1, by1),
+                     search_radius=search_radius,
+                     use_LoG=use_LoG, LoG_sigma=LoG_sigma, bg_method=bg_method,
+                     _seed_xy=seed_xy)
+        except Exception as e:
+            fig.suptitle(f'NCC failed: {e}', fontsize=9, color='red')
+            fig.canvas.draw_idle()
+            return
+
+        if not aligner.pairs:
+            fig.suptitle('NCC produced no result.', fontsize=9, color='red')
+            fig.canvas.draw_idle()
+            return
+
+        _, _, _, _, tgt_cx, tgt_cy = aligner.pairs[0]
+
+        # Cyan box in target — same pixel size as the reference box
+        box_w = bx1 - bx0
+        box_h = by1 - by0
+        tgt_rect = mpatches.Rectangle(
+            (tgt_cx - box_w / 2.0, tgt_cy - box_h / 2.0), box_w, box_h,
+            edgecolor='cyan', facecolor='none', linewidth=1.5, linestyle='--')
+        ax_tgt.add_patch(tgt_rect)
+        state['tgt_rect'] = tgt_rect
+
+        mark, = ax_tgt.plot(tgt_cx, tgt_cy, 'r+', ms=18, mew=2.5)
+        state['tgt_mark'] = mark
+
+        _show_ncc_surface(ax_ncc, ref_img, tgt_img, ref_frame, tgt_frame,
+                          bx0, by0, bx1, by1,
+                          search_radius, use_LoG, LoG_sigma, bg_method,
+                          seed_xy=seed_xy)
+        ax_ncc.set_visible(True)
+        _set_title()
+        fig.canvas.draw_idle()
+
+    # ---- Mouse handlers -----------------------------------------------------
+    def _on_press(event):
+        if fig.canvas.toolbar is not None and fig.canvas.toolbar.mode != '':
+            return
+        if event.xdata is None or event.ydata is None:
+            return
+
+        # Start a drag on the reference panel (single left-click press)
+        if event.inaxes is ax_ref and event.button == 1 and not event.dblclick:
+            state['press_xy'] = (event.xdata, event.ydata)
+
+    def _on_release(event):
+        if fig.canvas.toolbar is not None and fig.canvas.toolbar.mode != '':
+            return
+        if event.xdata is None or event.ydata is None:
+            return
+
+        # Swallow the release that immediately follows a double-click press
+        if state['ignore_next_release']:
+            state['ignore_next_release'] = False
+            return
+
+        # ---- Edit-mode: left-click on target sets new search seed -----------
+        if (state['edit_mode'] and event.inaxes is ax_tgt
+                and event.button == 1 and not event.dblclick):
+            seed_x, seed_y = event.xdata, event.ydata
+            state['seed_xy'] = (seed_x, seed_y)
+            state['edit_mode'] = False
+            bx0, by0, bx1, by1 = state['result']
+            _run_ncc(bx0, by0, bx1, by1, seed_xy=(seed_x, seed_y))
+            return
+
+        # ---- Normal drag on reference: draw box and run NCC -----------------
+        if event.inaxes is not ax_ref or event.button != 1:
+            state['press_xy'] = None
+            return
+        if state['press_xy'] is None:
+            return
+
+        x0, y0 = state['press_xy']
+        x1, y1 = event.xdata, event.ydata
+        state['press_xy'] = None
+
+        bx0, bx1 = sorted([int(round(x0)), int(round(x1))])
+        by0, by1 = sorted([int(round(y0)), int(round(y1))])
+        if bx1 - bx0 < 3 or by1 - by0 < 3:
+            fig.suptitle('Box too small — try again.', fontsize=10, color='red')
+            fig.canvas.draw_idle()
+            return
+
+        # Remove previous artists, draw new reference box
+        _clear_artists()
+        rect = mpatches.Rectangle(
+            (bx0, by0), bx1 - bx0, by1 - by0,
+            edgecolor='cyan', facecolor='none', linewidth=1.5, linestyle='--')
+        ax_ref.add_patch(rect)
+        state['rect']   = rect
+        state['result'] = (bx0, by0, bx1, by1)
+
+        _run_ncc(bx0, by0, bx1, by1)
+
+    def _on_click(event):
+        """Separate handler for double-click on target → enter edit mode."""
+        if fig.canvas.toolbar is not None and fig.canvas.toolbar.mode != '':
+            return
+        if not event.dblclick or event.button != 1:
+            return
+        if event.inaxes is not ax_tgt:
+            return
+        if state['result'] is None or not aligner.pairs:
+            return
+
+        # Always swallow the release that pairs with this double-click press
+        state['ignore_next_release'] = True
+
+        # Toggle edit mode — no visual decoration, just change the title
+        state['edit_mode'] = not state['edit_mode']
+        _set_title()
+        fig.canvas.draw_idle()
+
+    def _on_key(event):
+        if event.key == 'r':
+            _clear_artists()
+            aligner.pairs.clear()
+            ax_ref.set_title('Reference — click-drag to select region')
+            _set_title()
+            fig.canvas.draw_idle()
+        elif event.key == 'enter':
+            plt.close(fig)
+        elif event.key == 'escape':
+            aligner.pairs.clear()
+            plt.close(fig)
+
+    def _on_scroll(event):
+        ax = event.inaxes
+        if ax not in (ax_ref, ax_tgt) or event.xdata is None:
+            return
+        factor = 0.85 if event.button == 'up' else 1.15
+        xlim, ylim = ax.get_xlim(), ax.get_ylim()
+        cx, cy = event.xdata, event.ydata
+        ax.set_xlim([cx + (x - cx) * factor for x in xlim])
+        ax.set_ylim([cy + (y - cy) * factor for y in ylim])
+        fig.canvas.draw_idle()
+
+    fig.canvas.mpl_connect('button_press_event',   _on_press)
+    fig.canvas.mpl_connect('button_release_event', _on_release)
+    fig.canvas.mpl_connect('button_press_event',   _on_click)
+    fig.canvas.mpl_connect('key_press_event',      _on_key)
+    fig.canvas.mpl_connect('scroll_event',         _on_scroll)
+
+    _set_title()
+    plt.tight_layout()
+    plt.show()
+
+
+def _show_ncc_surface(ax, ref_img, tgt_img, ref_frame, tgt_frame,
+                      x0, y0, x1, y1,
+                      search_radius, use_LoG, LoG_sigma, bg_method,
+                      seed_xy=None):
+    """
+    Recompute the NCC surface for a given box and display it in ax.
+    Used only for visualisation inside _arc_ncc_interactive.
+    """
+    from scipy.signal import fftconvolve
+
+    template = np.nan_to_num(ref_img[y0:y1, x0:x1], nan=0.0).copy()
+    tmpl_h, tmpl_w = template.shape
+    ref_cx = (x0 + x1) / 2.0
+    ref_cy = (y0 + y1) / 2.0
+
+    if seed_xy is not None:
+        pred_tx, pred_ty = float(seed_xy[0]), float(seed_xy[1])
+    else:
+        try:
+            sky = ref_frame.wcs.all_pix2world([[ref_cx, ref_cy]], 0)
+            ra, dec = float(sky[0, 0]), float(sky[0, 1])
+            pred = tgt_frame.wcs.all_world2pix([[ra, dec]], 0)
+            pred_tx, pred_ty = float(pred[0, 0]), float(pred[0, 1])
+        except Exception:
+            t_ny, t_nx = tgt_img.shape
+            pred_tx, pred_ty = t_nx / 2.0, t_ny / 2.0
+
+    ref_scale = _estimate_pixel_scale_arcsec(ref_frame, ref_img)
+    tgt_scale = _estimate_pixel_scale_arcsec(tgt_frame, tgt_img)
+    zoom_factor = tgt_scale / ref_scale if ref_scale > 0 else 1.0
+    search_px   = max(5, int(np.ceil(search_radius / tgt_scale)))
+
+    t_ny, t_nx = tgt_img.shape
+    half_w = (tmpl_w / zoom_factor) / 2.0 + search_px
+    half_h = (tmpl_h / zoom_factor) / 2.0 + search_px
+    sx0 = max(0, int(np.floor(pred_tx - half_w)))
+    sx1 = min(t_nx, int(np.ceil(pred_tx + half_w)))
+    sy0 = max(0, int(np.floor(pred_ty - half_h)))
+    sy1 = min(t_ny, int(np.ceil(pred_ty + half_h)))
+
+    search_raw = np.nan_to_num(tgt_img[sy0:sy1, sx0:sx1], nan=0.0).copy()
+
+    if abs(zoom_factor - 1.0) > 0.05:
+        from scipy.ndimage import zoom as _zoom
+        search_img = _zoom(search_raw, zoom_factor, order=3)
+    else:
+        search_img = search_raw
+        zoom_factor = 1.0
+
+    if use_LoG:
+        sigma = LoG_sigma if LoG_sigma > 0 else 1.5
+        template   = _apply_log(template,   sigma)
+        search_img = _apply_log(search_img, sigma)
+
+    def _sub_bg(arr):
+        fin = arr[np.isfinite(arr)].ravel()
+        if len(fin) == 0:
+            return arr
+        bg, _ = _bg_stats(fin, bg_method)
+        return arr - bg
+
+    template   = _sub_bg(template)
+    search_img = _sub_bg(search_img)
+
+    tmpl_std = template.std()
+    if tmpl_std < 1e-10:
+        return
+    tmpl_norm = template / (tmpl_std * template.size)
+    ncc = fftconvolve(search_img, tmpl_norm[::-1, ::-1], mode='valid')
+    search_std = search_img.std()
+    if search_std > 1e-10:
+        ncc = ncc / search_std
+
+    if ncc.size == 0:
+        return
+
+    peak_row, peak_col = _ncc_subpixel_peak(ncc)
+
+    ax.cla()
+    im = ax.imshow(ncc, origin='lower', cmap='hot', interpolation='nearest')
+    ax.plot(peak_col, peak_row, 'c+', ms=14, mew=2)
+    ax.set_title(f'NCC surface  (peak={ncc.max():.3f})')
+    ax.set_xlabel('Δx (px in search)')
+    ax.set_ylabel('Δy (px in search)')
+    try:
+        plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    except Exception:
+        pass
+
+
+def _arc_ncc(aligner,
+             box_ref,
+             search_radius: float = 5.0,
+             use_LoG: bool = False,
+             LoG_sigma: float = 0.0,
+             bg_method: str = 'mad',
+             _seed_xy=None):
+    """
+    Align two IFU images by NCC template matching on a user-selected region.
+
+    The user specifies a bounding box in the reference image that contains a
+    compact feature common to both observations (a bright arc knot, an emission
+    peak, a foreground star).  The function extracts that cutout as a template,
+    builds a search region in the target centred on the WCS-predicted position,
+    optionally reprojects to a common pixel scale, and finds the shift that
+    maximises the Normalised Cross-Correlation (NCC) between the two cutouts.
+    A single pair is stored in ``aligner.pairs``.
+
+    Unlike the ``cross_corr`` strategy, this requires *no* point-source
+    detection — it works directly on extended emission.
+
+    Parameters
+    ----------
+    box_ref : (x0, y0, x1, y1)
+        Bounding box in **reference** pixel coordinates (floats are rounded).
+        Can be given in any corner order; will be sorted internally.
+    search_radius : float
+        Half-width of the search region around the WCS-predicted target
+        position, in arcsec.  Default 5.0".  Increase if the WCS offset is
+        known to be large.
+    use_LoG : bool
+        Apply a Laplacian-of-Gaussian (LoG) filter to both cutouts before
+        computing the NCC.  Suppresses seeing halos and broad backgrounds;
+        useful when the two datasets have noticeably different seeing.
+        Default False.
+    LoG_sigma : float
+        LoG smoothing scale in pixels.  0 (default) → auto set to 1.5 px.
+    bg_method : str
+        Background estimator: ``'mad'`` (default, robust) or
+        ``'sigma_clip'``.
+
+    Notes
+    -----
+    * If the two frames have pixel scales that differ by more than 5 %, the
+      target search region is resampled to the reference pixel scale before
+      NCC so that the template and search image are in the same pixel units.
+    * The NCC peak is refined to sub-pixel precision by 1-D parabolic
+      interpolation along each axis.
+    * Only one pair is produced, representing the centre of the selected box
+      matched to its best-fit position in the target.  Pass this to
+      ``aligner.compute_offset()`` (translation) or combine with additional
+      pairs from other strategies for a full WCS solution.
+
+    Examples
+    --------
+    >>> aligner.find_sources(strategy='arc_ncc',
+    ...                      box_ref=(45, 30, 75, 60),
+    ...                      search_radius=8.0,
+    ...                      use_LoG=True)
+    """
+    from scipy.signal import fftconvolve
+
+    ref = aligner.reference
+    tgt = aligner.targets[0]
+    ref_img = ref.image2d
+    tgt_img = tgt.image2d
+    if ref_img is None or tgt_img is None:
+        raise RuntimeError(
+            "Call preprocess() before find_sources(strategy='arc_ncc').")
+
+    # --- Parse and clamp bounding box ---
+    x0, y0, x1, y1 = [int(round(v)) for v in box_ref]
+    x0, x1 = sorted([x0, x1])
+    y0, y1 = sorted([y0, y1])
+    r_ny, r_nx = ref_img.shape
+    x0 = max(0, x0);  x1 = min(r_nx, x1)
+    y0 = max(0, y0);  y1 = min(r_ny, y1)
+    if x1 - x0 < 3 or y1 - y0 < 3:
+        raise ValueError(
+            f"box_ref ({x0},{y0})→({x1},{y1}) is too small (< 3 px on a side).")
+
+    template = np.nan_to_num(ref_img[y0:y1, x0:x1], nan=0.0).copy()
+    tmpl_h, tmpl_w = template.shape
+
+    # --- Reference box centre → sky ---
+    ref_cx = (x0 + x1) / 2.0
+    ref_cy = (y0 + y1) / 2.0
+    sky = ref.wcs.all_pix2world([[ref_cx, ref_cy]], 0)
+    ra, dec = float(sky[0, 0]), float(sky[0, 1])
+
+    # --- Search centre in target: manual seed overrides WCS prediction ---
+    if _seed_xy is not None:
+        pred_tx, pred_ty = float(_seed_xy[0]), float(_seed_xy[1])
+        print(f"[rb_align] arc_ncc: using manual seed "
+              f"({pred_tx:.1f}, {pred_ty:.1f}) as search centre.")
+    else:
+        try:
+            pred = tgt.wcs.all_world2pix([[ra, dec]], 0)
+            pred_tx, pred_ty = float(pred[0, 0]), float(pred[0, 1])
+        except Exception:
+            t_ny0, t_nx0 = tgt_img.shape
+            pred_tx, pred_ty = t_nx0 / 2.0, t_ny0 / 2.0
+            print("[rb_align] arc_ncc: WCS projection failed; "
+                  "centring search on target image centre.")
+
+    # --- Pixel scales (arcsec/px) ---
+    ref_scale = _estimate_pixel_scale_arcsec(ref, ref_img)
+    tgt_scale = _estimate_pixel_scale_arcsec(tgt, tgt_img)
+
+    # zoom_factor: rescale target → reference pixel scale
+    # zoom > 1 if target pixels are larger (coarser) than reference
+    zoom_factor = tgt_scale / ref_scale if ref_scale > 0 else 1.0
+
+    # search_radius in original target pixels
+    search_px = max(5, int(np.ceil(search_radius / tgt_scale)))
+
+    t_ny, t_nx = tgt_img.shape
+
+    # --- Extract search region from target (original pixel coords) ---
+    # After zoom_factor rescaling, the template occupies (tmpl_h, tmpl_w) pixels.
+    # We need the rescaled search image to be at least (tmpl + 2*search_px) on
+    # each side, which in original target pixels is (tmpl/zoom + 2*search_px).
+    half_w_tgt = (tmpl_w / zoom_factor) / 2.0 + search_px
+    half_h_tgt = (tmpl_h / zoom_factor) / 2.0 + search_px
+
+    sx0 = max(0, int(np.floor(pred_tx - half_w_tgt)))
+    sx1 = min(t_nx, int(np.ceil(pred_tx  + half_w_tgt)))
+    sy0 = max(0, int(np.floor(pred_ty - half_h_tgt)))
+    sy1 = min(t_ny, int(np.ceil(pred_ty  + half_h_tgt)))
+
+    if sx1 - sx0 < 3 or sy1 - sy0 < 3:
+        raise RuntimeError(
+            "Target search region is entirely outside the image. "
+            "Check WCS headers or increase search_radius.")
+
+    search_raw = np.nan_to_num(tgt_img[sy0:sy1, sx0:sx1], nan=0.0).copy()
+
+    # --- Resample target cutout to reference pixel scale if needed ---
+    if abs(zoom_factor - 1.0) > 0.05:
+        from scipy.ndimage import zoom as _zoom
+        search_img = _zoom(search_raw, zoom_factor, order=3)
+        _rescaled = True
+        print(f"[rb_align] arc_ncc: resampling target cutout "
+              f"(tgt {tgt_scale:.3f}\"/px → ref {ref_scale:.3f}\"/px, "
+              f"zoom={zoom_factor:.3f})")
+    else:
+        search_img = search_raw
+        zoom_factor = 1.0
+        _rescaled = False
+
+    sh, sw = search_img.shape
+    if sh < tmpl_h or sw < tmpl_w:
+        raise RuntimeError(
+            f"Rescaled search region ({sw}×{sh} px) is smaller than the "
+            f"template ({tmpl_w}×{tmpl_h} px). Increase search_radius.")
+
+    # --- Optional LoG preprocessing ---
+    if use_LoG:
+        sigma = LoG_sigma if LoG_sigma > 0 else 1.5
+        template   = _apply_log(template,   sigma)
+        search_img = _apply_log(search_img, sigma)
+        print(f"[rb_align] arc_ncc: LoG preprocessing (sigma={sigma:.1f} px)")
+
+    # --- Background subtraction ---
+    def _sub_bg(arr):
+        fin = arr[np.isfinite(arr)].ravel()
+        if len(fin) == 0:
+            return arr
+        bg, _ = _bg_stats(fin, bg_method)
+        return arr - bg
+
+    template   = _sub_bg(template)
+    search_img = _sub_bg(search_img)
+
+    # --- Normalised Cross-Correlation via FFT (valid mode = template matching) ---
+    # valid mode: only positions where template fully overlaps the search image
+    # NCC output shape = (sh - tmpl_h + 1, sw - tmpl_w + 1)
+    tmpl_std = template.std()
+    if tmpl_std < 1e-10:
+        raise RuntimeError(
+            "Reference cutout has no variance — "
+            "choose a box that contains signal.")
+    tmpl_norm = template / (tmpl_std * template.size)
+
+    ncc = fftconvolve(search_img, tmpl_norm[::-1, ::-1], mode='valid')
+
+    if ncc.size == 0:
+        raise RuntimeError(
+            "NCC surface is empty — search region is too small for the template. "
+            "Reduce box_ref size or increase search_radius.")
+
+    search_std = search_img.std()
+    if search_std > 1e-10:
+        ncc = ncc / search_std
+
+    # --- Sub-pixel peak location ---
+    peak_row, peak_col = _ncc_subpixel_peak(ncc)
+    peak_val = float(ncc[int(round(peak_row)), int(round(peak_col))])
+
+    # --- Convert NCC peak → original target pixel coordinates ---
+    # Position (r, c) in the valid NCC output means the template top-left corner
+    # is at (r, c) in the (rescaled) search_img.
+    # Template centre in rescaled search coords:
+    cx_rescaled = peak_col + tmpl_w / 2.0
+    cy_rescaled = peak_row + tmpl_h / 2.0
+
+    # Map from rescaled search coords back to original target pixels:
+    # rescaled pixel j → original target pixel sx0 + j / zoom_factor
+    tgt_cx = sx0 + cx_rescaled / zoom_factor
+    tgt_cy = sy0 + cy_rescaled / zoom_factor
+    tgt_cx = float(np.clip(tgt_cx, 0, t_nx - 1))
+    tgt_cy = float(np.clip(tgt_cy, 0, t_ny - 1))
+
+    shift_dx    = tgt_cx - pred_tx
+    shift_dy    = tgt_cy - pred_ty
+    shift_arcsec = np.sqrt((shift_dx * tgt_scale) ** 2 +
+                           (shift_dy * tgt_scale) ** 2)
+
+    print(f"[rb_align] arc_ncc: NCC peak = {peak_val:.4f} | "
+          f"WCS pred = ({pred_tx:.1f}, {pred_ty:.1f}) px | "
+          f"NCC found = ({tgt_cx:.2f}, {tgt_cy:.2f}) px | "
+          f"shift = ({shift_dx:+.2f}, {shift_dy:+.2f}) px "
+          f"= {shift_arcsec:.2f}\"")
+
+    aligner.pairs.clear()
+    aligner.pairs.append((ref_cx, ref_cy, ra, dec, tgt_cx, tgt_cy))
+
+
+# ---------------------------------------------------------------------------
 # Auto cascade
 # ---------------------------------------------------------------------------
 
@@ -1278,7 +1942,12 @@ def _run_strategy(aligner,
                   radius_deg: float = 0.5,
                   max_stars: int = 50,
                   # batch options
-                  headless: bool = False):
+                  headless: bool = False,
+                  # arc_ncc options
+                  box_ref=None,
+                  search_radius: float = 5.0,
+                  use_LoG: bool = False,
+                  LoG_sigma: float = 0.0):
     """Dispatch to the selected source detection strategy."""
 
     strategy = strategy.lower()
@@ -1311,6 +1980,18 @@ def _run_strategy(aligner,
         if save_catalog is not None:
             _save_pairs_catalog(aligner.pairs, save_catalog)
 
+    elif strategy == 'arc_ncc':
+        if box_ref is None:
+            # No box given → open interactive draw-and-match window
+            _arc_ncc_interactive(aligner, search_radius=search_radius,
+                                 use_LoG=use_LoG, LoG_sigma=LoG_sigma,
+                                 bg_method=bg_method, stretch=stretch)
+        else:
+            _arc_ncc(aligner, box_ref=box_ref, search_radius=search_radius,
+                     use_LoG=use_LoG, LoG_sigma=LoG_sigma, bg_method=bg_method)
+        if save_catalog is not None:
+            _save_pairs_catalog(aligner.pairs, save_catalog)
+
     elif strategy == 'batch':
         if catalog is None:
             raise ValueError("strategy='batch' requires catalog='path/to/catalog.fits'.")
@@ -1325,7 +2006,7 @@ def _run_strategy(aligner,
     else:
         raise ValueError(
             f"Unknown strategy '{strategy}'. Choose from: "
-            "interactive, gaia, dao, knots, cross_corr, batch, auto."
+            "interactive, gaia, dao, knots, cross_corr, arc_ncc, batch, auto."
         )
 
     print(f"[rb_align] find_sources('{strategy}'): "

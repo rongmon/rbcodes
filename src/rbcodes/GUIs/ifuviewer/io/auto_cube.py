@@ -247,9 +247,27 @@ def _make_2d_wcs(header):
     Build a 2D spatial astropy WCS from a 3D cube header.
     Uses naxis=2 to read only the first two (spatial) axes directly,
     avoiding the WCS-axis-count mismatch warning.
+
+    Falls back to manually constructing a WCS from scalar CRPIX/CRVAL/CDELT
+    keywords when the header uses a mixed CD/CDELT convention that confuses
+    wcslib (e.g. CDELT1/2 for spatial + CD3_3 for wavelength, no CD1_1 etc.).
     """
     try:
         wcs2d = WCS(header, naxis=2)
         return wcs2d
+    except Exception:
+        pass
+    # Fallback: build a clean 2D WCS from individual header keywords
+    try:
+        w = WCS(naxis=2)
+        w.wcs.crpix = [header['CRPIX1'], header['CRPIX2']]
+        w.wcs.crval = [header['CRVAL1'], header['CRVAL2']]
+        w.wcs.cdelt = [header['CDELT1'], header['CDELT2']]
+        w.wcs.ctype = [header.get('CTYPE1', 'RA---TAN'),
+                       header.get('CTYPE2', 'DEC--TAN')]
+        if 'CROTA2' in header:
+            w.wcs.crota = [0.0, header['CROTA2']]
+        w.wcs.set()
+        return w
     except Exception:
         return None

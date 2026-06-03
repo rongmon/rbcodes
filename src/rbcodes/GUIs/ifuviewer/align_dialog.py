@@ -179,6 +179,44 @@ class StrategyOptionsDialog(QDialog):
                      "Maximum number of Gaia stars to match (brightest first).")
             self._widgets['max_stars'] = w
 
+        elif strategy == 'arc_ncc':
+            w = QDoubleSpinBox()
+            w.setRange(0.5, 60.0)
+            w.setDecimals(1)
+            w.setSuffix(" \"")
+            w.setValue(current_opts.get('search_radius', 5.0))
+            _add_row("Search radius:", w,
+                     "Half-width in arcsec to search around the WCS-predicted\n"
+                     "target position.  Increase if the WCS offset is large.")
+            self._widgets['search_radius'] = w
+
+            from PyQt5.QtWidgets import QCheckBox
+            w = QCheckBox()
+            w.setChecked(current_opts.get('use_LoG', False))
+            _add_row("Use LoG filter:", w,
+                     "Apply a Laplacian-of-Gaussian filter before NCC.\n"
+                     "Suppresses seeing halos; useful when the two datasets\n"
+                     "have noticeably different seeing.")
+            self._widgets['use_LoG'] = w
+
+            w = QDoubleSpinBox()
+            w.setRange(0.0, 20.0)
+            w.setDecimals(1)
+            w.setSuffix(" px")
+            w.setValue(current_opts.get('LoG_sigma', 0.0))
+            _add_row("LoG sigma:", w,
+                     "Gaussian scale for LoG in pixels.\n"
+                     "0 = auto (1.5 px).  Match to expected knot size.")
+            self._widgets['LoG_sigma'] = w
+
+            w = QComboBox()
+            w.addItems(['mad', 'sigma_clip'])
+            w.setCurrentText(current_opts.get('bg_method', 'mad'))
+            _add_row("BG estimator:", w,
+                     "mad        — median absolute deviation (default, robust).\n"
+                     "sigma_clip — iterative sigma-clipped std.")
+            self._widgets['bg_method'] = w
+
         # OK / Cancel
         btn_row = QHBoxLayout()
         btn_row.addStretch()
@@ -192,10 +230,13 @@ class StrategyOptionsDialog(QDialog):
         layout.addLayout(btn_row)
 
     def get_options(self) -> dict:
+        from PyQt5.QtWidgets import QCheckBox
         result = {}
         for key, w in self._widgets.items():
             if isinstance(w, QComboBox):
                 result[key] = w.currentText()
+            elif isinstance(w, QCheckBox):
+                result[key] = w.isChecked()
             else:
                 result[key] = w.value()
         return result
@@ -261,9 +302,17 @@ class AlignDialog(QDialog):
             'knots':      dict(threshold_sigma=2.0, max_knots=10,
                                bg_method='sigma_clip'),
             'gaia':       dict(radius_deg=0.5, max_stars=50),
+            'arc_ncc':    dict(search_radius=5.0, use_LoG=False,
+                               LoG_sigma=0.0, bg_method='mad'),
             'interactive': {},
             'batch':       {},
         }
+
+        # arc_ncc drag state
+        self._arc_ncc_press_xy  = None   # (x, y) where drag started on reference
+        self._arc_ncc_rect      = None   # rubber-band Rectangle on reference panel
+        self._arc_ncc_tgt_rect  = None   # result box on target panel
+        self._arc_ncc_tgt_cross = None   # result cross on target panel
 
         # Pending click state
         self._pending_ref_xy   = None
@@ -483,6 +532,7 @@ class AlignDialog(QDialog):
         self._strategy_combo = QComboBox()
         self._strategy_combo.addItems([
             'interactive',
+            'arc_ncc',
             'cross_corr',
             'dao',
             'knots',
@@ -491,6 +541,8 @@ class AlignDialog(QDialog):
         ])
         self._strategy_combo.setToolTip(
             "interactive — click pairs manually (always works)\n"
+            "arc_ncc     — NCC template matching on a user-drawn box;\n"
+            "              best for extended arcs/lensed sources with different seeing\n"
             "cross_corr  — cross-correlation shift; best for same-instrument "
             "IFU↔IFU with similar PSF\n"
             "dao         — DAOStarFinder point-source detection (photutils)\n"
@@ -560,9 +612,11 @@ class AlignDialog(QDialog):
         self._ref_canvas = FigureCanvasQTAgg(self._ref_fig)
         self._ref_canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._ref_toolbar = NavToolbar(self._ref_canvas, self)
-        self._ref_canvas.mpl_connect('button_press_event', self._on_ref_click)
-        self._ref_canvas.mpl_connect('button_press_event', self._on_right_click_delete)
-        self._ref_canvas.mpl_connect('button_press_event', self._on_double_click)
+        self._ref_canvas.mpl_connect('button_press_event',   self._on_ref_click)
+        self._ref_canvas.mpl_connect('button_press_event',   self._on_right_click_delete)
+        self._ref_canvas.mpl_connect('button_press_event',   self._on_double_click)
+        self._ref_canvas.mpl_connect('button_release_event', self._on_ref_release)
+        self._ref_canvas.mpl_connect('motion_notify_event',  self._on_ref_motion)
         _connect_scroll_zoom(self._ref_ax, self._ref_canvas)
         ref_vbox.addWidget(self._ref_toolbar)
         ref_vbox.addWidget(self._ref_canvas)
@@ -814,13 +868,23 @@ class AlignDialog(QDialog):
 
     def _on_strategy_changed(self, strategy: str):
         is_interactive = (strategy == 'interactive')
-        is_batch = (strategy == 'batch')
+        is_batch       = (strategy == 'batch')
+        is_arc_ncc     = (strategy == 'arc_ncc')
         self._set_catalog_visible(is_batch)
         # Options button: no settings for interactive or batch
         self._strat_opts_btn.setEnabled(strategy not in ('interactive', 'batch'))
-        # Find Sources makes no sense for interactive — clicks drive that
         ref_loaded = hasattr(self, '_ref_frame')
         self._find_btn.setEnabled(not is_interactive and ref_loaded)
+        # arc_ncc uses drag-to-draw on the reference panel
+        if is_arc_ncc:
+            self._find_btn.setText("Draw NCC box…")
+        else:
+            self._find_btn.setText("Find Sources")
+        # Exit arc_ncc draw mode if user switches strategy
+        if not is_arc_ncc and self._state == 'ARC_NCC':
+            self._exit_arc_ncc_mode()
+            self._state = 'IDLE'
+            self._update_state_label()
 
     def _on_strategy_options(self):
         strategy = self._strategy_combo.currentText()
@@ -848,6 +912,13 @@ class AlignDialog(QDialog):
         strategy = self._strategy_combo.currentText()
         if strategy == 'interactive':
             return   # handled by click state machine
+
+        # arc_ncc: enter draw mode — user drags a box on the reference panel
+        if strategy == 'arc_ncc':
+            self._exit_arc_ncc_mode()
+            self._state = 'ARC_NCC'
+            self._update_state_label()
+            return
 
         # Batch requires a catalog
         if strategy == 'batch' and not self._catalog_path:
@@ -1133,6 +1204,143 @@ class AlignDialog(QDialog):
         self._align_btn.setEnabled(n > 0)
         self._update_info_label()
 
+    # ------------------------------------------------------------------
+    # arc_ncc drag helpers
+    # ------------------------------------------------------------------
+
+    def _exit_arc_ncc_mode(self):
+        """Remove any arc_ncc rubber-band and result artists."""
+        for attr, canvas in (
+            ('_arc_ncc_rect',      self._ref_canvas),
+            ('_arc_ncc_tgt_rect',  self._tgt_canvas),
+            ('_arc_ncc_tgt_cross', self._tgt_canvas),
+        ):
+            art = getattr(self, attr)
+            if art is not None:
+                try:
+                    art.remove()
+                except Exception:
+                    pass
+                setattr(self, attr, None)
+        self._arc_ncc_press_xy = None
+        self._ref_canvas.draw_idle()
+        self._tgt_canvas.draw_idle()
+
+    def _on_ref_motion(self, event):
+        """Update rubber-band rectangle while dragging in ARC_NCC mode."""
+        if self._state != 'ARC_NCC':
+            return
+        if self._arc_ncc_press_xy is None:
+            return
+        if event.inaxes is not self._ref_ax or event.xdata is None:
+            return
+        x0, y0 = self._arc_ncc_press_xy
+        x1, y1 = event.xdata, event.ydata
+        if self._arc_ncc_rect is not None:
+            try:
+                self._arc_ncc_rect.remove()
+            except Exception:
+                pass
+        import matplotlib.patches as mpatches
+        bx0, bx1 = sorted([x0, x1])
+        by0, by1 = sorted([y0, y1])
+        self._arc_ncc_rect = mpatches.Rectangle(
+            (bx0, by0), bx1 - bx0, by1 - by0,
+            edgecolor='cyan', facecolor='none', linewidth=1.5,
+            linestyle='--', zorder=9)
+        self._ref_ax.add_patch(self._arc_ncc_rect)
+        self._ref_canvas.draw_idle()
+
+    def _on_ref_release(self, event):
+        """On mouse release in ARC_NCC mode: run NCC with the drawn box."""
+        if self._state != 'ARC_NCC':
+            return
+        if self._arc_ncc_press_xy is None:
+            return
+        if event.button != 1:
+            return
+        if event.xdata is None or event.ydata is None:
+            return
+
+        x0, y0 = self._arc_ncc_press_xy
+        x1, y1 = event.xdata, event.ydata
+        self._arc_ncc_press_xy = None
+
+        bx0, bx1 = sorted([int(round(x0)), int(round(x1))])
+        by0, by1 = sorted([int(round(y0)), int(round(y1))])
+
+        if bx1 - bx0 < 3 or by1 - by0 < 3:
+            self._state_label.setText("Box too small — try again.")
+            return
+
+        # Remove old result artists (keep the ref box — already drawn as rubber-band)
+        for attr, canvas in (
+            ('_arc_ncc_tgt_rect',  self._tgt_canvas),
+            ('_arc_ncc_tgt_cross', self._tgt_canvas),
+        ):
+            art = getattr(self, attr)
+            if art is not None:
+                try:
+                    art.remove()
+                except Exception:
+                    pass
+                setattr(self, attr, None)
+
+        opts = self._strategy_opts.get('arc_ncc', {})
+        try:
+            from rbcodes.rb_align.sources import _arc_ncc
+            _arc_ncc(self._aligner,
+                     box_ref=(bx0, by0, bx1, by1),
+                     search_radius=opts.get('search_radius', 5.0),
+                     use_LoG=opts.get('use_LoG', False),
+                     LoG_sigma=opts.get('LoG_sigma', 0.0),
+                     bg_method=opts.get('bg_method', 'mad'))
+        except Exception as e:
+            self._state_label.setText(f"arc_ncc failed: {e}")
+            return
+
+        if not self._aligner.pairs:
+            self._state_label.setText("NCC produced no result — try a different region.")
+            return
+
+        _, _, _, _, tgt_cx, tgt_cy = self._aligner.pairs[-1]
+        box_w = bx1 - bx0
+        box_h = by1 - by0
+
+        import matplotlib.patches as mpatches
+        tgt_rect = mpatches.Rectangle(
+            (tgt_cx - box_w / 2.0, tgt_cy - box_h / 2.0), box_w, box_h,
+            edgecolor='cyan', facecolor='none', linewidth=1.5,
+            linestyle='--', zorder=9)
+        self._tgt_ax.add_patch(tgt_rect)
+        self._arc_ncc_tgt_rect = tgt_rect
+
+        cross, = self._tgt_ax.plot(tgt_cx, tgt_cy, 'r+',
+                                    markersize=14, mew=2, zorder=10)
+        self._arc_ncc_tgt_cross = cross
+
+        from rbcodes.rb_align.sources import _estimate_pixel_scale_arcsec
+        tgt_scale = _estimate_pixel_scale_arcsec(
+            self._aligner.targets[0], self._aligner.targets[0].image2d)
+        try:
+            ra, dec = self._aligner.pairs[-1][2], self._aligner.pairs[-1][3]
+            pred = self._aligner.targets[0].wcs.all_world2pix([[ra, dec]], 0)
+            shift_dx = tgt_cx - float(pred[0, 0])
+            shift_dy = tgt_cy - float(pred[0, 1])
+        except Exception:
+            shift_dx = shift_dy = 0.0
+        shift_as = np.sqrt((shift_dx * tgt_scale)**2 + (shift_dy * tgt_scale)**2)
+
+        self._tgt_canvas.draw_idle()
+        self._undo_btn.setEnabled(True)
+        self._clear_btn.setEnabled(True)
+        self._save_catalog_btn.setEnabled(True)
+        self._align_btn.setEnabled(True)
+        self._state_label.setText(
+            f"arc_ncc: shift = ({shift_dx:+.2f}, {shift_dy:+.2f}) px"
+            f" = {shift_as:.2f}\"  |  Draw another box to add a second pair,"
+            f" or click Align.")
+
     def _on_ref_click(self, event):
         if self._toolbar_active(self._ref_toolbar):
             return
@@ -1142,6 +1350,11 @@ class AlignDialog(QDialog):
             return
         if event.dblclick:
             return   # handled by _on_double_click
+        # In ARC_NCC mode, record drag start; actual work done in _on_ref_release
+        if self._state == 'ARC_NCC':
+            if event.xdata is not None and event.ydata is not None:
+                self._arc_ncc_press_xy = (event.xdata, event.ydata)
+            return
         if self._state != 'IDLE':
             return
         if self._aligner is None:
@@ -1388,6 +1601,12 @@ class AlignDialog(QDialog):
         self._pending_ref_xy   = None
         self._pending_tgt_pred = None
 
+        # Clean up arc_ncc artists
+        self._exit_arc_ncc_mode()
+        if self._state == 'ARC_NCC':
+            self._state = 'IDLE'
+            self._update_state_label()
+
     def _redraw_all_markers(self):
         """Redraw confirmed-pair markers.
         Pairs in edit mode show a numbered cyan circle on the target instead of red cross."""
@@ -1600,6 +1819,9 @@ class AlignDialog(QDialog):
             'PENDING': (f"Source {n_pending} pending — "
                         f"left-click on the target panel to confirm.  "
                         f"Right-click to cancel."),
+            'ARC_NCC': ("arc_ncc mode — click-drag on the reference panel to draw a box"
+                        " around a feature.  NCC runs on release.  "
+                        "Draw another box to add a second pair."),
         }
         self._state_label.setText(msgs.get(self._state, ""))
 
