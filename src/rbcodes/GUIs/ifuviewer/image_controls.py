@@ -213,17 +213,17 @@ class ImageControls(QWidget):
         )
 
     def _on_scale_changed(self, idx):
-        if self._updating or self._canvas._data_raw is None:
+        if self._updating or self._data_initial is None:
             return
-        scaled = _apply_scale(self._canvas._data_raw, idx)
+        scaled = _apply_scale(self._data_initial, idx)
         self._canvas.update_data(scaled)
         self._apply_norm(scaled)
 
     def _on_norm_changed(self, idx):
-        if self._updating or self._canvas._data_raw is None:
+        if self._updating or self._data_initial is None:
             return
-        # Use the stored raw data, not get_array() which returns a MaskedArray
-        scaled = _apply_scale(self._canvas._data_raw,
+        # Always apply scale to the original raw data, not the already-scaled display data
+        scaled = _apply_scale(self._data_initial,
                               self._scale_box.currentIndex())
         self._apply_norm(scaled, norm_idx=idx)
 
@@ -252,7 +252,6 @@ class ImageControls(QWidget):
         """Restore Linear / ZScale / gray and redisplay original data."""
         if self._data_initial is None:
             return
-        self._canvas._data_raw = self._data_initial
         self._canvas.update_data(self._data_initial)
         self._apply_defaults(self._data_initial)
 
@@ -314,8 +313,9 @@ def _apply_scale(data, scale_idx):
     if scale_idx == 0:
         return d
     elif scale_idx == 1:     # Log
-        offset = max(0, -np.nanmin(d)) + 1e-10
-        return np.log10(d + offset)
+        d[d <= 0] = 1e-99
+        with np.errstate(divide='ignore', invalid='ignore'):
+            return np.log10(d)
     elif scale_idx == 2:     # Sqrt
         out = np.empty_like(d)
         pos = d >= 0
