@@ -77,6 +77,59 @@ def moment2(flux, wave, wmin, wmax, lambda_rest):
         return np.where(m0 > 0, np.sqrt(np.abs(m2 / m0)), np.nan)
 
 
+def sky_stats(flux, wave, sky_mask, wmin=None, wmax=None):
+    """
+    Compute background statistics for the sky region.
+
+    General stats (mean, median, sigma) are always computed over ALL channels.
+    If wmin/wmax are given, also compute the integrated moment-0 noise
+    (sigma_m0) and channel count (n_channels) for that window.
+
+    Parameters
+    ----------
+    flux     : ndarray (n_wave, ny, nx)
+    wave     : ndarray (n_wave,)
+    sky_mask : ndarray (ny, nx) bool
+    wmin, wmax : float or None
+
+    Returns
+    -------
+    dict with keys:
+        n_spaxels  — number of sky spaxels
+        mean       — mean flux across all sky spaxels and channels
+        median     — median flux across all sky spaxels and channels
+        sigma      — median per-channel RMS (representative noise per channel)
+        sigma_m0   — integrated M0 noise over [wmin,wmax] (only if wmin/wmax given)
+        n_channels — number of channels in [wmin,wmax]  (only if wmin/wmax given)
+    Returns None if sky_mask has no True pixels.
+    """
+    n_spaxels = int(sky_mask.sum())
+    if n_spaxels == 0:
+        return None
+
+    sky_flux_all = flux[:, sky_mask]   # (n_wave, N_sky) — all channels
+    with np.errstate(all='ignore'):
+        mean       = float(np.nanmean(sky_flux_all))
+        median     = float(np.nanmedian(sky_flux_all))
+        rms_all    = np.nanstd(sky_flux_all, axis=1)   # (n_wave,)
+        sigma      = float(np.nanmedian(rms_all))
+
+    result = dict(n_spaxels=n_spaxels, mean=mean, median=median, sigma=sigma)
+
+    if wmin is not None and wmax is not None:
+        ch_mask = (wave >= wmin) & (wave <= wmax)
+        if ch_mask.any():
+            dw          = np.gradient(wave[ch_mask])
+            sky_flux_w  = flux[ch_mask][:, sky_mask]   # (N_ch, N_sky)
+            with np.errstate(all='ignore'):
+                rms_per_ch = np.nanstd(sky_flux_w, axis=1)   # (N_ch,)
+                sigma_m0   = float(np.sqrt(np.nansum((rms_per_ch * dw) ** 2)))
+            result['sigma_m0']   = sigma_m0
+            result['n_channels'] = int(ch_mask.sum())
+
+    return result
+
+
 def compute_snr_map(m0, flux, wave, wmin, wmax,
                     var=None, sky_mask=None, cont1=None, cont2=None):
     """

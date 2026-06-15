@@ -27,7 +27,7 @@ from rbcodes.GUIs.ifuviewer.io.image2d import FITSImage
 from rbcodes.GUIs.ifuviewer.processing.cube_collapse import (
     build_whitelight, build_narrowband, build_continuum_sub)
 from rbcodes.GUIs.ifuviewer.processing.moment_maps import (
-    moment_map, subtract_linear_continuum, compute_snr_map)
+    moment_map, subtract_linear_continuum, compute_snr_map, sky_stats)
 from rbcodes.GUIs.ifuviewer.processing.aperture_extract import (
     extract_aperture, extract_variance_weighted,
     extract_with_method, subtract_background,
@@ -51,6 +51,7 @@ class MainWindow(QMainWindow):
         self._dataset_states       = {}   # id(cube) → saved per-dataset state
         self._sky_mask             = None  # 2-D bool array — sky region for SNR
         self._sky_rect             = None  # (x1, y1, x2, y2) pixel bounds
+        self._last_moment_window   = None  # (wmin, wmax) of last computed moment map
         self._ds9_bridge           = None  # DS9Bridge, created on connect
         self._ds9_frame_queue      = []   # list of (label, data2d, header, frame_no)
 
@@ -308,6 +309,12 @@ class MainWindow(QMainWindow):
         clear_sky_action = QAction("Clear Sky Region", self)
         clear_sky_action.triggered.connect(self._on_clear_sky_region)
         analysis_menu.addAction(clear_sky_action)
+
+        sky_stats_action = QAction("Sky Region Statistics…", self)
+        sky_stats_action.setToolTip(
+            "Show background statistics for the current sky region.")
+        sky_stats_action.triggered.connect(self._on_sky_stats)
+        analysis_menu.addAction(sky_stats_action)
 
         analysis_menu.addSeparator()
 
@@ -1066,9 +1073,16 @@ class MainWindow(QMainWindow):
         self._sky_mask = mask
         self._sky_rect = rect
         self._image_canvas.draw_sky_region(x1, y1, x2, y2)
-        self.statusBar().showMessage(
-            f"Sky region set: x=[{x1},{x2}) y=[{y1},{y2})  "
-            f"({mask.sum()} spaxels)", 5000)
+        stats = sky_stats(cube.flux, cube.wave, mask)
+        if stats:
+            self.statusBar().showMessage(
+                f"Sky region set: N={stats['n_spaxels']} spaxels  "
+                f"median={stats['median']:.4g}  "
+                f"mean={stats['mean']:.4g}  "
+                f"σ={stats['sigma']:.4g}", 8000)
+        else:
+            self.statusBar().showMessage(
+                f"Sky region set: x=[{x1},{x2}) y=[{y1},{y2})", 5000)
 
     def _on_clear_sky_region(self):
         """Remove the sky region."""
@@ -1076,6 +1090,60 @@ class MainWindow(QMainWindow):
         self._sky_rect = None
         self._image_canvas.clear_sky_region()
         self.statusBar().showMessage("Sky region cleared.", 3000)
+
+    def _on_sky_stats(self):
+        """Show a popup with background statistics for the current sky region."""
+        if self._sky_mask is None:
+            QMessageBox.information(self, "No sky region",
+                                    "Set a sky region on the image first.")
+            return
+        cube = self._active_cube
+        if cube is None:
+            return
+        stats = sky_stats(cube.flux, cube.wave,
+                          self._sky_mask, **(
+                              {'wmin': self._last_moment_window[0],
+                               'wmax': self._last_moment_window[1]}
+                              if self._last_moment_window else {}))
+        if stats is None:
+            QMessageBox.warning(self, "Sky stats", "Sky region contains no valid spaxels.")
+            return
+
+        x1, y1, x2, y2 = self._sky_rect
+        lines = [
+            "<b>Sky Region Statistics</b>",
+            f"Region: x=[{x1}, {x2})  y=[{y1}, {y2})",
+            "",
+            "<b>Overall (all channels)</b>",
+            f"Spaxels: {stats['n_spaxels']}",
+            f"Mean flux: {stats['mean']:.6g}",
+            f"Median flux: {stats['median']:.6g}",
+            f"&sigma; per channel: {stats['sigma']:.6g}",
+        ]
+
+        if 'sigma_m0' in stats:
+            wmin, wmax = self._last_moment_window
+            lines += [
+                "",
+                "<b>Last moment map window</b>",
+                f"Wave range: {wmin:.2f} \u2013 {wmax:.2f} \u00c5",
+                f"N channels: {stats['n_channels']}",
+                f"&sigma;<sub>M0</sub> (integrated noise): {stats['sigma_m0']:.6g}",
+            ]
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Sky Region Statistics")
+        dlg.setMinimumWidth(320)
+        layout = QVBoxLayout(dlg)
+        label = QLabel("<br>".join(lines))
+        label.setTextInteractionFlags(
+            Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+        label.setWordWrap(True)
+        layout.addWidget(label)
+        btn = QDialogButtonBox(QDialogButtonBox.Close)
+        btn.rejected.connect(dlg.reject)
+        layout.addWidget(btn)
+        dlg.exec_()
 
     # ------------------------------------------------------------------
     # Aperture highlighting
@@ -1703,16 +1771,22 @@ class MainWindow(QMainWindow):
         if not dlg.exec_():
             return
 
-        order, wmin, wmax, lambda_rest, subtract_cont, \
-            bcont_min, bcont_max, rcont_min, rcont_max, \
+        order, wmin, wmax, lambda_rest, \
+            subtract_sky, sky_method, \
+            subtract_cont, bcont_min, bcont_max, rcont_min, rcont_max, \
             apply_snr, snr_thresh, snr_method = dlg.values()
 
         try:
             flux = cube.flux
+            if subtract_sky and self._sky_mask is not None:
+                fn = np.nanmedian if sky_method == 'Median' else np.nanmean
+                sky_spec = fn(flux[:, self._sky_mask], axis=1)   # (n_wave,)
+                flux = flux - sky_spec[:, None, None]
             if subtract_cont:
                 flux = subtract_linear_continuum(
                     flux, cube.wave, bcont_min, bcont_max, rcont_min, rcont_max)
             img = moment_map(flux, cube.wave, wmin, wmax, order, lambda_rest)
+            self._last_moment_window = (wmin, wmax)
         except Exception as exc:
             QMessageBox.warning(self, "Moment map failed", str(exc))
             return
@@ -1748,6 +1822,7 @@ class MainWindow(QMainWindow):
         self._image_controls.set_cmap(cmap)
         self._image_controls.refresh(img)
 
+        sky_tag  = f"  sky-sub ({sky_method.lower()})" if subtract_sky else ""
         cont_tag = (f"  cont [{bcont_min:.0f}–{bcont_max:.0f}, "
                     f"{rcont_min:.0f}–{rcont_max:.0f}] Å") if subtract_cont else ""
         snr_tag  = f"  SNR≥{snr_thresh} ({snr_method})" if apply_snr else ""
@@ -1755,7 +1830,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             f"Moment {order} map  [{wmin:.1f}–{wmax:.1f} Å]"
             + (f"  λ_center={lambda_rest:.2f} Å" if lambda_rest else "")
-            + cont_tag + snr_tag
+            + sky_tag + cont_tag + snr_tag
             + f"  ({units[order]})  — click any mode button to return",
             0)
 
@@ -3818,6 +3893,8 @@ class MomentMapDialog(QDialog):
     _last_wmin     = None
     _last_wmax     = None
     _last_lrest    = None
+    _last_sky_sub  = False
+    _last_sky_meth = 'Median'
     _last_cont_sub = False
     _last_bcont    = (None, None)
     _last_rcont    = (None, None)
@@ -3913,6 +3990,34 @@ class MomentMapDialog(QDialog):
 
         self._on_order_changed()   # set initial visibility
 
+        # ---- Sky subtraction ----
+        self._sky_cb = QCheckBox("Subtract sky background")
+        self._sky_cb.setToolTip(
+            "Subtract the median (or mean) sky spectrum from every spaxel\n"
+            "before computing moments.  Requires a sky region to be set\n"
+            "on the image.  Applied before continuum subtraction.")
+        self._sky_cb.setEnabled(has_sky)
+        if not has_sky:
+            self._sky_cb.setToolTip("Set a sky region on the image first.")
+        self._sky_cb.setChecked(self._last_sky_sub and has_sky)
+        self._sky_cb.toggled.connect(self._on_sky_toggled)
+        form.addRow("", self._sky_cb)
+
+        sky_meth_widget = QWidget()
+        sky_meth_layout = QHBoxLayout(sky_meth_widget)
+        sky_meth_layout.setContentsMargins(0, 0, 0, 0)
+        self._sky_meth_box = QComboBox()
+        self._sky_meth_box.addItems(['Median', 'Mean'])
+        self._sky_meth_box.setCurrentText(self._last_sky_meth)
+        self._sky_meth_box.setFixedWidth(90)
+        sky_meth_layout.addWidget(self._sky_meth_box)
+        sky_meth_layout.addStretch()
+        self._sky_meth_label  = QLabel("Sky method:")
+        self._sky_meth_widget = sky_meth_widget
+        form.addRow(self._sky_meth_label, self._sky_meth_widget)
+
+        self._on_sky_toggled(self._last_sky_sub and has_sky)
+
         # ---- Continuum subtraction ----
         self._cont_cb = QCheckBox("Subtract linear continuum")
         self._cont_cb.setToolTip(
@@ -4002,6 +4107,10 @@ class MomentMapDialog(QDialog):
         self._lrest_label.setVisible(needs_rest)
         self._lrest_spin.setVisible(needs_rest)
 
+    def _on_sky_toggled(self, checked):
+        for w in (self._sky_meth_label, self._sky_meth_widget):
+            w.setVisible(checked)
+
     def _on_cont_toggled(self, checked):
         for w in (self._bcont_label, self._bcont_widget,
                   self._rcont_label, self._rcont_widget):
@@ -4019,7 +4128,9 @@ class MomentMapDialog(QDialog):
     def values(self):
         """
         Return (order, wmin, wmax, lambda_rest_or_None,
-                subtract_cont, bcont_min, bcont_max, rcont_min, rcont_max)
+                subtract_sky, sky_method,
+                subtract_cont, bcont_min, bcont_max, rcont_min, rcont_max,
+                apply_snr, snr_thresh, snr_method)
         and save to class for next open.
         """
         order  = self._order_group.checkedId()
@@ -4027,17 +4138,18 @@ class MomentMapDialog(QDialog):
         wmax   = self._wmax_spin.value()
         if wmin > wmax:
             wmin, wmax = wmax, wmin
-        lrest       = self._lrest_spin.value() if order in (1, 2) else None
-        subtract    = self._cont_cb.isChecked()
-        bcont_min   = self._bcont_min.value()
-        bcont_max   = self._bcont_max.value()
-        rcont_min   = self._rcont_min.value()
-        rcont_max   = self._rcont_max.value()
+        lrest        = self._lrest_spin.value() if order in (1, 2) else None
+        subtract_sky = self._sky_cb.isChecked() and self._sky_cb.isEnabled()
+        sky_method   = self._sky_meth_box.currentText()
+        subtract     = self._cont_cb.isChecked()
+        bcont_min    = self._bcont_min.value()
+        bcont_max    = self._bcont_max.value()
+        rcont_min    = self._rcont_min.value()
+        rcont_max    = self._rcont_max.value()
         if bcont_min > bcont_max:
             bcont_min, bcont_max = bcont_max, bcont_min
         if rcont_min > rcont_max:
             rcont_min, rcont_max = rcont_max, rcont_min
-        # Persist for next open
         apply_snr  = self._snr_cb.isChecked() and self._snr_cb.isEnabled()
         snr_thresh = self._snr_thr_spin.value()
         snr_method = self._snr_meth_box.currentText()
@@ -4046,6 +4158,8 @@ class MomentMapDialog(QDialog):
         MomentMapDialog._last_wmin     = wmin
         MomentMapDialog._last_wmax     = wmax
         MomentMapDialog._last_lrest    = lrest
+        MomentMapDialog._last_sky_sub  = subtract_sky
+        MomentMapDialog._last_sky_meth = sky_method
         MomentMapDialog._last_cont_sub = subtract
         MomentMapDialog._last_bcont    = (bcont_min, bcont_max)
         MomentMapDialog._last_rcont    = (rcont_min, rcont_max)
@@ -4053,6 +4167,7 @@ class MomentMapDialog(QDialog):
         MomentMapDialog._last_snr_thr  = snr_thresh
         MomentMapDialog._last_snr_meth = snr_method
         return (order, wmin, wmax, lrest,
+                subtract_sky, sky_method,
                 subtract, bcont_min, bcont_max, rcont_min, rcont_max,
                 apply_snr, snr_thresh, snr_method)
 
