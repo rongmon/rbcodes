@@ -9,7 +9,10 @@ rb_zfind spectrum.fits -l zfind_galaxy  # with default linelist
 """
 
 import sys
+import os
 import argparse
+os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '0'
+os.environ['QT_ENABLE_HIGHDPI_SCALING'] = '0'
 
 
 def launch_zfind(spec_or_file=None, linelist=None, **kwargs):
@@ -27,9 +30,12 @@ def launch_zfind(spec_or_file=None, linelist=None, **kwargs):
         Default linelist to pre-select (e.g. 'zfind_em', 'zfind_galaxy')
     """
     from PyQt5.QtWidgets import QApplication
+    from PyQt5.QtCore import Qt
     from rbcodes.GUIs.zfind.io import to_rb_spectrum
     from rbcodes.GUIs.zfind.dialog import ZFindDialog
 
+    QApplication.setAttribute(Qt.AA_DisableHighDpiScaling, True)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
     app = QApplication.instance() or QApplication(sys.argv[:1])
 
     spec = None

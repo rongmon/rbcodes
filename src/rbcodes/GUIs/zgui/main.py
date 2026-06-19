@@ -1,4 +1,6 @@
 import sys, argparse, os
+os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '0'
+os.environ['QT_ENABLE_HIGHDPI_SCALING'] = '0'
 import pandas as pd
 
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QStatusBar,
@@ -305,6 +307,8 @@ def launch_gui(xspecio=False, toggle_frames=False, fitsfile=''):
         toggle_frames (bool): Enable frame toggling
         fitsfile (str): Optional FITS file to load on startup
     """
+    QApplication.setAttribute(Qt.AA_DisableHighDpiScaling, True)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
     app = QApplication(sys.argv[:1])
     
     # Report IO mode

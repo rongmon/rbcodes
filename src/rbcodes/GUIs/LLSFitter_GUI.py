@@ -1,5 +1,7 @@
 import sys
 import os
+os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '0'
+os.environ['QT_ENABLE_HIGHDPI_SCALING'] = '0'
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -1943,6 +1945,8 @@ class LLSFitterGUI(QMainWindow):
 
 
 def main():
+    QApplication.setAttribute(Qt.AA_DisableHighDpiScaling, True)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
     app = QApplication(sys.argv)
     window = LLSFitterGUI()
     window.show()

@@ -4,6 +4,9 @@ IFU Viewer — MainWindow
 Phase 3: sidebar + image panel (whitelight / plain 2D image).
 """
 import sys
+import os
+os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '0'
+os.environ['QT_ENABLE_HIGHDPI_SCALING'] = '0'
 import numpy as np
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QStatusBar,
                               QHBoxLayout, QVBoxLayout, QLabel, QAction,
@@ -3712,6 +3715,8 @@ def launch_viewer(files=None):
     files : str or list of str or None
         FITS file(s) to load on startup.
     """
+    QApplication.setAttribute(Qt.AA_DisableHighDpiScaling, True)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
     app = QApplication.instance() or QApplication(sys.argv)
     win = MainWindow()
     win.setAttribute(Qt.WA_DeleteOnClose)

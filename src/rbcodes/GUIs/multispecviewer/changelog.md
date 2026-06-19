@@ -1,6 +1,16 @@
 # Changelog
 All notable changes to MultispecViewer will be documented in this file.
 
+## [1.7.0] - 2026-06-19
+
+### Added
+- **FITS Header / Metadata viewer** (`View > Show FITS Header…`): New menu bar with a `View` menu containing a header viewer dialog. Supports all loaded spectrum types:
+  - **FITS files**: Full multi-extension browsing via extension combo (reuses ifuviewer's `HeaderDialog._collect_headers`). File combo lets users switch between all loaded FITS files without closing the dialog.
+  - **JSON files**: Re-reads the file and displays metadata fields (strips large array data). Handles rb_spec analysis JSON (shows `zabs`, `W`, `N`, `logN`, etc.) and rb_spectrum native JSON.
+  - **HDF5 / ASCII / in-memory arrays**: Renders `spec.meta` as `KEY = VALUE` lines; nested dicts (e.g. `rb_spec_analysis`) are expanded as subsections.
+  - **No metadata available**: Shows an informative message instead of crashing.
+  - Search bar with highlight-all, Prev/Next navigation, and wrap-around. Copy-to-clipboard button.
+
 ## [1.6.0] - 2026-05-28
 
 ### Added

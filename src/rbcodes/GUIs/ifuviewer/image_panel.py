@@ -633,19 +633,35 @@ class ImageCanvas(FigureCanvasQTAgg):
         self._ax.yaxis.label.set_fontsize(8)
         self._ax.tick_params(axis='both', colors=c, labelcolor=c, labelsize=8)
         if hasattr(self._ax, 'coords'):
+            import astropy
+            _new_astropy = int(astropy.__version__.split('.')[0]) >= 6
             for coord in self._ax.coords:
-                try:
-                    coord.axislabels.set_color(c)
-                except Exception:
-                    pass
-                try:
-                    coord.ticklabels.set_color(c)
-                except Exception:
-                    pass
-                try:
-                    coord.ticks.set_color(c)
-                except Exception:
-                    pass
+                if _new_astropy:
+                    try:
+                        coord.set_axislabel(coord.get_axislabel(), color=c)
+                    except Exception:
+                        pass
+                    try:
+                        coord.set_ticklabel(color=c)
+                    except Exception:
+                        pass
+                    try:
+                        coord.set_ticks(color=c)
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        coord.axislabels.set_color(c)
+                    except Exception:
+                        pass
+                    try:
+                        coord.ticklabels.set_color(c)
+                    except Exception:
+                        pass
+                    try:
+                        coord.ticks.set_color(c)
+                    except Exception:
+                        pass
 
 
 # ---------------------------------------------------------------------------

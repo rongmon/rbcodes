@@ -812,9 +812,11 @@ def _detect_dao_sources(img: np.ndarray, box: int,
             sources = finder(img - bg_median)
             if sources is None or len(sources) == 0:
                 return []
+            x_col = 'x_centroid' if 'x_centroid' in sources.colnames else 'xcentroid'
+            y_col = 'y_centroid' if 'y_centroid' in sources.colnames else 'ycentroid'
             return list(zip(
-                np.asarray(sources['xcentroid']),
-                np.asarray(sources['ycentroid'])
+                np.asarray(sources[x_col]),
+                np.asarray(sources[y_col])
             ))
         except Exception:
             pass
@@ -918,9 +920,11 @@ def _detect_knots(img: np.ndarray, box: int, n_knots: int = 10,
             tbl = cat.to_table()
             tbl.sort('segment_flux', reverse=True)
             tbl = tbl[:n_knots]
+            x_col = 'x_centroid' if 'x_centroid' in tbl.colnames else 'xcentroid'
+            y_col = 'y_centroid' if 'y_centroid' in tbl.colnames else 'ycentroid'
             return list(zip(
-                np.asarray(tbl['xcentroid']),
-                np.asarray(tbl['ycentroid'])
+                np.asarray(tbl[x_col]),
+                np.asarray(tbl[y_col])
             ))
         except Exception:
             pass
@@ -1025,7 +1029,9 @@ def _cross_corr_image_fallback(aligner):
 
 def _cross_corr(aligner, box: float = 0.1, fwhm: float = 0.0,
                 threshold_sigma: float = 3.0, max_sources: int = 50,
-                bg_method: str = 'sigma_clip'):
+                bg_method: str = 'sigma_clip',
+                fwhm_ref: float = None, fwhm_tgt: float = None,
+                threshold_sigma_ref: float = None, threshold_sigma_tgt: float = None):
     """
     Multi-source cross-match via Hough-style catalog voting.
 
@@ -1042,10 +1048,34 @@ def _cross_corr(aligner, box: float = 0.1, fwhm: float = 0.0,
 
     Parameters
     ----------
-    box : int
+    box : float
         Centroid box half-width in arcsec; also used directly as the Hough
         bin size (clipped to 1.5–10 arcsec).
+    fwhm : float
+        Fallback FWHM (px) for both ref and target when fwhm_ref/fwhm_tgt
+        are not set. 0 = auto.
+    threshold_sigma : float
+        Fallback detection threshold for both frames when
+        threshold_sigma_ref/threshold_sigma_tgt are not set.
+    fwhm_ref : float or None
+        FWHM (px) for source detection in the reference image.
+        Overrides fwhm for the reference frame. 0 = auto.
+    fwhm_tgt : float or None
+        FWHM (px) for source detection in the target image.
+        Overrides fwhm for the target frame. 0 = auto.
+    threshold_sigma_ref : float or None
+        Detection threshold (× background σ) for the reference image.
+        Overrides threshold_sigma for the reference frame.
+    threshold_sigma_tgt : float or None
+        Detection threshold (× background σ) for the target image.
+        Overrides threshold_sigma for the target frame. Lower = more
+        sensitive; useful when the target is fainter than the reference.
     """
+    _fwhm_ref  = fwhm_ref  if fwhm_ref  is not None else fwhm
+    _fwhm_tgt  = fwhm_tgt  if fwhm_tgt  is not None else fwhm
+    _thresh_ref = threshold_sigma_ref if threshold_sigma_ref is not None else threshold_sigma
+    _thresh_tgt = threshold_sigma_tgt if threshold_sigma_tgt is not None else threshold_sigma
+
     ref = aligner.reference
     tgt = aligner.targets[0]
     ref_img = ref.image2d
@@ -1062,13 +1092,13 @@ def _cross_corr(aligner, box: float = 0.1, fwhm: float = 0.0,
     tgt_box_px = _box_to_pixels(box, tgt, tgt_img)
 
     # ------------------------------------------------------------------
-    # Step 1: source detection — keep up to 50 brightest per image
+    # Step 1: source detection — keep up to max_sources brightest per image
     # ------------------------------------------------------------------
-    ref_sources = _detect_dao_sources(ref_img, ref_box_px, fwhm=fwhm,
-                                       threshold_sigma=threshold_sigma,
+    ref_sources = _detect_dao_sources(ref_img, ref_box_px, fwhm=_fwhm_ref,
+                                       threshold_sigma=_thresh_ref,
                                        bg_method=bg_method)
-    tgt_sources = _detect_dao_sources(tgt_img, tgt_box_px, fwhm=fwhm,
-                                       threshold_sigma=threshold_sigma,
+    tgt_sources = _detect_dao_sources(tgt_img, tgt_box_px, fwhm=_fwhm_tgt,
+                                       threshold_sigma=_thresh_tgt,
                                        bg_method=bg_method)
 
     if not ref_sources or not tgt_sources:
@@ -1936,6 +1966,11 @@ def _run_strategy(aligner,
                   threshold_sigma: float = 3.0,
                   max_sources: int = 50,
                   bg_method: str = 'sigma_clip',
+                  # cross_corr per-frame overrides
+                  fwhm_ref: float = None,
+                  fwhm_tgt: float = None,
+                  threshold_sigma_ref: float = None,
+                  threshold_sigma_tgt: float = None,
                   # knots options
                   max_knots: int = 10,
                   # gaia options
@@ -1976,7 +2011,10 @@ def _run_strategy(aligner,
     elif strategy == 'cross_corr':
         _cross_corr(aligner, box=box, fwhm=fwhm,
                     threshold_sigma=threshold_sigma, max_sources=max_sources,
-                    bg_method=bg_method)
+                    bg_method=bg_method,
+                    fwhm_ref=fwhm_ref, fwhm_tgt=fwhm_tgt,
+                    threshold_sigma_ref=threshold_sigma_ref,
+                    threshold_sigma_tgt=threshold_sigma_tgt)
         if save_catalog is not None:
             _save_pairs_catalog(aligner.pairs, save_catalog)
 

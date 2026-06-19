@@ -3,10 +3,12 @@ import sys
 import os
 import argparse
 import importlib
+os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '0'
+os.environ['QT_ENABLE_HIGHDPI_SCALING'] = '0'
 from rbcodes.GUIs.multispecviewer.io_manager import IOManager
 
 # Version information
-__version__ = "1.6.0"
+__version__ = "1.7.0"
 
 def display_examples():
     """Display detailed usage examples for the rb_multispec tool."""
@@ -124,6 +126,8 @@ def main():
                     print(f"Warning: File not found: {filename}")
         
         # Initialize QApplication
+        multispec.QApplication.setAttribute(multispec.Qt.AA_DisableHighDpiScaling, True)
+        multispec.QApplication.setAttribute(multispec.Qt.AA_UseHighDpiPixmaps, True)
         app = multispec.QApplication(filtered_argv)
         
         # Create MainWindow instance

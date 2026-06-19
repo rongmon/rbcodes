@@ -9,13 +9,27 @@ import matplotlib.pyplot as plt
 
 
 # PyQt5 imports
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, 
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton,
                              QVBoxLayout, QWidget, QFileDialog, QSplitter,
                              QLabel, QHBoxLayout, QSizePolicy, QInputDialog,
-                             QDialog, QListWidget,QCheckBox)
+                             QDialog, QListWidget, QCheckBox,
+                             QMenu, QAction, QComboBox,
+                             QPlainTextEdit, QLineEdit, QTextEdit)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette, QColor
 from PyQt5 import QtCore, QtGui
+
+# Reuse HeaderDialog and mono font from ifuviewer (read-only import, no edits there)
+try:
+    from rbcodes.GUIs.ifuviewer.main import HeaderDialog as _IFUHeaderDialog, _mono_font
+    _IFU_HEADER_AVAILABLE = True
+except Exception:
+    _IFU_HEADER_AVAILABLE = False
+    def _mono_font():
+        from PyQt5.QtGui import QFont, QFontDatabase
+        f = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+        f.setPointSize(10)
+        return f
 
 # Matplotlib imports
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -1333,6 +1347,19 @@ class SpectralPlot(FigureCanvas):
 
     
     
+class _SpecAdapter:
+    """
+    Duck-type adapter so rb_spectrum objects satisfy the interface expected
+    by ifuviewer's HeaderDialog._collect_headers (needs .path, .name, .header).
+    Only used for FITS files — HeaderDialog reads extensions directly from disk.
+    """
+    def __init__(self, spec, index):
+        path = getattr(spec, 'filename', '') or ''
+        self.path   = path
+        self.name   = os.path.basename(path) or f'Spectrum {index + 1}'
+        self.header = None   # None tells _collect_headers to read from disk
+
+
 class MainWindow(QMainWindow):
     """
     Main application window for displaying spectral plots.
@@ -1619,13 +1646,31 @@ class MainWindow(QMainWindow):
         bottom_layout.addWidget(button_container)
         
         self.spectra = []  # Stores loaded spectra
-        
+
         status_text = "Ready - Click on plot then use keys: x = set min x-limit, X = set max x-limit, "
         status_text += "t = set max y-limit, b = set min y-limit, q = quit application, "
         status_text += "Right-click = identify spectral lines"
         self.statusBar().showMessage(status_text)
         self.message_box.on_sent_message("Application ready. Select FITS files to begin.", "#FFFFFF")
+
+        self._build_menu()
     
+
+    def _build_menu(self):
+        """Add the View menu with FITS header action."""
+        view_menu = self.menuBar().addMenu("View")
+        act = QAction("Show FITS Header\u2026", self)
+        act.setToolTip("Show the FITS header or metadata of a loaded spectrum")
+        act.triggered.connect(self._on_show_header)
+        view_menu.addAction(act)
+
+    def _on_show_header(self):
+        """Open the FITS header / metadata viewer for the loaded spectra."""
+        if not self.spectra:
+            self.message_box.on_sent_message("No spectra loaded.", "#FF0000")
+            return
+        dlg = SpectraHeaderDialog(self.spectra, parent=self)
+        dlg.exec_()
 
     def clear_all_absorber_lines(self):
         """Remove all absorber lines from the plot and reset all checkboxes in the absorber manager"""
@@ -2445,6 +2490,270 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.message_box.on_sent_message(f"Error converting file: {str(e)}", "#FF0000")
     
+
+class SpectraHeaderDialog(QDialog):
+    """
+    Show FITS header or metadata for one or more loaded spectra.
+
+    File-level combo (hidden when only one spectrum is loaded) lets the user
+    switch between files without closing the dialog.  Extension-level combo
+    (hidden when only one extension exists) mirrors ifuviewer behaviour.
+
+    Source dispatch:
+      FITS on disk   → HeaderDialog._collect_headers from ifuviewer (full multi-ext)
+      JSON on disk   → raw JSON with array data stripped, shown as pretty text
+      anything else  → spec.meta rendered as KEY = VALUE lines
+      nothing found  → informative message, no crash
+    """
+
+    def __init__(self, spectra, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("FITS Header / Metadata")
+        self.resize(700, 560)
+
+        self._spectra    = spectra
+        self._cache      = {}   # spec_index -> [(label, hdr_or_str_or_None)]
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
+
+        # File selector — hidden when only one spectrum loaded
+        self._file_combo = QComboBox()
+        for i, spec in enumerate(spectra):
+            path  = getattr(spec, 'filename', '') or ''
+            label = os.path.basename(path) or f'Spectrum {i + 1}'
+            self._file_combo.addItem(label)
+        if len(spectra) > 1:
+            self._file_combo.currentIndexChanged.connect(self._on_file_changed)
+            layout.addWidget(self._file_combo)
+
+        # Extension selector — shown only for multi-extension FITS
+        self._ext_combo = QComboBox()
+        self._ext_combo.currentIndexChanged.connect(self._on_ext_changed)
+        layout.addWidget(self._ext_combo)
+
+        # Header / metadata text area
+        self._text = QPlainTextEdit()
+        self._text.setReadOnly(True)
+        self._text.setFont(_mono_font())
+        self._text.setLineWrapMode(QPlainTextEdit.NoWrap)
+        layout.addWidget(self._text)
+
+        # Search bar
+        search_row = QHBoxLayout()
+        self._search_box  = QLineEdit()
+        self._search_box.setPlaceholderText("Search header\u2026")
+        self._search_box.returnPressed.connect(self._find_next)
+        self._search_box.textChanged.connect(self._on_search_changed)
+        self._match_label = QLabel("")
+        prev_btn = QPushButton("Prev")
+        next_btn = QPushButton("Next")
+        prev_btn.setFixedWidth(48)
+        next_btn.setFixedWidth(48)
+        prev_btn.clicked.connect(self._find_prev)
+        next_btn.clicked.connect(self._find_next)
+        search_row.addWidget(self._search_box)
+        search_row.addWidget(prev_btn)
+        search_row.addWidget(next_btn)
+        search_row.addWidget(self._match_label)
+        layout.addLayout(search_row)
+
+        # Bottom buttons
+        btn_row = QHBoxLayout()
+        copy_btn  = QPushButton("Copy to Clipboard")
+        close_btn = QPushButton("Close")
+        copy_btn.clicked.connect(self._copy)
+        close_btn.clicked.connect(self.accept)
+        btn_row.addWidget(copy_btn)
+        btn_row.addStretch()
+        btn_row.addWidget(close_btn)
+        layout.addLayout(btn_row)
+
+        # Populate with first spectrum
+        self._on_file_changed(0)
+
+    # ------------------------------------------------------------------
+    # Data collection
+    # ------------------------------------------------------------------
+
+    def _get_entries(self, spec_index):
+        """Return (and cache) the list of (label, value) pairs for spec_index."""
+        if spec_index not in self._cache:
+            self._cache[spec_index] = self._collect_entries(
+                self._spectra[spec_index], spec_index)
+        return self._cache[spec_index]
+
+    @staticmethod
+    def _collect_entries(spec, index):
+        """
+        Return list of (label, value) where value is:
+          astropy fits.Header  — FITS files (possibly multi-extension)
+          str                  — JSON / meta rendered as text
+          None                 — nothing found
+        """
+        import json as _json
+
+        path = getattr(spec, 'filename', '') or ''
+        ext  = os.path.splitext(path)[1].lower()
+        name = os.path.basename(path) or f'Spectrum {index + 1}'
+
+        # --- FITS: reuse HeaderDialog._collect_headers from ifuviewer ---
+        if ext in ('.fits', '.fit') and os.path.isfile(path):
+            if _IFU_HEADER_AVAILABLE:
+                try:
+                    entries = _IFUHeaderDialog._collect_headers(_SpecAdapter(spec, index))
+                    if entries:
+                        return entries
+                except Exception:
+                    pass
+            # Fallback: open ourselves if ifuviewer import failed
+            try:
+                from astropy.io import fits as _fits
+                headers = []
+                with _fits.open(path, memmap=False) as hdul:
+                    for i, hdu in enumerate(hdul):
+                        hname  = hdu.name or 'UNNAMED'
+                        label  = f'[{i}]  {hname}'
+                        if getattr(hdu, 'data', None) is not None:
+                            shape = getattr(hdu.data, 'shape', '')
+                            if shape:
+                                label += f'  {shape}'
+                        headers.append((label, hdu.header.copy()))
+                if headers:
+                    return headers
+            except Exception:
+                pass
+
+        # --- JSON: re-read file, strip large array keys ---
+        if ext == '.json' and os.path.isfile(path):
+            try:
+                _SKIP = {'wavelength', 'flux', 'error', 'continuum',
+                         'wave_slice', 'flux_slice', 'error_slice',
+                         'line_list', 'absorbers'}
+                with open(path, 'r') as f:
+                    data = _json.load(f)
+                display = {k: v for k, v in data.items() if k not in _SKIP}
+                text = _json.dumps(display, indent=2, default=str)
+                return [(f'[0]  {name}', text)]
+            except Exception:
+                pass
+
+        # --- Fallback: spec.meta (HDF5, ASCII, in-memory arrays) ---
+        meta = getattr(spec, 'meta', None) or {}
+        flat    = {k: v for k, v in meta.items()
+                   if k != 'airvac' and not isinstance(v, dict)}
+        nested  = {k: v for k, v in meta.items()
+                   if k != 'airvac' and isinstance(v, dict)}
+
+        if flat or nested:
+            lines = [f'{k} = {v}' for k, v in flat.items()]
+            for k, v in nested.items():
+                lines.append(f'\n[{k}]')
+                lines.extend(f'  {sk} = {sv}' for sk, sv in v.items())
+            return [(f'[0]  {name}', '\n'.join(lines))]
+
+        # --- Nothing useful found ---
+        return [(f'[0]  {name}', None)]
+
+    # ------------------------------------------------------------------
+    # UI callbacks
+    # ------------------------------------------------------------------
+
+    def _on_file_changed(self, file_idx):
+        entries = self._get_entries(file_idx)
+
+        # Repopulate extension combo without triggering _on_ext_changed
+        self._ext_combo.blockSignals(True)
+        self._ext_combo.clear()
+        for label, _ in entries:
+            self._ext_combo.addItem(label)
+        self._ext_combo.blockSignals(False)
+
+        # Only show extension combo when there is genuinely more than one extension
+        self._ext_combo.setVisible(len(entries) > 1)
+
+        # Update window title to reflect the current file
+        spec = self._spectra[file_idx]
+        path = getattr(spec, 'filename', '') or ''
+        name = os.path.basename(path) or f'Spectrum {file_idx + 1}'
+        self.setWindowTitle(f'FITS Header \u2014 {name}')
+
+        self._show_entry(entries, 0)
+        self._on_search_changed(self._search_box.text())
+
+    def _on_ext_changed(self, idx):
+        file_idx = self._file_combo.currentIndex()
+        entries  = self._get_entries(file_idx)
+        self._show_entry(entries, idx)
+        self._on_search_changed(self._search_box.text())
+
+    def _show_entry(self, entries, idx):
+        if idx < 0 or idx >= len(entries):
+            return
+        _, val = entries[idx]
+        if val is None:
+            self._text.setPlainText(
+                "No header or metadata available for this spectrum.")
+        elif isinstance(val, str):
+            self._text.setPlainText(val)
+        else:
+            # astropy fits.Header
+            self._text.setPlainText(
+                '\n'.join(str(card) for card in val.cards))
+
+    # ------------------------------------------------------------------
+    # Search
+    # ------------------------------------------------------------------
+
+    def _on_search_changed(self, text):
+        self._match_label.setText("")
+        if not text:
+            self._text.setExtraSelections([])
+            return
+        self._highlight_all(text)
+        self._text.moveCursor(self._text.textCursor().Start)
+        self._find_next()
+
+    def _highlight_all(self, text):
+        from PyQt5.QtGui import QTextCharFormat, QColor
+        fmt = QTextCharFormat()
+        fmt.setBackground(QColor('#f9e2af'))
+        fmt.setForeground(QColor('#1e1e2e'))
+        selections = []
+        cursor = self._text.document().find(text)
+        count  = 0
+        while not cursor.isNull():
+            sel = QTextEdit.ExtraSelection()
+            sel.cursor = cursor
+            sel.format  = fmt
+            selections.append(sel)
+            count  += 1
+            cursor  = self._text.document().find(text, cursor)
+        self._text.setExtraSelections(selections)
+        self._match_label.setText(
+            f"{count} match{'es' if count != 1 else ''}" if count else "Not found")
+
+    def _find_next(self):
+        text = self._search_box.text()
+        if not text:
+            return
+        if not self._text.find(text):
+            self._text.moveCursor(self._text.textCursor().Start)
+            self._text.find(text)
+
+    def _find_prev(self):
+        from PyQt5.QtGui import QTextDocument
+        text = self._search_box.text()
+        if not text:
+            return
+        if not self._text.find(text, QTextDocument.FindBackward):
+            self._text.moveCursor(self._text.textCursor().End)
+            self._text.find(text, QTextDocument.FindBackward)
+
+    def _copy(self):
+        QApplication.clipboard().setText(self._text.toPlainText())
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

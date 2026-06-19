@@ -24,8 +24,12 @@ Examples:
 import sys
 import os
 import argparse
+os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '0'
+os.environ['QT_ENABLE_HIGHDPI_SCALING'] = '0'
 from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import Qt, QTimer
+QApplication.setAttribute(Qt.AA_DisableHighDpiScaling, True)
+QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
 # Version information
 __version__ = "1.0.6"

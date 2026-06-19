@@ -232,7 +232,9 @@ class wcs_align:
             Path to existing FITS catalog (batch strategy).
         **kwargs
             Extra per-strategy options forwarded to the detection function:
-            fwhm, threshold_sigma, max_sources  (cross_corr, dao)
+            fwhm_ref, fwhm_tgt, threshold_sigma_ref, threshold_sigma_tgt,
+            max_sources                          (cross_corr)
+            fwhm, threshold_sigma, max_sources   (dao)
             threshold_sigma, max_knots           (knots)
             radius_deg, max_stars                (gaia)
         """

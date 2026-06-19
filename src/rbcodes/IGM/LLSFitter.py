@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from linetools.spectra.xspectrum1d import XSpectrum1D
+#from linetools.spectra.xspectrum1d import XSpectrum1D
+from rbcodes.utils.rb_spectrum import rb_read_spec
 import emcee
 import corner
 from scipy.optimize import curve_fit
@@ -58,7 +59,7 @@ class LLSFitter:
         spectrum_file : str
             Path to the FITS file
         """
-        self.spectrum = XSpectrum1D.from_file(spectrum_file)
+        self.spectrum = rb_read_spec(spectrum_file)
         
         # Extract data and normalize
         self.wave = self.spectrum.wavelength.value

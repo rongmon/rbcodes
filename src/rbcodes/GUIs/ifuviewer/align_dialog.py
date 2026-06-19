@@ -96,7 +96,68 @@ class StrategyOptionsDialog(QDialog):
                 widget.setToolTip(tooltip)
             right.addWidget(widget)
 
-        if strategy in ('cross_corr', 'dao'):
+        if strategy == 'cross_corr':
+            w = QDoubleSpinBox()
+            w.setRange(0.0, 200.0)
+            w.setDecimals(1)
+            w.setSuffix(" px")
+            w.setValue(current_opts.get('fwhm_ref', 0.0))
+            _add_row("Ref FWHM:", w,
+                     "Expected source FWHM in the reference image (px).\n"
+                     "0 = auto-estimate as box × 0.5.\n"
+                     "Set to match the reference PSF (e.g. HST ~2 px).")
+            self._widgets['fwhm_ref'] = w
+
+            w = QDoubleSpinBox()
+            w.setRange(0.0, 200.0)
+            w.setDecimals(1)
+            w.setSuffix(" px")
+            w.setValue(current_opts.get('fwhm_tgt', 0.0))
+            _add_row("Target FWHM:", w,
+                     "Expected source FWHM in the target image (px).\n"
+                     "0 = auto-estimate as box × 0.5.\n"
+                     "Set to match the target PSF (e.g. KCWI/MUSE ~5-8 px).")
+            self._widgets['fwhm_tgt'] = w
+
+            w = QDoubleSpinBox()
+            w.setRange(0.5, 20.0)
+            w.setDecimals(1)
+            w.setSuffix(" σ")
+            w.setValue(current_opts.get('threshold_sigma_ref', 3.0))
+            _add_row("Ref threshold:", w,
+                     "Detection threshold for the reference image (× background σ).\n"
+                     "Lower = more sources (more false positives).")
+            self._widgets['threshold_sigma_ref'] = w
+
+            w = QDoubleSpinBox()
+            w.setRange(0.5, 20.0)
+            w.setDecimals(1)
+            w.setSuffix(" σ")
+            w.setValue(current_opts.get('threshold_sigma_tgt', 2.0))
+            _add_row("Target threshold:", w,
+                     "Detection threshold for the target image (× background σ).\n"
+                     "Lower than ref to compensate for fainter IFU whitelight frames.\n"
+                     "Typical: 1.5–2.5 σ for KCWI/MUSE targets.")
+            self._widgets['threshold_sigma_tgt'] = w
+
+            w = QSpinBox()
+            w.setRange(1, 500)
+            w.setValue(current_opts.get('max_sources', 50))
+            _add_row("Max sources:", w,
+                     "Maximum number of sources to use from each image.")
+            self._widgets['max_sources'] = w
+
+            w = QComboBox()
+            w.addItems(['sigma_clip', 'mad'])
+            w.setCurrentText(current_opts.get('bg_method', 'mad'))
+            _add_row("BG estimator:", w,
+                     "sigma_clip — iterative sigma-clipped std.\n"
+                     "mad        — median absolute deviation × 1.4826.\n"
+                     "Use 'mad' for IFU data with correlated noise or\n"
+                     "when the source fraction is high (e.g. QSO fields).")
+            self._widgets['bg_method'] = w
+
+        elif strategy == 'dao':
             w = QDoubleSpinBox()
             w.setRange(0.0, 200.0)
             w.setDecimals(1)
@@ -295,8 +356,9 @@ class AlignDialog(QDialog):
 
         # Per-strategy detection options (populated by StrategyOptionsDialog)
         self._strategy_opts = {
-            'cross_corr': dict(fwhm=0.0, threshold_sigma=3.0, max_sources=50,
-                               bg_method='sigma_clip'),
+            'cross_corr': dict(fwhm_ref=0.0, fwhm_tgt=0.0,
+                               threshold_sigma_ref=3.0, threshold_sigma_tgt=2.0,
+                               max_sources=50, bg_method='mad'),
             'dao':        dict(fwhm=0.0, threshold_sigma=3.0, max_sources=50,
                                bg_method='sigma_clip'),
             'knots':      dict(threshold_sigma=2.0, max_knots=10,
