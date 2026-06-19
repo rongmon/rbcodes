@@ -16,12 +16,12 @@ def clear_artists(ax, keep_lines=None):
 	    preserves the base flux+error lines; keep_lines=0 removes all).
 	"""
 	while ax.texts:
-		ax.texts.pop()
+		ax.texts[-1].remove()
 	while ax.collections:
-		ax.collections.pop()
+		ax.collections[-1].remove()
 	if keep_lines is not None:
 		while len(ax.lines) > keep_lines:
-			ax.lines.pop()
+			ax.lines[-1].remove()
 
 
 def get_linelist_df(linelist_name):

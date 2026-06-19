@@ -24,6 +24,7 @@ Example
 import sys
 import math
 import re
+from importlib.resources import files
 from scipy.interpolate import interp1d
 from astropy.cosmology import Planck18
 from astropy.constants import G
@@ -32,7 +33,7 @@ from numpy import log10
 def stellarToHaloMass(z,stellar_mass):
     
     #Load params
-    param_file = open('smhm_med_params.txt', "r")
+    param_file = files('rbcodes.halo').joinpath('smhm_med_params.txt').open('r')
     param_list = []
     allparams = []
     for line in param_file:

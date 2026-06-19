@@ -957,14 +957,14 @@ class MplCanvas(FigureCanvasQTAgg):
 						else:
 							print('Multiple Gaussian fitting starts.')
 							# Double Gaussian Fitting
-							self.axes.fill_between(g_wave,
+							_poly = self.axes.fill_between(g_wave,
 													y1=np.max(g_flux)*1.1,
 													y2=np.min(g_flux)*0.9,
 													alpha=0.5,
 													color='pink')
 							self.draw()
 							# delete the drawn polygon from collection
-							self.axes.collections.pop()
+							_poly.remove()
 
 							self.gauss2d = Gaussfit_2d(g_wave, g_flux, g_error, 
 														gauss_num=self.gauss_num,
@@ -990,7 +990,7 @@ class MplCanvas(FigureCanvasQTAgg):
 
 		elif (event.key == 'A') & (self.gauss_num > 1):
 			# shade entire spectrum region
-			self.axes.fill_between([self.wave[0]*0.9, self.wave[-1]*1.1],
+			_poly = self.axes.fill_between([self.wave[0]*0.9, self.wave[-1]*1.1],
 									y1=np.max(self.flux)*1.1,
 									y2=np.min(self.flux)*0.9,
 									alpha=0.5,
@@ -998,7 +998,7 @@ class MplCanvas(FigureCanvasQTAgg):
 			self.draw()
 			self.send_message.emit('Entire spectrum has been selected!')
 			# delete the drawn polygon from collection
-			self.axes.collections.pop()
+			_poly.remove()
 			# initialize Multi-Gaussian
 			self.gauss2d = Gaussfit_2d(self.wave, self.flux, self.error,
 										gauss_num=self.gauss_num,

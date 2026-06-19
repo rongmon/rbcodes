@@ -228,7 +228,7 @@ class Gaussfit_2d(QWidget):
         if self.kernel_size % 2 == 0:
             self.kernel_size += 1
         self.c.fit_continuum(window=self.kernel_size)
-        self.line1d.axline.lines.pop()
+        self.line1d.axline.lines[-1].remove()
         self.line1d.axline.plot(self.wave, self.c.cont, 'b')
         self.line1d.draw()
         self.cont = self.c.cont
