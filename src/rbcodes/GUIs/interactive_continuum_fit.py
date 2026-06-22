@@ -412,36 +412,71 @@ class InteractiveContinuumFitWindow(QMainWindow):
         self.min_order_spin = QSpinBox()
         self.min_order_spin.setRange(0, 10)
         self.min_order_spin.setValue(self.fit_params['min_order'])
-        
+        self.min_order_spin.setToolTip(
+            "Minimum polynomial order the BIC search is allowed to select.\n"
+            "0 = flat continuum is a valid solution."
+        )
+
         self.max_order_spin = QSpinBox()
         self.max_order_spin.setRange(1, 15)
         self.max_order_spin.setValue(self.fit_params['max_order'])
-        
+        self.max_order_spin.setToolTip(
+            "Maximum polynomial order the BIC search will try.\n"
+            "Higher values allow more curvature but risk overfitting."
+        )
+
         self.sigma_spin = QDoubleSpinBox()
         self.sigma_spin.setRange(0.5, 10.0)
         self.sigma_spin.setSingleStep(0.5)
         self.sigma_spin.setValue(self.fit_params['sigma'])
-        
+        self.sigma_spin.setToolTip(
+            "Sigma threshold for iterative sigma-clipping during continuum fitting.\n"
+            "Pixels deviating more than this many σ from the fit are rejected each iteration.\n"
+            "Lower values clip more aggressively; 3.0 is a typical starting point."
+        )
+
         # Add new spinboxes for auto-masking parameters
         self.auto_mask_sigma_spin = QDoubleSpinBox()
         self.auto_mask_sigma_spin.setRange(0.5, 10.0)
         self.auto_mask_sigma_spin.setSingleStep(0.5)
-        self.auto_mask_sigma_spin.setValue(2.0)  # Separate default for auto-masking
-        
+        self.auto_mask_sigma_spin.setValue(2.0)
+        self.auto_mask_sigma_spin.setToolTip(
+            "Detection threshold for auto-masking, in units of MAD robust noise.\n"
+            "Pixels where |residual| > σ × MAD are flagged as spectral features.\n"
+            "Also sets the prominence threshold for peak-based detection.\n"
+            "Lower values mask more; 2.0–3.0 is typical."
+        )
+
         self.min_mask_width_spin = QDoubleSpinBox()
         self.min_mask_width_spin.setRange(1.0, 500.0)
         self.min_mask_width_spin.setSingleStep(10.0)
-        self.min_mask_width_spin.setValue(20.0)  # Default 20 km/s minimum mask width
-        # Set suffix based on current x-axis type
+        self.min_mask_width_spin.setValue(20.0)  # Default for velocity mode (km/s)
         self.min_mask_width_spin.setSuffix(f" {self.x_axis_unit}")
-
+        self.min_mask_width_spin.setToolTip(
+            "Minimum width a flagged region must span to be kept as a mask.\n"
+            "Regions narrower than this are discarded as likely noise spikes.\n"
+            "Velocity mode: ~20 km/s. Wavelength mode: auto-set to ~5 pixels."
+        )
 
         self.mask_gap_spin = QDoubleSpinBox()
         self.mask_gap_spin.setRange(1.0, 500.0)
         self.mask_gap_spin.setSingleStep(10.0)
-        self.mask_gap_spin.setValue(100.0)  # Default 100 km/s grouping window
+        self.mask_gap_spin.setValue(100.0)  # Default for velocity mode (km/s)
         self.mask_gap_spin.setSuffix(f" {self.x_axis_unit}")
+        self.mask_gap_spin.setToolTip(
+            "Maximum gap between two adjacent mask regions before they are merged into one.\n"
+            "Useful when a single broad feature is flagged in disconnected pieces.\n"
+            "Velocity mode: ~100 km/s. Wavelength mode: auto-set to ~10 pixels."
+        )
 
+        self.peak_smooth_spin = QDoubleSpinBox()
+        self.peak_smooth_spin.setRange(0.0, 15.0)
+        self.peak_smooth_spin.setSingleStep(0.5)
+        self.peak_smooth_spin.setValue(3.0)  # Default 3-pixel FWHM smoothing
+        self.peak_smooth_spin.setToolTip(
+            "Gaussian smoothing FWHM (pixels) for peak-based feature detection.\n"
+            "Set to 0 to disable peak detection and use sigma-clipping only."
+        )
 
         advanced_layout.addRow("Min Polynomial Order:", self.min_order_spin)
         advanced_layout.addRow("Max Polynomial Order:", self.max_order_spin)
@@ -449,6 +484,7 @@ class InteractiveContinuumFitWindow(QMainWindow):
         advanced_layout.addRow("Auto-Mask Sigma:", self.auto_mask_sigma_spin)
         advanced_layout.addRow("Min Mask Width:", self.min_mask_width_spin)
         advanced_layout.addRow("Grouping Window:", self.mask_gap_spin)
+        advanced_layout.addRow("Peak Smooth (pix):", self.peak_smooth_spin)
         
         # Add tabs to sidebar
         sidebar.addTab(basic_tab, "Basic")
@@ -524,11 +560,19 @@ class InteractiveContinuumFitWindow(QMainWindow):
         # Calculate equivalent range in the other coordinate system
         if self.velocity_radio.isChecked():
             # Switching to velocity
+            # Convert existing masks from wavelength → velocity
+            if (self.masks and self.velocity is not None
+                    and not getattr(self, 'prev_was_velocity', True)):
+                self.masks = [
+                    float(self.velocity[int(np.argmin(np.abs(self.wave - v)))])
+                    for v in self.masks
+                ]
+
             self.x_axis = self.velocity
             self.x_axis_type = 'velocity'
             self.x_axis_label = 'Velocity (km/s)'
             self.x_axis_unit = 'km/s'
-            
+
             # Set velocity-specific default values
             self.min_mask_width_spin.setRange(1.0, 500.0)
             self.min_mask_width_spin.setSingleStep(10.0)
@@ -537,7 +581,7 @@ class InteractiveContinuumFitWindow(QMainWindow):
             self.mask_gap_spin.setSingleStep(10.0)
             self.mask_gap_spin.setValue(100.0)  # Default 100 km/s grouping window
 
-            
+
             # Convert current wavelength view to velocity if needed
             if not hasattr(self, 'prev_was_velocity') or not self.prev_was_velocity:
                 # If we were in wavelength, convert the current view to equivalent velocity
@@ -556,19 +600,36 @@ class InteractiveContinuumFitWindow(QMainWindow):
             self.prev_was_velocity = True
         else:
             # Switching to wavelength
+            # Convert existing masks from velocity → wavelength
+            if (self.masks and self.velocity is not None
+                    and getattr(self, 'prev_was_velocity', False)):
+                self.masks = [
+                    float(self.wave[int(np.argmin(np.abs(self.velocity - v)))])
+                    for v in self.masks
+                ]
+
             self.x_axis = self.wave
             self.x_axis_type = 'wavelength'
             self.x_axis_label = 'Wavelength (Å)'
             self.x_axis_unit = 'Å'
             
-            # Set wavelength-specific default values
-            self.min_mask_width_spin.setRange(0.001, 500.0)
-            self.min_mask_width_spin.setSingleStep(10.0)
-            self.min_mask_width_spin.setValue(1.0)  # 1 Å for wavelength
-            
-            self.mask_gap_spin.setRange(0.001, 500.0)
-            self.mask_gap_spin.setSingleStep(10.0)
-            self.mask_gap_spin.setValue(5.0)  # 5 Å for wavelength
+            # Set wavelength-specific default values scaled to the pixel scale of
+            # the actual spectrum so they work for COS UV (0.04 Å/px) through
+            # optical (1–2 Å/px) without hardcoding a single number.
+            pix_scale = float(np.median(np.diff(self.wave)))
+            step = round(pix_scale, 3)
+            min_width_default = round(5 * pix_scale, 3)   # ~5 pixels minimum
+            gap_default       = round(10 * pix_scale, 3)  # ~10 pixels gap threshold
+
+            self.min_mask_width_spin.setRange(round(pix_scale, 3), 500.0)
+            self.min_mask_width_spin.setSingleStep(step)
+            self.min_mask_width_spin.setDecimals(3)
+            self.min_mask_width_spin.setValue(min_width_default)
+
+            self.mask_gap_spin.setRange(round(pix_scale, 3), 500.0)
+            self.mask_gap_spin.setSingleStep(step)
+            self.mask_gap_spin.setDecimals(3)
+            self.mask_gap_spin.setValue(gap_default)
 
 
             
@@ -1297,42 +1358,59 @@ class InteractiveContinuumFitWindow(QMainWindow):
             # Step 3: Normalize flux, compute residuals
             normalized_flux = self.flux / prelim_continuum
             residual = normalized_flux - 1.0
-    
+
             from astropy.stats import mad_std
             import warnings
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 robust_std = mad_std(residual, ignore_nan=True)
 
-    
-            # Step 4: Identify potential masked points
+            # Step 3b: Build ivar for peak detection (normalised error units)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                ivar_for_peaks = np.where(
+                    self.error > 0,
+                    1.0 / (self.error / prelim_continuum) ** 2,
+                    0.0
+                )
+
+            # Step 4: Sigma-clip — flag pixels where |residual| > sigma*MAD
+            #         or relative error is too large
             potential_masks = (np.abs(residual) > sigma * robust_std) | \
                               (self.error / prelim_continuum > error_threshold)
 
-            # Try wavelet method
-            #from rbcodes.IGM.find_line_features_wavelet import find_spectral_lines_wavelet, create_feature_mask 
-            #try:
-            #    # Apply wavelet line finder to normalized residuals
-            #    results = find_spectral_lines_wavelet(x_data, residual,
-            #    line_type='absorption', 
-            #    min_snr=sigma,
-            #    min_scale=1,
-            #    max_scale=5,
-            #    num_scales=15,
-            #    fit_lines=True,
-            #    edge_buffer=10
-            #)
-            #   
-            #    # Create a boolean mask (True = keep, False = mask out)
-            #    wavelet_mask = create_feature_mask(x_data, results, width_scale_factor=5.0)
-            #    #potential_masks = ~wavelet_mask  # invert because we want to mask the detected lines
-            #    potential_masks = (( ~wavelet_mask) |
-            #        (np.abs(residual) > sigma * robust_std) |(self.error / prelim_continuum > error_threshold)
-            #        )
-            #except Exception as e:
-            #    self.statusBar.showMessage(f"Wavelet-based detection failed: {str(e)}. Falling back to MAD.")
-            #    potential_masks = (np.abs(residual) > sigma * robust_std) | \
-            #                    (self.error / prelim_continuum > error_threshold)
+            # Step 4b: Peak-based detection — catches coherent features
+            #          (broad/shallow lines) missed by pixel-wise sigma-clip.
+            #          Result is OR-ed into potential_masks; existing flags unchanged.
+            peak_msg = ""
+            smooth_pix = self.peak_smooth_spin.value()
+            if smooth_pix > 0:
+                try:
+                    from rbcodes.GUIs.zfind.picket_fence import detect_peaks_simple
+                    peak_results = detect_peaks_simple(
+                        self.wave,          # always wavelength for physical smoothing
+                        residual,
+                        ivar=ivar_for_peaks,
+                        smooth_fwhm_pix=smooth_pix,
+                        prominence_sigma=sigma,
+                        width_scale_factor=1.5,
+                    )
+                    all_windows = peak_results['emission'] + peak_results['absorption']
+                    for lw, rw in all_windows:
+                        if coord_type == 'velocity':
+                            li = int(np.searchsorted(self.wave, lw))
+                            ri = int(np.searchsorted(self.wave, rw))
+                            li = max(0, min(li, len(self.wave) - 1))
+                            ri = max(0, min(ri, len(self.wave) - 1))
+                            x_lo, x_hi = x_data[li], x_data[ri]
+                        else:
+                            x_lo, x_hi = lw, rw
+                        potential_masks |= (x_data >= x_lo) & (x_data <= x_hi)
+                    n_peaks = len(all_windows)
+                    peak_msg = f", +{n_peaks} peaks"
+                except ImportError:
+                    peak_msg = " (peak detection unavailable)"
+                except Exception as e:
+                    peak_msg = f" (peak detection failed: {e})"
     
     
             # Step 5: Find contiguous mask regions
@@ -1384,7 +1462,7 @@ class InteractiveContinuumFitWindow(QMainWindow):
             units = "km/s" if coord_type == "velocity" else "Å"
             self.statusBar.showMessage(
                 f"Added {region_count} mask regions (σ={sigma}, MAD={robust_std:.3f}, "
-                f"min_width={min_width} {units}, error>{error_threshold*100:.0f}%)"
+                f"min_width={min_width} {units}, error>{error_threshold*100:.0f}%{peak_msg})"
             )
             xlim = self.canvas.figure.gca().get_xlim()
 

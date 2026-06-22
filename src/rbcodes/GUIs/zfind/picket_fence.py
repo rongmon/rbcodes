@@ -136,6 +136,87 @@ def _mad_ivar(flux_smooth):
     return np.full_like(flux_smooth, 1.0 / sigma ** 2)
 
 
+def detect_peaks_simple(wave, flux, ivar=None,
+                        smooth_fwhm_pix=3.0,
+                        prominence_sigma=3.0,
+                        width_scale_factor=1.5):
+    """
+    Detect emission and absorption peaks without requiring a line list.
+
+    Designed for continuum auto-masking: returns wavelength windows
+    (left_wave, right_wave) around each detected peak, sized from the
+    measured peak widths scaled by width_scale_factor.
+
+    Parameters
+    ----------
+    wave : array-like
+        Observed wavelengths in Angstroms, monotonically increasing.
+    flux : array-like
+        Continuum-subtracted or continuum-normalised flux.
+    ivar : array-like or None
+        Inverse-variance. If None or invalid, MAD-STD uniform ivar is used.
+    smooth_fwhm_pix : float
+        FWHM in pixels for Gaussian pre-smoothing (default 3.0).
+    prominence_sigma : float
+        Detection threshold in units of MAD noise (default 3.0).
+    width_scale_factor : float
+        Multiply measured peak half-width by this factor before masking (default 1.5).
+
+    Returns
+    -------
+    dict with keys:
+        'emission'   : list of (left_wave, right_wave) tuples
+        'absorption' : list of (left_wave, right_wave) tuples
+        'peaks'      : dict with 'emission' and 'absorption' center wavelength arrays
+    """
+    from scipy.signal import find_peaks
+
+    wave = np.asarray(wave, dtype=float)
+    flux_arr = np.asarray(flux, dtype=float)
+    flux_clean = np.nan_to_num(flux_arr, nan=0.0)
+
+    # Gaussian smoothing
+    if smooth_fwhm_pix is not None and smooth_fwhm_pix > 0:
+        sigma_pix = float(smooth_fwhm_pix) / 2.355
+        flux_smooth = gaussian_filter1d(flux_clean, sigma=sigma_pix)
+    else:
+        flux_smooth = flux_clean.copy()
+
+    # MAD noise estimate for prominence threshold
+    sigma_noise = 1.4826 * float(
+        median_abs_deviation(flux_smooth, nan_policy='omit')
+    )
+    if sigma_noise == 0.0:
+        finite = flux_smooth[np.isfinite(flux_smooth)]
+        sigma_noise = float(np.std(finite)) if len(finite) > 0 else 1.0
+    prominence = prominence_sigma * sigma_noise
+
+    N = len(wave)
+
+    def _peak_windows(indices, props):
+        windows = []
+        for k, idx in enumerate(indices):
+            left_ip  = props['left_ips'][k]
+            right_ip = props['right_ips'][k]
+            half_w   = (right_ip - left_ip) / 2.0 * width_scale_factor
+            left_pix  = max(0,   int(np.floor(idx - half_w)))
+            right_pix = min(N-1, int(np.ceil( idx + half_w)))
+            windows.append((wave[left_pix], wave[right_pix]))
+        return windows
+
+    em_idx,  em_props  = find_peaks( flux_smooth, prominence=prominence, width=1)
+    abs_idx, abs_props = find_peaks(-flux_smooth, prominence=prominence, width=1)
+
+    return {
+        'emission':   _peak_windows(em_idx,  em_props),
+        'absorption': _peak_windows(abs_idx, abs_props),
+        'peaks': {
+            'emission':   wave[em_idx]  if len(em_idx)  > 0 else np.array([]),
+            'absorption': wave[abs_idx] if len(abs_idx) > 0 else np.array([]),
+        },
+    }
+
+
 # ---------------------------------------------------------------------------
 # PicketFenceZ
 # ---------------------------------------------------------------------------
