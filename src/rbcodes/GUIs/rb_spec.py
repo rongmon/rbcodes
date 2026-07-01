@@ -1,6 +1,6 @@
 __version__ = "2.4.0"
 __author__ = "Rongmon Bordoloi"
-__last_updated__ = "June 2025"
+__last_updated__ = "June 2026"
 
 """
 rb_spec.py - Comprehensive Absorption Line Analysis Pipeline
@@ -20,9 +20,9 @@ Version History:
 - v2.3.0 (2025): Continuum mask added to output, display_field_info module added 
 - v2.3.1 (2025): Fixed logN text in plot_continuum routine
 - v2.3.2 (2025): Unified version declaration, minor cleanup
-- v2.3.3 (2025): logN_e for non detector now gives 1\sigma limit and logN=0 for non detection
+- v2.3.3 (2025): logN_e for non detector now gives 1 sigma limit and logN=0 for non detection
 - v2.4.0 (2025): updated from_file routine, now uses rb_spectrum to load fits file by default, supports .fits.gz file format.
-
+-v2.4.1 (2026): Added robust checking for interactive/Interactive option in fit_continuum method, added helper function to show relevant help topics, bug fix to load_rb_spec_object function. 
 """.format(
     version=__version__,
     author=__author__,
@@ -30,15 +30,13 @@ Version History:
 )
 
 import numpy as np
-from scipy.interpolate import splrep,splev
-from numpy.polynomial.legendre import Legendre
 import sys
 import os
-import pdb
 import warnings
 import datetime
-
 import json
+
+_SPEED_OF_LIGHT = 2.9979e5  # km/s
 
 #rbcodes imports 
 
@@ -86,17 +84,28 @@ def load_rb_spec_object(filename, verbose=True):
         print(f"Error loading JSON file {filename}: {e}")
         return None
 
-    spec_object = rb_spec.from_data(np.array(data['wave_slice'])*(1.+data['zabs']), np.array(data['flux_slice']), np.array(data['error_slice']))
+    # Bypass __init__ to avoid re-normalizing already-processed arrays
+    spec_object = object.__new__(rb_spec)
 
-    # Set each value in json file as an attribute of the object
+    # Set safe defaults for attributes __init__ normally provides
+    spec_object.filename = filename
+    spec_object.continuum_masks = []
+    spec_object.continuum_mask_wavelengths = []
+    spec_object.continuum_fit_params = {}
+
+    # Populate all attributes from JSON, converting lists to numpy arrays
     for key, value in data.items():
         if isinstance(value, list):
-            value = np.array(value)  # Convert lists to numpy arrays
+            value = np.array(value)
         setattr(spec_object, key, value)
+
+    # wave/flux/error point to the slice since the full spectrum is not stored
+    spec_object.wave  = spec_object.wave_slice
+    spec_object.flux  = spec_object.flux_slice
+    spec_object.error = spec_object.error_slice
 
     if verbose:
         print('---Finished loading saved rb_spec object----')
-        # Add a hint about metadata if it exists
         if 'metadata' in data and isinstance(data['metadata'], dict):
             print('Metadata is available in the .metadata attribute.')
 
@@ -111,6 +120,141 @@ def calculate_confidence_bounds(x, model, cov_matrix):
     y_err = np.sqrt(np.sum((P @ cov_matrix) * P, axis=1))
 
     return y_err
+
+_HELP_TOPICS = {
+    'overview': """
+rb_spec — Absorption Line Analysis Pipeline  (v{version})
+
+Typical workflow:
+──────────────────────────────────────────────────────────
+  1. Load       s = rb_spec.from_file('spec.fits')
+  2. Shift      s.shift_spec(zabs=0.5112)
+  3. Slice      s.slice_spec(2796.3, -600, 600, use_vel=True)
+  4. Continuum  s.fit_continuum(mask=[-200, 200], Legendre=3)
+  5. Measure    s.compute_EW(2796.3, vmin=-200, vmax=200)
+  6. Save       s.save_slice('result.json')
+
+Topics (call rb_spec.help('<topic>') for details):
+  load | slice | continuum | ew | save | plot
+""",
+    'load': """
+LOADING SPECTRA
+───────────────
+# Auto-detect format from extension:
+s = rb_spec.from_file('spectrum.fits')
+s = rb_spec.from_file('spectrum.fits.gz')
+s = rb_spec.from_file('spectrum.txt')
+s = rb_spec.from_file('spectrum.p')
+
+# Explicit filetype:
+s = rb_spec.from_file('spectrum.fits', filetype='fits')
+s = rb_spec.from_file('spectrum.txt',  filetype='ascii')
+s = rb_spec.from_file('spectrum.p',    filetype='p')
+
+# From numpy arrays directly:
+s = rb_spec.from_data(wave, flux, error)
+
+# Reload a previously saved JSON result:
+from rbcodes.GUIs.rb_spec import load_rb_spec_object
+s = load_rb_spec_object('result.json')
+""",
+    'slice': """
+SHIFTING AND SLICING
+────────────────────
+# Shift spectrum to absorber rest frame first:
+s.shift_spec(zabs=0.5112)
+
+# Slice in velocity space (recommended):
+s.slice_spec(2796.3, -600, 600, use_vel=True)
+
+# Slice in wavelength space:
+s.slice_spec(2796.3, 4190.0, 4210.0, use_vel=False)
+
+# Skip line-list lookup, use exact wavelength:
+s.slice_spec(2796.3, -600, 600, use_vel=True, method='Exact')
+
+# Available after slicing:
+#   s.wave_slice    rest-frame wavelength
+#   s.flux_slice    flux
+#   s.error_slice   error
+#   s.velo          velocity array (km/s)
+""",
+    'continuum': """
+CONTINUUM FITTING
+─────────────────
+# Legendre polynomial with masked regions:
+s.fit_continuum(mask=[-200, 200, 400, 600], Legendre=3, domain=[-600, 600])
+
+# Auto-select best polynomial order via BIC:
+s.fit_continuum(mask=[-200, 200], Legendre=3, optimize_cont=True)
+
+# Interactive GUI (Qt):
+s.fit_continuum(Interactive=True)
+
+# Use a pre-computed continuum array:
+s.fit_continuum(prefit_cont=my_cont_array)
+
+# RANSAC fitting (robust to outliers):
+s.fit_continuum_ransac(window=149)
+
+# Available after fitting:
+#   s.cont     fitted continuum
+#   s.fnorm    normalized flux
+#   s.enorm    normalized error
+""",
+    'ew': """
+EQUIVALENT WIDTH AND COLUMN DENSITY
+────────────────────────────────────
+# Compute EW and apparent optical depth column density:
+s.compute_EW(2796.3, vmin=-200., vmax=200.)
+
+# Available after compute_EW:
+#   s.W             rest-frame EW (Angstroms)
+#   s.W_e           EW uncertainty (Angstroms)
+#   s.logN          log10 column density (cm^-2)
+#   s.logN_e        log10 column density uncertainty
+#   s.N             column density (cm^-2)
+#   s.N_e           column density uncertainty
+#   s.vel_centroid  EW-weighted velocity centroid (km/s)
+#   s.vel_disp      1-sigma velocity dispersion (km/s)
+#   s.Tau           apparent optical depth vs velocity
+""",
+    'save': """
+SAVING AND LOADING
+──────────────────
+# Save as JSON (recommended, human-readable):
+s.save_slice('result.json')
+
+# Save as pickle (preserves full Python object):
+s.save_slice('result.p', file_format='pickle')
+
+# Reload from JSON:
+from rbcodes.GUIs.rb_spec import load_rb_spec_object
+s = load_rb_spec_object('result.json')
+
+# Reload from pickle:
+import pickle
+with open('result.p', 'rb') as f:
+    s = pickle.load(f)
+""",
+    'plot': """
+PLOTTING
+────────
+# Interactive plot of the full spectrum:
+s.plot_spec()
+
+# Two-panel plot: flux+continuum and normalized flux:
+s.plot_slice()
+
+# Continuum fit with masked regions and EW window:
+fig = s.plot_continuum_fit()
+fig = s.plot_continuum_fit(xlim=[-400, 400], outfilename='fit.png')
+
+# Doublet side-by-side:
+s.plot_doublet(2796.3, 2803.5, vmin=-600, vmax=600)
+""",
+}
+
 
 class rb_spec(object):
     """A spectrum read into a class, spectrum will have following properties.
@@ -346,7 +490,32 @@ class rb_spec(object):
     def version(self):
         """Return the rb_spec version."""
         return __version__
-    
+
+    @staticmethod
+    def help(topic=None):
+        """Display usage help and examples.
+
+        Parameters
+        ----------
+        topic : str, optional
+            One of: 'load', 'slice', 'continuum', 'ew', 'save', 'plot'.
+            If None, prints workflow overview and topic list.
+
+        Examples
+        --------
+        rb_spec.help()
+        rb_spec.help('continuum')
+        rb_spec.help('ew')
+        """
+        valid = [k for k in _HELP_TOPICS if k != 'overview']
+        if topic is None:
+            print(_HELP_TOPICS['overview'].format(version=__version__))
+        elif topic in _HELP_TOPICS:
+            print(_HELP_TOPICS[topic])
+        else:
+            print(f"Unknown topic '{topic}'. Available: {', '.join(valid)}")
+
+
 
     @classmethod
     def from_file(cls, filename, filetype=False, efil=None, **kwargs):
@@ -926,7 +1095,8 @@ class rb_spec(object):
         verbose = kwargs.get('verbose', False)  # Default is False if not provided
         optimize_cont = kwargs.get('optimize_cont', False)  # Default is False if not provided
         n_sigma = kwargs.get('n_sigma', 3)  # sigma clipping level
-        interactive = kwargs.get('Interactive', False)  # Check if interactive mode is requested
+        #interactive = kwargs.get('Interactive', False)  # Check if interactive mode is requested
+        interactive = kwargs.get('interactive') or kwargs.get('Interactive', False)
         classic_gui = kwargs.get('classic', False)  # Check if classic GUI is requested
         
         # If optimize_cont is True and Legendre is False, set a default value for Legendre

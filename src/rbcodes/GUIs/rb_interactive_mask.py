@@ -23,6 +23,9 @@ from astropy.stats import sigma_clip
 import time
 import warnings
 import datetime
+import os 
+os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '0'
+os.environ['QT_ENABLE_HIGHDPI_SCALING'] = '0'
 
 # Try to import from rbcodes, fall back to local imports if not available
 try:

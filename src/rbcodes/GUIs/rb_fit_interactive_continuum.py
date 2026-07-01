@@ -7,6 +7,8 @@ from scipy.interpolate import splrep, splev
 import sys
 import os
 import warnings
+os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '0'
+os.environ['QT_ENABLE_HIGHDPI_SCALING'] = '0'
 
 class rb_fit_interactive_continuum:
     """

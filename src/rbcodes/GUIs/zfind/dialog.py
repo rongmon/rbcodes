@@ -510,6 +510,16 @@ try:
                                        border: 1px solid #555; padding: 2px; }
             """)
 
+            # On macOS the native style ignores QComboBox QAbstractItemView
+            # stylesheet rules in the popup (a separate top-level window).
+            # Applying Fusion style only to each QComboBox fixes the popup
+            # colours without touching the parent application's style.
+            from PyQt5.QtWidgets import QStyleFactory, QComboBox as _QCB
+            _fusion = QStyleFactory.create('Fusion')
+            if _fusion is not None:
+                for _cb in self.findChildren(_QCB):
+                    _cb.setStyle(_fusion)
+
             # --- Matplotlib figure: dark background ---
             _bg   = '#353535'
             _axes = '#252525'
