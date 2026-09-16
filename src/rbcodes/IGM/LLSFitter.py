@@ -13,7 +13,11 @@ class LLSFitter:
     Class for measuring the column density of Lyman Limit Systems (LLS)
     using both curve_fit and MCMC methods.
     """
-    
+
+    # Exact HI Lyman-limit wavelength in Angstroms (not the commonly
+    # rounded 912 A), matching qso_spec_with_LLS.py and rb_qso_spec.py.
+    LYMAN_LIMIT = 911.753
+
     def __init__(self, spectrum_file=None, zabs=None):
         """
         Initialize the LLSFitter object.
@@ -39,6 +43,15 @@ class LLSFitter:
         self.theta_init = np.array([1.0, 0.0, 17.0])  # [C0, C1, logNHI]
         self.bounds_lower = np.array([-10.0, -10.0, 14.0])
         self.bounds_upper = np.array([10.0, 10.0, 19.0])
+
+        # Which HI photoionization cross section to use in model_flx:
+        # 'exact'  -- non-relativistic hydrogenic cross section (Stobbe 1930;
+        #             Bethe & Salpeter 1957), valid at all wavelengths below
+        #             the Lyman limit.
+        # 'approx' -- legacy near-threshold power-law approximation,
+        #             sigma(lambda) = 6.3e-18 * (lambda/LYMAN_LIMIT)^2.75 cm^2,
+        #             kept only for backward-compatibility/comparison.
+        self.tau_model = 'exact'
         
         # Results storage
         self.curve_fit_results = None
@@ -128,9 +141,26 @@ class LLSFitter:
             ]
         else:
             self.continuum_regions = regions
-        
+
         return self
-    
+
+    def set_tau_model(self, tau_model):
+        """
+        Select which HI photoionization cross section model_flx uses.
+
+        Parameters:
+        -----------
+        tau_model : str
+            'exact' (default) for the non-relativistic hydrogenic cross
+            section (Stobbe 1930; Bethe & Salpeter 1957), or 'approx' for
+            the legacy sigma(lambda) = 6.3e-18*(lambda/LYMAN_LIMIT)^2.75
+            power-law approximation, kept for backward compatibility/comparison.
+        """
+        if tau_model not in ('exact', 'approx'):
+            raise ValueError("tau_model must be 'exact' or 'approx'")
+        self.tau_model = tau_model
+        return self
+
     def get_continuum_mask(self, sigma=None):
         """
         Create mask for continuum regions and apply sigma clipping to avoid absorption lines.
@@ -211,29 +241,73 @@ class LLSFitter:
         
         return final_mask    
     # --- Models ---
+    @staticmethod
+    def sigma_hi_exact(wave, lam_edge=LYMAN_LIMIT, sigma0=6.3e-18):
+        """
+        Exact non-relativistic hydrogenic photoionization cross section
+        (Stobbe 1930; Bethe & Salpeter 1957), valid at all wavelengths
+        below the Lyman limit. Matches rb_qso_spec.py's
+        _Lyman_edge_flux_tau and the fix applied in qso_spec_with_LLS.py.
+
+        Parameters:
+        -----------
+        wave : array-like
+            Rest-frame wavelength array in Angstroms, all values < lam_edge.
+        lam_edge : float, optional
+            Lyman-limit wavelength in Angstroms (default 911.753, the
+            class's LYMAN_LIMIT constant).
+        sigma0 : float, optional
+            Threshold cross section in cm^2 (default 6.3e-18).
+
+        Returns:
+        --------
+        sigma : array-like
+            Cross section in cm^2 at each wavelength.
+        """
+        epsilon = np.sqrt(lam_edge / wave - 1.0)
+        return sigma0 * (wave / lam_edge) ** 4 * np.exp(
+            (4.0 - 4.0 * np.arctan(epsilon) / epsilon) / (1.0 - np.exp(-2.0 * np.pi / epsilon))
+        )
+
+    @staticmethod
+    def sigma_hi_approx(wave, lam_edge=LYMAN_LIMIT, sigma0=6.3e-18):
+        """
+        Legacy near-threshold power-law approximation,
+        sigma(lambda) = sigma0 * (lambda/lam_edge)^2.75, kept only for
+        backward compatibility/comparison with the exact cross section.
+        """
+        return sigma0 * (wave / lam_edge) ** 2.75
+
     def model_flx(self, theta, wave):
         """
         Physical model with a continuum and a Lyman limit absorption.
-        
+
         Parameters:
         -----------
         theta : array-like
             Model parameters [C0, C1, logNHI]
         wave : array-like
             Wavelength array in Angstroms
-            
+
         Returns:
         --------
         model : array-like
             Model flux
         """
-        c = theta[0] + theta[1] * (wave - 911.0)
+        c = theta[0] + theta[1] * (wave - self.LYMAN_LIMIT)
         NHI = 10.0 ** theta[2]
-        Tau = NHI * 6.3e-18 * (wave / 912.0) ** 2.75
 
         model = np.copy(c)
-        q = np.where(wave <= 912)
-        model[q] = c[q] * np.exp(-Tau[q])
+        q = np.where(wave <= self.LYMAN_LIMIT)
+        wave_q = wave[q]
+
+        if self.tau_model == 'approx':
+            sigma = self.sigma_hi_approx(wave_q)
+        else:
+            sigma = self.sigma_hi_exact(wave_q)
+        Tau_q = NHI * sigma
+
+        model[q] = c[q] * np.exp(-Tau_q)
         return model
     
     def model_test(self, wave, *params):
@@ -473,7 +547,8 @@ class LLSFitter:
         ax.plot(self.rest_wave, model_flux, 'g-', linewidth=2, label='Model Fit', zorder=4)
         
         # Add vertical line at Lyman limit
-        ax.axvline(x=912, color='k', linestyle='--', alpha=0.7, label='Lyman Limit (912 Å)', zorder=3)
+        ax.axvline(x=self.LYMAN_LIMIT, color='k', linestyle='--', alpha=0.7,
+                   label=f'Lyman Limit ({self.LYMAN_LIMIT:.3f} Å)', zorder=3)
         
         # Plot continuum points used (do this last so they're on top)
         if show_continuum_regions:
