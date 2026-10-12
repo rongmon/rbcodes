@@ -26,6 +26,7 @@ cube.wcs     # 2D spatial WCS
 | `noise` | `NoiseModel.from_cube(cube, linefree=..., sky_box= / sky_mask= / sky_region=, spaxel_scale=True)` — sqrt(variance), or the hybrid model σ_sky(λ)·s(y,x) from a user-defined sky region; `.correlation(...)` estimates adjacent-spaxel / adjacent-channel noise correlation |
 | `lines` | `LINES` catalogue (air and vacuum rest wavelengths), `LineModel` (single lines, multiplets with fixed or bounded free ratios, several lines tied in v and σ), LSFs (`lsf_muse`, `lsf_resolution(R)`, `lsf_constant`) |
 | `measure` | `GaussianFitter`, `MomentMeasurer`, `MCErrors`, `QualityMask`, `SpaxelDecisions`, `FitResult` (maps; FITS save/load), `spaxel_report`, `plot_spaxel` |
+| `vmap` | `VelocityMap`: v, σ_v, width, flux, mask, rejection codes; image-plane pixel positions and optional source-plane β (kpc) + image id; kpc/pix, PSF, line, z, provenance; `from_fit`, `from_moments`, `select`, `subtract_bulk`, `points`, `save`/`load`, `plot` |
 | `spatial_mask` | `parse_ds9_regions(text)`, `region_to_mask(region, wcs, ny, nx)` (pixel-centre rule; image or sky coordinates), `draw_region_overlay`, `regions_to_ds9_text`, `iau_name` |
 
 ## Example: velocity map inside a ds9 region
@@ -105,6 +106,24 @@ decisions=)`; they change the maps without refitting the cube.
 `sky_region`) and line-free channels: σ(λ, y, x) = σ_sky(λ) × s(y, x), where σ_sky is the
 robust scatter across the sky spaxels per channel and s the robust scatter of f/σ_sky over the
 line-free channels of each spaxel (`spaxel_scale=False` drops s).
+
+## VelocityMap (`vmap`)
+
+Data and mocks, lensed or unlensed, all become a `VelocityMap`; everything downstream
+(`rbcodes.turbulence`: bulk flows, structure functions, summaries, inference) only uses it.
+
+```python
+from rbcodes.ifu.vmap import VelocityMap
+vm = VelocityMap.from_fit(fit, qm, kpc_per_pix=1.49, psf_fwhm_kpc=5.2)
+vm.save('OII_vmap.fits')                      # VelocityMap.load(...)
+inner = vm.select(region='inner.reg')         # ds9 region / bool mask; select(image=1) for lensed images
+x, y, v, v_err = vm.points()                  # kept spaxels; positions='source' uses beta (kpc)
+res = vm.subtract_bulk(model)                 # model.fit(x, y, v, v_err), model.predict(x, y)
+```
+
+Rejected spaxels keep their values but are outside `mask`; nothing is filled. Each operation
+appends to `provenance`. Source-plane positions are set with `set_source_positions(beta_x,
+beta_y, image)` (kpc), e.g. from a lens model.
 
 ## Notes
 

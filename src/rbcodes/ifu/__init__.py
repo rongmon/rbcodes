@@ -14,6 +14,7 @@ spatial_mask     ds9 region parsing, region -> pixel mask, overlays, region expo
 noise            NoiseModel: variance, or hybrid estimate from a user-defined sky region
 lines            line catalogue (air/vacuum) and LineModel (single, multiplet, tied lines)
 measure          GaussianFitter, MomentMeasurer, MCErrors, QualityMask, SpaxelDecisions
+vmap             VelocityMap: velocity field + errors, mask, image/source-plane positions
 """
 from .io import load_fits
 from .io.image2d import load_image

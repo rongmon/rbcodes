@@ -22,6 +22,8 @@ New Features
   region; correlated-noise estimate).
 * ``rbcodes.ifu.measure``: ``GaussianFitter``, ``MomentMeasurer``, ``MCErrors``,
   ``QualityMask`` (rejection codes 0-10), ``SpaxelDecisions``, ``FitResult`` (FITS save/load).
+* ``rbcodes.ifu.vmap``: ``VelocityMap`` (velocity field with errors, mask, codes, image- and
+  source-plane positions, metadata and provenance; select, bulk subtraction, FITS save/load).
 * ``rb_selftest`` checks the line fit.
 
 Version 3.0.0 (2026-10-12)
