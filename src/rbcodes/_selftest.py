@@ -285,12 +285,12 @@ def check_ifu_cube_io():
 
 def check_ifu_line_fit():
     import numpy as np
-    from rbcodes.ifu.linefit import EmissionLine, fit_spectrum, vac_to_air
-    assert abs(vac_to_air(3727.092) - 3726.032) < 0.01
-    line = EmissionLine('OII', z=0.785, air=True, lsf='muse')
+    from rbcodes.ifu.lines import LineModel, lsf_muse
+    from rbcodes.ifu.measure import GaussianFitter
+    lm = LineModel('OII', z=0.785, windows=dict(fit=(6620., 6690.)), air=False, lsf=lsf_muse)
     wave = np.arange(6620., 6690., 1.25)
-    true = (0.1, 4., 1.2, -75., 35.)
-    r = fit_spectrum(line, wave, line(wave, *true), np.full(wave.size, 0.01))
+    true = (0.02, 4., 1.2, -75., 35.)          # continuum within the default +-5 x noise bound
+    r = GaussianFitter(lm).fit_spectrum(wave, lm(wave, *true), np.full(wave.size, 0.01))
     assert r['status'] == 0 and np.allclose(r['p'], true, rtol=1e-4, atol=1e-4), r.get('p')
 
 

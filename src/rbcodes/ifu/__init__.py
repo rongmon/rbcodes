@@ -11,8 +11,9 @@ cube_collapse    white-light, narrow-band and continuum-subtracted images
 moment_maps      moment 0/1/2 maps, S/N maps, linear continuum subtraction
 aperture_extract aperture masks and 1D spectrum extraction
 spatial_mask     ds9 region parsing, region -> pixel mask, overlays, region export
-noise            noise cube from the variance, or estimated from sky spaxels
-linefit          emission-line fits -> velocity / dispersion / flux maps, quality cuts
+noise            NoiseModel: variance, or hybrid estimate from a user-defined sky region
+lines            line catalogue (air/vacuum) and LineModel (single, multiplet, tied lines)
+measure          GaussianFitter, MomentMeasurer, MCErrors, QualityMask, SpaxelDecisions
 """
 from .io import load_fits
 from .io.image2d import load_image

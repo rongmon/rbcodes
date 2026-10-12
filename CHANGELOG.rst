@@ -15,11 +15,13 @@ Changes
 
 New Features
 ------------
-* ``rbcodes.ifu.linefit``: emission-line fitting of IFU cubes (single lines and doublets
-  with free or fixed ratios, tied velocity and width, instrumental width in the model,
-  air or vacuum wavelengths from the rbcodes line lists) giving velocity, dispersion, flux
-  and ratio maps with errors; quality cuts with rejection codes; FITS save/load of the maps.
-* ``rbcodes.ifu.noise``: noise cubes from the variance, or estimated without one.
+* ``rbcodes.ifu.lines``: line catalogue (air and vacuum) and ``LineModel`` (single lines,
+  multiplets with fixed or bounded free ratios, several lines tied in velocity and width,
+  per-line LSF); windows in observed-frame Angstrom.
+* ``rbcodes.ifu.noise``: ``NoiseModel`` (variance, or hybrid estimate from a user-defined sky
+  region; correlated-noise estimate).
+* ``rbcodes.ifu.measure``: ``GaussianFitter``, ``MomentMeasurer``, ``MCErrors``,
+  ``QualityMask`` (rejection codes 0-10), ``SpaxelDecisions``, ``FitResult`` (FITS save/load).
 * ``rb_selftest`` checks the line fit.
 
 Version 3.0.0 (2026-10-12)

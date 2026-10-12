@@ -23,8 +23,9 @@ cube.wcs     # 2D spatial WCS
 | `cube_collapse` | `build_whitelight(flux, wave, wmin, wmax, method)`, `build_narrowband`, `build_continuum_sub` (on-band minus one or two continuum windows) |
 | `moment_maps` | `moment0/1/2(flux, wave, wmin, wmax[, lambda_rest])` (flux, velocity in km/s, dispersion in km/s), `moment_map(..., order)`, `compute_snr_map`, `sky_stats`, `subtract_linear_continuum`, `velocity_array` |
 | `aperture_extract` | `make_circular_mask`, `make_square_mask`, `make_annulus_mask`; `extract_aperture` (sum, error from variance), `extract_variance_weighted` (inverse-variance weighted mean), `extract_with_method`, `subtract_background` |
-| `noise` | `noise_cube(flux, var=None, line_free=None, sky_mask=None)` — sqrt(variance), or, without a variance cube, a sky spectrum (robust spread over your sky region per channel) times a per-spaxel scale (robust spread over line-free channels). `sky_mask_from_region(reg, wcs, shape)` makes the sky mask from a ds9 region file or text |
-| `linefit` | Emission-line fitting → velocity, dispersion, flux, doublet-ratio maps with errors; quality cuts (see below) |
+| `noise` | `NoiseModel.from_cube(cube, linefree=..., sky_box= / sky_mask= / sky_region=, spaxel_scale=True)` — sqrt(variance), or the hybrid model σ_sky(λ)·s(y,x) from a user-defined sky region; `.correlation(...)` estimates adjacent-spaxel / adjacent-channel noise correlation |
+| `lines` | `LINES` catalogue (air and vacuum rest wavelengths), `LineModel` (single lines, multiplets with fixed or bounded free ratios, several lines tied in v and σ), LSFs (`lsf_muse`, `lsf_resolution(R)`, `lsf_constant`) |
+| `measure` | `GaussianFitter`, `MomentMeasurer`, `MCErrors`, `QualityMask`, `SpaxelDecisions`, `FitResult` (maps; FITS save/load), `spaxel_report`, `plot_spaxel` |
 | `spatial_mask` | `parse_ds9_regions(text)`, `region_to_mask(region, wcs, ny, nx)` (pixel-centre rule; image or sky coordinates), `draw_region_overlay`, `regions_to_ds9_text`, `iau_name` |
 
 ## Example: velocity map inside a ds9 region
@@ -43,65 +44,67 @@ reg = parse_ds9_regions(open('nebula.reg').read())[0]
 v[~region_to_mask(reg, cube.wcs, ny, nx)] = float('nan')
 ```
 
-## Line fitting (`rbcodes.ifu.linefit`)
+## Velocity measurements (`lines`, `noise`, `measure`)
 
 ```python
 from rbcodes.ifu import load_fits
-from rbcodes.ifu.linefit import EmissionLine, fit_cube, quality_mask, LineFitResult
+from rbcodes.ifu.lines import LineModel, lsf_muse
+from rbcodes.ifu.noise import NoiseModel
+from rbcodes.ifu.measure import GaussianFitter, QualityMask, SpaxelDecisions, FitResult
 
-cube = load_fits('muse_cube.fits')
-line = EmissionLine('OII', z=0.785273, air=True, lsf='muse')
-res  = fit_cube(cube, line, exclude=[(6680, 6685)])      # noise from the variance extension
-keep, code = quality_mask(res, snr_min=5, verr_max=30, chi2_max=3)
-res.save('OII_fit.fits')                                  # all maps + WCS; LineFitResult.load(...)
-v = res['v']                                              # km/s relative to z
+cube = load_fits('cube.fits')
+lm   = LineModel('OII', z=0.785273, windows=dict(flux=(6640, 6680), fit=(6640, 6680)),
+                 air=False, lsf=lsf_muse)                      # air/vacuum must match the cube
+nm   = NoiseModel.from_cube(cube, linefree=lm, sky_box=(0, 5, 0, 8))
+dec  = SpaxelDecisions('OII_decisions.json')
+fit  = GaussianFitter(lm, vmax=600, sig_bounds=(1, 500)).fit_cube(cube, nm, detect_snr=3, decisions=dec)
+qm   = QualityMask(snr_min=5, verr_max=30, chi2_max=3).apply(fit, decisions=dec)
+fit.save('OII_fit.fits')                                     # FitResult.load(...)
 ```
 
-**Model.** All components share one velocity v and one intrinsic dispersion s:
-f(λ) = C + F Σ w_k G(λ; λ_k, σ_k), with λ_k = λ_rest,k (1+z)(1+v/c) and
-σ_k² = (λ_k s/c)² + σ_LSF(λ_k)². G has unit area, so F is the total line flux. The instrumental
-width is part of the model, so `sig` is the intrinsic dispersion.
+**Nothing instrument- or physics-specific is fixed.** Air or vacuum (`air`), the LSF, the
+windows, doublet ratio bounds (`ratio_bounds`), fixed ratios (`ratios`) and the line catalogue
+(`catalogue`) are all arguments; `LINES` only provides defaults.
 
-**Lines.** Presets `OII` (doublet, free ratio R = F3729/F3726), `OIII`, `OIII_doublet` (ratio fixed
-to 1/2.98), `Hbeta`, `Halpha`, `NII` (fixed 1/3.05), `MgII` (free R = F2803/F2796). Rest
-wavelengths come from the rbcodes line lists (vacuum); `air=True` converts them to air (MUSE
-cubes are in air — using vacuum wavelengths on an air cube shifts velocities by ~85 km/s).
-Custom lines: `EmissionLine('CIII', z=2, rest=(1906.68, 1908.73), ratio_bounds=(0.5, 2))`.
+**Model.** All lines share one velocity v and one intrinsic dispersion s:
+f(λ) = C_g + F_g Σ w_k G(λ; λ_k, σ_k) in the fit window of line g, λ_k = λ_rest,k (1+z)(1+v/c),
+σ_k² = (λ_k s/c)² + σ_LSF(λ_k)². G has unit area, so F is the line flux; with an LSF, `sig` is
+the intrinsic dispersion. Doublets: `ratio='free'` (R = F of the 2nd catalogue entry / 1st,
+within bounds), `'fixed'`, or `'single'`. Several lines: `LineModel(['OII', 'Hbeta'], z,
+windows={'OII': dict(fit=...), 'Hbeta': dict(fit=...)})` — independent fluxes and continua,
+each line in its own fit window with its own LSF (`lsf={'OII': ..., 'Hbeta': ...}`).
 
-**Instrumental width (`lsf`).** `'muse'` (Bacon et al. 2017), `lsf_resolution(R)` for a constant
-resolving power (e.g. KCWI), a number (constant σ in Å), any function of observed wavelength,
-or None.
+**Windows** are observed-frame Å per line: `fit` (required), `flux` (detection S/N; default
+`fit`), `exclude` (ranges dropped from the fit), `linefree` (noise estimate; default: more
+than 5 Å outside `fit`).
 
-**Fitting options** (`fit_cube`): `window` (default ±max(900, vmax+300) km/s around the
-line), `exclude` ranges (sky residuals), `vmax`, `sig_bounds`, `ratio_bounds`, `detect` /
-`detect_snr` (which spaxels to fit; the detection S/N counts continuum too, so pass `detect`
-for cubes that are not continuum-subtracted), `overrides={(iy, ix): {...}}` for single spaxels.
-Errors are from the fit covariance with the given noise, multiplied by sqrt(max(1, χ²_ν))
-(`inflate=False` to switch off). Fitting is done in units of the median noise, so any flux
-units work.
+**GaussianFitter.** `curve_fit` with `absolute_sigma=True`; errors × sqrt(max(1, χ²_ν)) unless
+`inflate=False`. Bounds: ±`vmax`, `sig_bounds`, ratio bounds, continuum ±`cont_bound` × median
+noise around `cont_p0` (defaults 5 and 0 assume continuum-subtracted cubes). Fits are done in
+units of the median noise, so any flux units work. Per-spaxel `overrides={(iy, ix): dict(fit=,
+exclude=, vmax=, sig_bounds=, ratio_bounds=, p0_v=, p0_sig=)}`; `refit(...)` fits one spaxel.
 
-**Maps** (`res[key]`): `v`, `v_err`, `sig`, `sig_err`, `F`, `F_err`, `R`, `R_err`, `C`,
-`C_err`, `chi2`, `status` (NaN = not fitted, 0 ok, 1 bad data, 2 fit failed), `det_snr`.
+**MomentMeasurer.** Fixed velocity window moments (v, width including the instrument, flux) with
+analytic errors; the components of tied lines are stacked in velocity with inverse-variance
+weights (gains S/N for lines of similar strength). Choose `vwin` close to the line extent.
 
-**Quality cuts.** `quality_mask` applies S/N, velocity-error, χ²_ν and velocity-bound cuts, then
-removes isolated pixels and small islands; `code` gives the first reason each spaxel was
-rejected (`REJECT`), with `force_include` / `force_exclude` lists. `spaxel_report(res, code, iy, ix)`
-prints a one-line diagnosis and `plot_spaxel(axes, line, wave, flux, noise, iy, ix, res)` plots
-data, fit, components and residuals.
+**MCErrors.** Injects noise (white, or correlated with Gaussian smoothing of `corr_spatial`
+spaxels / `corr_spectral` channels) into the best-fit models, refits, and returns the ratio of
+the scatter in v to the reported σ_v. The seed is a required argument.
 
-**No variance extension?** Define a blank-sky region (no sources, away from the cube edges)
-and estimate the noise from it:
-```python
-from rbcodes.ifu.noise import noise_cube, sky_mask_from_region
-from rbcodes.ifu.linefit import fit_domain
-sky = sky_mask_from_region('sky.reg', cube.wcs, cube.flux.shape[1:])   # or any bool (ny, nx) array
-line_free = ~fit_domain(cube.wave, line.default_window(1000))
-noise, _ = noise_cube(cube.flux, line_free=line_free, sky_mask=sky)
-res = fit_cube(cube, line, noise=noise)
-```
-noise(λ, y, x) = σ_sky(λ) × s(y, x): σ_sky is the robust scatter (1.4826 MAD) across the sky
-spaxels in each channel (follows sky-line residuals); s is the robust scatter of flux/σ_sky over
-the line-free channels of each spaxel (follows exposure-map variations).
+**QualityMask** codes (`REJECT`): 0 kept, 1 not attempted / bad data, 2 fit failed, 3 low S/N,
+4 large σ_v, 5 high χ²_ν, 6 at velocity bound, 7 isolated pixel, 8 small island, 9 forced
+include, 10 forced exclude. No hole filling.
+
+**SpaxelDecisions** (JSON file): `accept(fit, iy, ix)` keeps a spaxel; `accept(fit, iy, ix,
+fitter.refit(...))` writes a refit into the maps and stores its override; `reject(line, iy, ix)`;
+`forget(line, iy, ix)`. Re-applied by `fit_cube(..., decisions=)` and `QualityMask.apply(...,
+decisions=)`; they change the maps without refitting the cube.
+
+**No variance extension?** Give a blank-sky region (`sky_box`, `sky_mask`, or a ds9
+`sky_region`) and line-free channels: σ(λ, y, x) = σ_sky(λ) × s(y, x), where σ_sky is the
+robust scatter across the sky spaxels per channel and s the robust scatter of f/σ_sky over the
+line-free channels of each spaxel (`spaxel_scale=False` drops s).
 
 ## Notes
 
