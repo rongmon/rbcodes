@@ -13,6 +13,7 @@ Python tools for astrophysical spectroscopy research by Rongmon Bordoloi and col
   - [Halo Analysis](#halo-analysis)
   - [Statistical Tools](#statistical-tools)
   - [Lensing](#lensing)
+  - [IFU Tools](#ifu-tools)
   - [Utility Modules](#utility-modules)
   - [Catalog Tools](#catalog-tools)
 - [Citation](#citation)
@@ -161,6 +162,16 @@ Standalone modules for dark matter halo calculations. Available for direct impor
 | Module | Description |
 |--------|-------------|
 | **lens_ang_sep.py** | Gravitational lensing ray-tracing — maps image-plane coordinates to the source plane (or any plane between lens and source) using deflection matrices; nearest-pixel or bilinear lookup, NaN outside the maps. Includes cosmological distance utilities (`cosmic_D`, `ang_D12`, `ang_sep_D`). (A. Shaban 2020, R. Bordoloi 2021) |
+
+---
+
+### IFU Tools
+
+[Full Documentation](ifu/ifu_readme.md)
+
+| Module | Description |
+|--------|-------------|
+| **rbcodes.ifu** | IFU cube reading (MUSE, KCWI, generic; variance from extensions or a separate file), white-light/narrow-band images, moment maps, aperture extraction, ds9 region masks. Used by `rb_ifuview` and `rb_align`. |
 
 ---
 

@@ -26,12 +26,12 @@ from rbcodes.GUIs.ifuviewer.image_panel import ImageCanvas
 from rbcodes.GUIs.ifuviewer.image_controls import ImageControls
 from rbcodes.GUIs.ifuviewer.channel_slider import ChannelSlider
 from rbcodes.GUIs.ifuviewer.spectrum_panel import SpectrumCanvas
-from rbcodes.GUIs.ifuviewer.io.image2d import FITSImage
-from rbcodes.GUIs.ifuviewer.processing.cube_collapse import (
+from rbcodes.ifu.io.image2d import FITSImage
+from rbcodes.ifu.cube_collapse import (
     build_whitelight, build_narrowband, build_continuum_sub)
-from rbcodes.GUIs.ifuviewer.processing.moment_maps import (
+from rbcodes.ifu.moment_maps import (
     moment_map, subtract_linear_continuum, compute_snr_map, sky_stats)
-from rbcodes.GUIs.ifuviewer.processing.aperture_extract import (
+from rbcodes.ifu.aperture_extract import (
     extract_aperture, extract_variance_weighted,
     extract_with_method, subtract_background,
     make_circular_mask, make_annulus_mask)
@@ -1284,7 +1284,7 @@ class MainWindow(QMainWindow):
         """Push all current apertures to the live ds9 instance as region overlays."""
         if not self._ds9_bridge or not self._ds9_bridge.available:
             return
-        from rbcodes.GUIs.ifuviewer.processing.spatial_mask import regions_to_ds9_text
+        from rbcodes.ifu.spatial_mask import regions_to_ds9_text
 
         cube  = self._active_cube
         wcs   = cube.wcs if cube is not None else None
@@ -1378,7 +1378,7 @@ class MainWindow(QMainWindow):
 
     def _extract_from_region_text(self, reg_text, method='sum', weighting='None'):
         """Parse region text; extract spectra if cube, overlay shapes only if 2D image."""
-        from rbcodes.GUIs.ifuviewer.processing.spatial_mask import (
+        from rbcodes.ifu.spatial_mask import (
             parse_ds9_regions, region_to_mask, region_center_sky)
 
         cube = self._active_cube
@@ -1460,7 +1460,7 @@ class MainWindow(QMainWindow):
 
     def _on_save_apertures_as_region(self):
         """Save current apertures back to a ds9 .reg file."""
-        from rbcodes.GUIs.ifuviewer.processing.spatial_mask import regions_to_ds9_text
+        from rbcodes.ifu.spatial_mask import regions_to_ds9_text
 
         if not self._extraction_marker_groups:
             QMessageBox.information(self, "Nothing to save",
@@ -1544,7 +1544,7 @@ class MainWindow(QMainWindow):
             selected_only = (reg_text_or_path == 'selected')
             reg_text = self._ds9_bridge.get_regions(selected_only=selected_only)
 
-        from rbcodes.GUIs.ifuviewer.processing.spatial_mask import (
+        from rbcodes.ifu.spatial_mask import (
             parse_ds9_regions, region_to_mask, region_center_sky, iau_name)
 
         regions = parse_ds9_regions(reg_text)
@@ -1619,7 +1619,7 @@ class MainWindow(QMainWindow):
                              save_folder, fname_style, prefix,
                              open_multispec, errors):
         """Load spectra into strip / save to disk after batch extraction."""
-        from rbcodes.GUIs.ifuviewer.processing.spatial_mask import iau_name
+        from rbcodes.ifu.spatial_mask import iau_name
 
         saved = 0
         loaded = 0
@@ -3453,9 +3453,9 @@ class BatchExtractThread(QThread):
         self._cancel = True
 
     def run(self):
-        from rbcodes.GUIs.ifuviewer.processing.spatial_mask import (
+        from rbcodes.ifu.spatial_mask import (
             region_to_mask, region_center_sky)
-        from rbcodes.GUIs.ifuviewer.processing.aperture_extract import (
+        from rbcodes.ifu.aperture_extract import (
             extract_aperture, extract_with_method)
 
         cube    = self._cube

@@ -264,7 +264,7 @@ def check_lens_raytrace():
 def check_ifu_cube_io():
     import numpy as np
     from astropy.io import fits
-    from rbcodes.GUIs.ifuviewer.io import load_fits
+    from rbcodes.ifu.io import load_fits
     nw, ny, nx = 50, 6, 7
     h = fits.Header()
     h['INSTRUME'] = 'MUSE'

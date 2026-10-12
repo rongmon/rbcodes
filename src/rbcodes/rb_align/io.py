@@ -1,5 +1,5 @@
 """
-io.py — thin wrappers around GUIs.ifuviewer.io for rb_align.
+io.py — thin wrappers around rbcodes.ifu.io for rb_align.
 
 Responsibilities
 ----------------
@@ -18,8 +18,8 @@ from typing import Optional
 import numpy as np
 from astropy.io import fits
 
-from rbcodes.GUIs.ifuviewer.io.auto_cube import load_fits
-from rbcodes.GUIs.ifuviewer.io.image2d import load_image
+from rbcodes.ifu.io.auto_cube import load_fits
+from rbcodes.ifu.io.image2d import load_image
 
 from .core import Frame
 

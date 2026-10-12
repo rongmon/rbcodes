@@ -2,6 +2,17 @@
 Changelog
 =========
 
+Unreleased (3.1.0)
+==================
+
+Changes
+-------
+* New ``rbcodes.ifu`` package: the IFU cube reader and image/moment/extraction/region
+  functions moved out of ``GUIs/ifuviewer/io`` and ``GUIs/ifuviewer/processing`` so they
+  can be used outside the GUI (``from rbcodes.ifu import load_fits``). ``rb_ifuview`` and
+  ``rb_align`` now import from there; the old import paths are removed. Tests in
+  ``tests/test_ifu``; docs in ``docs/ifu/ifu_readme.md``.
+
 Version 3.0.0 (2026-10-12)
 ==========================
 

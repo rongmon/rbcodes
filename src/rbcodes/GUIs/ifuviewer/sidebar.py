@@ -7,8 +7,8 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QColor
 
-from rbcodes.GUIs.ifuviewer.io.auto_cube import load_fits
-from rbcodes.GUIs.ifuviewer.io.image2d import FITSImage
+from rbcodes.ifu.io.auto_cube import load_fits
+from rbcodes.ifu.io.image2d import FITSImage
 
 
 class DatasetSidebar(QWidget):
