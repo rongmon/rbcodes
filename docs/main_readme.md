@@ -14,6 +14,7 @@ Python tools for astrophysical spectroscopy research by Rongmon Bordoloi and col
   - [Statistical Tools](#statistical-tools)
   - [Lensing](#lensing)
   - [IFU Tools](#ifu-tools)
+  - [Turbulence](#turbulence)
   - [Utility Modules](#utility-modules)
   - [Catalog Tools](#catalog-tools)
 - [Citation](#citation)
@@ -172,6 +173,16 @@ Standalone modules for dark matter halo calculations. Available for direct impor
 | Module | Description |
 |--------|-------------|
 | **rbcodes.ifu** | IFU cube reading (MUSE, KCWI, generic; variance from extensions or a separate file), white-light/narrow-band images, moment maps, aperture extraction, ds9 region masks, noise models, line models (air or vacuum, doublets, tied lines), Gaussian and moment velocity measurements, Monte Carlo error checks, quality cuts and per-spaxel decisions. Used by `rb_ifuview` and `rb_align`. |
+
+---
+
+### Turbulence
+
+[Full Documentation](turbulence/turbulence_readme.md)
+
+| Module | Description |
+|--------|-------------|
+| **rbcodes.turbulence** | Bulk-flow models (plane, quadratic, arctan disk, two-lobe; BIC comparison) and velocity structure functions of `VelocityMap`s: raw / debiased / inverse-variance / cross estimators, jackknife errors, directional S2, image- or source-plane separations, power-law fits with optional noise floor or PSF smoothing. |
 
 ---
 

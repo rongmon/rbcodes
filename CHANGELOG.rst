@@ -24,6 +24,10 @@ New Features
   ``QualityMask`` (rejection codes 0-10), ``SpaxelDecisions``, ``FitResult`` (FITS save/load).
 * ``rbcodes.ifu.vmap``: ``VelocityMap`` (velocity field with errors, mask, codes, image- and
   source-plane positions, metadata and provenance; select, bulk subtraction, FITS save/load).
+* New ``rbcodes.turbulence`` package: ``bulk`` (Constant, Plane, Quadratic, ArctanDisk, TwoLobe,
+  compare_bulk) and ``vsf`` (StructureFunction: raw/debiased/ivw/cross estimators, jackknife
+  covariance, directional S2, image or source plane, power-law fits with optional noise floor
+  or PSF smoothing, r_geo, r_turn). Docs in ``docs/turbulence/turbulence_readme.md``.
 * ``rb_selftest`` checks the line fit.
 
 Version 3.0.0 (2026-10-12)
