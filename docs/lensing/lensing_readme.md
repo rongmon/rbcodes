@@ -143,7 +143,23 @@ Raytrace a set of input RA DECs to their corresponding source plane at the given
            ralist: list of right ascension of the object at the image plane
            declist: list of declination of the object at the image plane.
            zs_n: redshift of the new source or plane at which you want to calculate the separation
-    
+           interp: 'nearest' (default) or 'bilinear' lookup of the deflection maps
+
            Output:
             returns the RA and Dec of the source plane location or the given redshift plane
+            (also stored as s.src_ra, s.src_dec). Positions outside the deflection maps give NaN.
+
+Note (2026): earlier versions truncated pixel positions with `int()`, so the deflection was often
+read from the neighbouring pixel. The default is now the pixel that contains the position. On the
+SGAS J1527 model (0.06" pixels) source-plane positions change by ~0.03" (median), well below the
+lens-model uncertainty from its realizations (~0.4").
+
+### deflection_at() (`lens_ang_sep`)
+
+Deflection, in deflection-map pixels, at 0-based pixel positions of the maps; `interp` as above.
+
+### deflection_scale() (`lens_ang_sep`)
+
+Factor applied to the deflections for a plane at `zs_n`: (D_ls/D_s)(zs_n) / (D_ls/D_s)(zs_o).
+It is 1 at `zs_n = zs_o` and 0 at the lens redshift.
 
