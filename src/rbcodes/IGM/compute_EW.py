@@ -364,9 +364,9 @@ def compute_EW(
         if is_saturated:
             ax1.axhline(y=sat_threshold, color='orange', linestyle='--', alpha=0.7, 
                       label=f'Saturation Threshold ({sat_threshold:.3f})')
-            title_text = f'$W_{{rest}} = {ew_tot:.3f} \pm {err_ew_tot:.3f}$ Å [SATURATED: {saturation_fraction:.1%}]'
+            title_text = rf'$W_{{rest}} = {ew_tot:.3f} \pm {err_ew_tot:.3f}$ Å [SATURATED: {saturation_fraction:.1%}]'
         else:
-            title_text = f'$W_{{rest}} = {ew_tot:.3f} \pm {err_ew_tot:.3f}$ Å'
+            title_text = rf'$W_{{rest}} = {ew_tot:.3f} \pm {err_ew_tot:.3f}$ Å'
         
         if SNR:
             ax1.text(min(vel)+200, 0.2, f'Median SNR: {output.get("SNR", "N/A"):.1f}')

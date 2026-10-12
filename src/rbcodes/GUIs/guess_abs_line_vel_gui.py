@@ -58,7 +58,7 @@ class vStack(object):
                
         self.keys = list(self.ions.keys())[:-1] # last item is the full target spectrum
         
-        self.nions = np.int(len(self.keys))
+        self.nions = int(len(self.keys))
         #Flag to know if it is a detection or not
         #Set everything by default to non-detection
         for i in (self.keys):
@@ -264,7 +264,7 @@ class vStack(object):
             if self.ions[i]['flag']==1:
                 #print(self.ions[i]['name']+' '+np.str('%.6f' % self.ions[i]['lam_0_z'])+' '+np.str(self.ions[i]['z']))
                 zip1=self.ions[i]['name']
-                zip2=np.str('%.6f' % self.ions[i]['lam_0_z'])#self.ions[i]['lam_0_z']#
+                zip2=str('%.6f' % self.ions[i]['lam_0_z'])#self.ions[i]['lam_0_z']#
                 zip3=self.ions[i]['z']#np.str(self.ions[i]['z'])
                 lst1.append(zip1)
                 lst2.append(zip2)

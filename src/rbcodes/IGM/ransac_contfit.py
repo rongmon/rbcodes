@@ -197,7 +197,7 @@ class cont_fitter(object):
         plt.plot(self.wave, self.flux, c='grey', label='Original Spectrum')
         plt.plot(self.wave, self.flx_md, c='blue', label='RunningMedFilter, '+str(self.window))
         plt.plot(self.wave, self.cont, c='red', label='RANSAC fit')
-        plt.xlabel('Wavelength ($\AA$)', fontsize=15)
+        plt.xlabel(r'Wavelength ($\AA$)', fontsize=15)
         plt.ylabel('Relative Flux ', fontsize=15)
         plt.legend(loc='upper right', fontsize=12)
         plt.ylim([-0.01, self.flux.max()+2])

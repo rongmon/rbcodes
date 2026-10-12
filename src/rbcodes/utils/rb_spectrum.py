@@ -691,38 +691,39 @@ def rb_read_spectrum(filename, meta=None, **kwargs):
 def _rb_read_fits(filename, **kwargs):
     """Read FITS file with format detection"""
     try:
-        hdulist = fits.open(filename)
-        header = hdulist[0].header
+        # memmap=False: arrays returned by the parsers stay valid after the file is closed
+        with fits.open(filename, memmap=False) as hdulist:
+            header = hdulist[0].header
         
-        # First check for binary table (regardless of NAXIS)
-        if (header.get('XTENSION') == 'BINTABLE' or 
-            (header.get('NAXIS', 0) == 0 and len(hdulist) > 1 and 
-             hasattr(hdulist[1], 'data') and hasattr(hdulist[1].data, 'dtype'))):
-            return _rb_parse_fits_binary_table(hdulist, filename=filename, **kwargs)
+            # First check for binary table (regardless of NAXIS)
+            if (header.get('XTENSION') == 'BINTABLE' or 
+                (header.get('NAXIS', 0) == 0 and len(hdulist) > 1 and 
+                 hasattr(hdulist[1], 'data') and hasattr(hdulist[1].data, 'dtype'))):
+                return _rb_parse_fits_binary_table(hdulist, filename=filename, **kwargs)
         
-        # Then proceed with NAXIS-based logic for image data
-        naxis = header.get('NAXIS', 0)
+            # Then proceed with NAXIS-based logic for image data
+            naxis = header.get('NAXIS', 0)
         
-        if naxis == 0:
-            # True binary table case
-            return _rb_parse_fits_binary_table(hdulist, filename=filename, **kwargs)
-        elif naxis == 1:
-            if len(hdulist) == 1:
-                # Single extension - look for separate error file
-                return _rb_parse_single_extension_fits(filename, hdulist, **kwargs)
+            if naxis == 0:
+                # True binary table case
+                return _rb_parse_fits_binary_table(hdulist, filename=filename, **kwargs)
+            elif naxis == 1:
+                if len(hdulist) == 1:
+                    # Single extension - look for separate error file
+                    return _rb_parse_single_extension_fits(filename, hdulist, **kwargs)
+                else:
+                    # Multi-extension
+                    return _rb_parse_multi_extension_fits(hdulist, filename=filename, **kwargs)
+            elif naxis == 2:
+                # Check for DESI brick format
+                if (len(hdulist) >= 3 and hdulist[0].name == 'FLUX' and 
+                    hdulist[2].name == 'WAVELENGTH'):
+                    return _rb_parse_desi_brick(hdulist, filename=filename, **kwargs)
+                else:
+                    # SDSS-style format (true 2D image)
+                    return _rb_parse_sdss_fits(hdulist, filename=filename, **kwargs)
             else:
-                # Multi-extension
-                return _rb_parse_multi_extension_fits(hdulist, filename=filename, **kwargs)
-        elif naxis == 2:
-            # Check for DESI brick format
-            if (len(hdulist) >= 3 and hdulist[0].name == 'FLUX' and 
-                hdulist[2].name == 'WAVELENGTH'):
-                return _rb_parse_desi_brick(hdulist, filename=filename, **kwargs)
-            else:
-                # SDSS-style format (true 2D image)
-                return _rb_parse_sdss_fits(hdulist, filename=filename, **kwargs)
-        else:
-            raise ValueError(f"Unsupported FITS format: NAXIS={naxis}")
+                raise ValueError(f"Unsupported FITS format: NAXIS={naxis}")
     
     except Exception as e:
         print(f"rb_spectrum FITS parsing failed for {filename}: {str(e)}")

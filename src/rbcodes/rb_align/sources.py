@@ -1657,6 +1657,7 @@ def _show_ncc_surface(ax, ref_img, tgt_img, ref_frame, tgt_frame,
     ax.set_xlabel('Δx (px in search)')
     ax.set_ylabel('Δy (px in search)')
     try:
+        import matplotlib.pyplot as plt
         plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
     except Exception:
         pass
