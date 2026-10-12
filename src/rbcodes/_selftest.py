@@ -283,8 +283,19 @@ def check_ifu_cube_io():
     assert cube.wcs is not None and cube.wcs.naxis == 2
 
 
+def check_ifu_line_fit():
+    import numpy as np
+    from rbcodes.ifu.linefit import EmissionLine, fit_spectrum, vac_to_air
+    assert abs(vac_to_air(3727.092) - 3726.032) < 0.01
+    line = EmissionLine('OII', z=0.785, air=True, lsf='muse')
+    wave = np.arange(6620., 6690., 1.25)
+    true = (0.1, 4., 1.2, -75., 35.)
+    r = fit_spectrum(line, wave, line(wave, *true), np.full(wave.size, 0.01))
+    assert r['status'] == 0 and np.allclose(r['p'], true, rtol=1e-4, atol=1e-4), r.get('p')
+
+
 NUMERICAL_CHECKS = (check_package_data, check_line_list, check_equivalent_width, check_nfw_mass,
-                    check_cosmology, check_lens_raytrace, check_ifu_cube_io)
+                    check_cosmology, check_lens_raytrace, check_ifu_cube_io, check_ifu_line_fit)
 
 
 # ---------------------------------------------------------------------------

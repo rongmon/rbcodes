@@ -171,7 +171,7 @@ Standalone modules for dark matter halo calculations. Available for direct impor
 
 | Module | Description |
 |--------|-------------|
-| **rbcodes.ifu** | IFU cube reading (MUSE, KCWI, generic; variance from extensions or a separate file), white-light/narrow-band images, moment maps, aperture extraction, ds9 region masks. Used by `rb_ifuview` and `rb_align`. |
+| **rbcodes.ifu** | IFU cube reading (MUSE, KCWI, generic; variance from extensions or a separate file), white-light/narrow-band images, moment maps, aperture extraction, ds9 region masks, noise estimates, and emission-line fitting to velocity/dispersion/flux maps with quality cuts. Used by `rb_ifuview` and `rb_align`. |
 
 ---
 

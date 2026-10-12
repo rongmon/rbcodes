@@ -13,6 +13,15 @@ Changes
   ``rb_align`` now import from there; the old import paths are removed. Tests in
   ``tests/test_ifu``; docs in ``docs/ifu/ifu_readme.md``.
 
+New Features
+------------
+* ``rbcodes.ifu.linefit``: emission-line fitting of IFU cubes (single lines and doublets
+  with free or fixed ratios, tied velocity and width, instrumental width in the model,
+  air or vacuum wavelengths from the rbcodes line lists) giving velocity, dispersion, flux
+  and ratio maps with errors; quality cuts with rejection codes; FITS save/load of the maps.
+* ``rbcodes.ifu.noise``: noise cubes from the variance, or estimated without one.
+* ``rb_selftest`` checks the line fit.
+
 Version 3.0.0 (2026-10-12)
 ==========================
 
