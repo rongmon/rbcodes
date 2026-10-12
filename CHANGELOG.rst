@@ -2,8 +2,8 @@
 Changelog
 =========
 
-Unreleased (py312-compat)
-=========================
+Version 3.0.0 (2026-10-12)
+==========================
 
 Breaking Changes
 ----------------
@@ -14,6 +14,8 @@ Breaking Changes
   from SciPy; not used anywhere in the package).
 * Removed ``environment.yml`` (an old Python 3.9 environment snapshot, not used by the
   installation). ``requirements-py312-lock.txt`` lists the exact tested versions.
+* Removed the unused Sphinx / Read the Docs setup (``docs/conf.py``, ``docs/*.rst``,
+  ``.readthedocs.yml``); the documentation is the Markdown in ``docs/``.
 * ``lens_ang_sep.model_delens.raytrace_new_z`` now reads the deflection of the pixel
   that contains each position. It previously truncated with ``int()``, which often read
   the neighbouring pixel; on the SGAS J1527 model, source-plane positions change by
