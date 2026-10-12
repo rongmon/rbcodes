@@ -20,14 +20,15 @@ Key components:
 - ``ang_D12(w_m, w_l, z1, z2)``         — angular diameter distance between two redshifts
 - ``ang_sep_D(xc1, yc1, xc2, yc2)``    — angular separation in radians
 - ``model_delens``                      — class to load lens deflection matrices and ray-trace
-  coordinates to a new source-plane redshift
+  coordinates to a new source-plane redshift (nearest-pixel or bilinear lookup of the
+  deflection; positions outside the maps give NaN)
 
 Example
 -------
     from rbcodes.lensing import lens_ang_sep as l
     s = l.model_delens(fits_x, fits_y, zl=0.392, zs_o=2.760)
-    s.raytrace_new_z(ra, dec, zs_n=0.5)
-    print(s.src_ra, s.src_dec)
+    src_ra, src_dec = s.raytrace_new_z(ra, dec, zs_n=0.5)                    # nearest pixel
+    src_ra, src_dec = s.raytrace_new_z(ra, dec, zs_n=0.5, interp='bilinear')
 
 Originally written by Ahmed Shaban (2020); extended by Rongmon Bordoloi (2021).
 

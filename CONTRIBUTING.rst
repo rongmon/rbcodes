@@ -91,7 +91,7 @@ Before you start coding, we recommend creating an isolated `virtual
 environment`_ to avoid any problems with your installed Python packages.
 This can easily be done via Miniconda_::
 
-    conda create -n rbcodes python=3.10
+    conda create -n rbcodes python=3.12
     conda activate rbcodes
 
 Clone the repository
@@ -105,12 +105,15 @@ Clone the repository
     git clone https://github.com/<your-username>/rbcodes.git
     cd rbcodes
 
-#. Install the package in development mode::
+#. Install the package in development mode, with the test dependencies::
 
     pip install -U pip setuptools
-    pip install -e .
+    pip install -e ".[testing]"
 
    This allows you to import the package under development and test your changes.
+   Check the installation with::
+
+    rb_selftest
 
 Implement your changes
 ----------------------
@@ -142,6 +145,11 @@ Implement your changes
 #. Before submitting, check that your changes don't break unit tests::
 
     pytest
+
+   This includes package-wide checks that every module imports, that the source
+   compiles without warnings, and that no NumPy, SciPy, astropy, pandas or
+   matplotlib function removed in the installed versions is used. The same tests
+   run on GitHub for every push and pull request.
 
    or run the full test suite with::
 

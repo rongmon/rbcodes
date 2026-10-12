@@ -154,9 +154,10 @@ pip install -e .
 pip install --upgrade PyQt5
 ```
 
-On M1/M2 Macs, use conda instead:
+PyQt5 5.15.10 and later install from pip on Apple Silicon. If the pip install fails,
+use the conda-forge build (the conda package is called `pyqt`):
 ```bash
-conda install -c conda-forge pyqt5
+conda install -c conda-forge "pyqt=5"
 ```
 
 #### GUI won't open (blank window or crash)
@@ -174,17 +175,23 @@ pip install --upgrade PyQt5 matplotlib
 ssh -X user@host
 ```
 
-#### "pandas version 1.3.5" error
+#### Dependency version conflicts
 
-**Cause**: Dependency conflict with newer pandas
+**Cause**: Another package in the same environment needs a version of numpy, scipy,
+astropy, pandas or matplotlib outside the range rbcodes allows (see
+[Dependencies](#dependencies)). The upper bounds keep out major releases that have not
+been tested yet.
 
-**Solution**: rbcodes is compatible with pandas 1.3.5. If you need a newer version:
-1. Open an issue on GitHub: https://github.com/rongmon/rbcodes/issues
-2. Or manually test with newer pandas version:
+**Solution**: Install rbcodes in its own environment. To get exactly the versions it
+was tested with:
 
 ```bash
-pip install pandas==1.4.0  # (at your own risk)
+pip install -r requirements-py312-lock.txt
+pip install -e . --no-deps
+rb_selftest
 ```
+
+If you need a newer major version of a dependency, please open an issue.
 
 #### JWST/NIRCam tools not working
 
@@ -270,13 +277,7 @@ pip install --upgrade rbcodes
 pip uninstall rbcodes
 ```
 
-If installed in development mode:
-
-```bash
-pip uninstall rbcodes
-cd /path/to/rbcodes
-python setup.py develop --uninstall
-```
+This works for both normal and development-mode (`pip install -e .`) installs.
 
 ## Getting Help
 
@@ -306,9 +307,9 @@ pip install -e ".[testing]"
 
 # Run the tests
 pytest
-
-# Run tests
-pytest
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
+The same tests run automatically on GitHub (Linux and macOS, newest and minimum
+supported dependency versions) for every push and pull request.
+
+See [CONTRIBUTING.rst](CONTRIBUTING.rst) for more details.
