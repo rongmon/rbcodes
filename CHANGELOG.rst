@@ -31,7 +31,9 @@ New Features
 * ``rbcodes.turbulence.forward`` (``grf``, ``psf_weight``, ``TurbulenceField``, ``Observation``: mock
   ``VelocityMap`` objects from 2-D or 3-D slab turbulent fields with toy intermittency, flux-weighted
   PSF, mask, bulk flow and noise) and ``rbcodes.turbulence.demo`` (``demo_velocity_field``,
-  ``demo_cube``), ported from vsf_pipeline.
+  ``demo_cube``), ported from vsf_pipeline. ``Observation`` also forward-models lensed systems:
+  the field is made in the source plane and sampled at each spaxel's source-plane position
+  (``beta=``, or ``from_vmap(traced_map, positions='source')``) before the image-plane PSF and noise.
 * ``rbcodes.turbulence.summaries``: ``S2``, ``Scattering`` (reduced wavelet scattering transform),
   ``Kurtosis``, ``LineWidth`` blocks and ``Summaries`` (measured on the data's pairs after the same
   bulk removal; optional variance-stabilising transforms), ported from vsf_pipeline.

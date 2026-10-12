@@ -14,6 +14,12 @@ independent smooth field of scale ``L_env``.
 Observation: flux-weighted PSF average, (F v (x) P) / (F (x) P); mean removed over the mask;
 optional bulk-flow model added; Gaussian noise of the per-spaxel velocity errors.
 
+Lensed systems (``beta=``): the field is made on a source-plane grid (``src_kpp`` kpc per pixel)
+covering the source-plane positions beta of the spaxels (e.g. from
+``rbcodes.lensing.lens_model.LensModel.raytrace``), sampled at each spaxel's beta (bilinear), and
+then observed in the image plane as above (PSF, mask, noise). Spaxels of different images that map
+to the same beta get the same field value. Spaxels without beta get zero weight.
+
 * mode '2D': sigma is the rms of the *observed* (PSF-weighted) field in the mask.
 * mode '3D': sigma is the rms of the 3-D field; the map is the PSF-weighted line-of-sight mean,
   and the width map is sigma_obs^2 = W(sigma_los^2 + v_c^2) - W(v_c)^2 + sigma_th^2 (W = the
@@ -133,34 +139,89 @@ class Observation:
     sigerr : (ny, nx), optional, width errors (3-D mode)
     sig_th : thermal width added in quadrature in 3-D mode (km/s; default 2.3)
     line, z, wcs : metadata copied to the mock maps
+    beta : (beta_x, beta_y), optional
+        Source-plane positions (kpc, 2-D like the mask, NaN where unknown) of a lensed system.
+        Spaxels without beta are removed from the mask.
+    image : (ny, nx) int, optional, multiple-image ids (copied to the mocks)
+    src_kpp : source-plane grid spacing (kpc); default: the median distance between neighbouring
+        spaxels in the source plane
     """
 
     def __init__(self, mask, flux, kpp, psf_sig, verr, bulk_model=None, sigerr=None, sig_th=2.3,
-                 line='mock', z=None, wcs=None):
+                 line='mock', z=None, wcs=None, beta=None, image=None, src_kpp=None):
         self.mask, self.flux, self.kpp, self.psf_sig = np.asarray(mask, bool), np.nan_to_num(flux), kpp, psf_sig
         self.shape = self.mask.shape
+        self.beta, self.image, self.src_kpp = None, image, src_kpp
+        if beta is not None:
+            bx, by = (np.asarray(b, dtype=float) for b in beta)
+            if bx.shape != self.shape or by.shape != self.shape:
+                raise ValueError('beta arrays must have the shape of the mask.')
+            have = np.isfinite(bx) & np.isfinite(by)
+            self.mask = self.mask & have
+            self.flux = np.where(have, self.flux, 0.)
+            self.beta = (bx, by)
+            if src_kpp is None:
+                from scipy.spatial import cKDTree
+                # distinct positions only: spaxels of different images can share a beta
+                pts = np.unique(np.round(np.c_[bx[self.mask], by[self.mask]], 9), axis=0)
+                if len(pts) < 2:
+                    raise ValueError('Fewer than two distinct source-plane positions in the mask.')
+                d, _ = cKDTree(pts).query(pts, k=2)
+                self.src_kpp = float(np.median(d[:, 1]))
+            if not self.src_kpp > 0:
+                raise ValueError(f'src_kpp must be positive, got {self.src_kpp}.')
         self.verr = np.nan_to_num(np.broadcast_to(verr, self.shape)).astype(float)
         self.sigerr = None if sigerr is None else np.nan_to_num(np.broadcast_to(sigerr, self.shape)).astype(float)
         self.bulk = np.zeros(self.shape) if bulk_model is None else np.nan_to_num(bulk_model)
         self.sig_th, self.line, self.z, self.wcs = sig_th, line, z, wcs
 
     @classmethod
-    def from_vmap(cls, vm, psf_fwhm_kpc=None, flux=None, bulk_model=None, **kw):
-        """Mask, flux, velocity errors, scale and PSF of a data VelocityMap."""
+    def from_vmap(cls, vm, psf_fwhm_kpc=None, flux=None, bulk_model=None, positions='image', **kw):
+        """Mask, flux, velocity errors, scale and PSF of a data VelocityMap; ``positions='source'``
+        also takes its source-plane positions and image ids (a lensed system)."""
         if vm.kpc_per_pix is None:
             raise ValueError('The map needs kpc_per_pix.')
         fwhm = vm.psf_fwhm_kpc if psf_fwhm_kpc is None else psf_fwhm_kpc
         if fwhm is None:
             raise ValueError('Give psf_fwhm_kpc (the map has none).')
         flux = vm.flux if flux is None else flux
+        if positions == 'source':
+            if not vm.has_source_positions:
+                raise ValueError('The map has no source-plane positions; ray-trace it first.')
+            kw.setdefault('beta', (vm.beta_x, vm.beta_y))
+            kw.setdefault('image', vm.image)
         return cls(vm.mask, flux, vm.kpc_per_pix, fwhm / 2.3548 / vm.kpc_per_pix, vm.v_err,
                    bulk_model=bulk_model, sigerr=np.where(np.isfinite(vm.width_err), vm.width_err, 0.),
                    line=vm.line, z=vm.z, wcs=vm.wcs, **kw)
 
+    def _draw(self, field, rng, kpp):
+        """The field on the image grid: drawn there, or (lensed) drawn in the source plane and sampled at beta."""
+        if self.beta is None:
+            return field.draw(self.shape, self.kpp if kpp is None else kpp, rng)
+        if kpp is not None and kpp != self.kpp:
+            raise ValueError('kpp cannot be changed for a lensed observation (positions come from beta).')
+        from scipy.ndimage import map_coordinates
+        bx, by = self.beta
+        have = np.isfinite(bx) & np.isfinite(by)
+        h = self.src_kpp
+        x0, y0 = np.nanmin(bx) - 2 * h, np.nanmin(by) - 2 * h
+        nx = int(np.ceil((np.nanmax(bx) - x0) / h)) + 3
+        ny = int(np.ceil((np.nanmax(by) - y0) / h)) + 3
+        if ny * nx > 4_000_000:
+            raise ValueError(f'Source-plane grid of {ny} x {nx} pixels at src_kpp={h:.3g} kpc is too large; '
+                             'give a larger src_kpp.')
+        d = field.draw((ny, nx), h, rng)
+        coords = np.vstack([((by[have] - y0) / h), ((bx[have] - x0) / h)])
+        out = {}
+        for k, f in d.items():
+            a = np.zeros(self.shape)
+            a[have] = map_coordinates(f, coords, order=1, mode='nearest')
+            out[k] = a
+        return out
+
     def observe(self, field, rng, kpp=None):
         """Noise-free observed turbulent maps: (v, width or None)."""
-        kpp = self.kpp if kpp is None else kpp
-        d = field.draw(self.shape, kpp, rng)
+        d = self._draw(field, rng, kpp)
         if field.mode == '2D':
             t = psf_weight(d['g'], self.flux, self.psf_sig)
             t = t - t[self.mask].mean()
@@ -183,11 +244,16 @@ class Observation:
         s = None if s is None else np.where(self.mask, s, np.nan)
         prov = [f'mock {field.mode}: sigma={field.sigma:g} alpha={field.alpha:g} L={field.L_kpc} '
                 f'gamma={field.gamma:g} noise={noise}']
-        return VelocityMap(v, self.verr, self.mask, width=s, kpc_per_pix=self.kpp if kpp is None else kpp,
-                           psf_fwhm_kpc=self.psf_sig * 2.3548 * self.kpp, line=self.line, z=self.z,
-                           wcs=self.wcs, provenance=prov,
-                           meta=dict(mock=dict(sigma=field.sigma, alpha=field.alpha, L_kpc=field.L_kpc,
-                                               gamma=field.gamma, mode=field.mode)))
+        if self.beta is not None:
+            prov[0] += f' (lensed, source grid {self.src_kpp:.3g} kpc)'
+        vm = VelocityMap(v, self.verr, self.mask, width=s, kpc_per_pix=self.kpp if kpp is None else kpp,
+                         psf_fwhm_kpc=self.psf_sig * 2.3548 * self.kpp, line=self.line, z=self.z,
+                         wcs=self.wcs, provenance=prov,
+                         meta=dict(mock=dict(sigma=field.sigma, alpha=field.alpha, L_kpc=field.L_kpc,
+                                             gamma=field.gamma, mode=field.mode, lensed=self.beta is not None)))
+        if self.beta is not None:
+            vm.set_source_positions(self.beta[0], self.beta[1], self.image)
+        return vm
 
     def simulate(self, theta, rng, noise=True, kpp=None, **field_kw):
         """Mock VelocityMap for theta = (sigma, alpha, log10 L, gamma)."""

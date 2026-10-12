@@ -80,6 +80,19 @@ mock = obs.simulate((10., 2/3, np.log10(20.), 0.), rng)               # theta = 
 * **Observation:** flux-weighted PSF average (F v ⊗ P)/(F ⊗ P), mean removed over the mask,
   optional bulk model, Gaussian noise from the velocity errors; returns a `VelocityMap`.
   Seeds: pass a `numpy.random.Generator`.
+* **Lensed systems:** `Observation.from_vmap(vm_traced, positions='source')` (or `beta=(bx, by)`)
+  makes the field on a source-plane grid (`src_kpp`, default the median spacing of distinct
+  source positions) covering the spaxels' β, samples it at each β (bilinear), then applies the
+  PSF, mask and noise in the image plane. Spaxels of different images at the same β get the same
+  value; spaxels without β get zero weight. Mocks carry β and image ids, so
+  `StructureFunction(mock, positions='source')` and `match_images(mock, ...)` work on them.
+
+```python
+traced = lens.raytrace(vm, z=1.70, images={1: 'arc1.reg', 2: 'arc2.reg'})
+obs    = Observation.from_vmap(traced, positions='source')
+mock   = obs.simulate((10., 2/3, 1.3, 0.), rng)
+sf     = StructureFunction(mock, positions='source')
+```
 
 ## demo
 
