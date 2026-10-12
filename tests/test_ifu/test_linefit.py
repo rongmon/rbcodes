@@ -8,7 +8,7 @@ from rbcodes.ifu import load_fits
 from rbcodes.ifu.linefit import (
     C_KMS, EmissionLine, LineFitResult, fit_cube, fit_spectrum, lsf_constant, lsf_muse,
     lsf_resolution, plot_spaxel, quality_mask, spaxel_report, vac_to_air, REJECT)
-from rbcodes.ifu.noise import noise_cube, robust_std
+from rbcodes.ifu.noise import noise_cube, robust_std, sky_mask_from_region
 
 Z = 0.785273
 NY, NX = 14, 16
@@ -228,7 +228,24 @@ class TestNoise:
         assert abs(np.median(ratio) - 1) < 0.05
         assert robust_std(ratio) < 0.15
         with pytest.raises(ValueError):
-            noise_cube(flux)
+            noise_cube(flux)                                    # no sky region given
+        with pytest.raises(ValueError):
+            noise_cube(flux, line_free=line_free)
+        with pytest.raises(ValueError):
+            noise_cube(flux, line_free=line_free, sky_mask=sky[:4])
+
+    def test_sky_mask_from_region(self, tmp_path):
+        # ds9 image coords are 1-based: box centre (8.5, 3) size 16x5 covers rows 0-4, all 16 columns
+        text = 'image\nbox(8.5,3,16,5,0)\ncircle(14,12,1.2)'
+        mask = sky_mask_from_region(text, None, (14, 16))
+        expected = np.zeros((14, 16), bool)
+        expected[0:5, :] = True
+        expected[11, 13] = expected[10, 13] = expected[12, 13] = True
+        expected[11, 12] = expected[11, 14] = True
+        np.testing.assert_array_equal(mask, expected)
+        f = tmp_path / 'sky.reg'
+        f.write_text(text)
+        np.testing.assert_array_equal(sky_mask_from_region(f, None, (14, 16)), mask)
 
 
 def test_plot_spaxel_runs():

@@ -23,7 +23,7 @@ cube.wcs     # 2D spatial WCS
 | `cube_collapse` | `build_whitelight(flux, wave, wmin, wmax, method)`, `build_narrowband`, `build_continuum_sub` (on-band minus one or two continuum windows) |
 | `moment_maps` | `moment0/1/2(flux, wave, wmin, wmax[, lambda_rest])` (flux, velocity in km/s, dispersion in km/s), `moment_map(..., order)`, `compute_snr_map`, `sky_stats`, `subtract_linear_continuum`, `velocity_array` |
 | `aperture_extract` | `make_circular_mask`, `make_square_mask`, `make_annulus_mask`; `extract_aperture` (sum, error from variance), `extract_variance_weighted` (inverse-variance weighted mean), `extract_with_method`, `subtract_background` |
-| `noise` | `noise_cube(flux, var=None, line_free=None, sky_mask=None)` — sqrt(variance), or, without a variance cube, a sky spectrum (robust spread over sky spaxels per channel) times a per-spaxel scale (robust spread over line-free channels) |
+| `noise` | `noise_cube(flux, var=None, line_free=None, sky_mask=None)` — sqrt(variance), or, without a variance cube, a sky spectrum (robust spread over your sky region per channel) times a per-spaxel scale (robust spread over line-free channels). `sky_mask_from_region(reg, wcs, shape)` makes the sky mask from a ds9 region file or text |
 | `linefit` | Emission-line fitting → velocity, dispersion, flux, doublet-ratio maps with errors; quality cuts (see below) |
 | `spatial_mask` | `parse_ds9_regions(text)`, `region_to_mask(region, wcs, ny, nx)` (pixel-centre rule; image or sky coordinates), `draw_region_overlay`, `regions_to_ds9_text`, `iau_name` |
 
@@ -89,14 +89,19 @@ rejected (`REJECT`), with `force_include` / `force_exclude` lists. `spaxel_repor
 prints a one-line diagnosis and `plot_spaxel(axes, line, wave, flux, noise, iy, ix, res)` plots
 data, fit, components and residuals.
 
-**No variance extension?**
+**No variance extension?** Define a blank-sky region (no sources, away from the cube edges)
+and estimate the noise from it:
 ```python
-from rbcodes.ifu.noise import noise_cube
+from rbcodes.ifu.noise import noise_cube, sky_mask_from_region
 from rbcodes.ifu.linefit import fit_domain
+sky = sky_mask_from_region('sky.reg', cube.wcs, cube.flux.shape[1:])   # or any bool (ny, nx) array
 line_free = ~fit_domain(cube.wave, line.default_window(1000))
-noise, _ = noise_cube(cube.flux, line_free=line_free, sky_mask=sky)   # sky: bool (ny, nx)
+noise, _ = noise_cube(cube.flux, line_free=line_free, sky_mask=sky)
 res = fit_cube(cube, line, noise=noise)
 ```
+noise(λ, y, x) = σ_sky(λ) × s(y, x): σ_sky is the robust scatter (1.4826 MAD) across the sky
+spaxels in each channel (follows sky-line residuals); s is the robust scatter of flux/σ_sky over
+the line-free channels of each spaxel (follows exposure-map variations).
 
 ## Notes
 
