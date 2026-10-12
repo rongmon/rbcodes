@@ -28,6 +28,10 @@ New Features
   compare_bulk) and ``vsf`` (StructureFunction: raw/debiased/ivw/cross estimators, jackknife
   covariance, directional S2, image or source plane, power-law fits with optional noise floor
   or PSF smoothing, r_geo, r_turn). Docs in ``docs/turbulence/turbulence_readme.md``.
+* ``rbcodes.turbulence.forward`` (``grf``, ``psf_weight``, ``TurbulenceField``, ``Observation``: mock
+  ``VelocityMap`` objects from 2-D or 3-D slab turbulent fields with toy intermittency, flux-weighted
+  PSF, mask, bulk flow and noise) and ``rbcodes.turbulence.demo`` (``demo_velocity_field``,
+  ``demo_cube``), ported from vsf_pipeline.
 * ``rbcodes.lensing.lens_model``: ``LensModel`` (best fit + optional realizations, e.g. a folder of
   ``dplx_k``/``dply_k`` maps) ray-traces a ``VelocityMap`` with ``model_delens`` into source-plane
   kpc, gives the magnification tensor; ``match_images`` pairs spaxels of different images that

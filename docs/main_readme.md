@@ -183,7 +183,7 @@ Standalone modules for dark matter halo calculations. Available for direct impor
 
 | Module | Description |
 |--------|-------------|
-| **rbcodes.turbulence** | Bulk-flow models (plane, quadratic, arctan disk, two-lobe; BIC comparison) and velocity structure functions of `VelocityMap`s: raw / debiased / inverse-variance / cross estimators, jackknife errors, directional S2, image- or source-plane separations, power-law fits with optional noise floor or PSF smoothing. |
+| **rbcodes.turbulence** | Bulk-flow models (plane, quadratic, arctan disk, two-lobe; BIC comparison) and velocity structure functions of `VelocityMap`s: raw / debiased / inverse-variance / cross estimators, jackknife errors, directional S2, image- or source-plane separations, power-law fits with optional noise floor or PSF smoothing; forward-modelled mock maps (2-D / 3-D turbulent fields through PSF, mask and noise); demo data with a known answer. |
 
 ---
 

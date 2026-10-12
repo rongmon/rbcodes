@@ -61,3 +61,30 @@ estimator='debiased', other=None, cross_images=False)`
 * **Geometry:** `major`, `minor` (4√eigenvalues of the position covariance), `r_geo` =
   0.3 × minor; `r_turn(rmax, frac=0.9)`; `increments(sep)` for increment distributions.
 * **Regions / images:** `StructureFunction(vm.select(region=...))`, `vm.select(image=1)`.
+
+## forward
+
+```python
+from rbcodes.turbulence.forward import TurbulenceField, Observation
+obs  = Observation.from_vmap(vm, psf_fwhm_kpc=5.2)                     # mask, flux, errors, scale of the data
+mock = obs(TurbulenceField(sigma=10., alpha=2/3, L_kpc=20.), np.random.default_rng(1))
+mock = obs.simulate((10., 2/3, np.log10(20.), 0.), rng)               # theta = (sigma, alpha, log10 L, gamma)
+```
+
+* **Field** (`grf`): P(k) ∝ (k² + k₀²)^−(α+D)/2, k₀ = 1/L, made in a box `pad`× larger and cut
+  at a random offset (large modes present, not periodic). S2 ∝ r^α for r ≪ L.
+* **Modes:** `'2D'` — σ is the rms of the observed (PSF-weighted) field in the mask; `'3D'` — a
+  slab of depth `depth_kpc`, σ is the rms of the 3-D field, the map is the PSF-weighted
+  line-of-sight mean and the width map σ_obs² = W(σ_los² + v_c²) − W(v_c)² + σ_th².
+* **Intermittency** (toy): g → g exp(γ g₂ − γ²/2), g₂ a smooth field of scale `L_env`.
+* **Observation:** flux-weighted PSF average (F v ⊗ P)/(F ⊗ P), mean removed over the mask,
+  optional bulk model, Gaussian noise from the velocity errors; returns a `VelocityMap`.
+  Seeds: pass a `numpy.random.Generator`.
+
+## demo
+
+`demo_velocity_field()` → (flux, velocity, turbulent part, galaxy mask) with `DEMO_TRUTH`
+(α = 2/3, L = 10 kpc, σ = 20 km/s, gradient (−7.0, −5.8) km/s/pix).
+`demo_cube(line, z)` → (cube, truth): a continuum-subtracted cube with that field (MUSE LSF,
+σ_int = 60 km/s, R = 1.35 for free-ratio doublets, exact variance), ready for
+`NoiseModel` / `GaussianFitter`.

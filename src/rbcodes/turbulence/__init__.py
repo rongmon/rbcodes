@@ -8,4 +8,7 @@ Modules
 bulk   bulk-flow models (Constant, Plane, Quadratic, ArctanDisk, TwoLobe) and compare_bulk
 vsf    StructureFunction: raw / debiased / ivw / cross S2, jackknife covariance, directional
        S2, power-law fits (optionally with a noise floor or PSF smoothing), r_geo, r_turn
+forward Gaussian random fields (2-D or 3-D slab, intermittency) seen through an Observation
+       (flux-weighted PSF, mask, bulk flow, noise) as mock VelocityMaps
+demo   synthetic velocity fields and IFU cubes with a known answer
 """
