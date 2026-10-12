@@ -164,3 +164,25 @@ Deflection, in deflection-map pixels, at 0-based pixel positions of the maps; `i
 Factor applied to the deflections for a plane at `zs_n`: (D_ls/D_s)(zs_n) / (D_ls/D_s)(zs_o).
 It is 1 at `zs_n = zs_o` and 0 at the lens redshift.
 
+
+### lens_model
+
+Velocity maps and lens models; a thin layer over `model_delens` (which does the ray tracing).
+
+```python
+from rbcodes.lensing.lens_model import LensModel, match_images
+lens = LensModel('dplx.fits', 'dply.fits', zl=0.43, zs=2.76)            # best fit only
+lens = LensModel.from_directory('Lens_Model/range', zl=0.43, zs=2.76)  # dplx_1 = best fit + realizations
+vm_src = lens.raytrace(vm, z=1.70, images={1: 'arc1.reg', 2: 'arc2.reg'})   # source-plane beta (kpc)
+for k, vm_k in lens.raytrace_realizations(vm, z=1.70):                      # k = 0 is the best fit
+    ...
+m = lens.magnification(ra, dec, z=1.70, interp='bilinear')   # A tensor, mu, kappa, gamma
+pairs = match_images(vm_src, tol=0.5)                         # spaxels of different images at the same beta
+```
+
+* Only the deflection matrices are needed; realizations are optional (best fit otherwise).
+* Velocities and errors stay with their image-plane spaxels; only positions are traced.
+* Source-plane coordinates are offsets from a fixed sky position (default: mean image-plane
+  position of the kept spaxels), x towards the west, in proper kpc at the plane redshift.
+* Magnification from central differences of the deflection maps; on the SGAS J1527 model it
+  agrees with lenstool's magnification map to 0.03% (median).

@@ -163,6 +163,7 @@ Standalone modules for dark matter halo calculations. Available for direct impor
 | Module | Description |
 |--------|-------------|
 | **lens_ang_sep.py** | Gravitational lensing ray-tracing — maps image-plane coordinates to the source plane (or any plane between lens and source) using deflection matrices; nearest-pixel or bilinear lookup, NaN outside the maps. Includes cosmological distance utilities (`cosmic_D`, `ang_D12`, `ang_sep_D`). (A. Shaban 2020, R. Bordoloi 2021) |
+| **lens_model.py** | `LensModel`: ray-trace a `VelocityMap` into source-plane kpc with `model_delens`, over optional lens-model realizations; magnification tensor; `match_images` for spaxels of different images at the same source position |
 
 ---
 

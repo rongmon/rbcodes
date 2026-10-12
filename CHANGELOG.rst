@@ -28,6 +28,10 @@ New Features
   compare_bulk) and ``vsf`` (StructureFunction: raw/debiased/ivw/cross estimators, jackknife
   covariance, directional S2, image or source plane, power-law fits with optional noise floor
   or PSF smoothing, r_geo, r_turn). Docs in ``docs/turbulence/turbulence_readme.md``.
+* ``rbcodes.lensing.lens_model``: ``LensModel`` (best fit + optional realizations, e.g. a folder of
+  ``dplx_k``/``dply_k`` maps) ray-traces a ``VelocityMap`` with ``model_delens`` into source-plane
+  kpc, gives the magnification tensor; ``match_images`` pairs spaxels of different images that
+  map to the same source position.
 * ``rb_selftest`` checks the line fit.
 
 Version 3.0.0 (2026-10-12)
