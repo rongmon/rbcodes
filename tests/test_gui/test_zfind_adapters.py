@@ -8,7 +8,7 @@ Verifies the exact output contracts that the target GUIs depend on:
     - selects correct solution via idx
     - empty solutions → [nan, nan]
     - NaN z_err propagated as-is
-    - idx out of range raises IndexError
+    - idx out of range is clamped to the valid range
 
   zfind_to_multispec_z
     - returns a plain float
@@ -136,10 +136,11 @@ class TestZfindToZguiZ:
         _, z_err = zfind_to_zgui_z(result)
         assert math.isnan(z_err)
 
-    def test_idx_out_of_range_raises(self):
-        result = _make_zfind_result([_make_solution(0.5)])
-        with pytest.raises(IndexError):
-            zfind_to_zgui_z(result, idx=5)
+    def test_idx_out_of_range_is_clamped(self):
+        sols = [_make_solution(0.5), _make_solution(0.8)]
+        result = _make_zfind_result(sols)
+        assert zfind_to_zgui_z(result, idx=5)[0] == pytest.approx(0.8)
+        assert zfind_to_zgui_z(result, idx=-3)[0] == pytest.approx(0.5)
 
     def test_z_is_float_not_array(self):
         result = _make_zfind_result([_make_solution(0.5)])
