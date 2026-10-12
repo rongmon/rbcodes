@@ -82,6 +82,7 @@ class StructureFunction:
             mask = mask & np.isfinite(X) & np.isfinite(Y)
         else:
             raise ValueError("positions must be 'image' or 'source'.")
+        self.mask = mask                                   # spaxels used (2-D), in the order of u
         self.x, self.y = X[mask], Y[mask]
         self.u, self.e2 = vm.v[mask], vm.v_err[mask] ** 2
         self.u2 = other.v[mask] if other is not None else None
@@ -144,22 +145,30 @@ class StructureFunction:
 
     # --- estimators -----------------------------------------------------------
 
-    def _pair_values(self, estimator):
+    def _pair_values(self, estimator, u=None, e2=None):
         i, j = self.i, self.j
+        u = self.u if u is None else u
+        e2 = self.e2 if e2 is None else e2
         if estimator == 'cross':
-            return (self.u[i] - self.u[j]) * (self.u2[i] - self.u2[j]), None
-        d2 = (self.u[i] - self.u[j]) ** 2
+            return (u[i] - u[j]) * (self.u2[i] - self.u2[j]), None
+        d2 = (u[i] - u[j]) ** 2
         if estimator == 'raw':
             return d2, None
-        e2 = self.e2[i] + self.e2[j]
+        e2 = e2[i] + e2[j]
         return d2 - e2, (1 / e2 ** 2 if estimator == 'ivw' else None)
 
-    def s2(self, estimator=None, sel=None):
-        """S2 per bin; ``sel`` is a boolean over pairs (e.g. a direction or a jackknife subset)."""
+    def values(self, vm):
+        """Velocities of another map (e.g. a mock) at this structure function's spaxels, in order."""
+        return vm.v[self.mask]
+
+    def s2(self, estimator=None, sel=None, u=None, e2=None):
+        """S2 per bin; ``sel`` is a boolean over pairs (e.g. a direction or a jackknife subset).
+        ``u`` (and ``e2``): velocities (variances) at the same spaxels to use instead of the map's,
+        e.g. ``sf.values(mock)``, so mocks are measured on exactly the data's pairs and bins."""
         est = self.estimator if estimator is None else estimator
         if est == 'cross' and self.u2 is None:
             raise ValueError("The 'cross' estimator needs other=.")
-        val, w = self._pair_values(est)
+        val, w = self._pair_values(est, u, e2)
         b = self.b if sel is None else np.where(sel, self.b, -1)
         g = b >= 0
         w = np.ones_like(val) if w is None else w
@@ -193,11 +202,13 @@ class StructureFunction:
         return dict(parallel=self.jackknife(estimator, dang < tol),
                     perpendicular=self.jackknife(estimator, dang > np.pi / 2 - tol))
 
-    def increments(self, sep, tol=None):
-        """Velocity increments v_i - v_j of pairs with |r - sep| < tol (default half a pixel)."""
+    def increments(self, sep, tol=None, u=None):
+        """Velocity increments v_i - v_j of pairs with |r - sep| < tol (default half a pixel);
+        ``u`` as in ``s2``."""
         tol = 0.5 * self.pixel if tol is None else tol
+        u = self.u if u is None else u
         sel = np.abs(self.r - sep) < tol
-        return (self.u[self.i] - self.u[self.j])[sel]
+        return (u[self.i] - u[self.j])[sel]
 
     # --- descriptive fits ---------------------------------------------------
 

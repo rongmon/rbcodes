@@ -11,4 +11,5 @@ vsf    StructureFunction: raw / debiased / ivw / cross S2, jackknife covariance,
 forward Gaussian random fields (2-D or 3-D slab, intermittency) seen through an Observation
        (flux-weighted PSF, mask, bulk flow, noise) as mock VelocityMaps
 demo   synthetic velocity fields and IFU cubes with a known answer
+summaries  S2, Scattering (reduced WST), Kurtosis, LineWidth blocks and the Summaries vector
 """

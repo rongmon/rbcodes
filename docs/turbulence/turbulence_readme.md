@@ -88,3 +88,20 @@ mock = obs.simulate((10., 2/3, np.log10(20.), 0.), rng)               # theta = 
 `demo_cube(line, z)` → (cube, truth): a continuum-subtracted cube with that field (MUSE LSF,
 σ_int = 60 km/s, R = 1.35 for free-ratio doublets, exact variance), ready for
 `NoiseModel` / `GaussianFitter`.
+
+## summaries
+
+```python
+from rbcodes.turbulence.summaries import Summaries, S2, Scattering, Kurtosis, LineWidth
+sf    = StructureFunction(vm_data, n_bins=20)
+summ  = Summaries(sf, blocks=['S2', 'WST', 'KURT', 'SIG'], removal='plane', transform=True)
+s_obs = summ(vm_data); s_mock = summ(mock)
+```
+
+Every map is measured on the data's spaxels, pairs, bins and errors (`sf`) after fitting and
+removing the same bulk model. Blocks: `S2` (debiased S2 in bins `kfit`), `Scattering` /
+`'WST'` (reduced wavelet scattering: log S1(j), s2(j1,j2) = S2/S1; J = 4 scales, L = 4
+orientations), `Kurtosis` / `'KURT'` (excess kurtosis of increments at 2, 4, 8 px),
+`LineWidth` / `'SIG'` (16/50/84th percentiles of width², needs a width map such as 3-D mocks).
+`transform=True`: asinh(S2/s2_ref), asinh(kurtosis), log(width²). `sf.s2(u=sf.values(mock))`
+gives S2 of any map on the data's pairs.
