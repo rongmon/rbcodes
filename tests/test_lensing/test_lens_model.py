@@ -1,6 +1,8 @@
 """Tests for rbcodes.lensing.lens_model against a singular isothermal sphere (SIS)."""
 import numpy as np
 import pytest
+
+pytestmark = pytest.mark.filterwarnings("ignore:divide by zero:RuntimeWarning", "ignore:invalid value:RuntimeWarning")
 from astropy.cosmology import FlatLambdaCDM
 from astropy.io import fits
 from astropy.wcs import WCS
