@@ -2,6 +2,59 @@
 Changelog
 =========
 
+Unreleased (py312-compat)
+=========================
+
+Breaking Changes
+----------------
+* Requires Python 3.12 (``>=3.12,<3.13``) and NumPy 2. Dependency lower bounds raised
+  to the oldest NumPy-2-compatible releases; upper bounds added at the next major
+  version. ``pytest``/``pytest-cov`` moved to the ``testing`` extra.
+* Removed ``IGM/find_line_features_wavelet.py`` (used ``scipy.signal.cwt``, removed
+  from SciPy; not used anywhere in the package).
+* Removed ``environment.yml`` (an old Python 3.9 environment snapshot, not used by the
+  installation). ``requirements-py312-lock.txt`` lists the exact tested versions.
+* ``lens_ang_sep.model_delens.raytrace_new_z`` now reads the deflection of the pixel
+  that contains each position. It previously truncated with ``int()``, which often read
+  the neighbouring pixel; on the SGAS J1527 model, source-plane positions change by
+  ~0.03" (median). Positions outside the deflection maps now give NaN instead of an
+  error or a wrapped-around index.
+
+New Features
+------------
+* ``rb_selftest`` command and ``rbcodes.selftest()``: checks an installation (versions,
+  imports, removed-API scan, numerical checks against known answers) in a few seconds.
+* ``raytrace_new_z(..., interp='bilinear')`` option; it now also returns
+  ``(src_ra, src_dec)``, is vectorised, and supports CD-matrix headers. New
+  ``deflection_at`` and ``deflection_scale`` methods.
+
+Bug Fixes
+---------
+* NumPy 2 / SciPy: ``np.trapz`` → ``np.trapezoid``, ``scipy.integrate.cumtrapz`` →
+  ``cumulative_trapezoid``, removed ``np.str``/``np.int`` aliases (``lens_ang_sep``,
+  ``rb_nfw``, ``PlotSpec_Integrated``, ``AdvancedFitDialog``, ``guess_abs_line_vel_gui``).
+* Invalid escape sequences (SyntaxWarning in Python 3.12) in five modules.
+* ``halo_profile.NFW_escape_vel(truncated=...)`` crashed (undefined ``Gkpc``).
+* ``lens_ang_sep.ang_sep_D`` lost precision below ~1" (3% error at 0.01"); now uses the
+  Vincenty formula.
+* Missing imports: ``QPalette`` in ``RedshiftInputWidget``, ``plt`` in
+  ``rb_align.sources._show_ncc_surface``; undefined ``available_range`` in an
+  ``rb_spec`` error message.
+* ``rb_spec.plot_continuum_fit`` used the removed matplotlib style name
+  ``seaborn-darkgrid`` and silently fell back to the default style.
+
+Deprecations
+------------
+* ``rb_spec.plot_spec`` (uses the old ``PlotSpec_Integrated`` GUI) warns; use ``rb_multispec``.
+
+Tests
+-----
+* New package-wide health tests (all modules import; no SyntaxWarnings; no removed
+  NumPy/SciPy/astropy/pandas/matplotlib APIs), tests for ``halo`` and ``lensing``, and the
+  ``rb_spec`` tests are now collected. ``rb_setline`` tests rewritten against the packaged
+  line lists (they mocked a removed ``pkg_resources`` API); zfind adapter test updated
+  for index clamping.
+
 Version 2.4.0 (2026-06-01)
 ==========================
 

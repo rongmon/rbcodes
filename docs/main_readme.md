@@ -58,18 +58,16 @@ spec.save_slice('results.json', file_format='json')
 ## Installation
 
 ```bash
-# 1. Create a conda environment (Python 3.10 recommended)
-conda create -n rbcodes-env python=3.10
+# 1. Create a conda environment (Python 3.12)
+conda create -n rbcodes-env python=3.12
 conda activate rbcodes-env
 
 # 2. Install rbcodes
 cd /path/to/rbcodes
 pip install -e .
-```
 
-**Optional** — pre-install dependencies via conda for better binary compatibility:
-```bash
-conda install -c conda-forge --file requirements_simple.txt
+# 3. Check the installation
+rb_selftest
 ```
 
 For full installation options, platform notes, and troubleshooting see [INSTALLATION.md](../INSTALLATION.md).

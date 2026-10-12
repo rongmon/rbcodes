@@ -4,7 +4,7 @@ Complete instructions for installing rbcodes on your system.
 
 ## System Requirements
 
-- **Python**: 3.9.6 to 3.10.x
+- **Python**: 3.12
 - **OS**: macOS, Linux, or Windows
 - **Disk space**: ~500 MB (including dependencies)
 
@@ -15,8 +15,8 @@ Complete instructions for installing rbcodes on your system.
 This is the easiest method as it handles all dependencies correctly.
 
 ```bash
-# 1. Create a conda environment with Python 3.10
-conda create -n rbcodes-env python=3.10
+# 1. Create a conda environment with Python 3.12
+conda create -n rbcodes-env python=3.12
 conda activate rbcodes-env
 
 # 2. Clone the repository (if you haven't already)
@@ -31,7 +31,7 @@ pip install -e .
 
 ```bash
 # 1. Create a virtual environment
-python3 -m venv rbcodes-env
+python3.12 -m venv rbcodes-env
 source rbcodes-env/bin/activate  # On Windows: rbcodes-env\Scripts\activate
 
 # 2. Clone the repository
@@ -52,44 +52,64 @@ pip install rbcodes
 
 ## Verify Installation
 
-After installation, verify that everything works:
+After installing, run the self-test. It needs no display and takes a few seconds
+(up to a minute the first time, while Python and matplotlib build their caches):
 
 ```bash
-# Test 1: Import the package
-python -c "import rbcodes; print(rbcodes.__version__)"
+rb_selftest
+```
 
-# Test 2: Check console entry points
-which launch_specgui
-which rb_multispec
-which rb_ifuview
-which rb_llsfitter
-which rb_zgui
+or, from Python:
 
-# Test 3: Launch the main GUI (closes immediately if working)
-launch_specgui --help
+```python
+import rbcodes
+rbcodes.selftest()
+```
+
+It prints the versions of Python, rbcodes and its dependencies, then checks that every
+module imports, that no code uses functions removed from NumPy, SciPy, astropy, pandas
+or matplotlib, and that a few calculations (line lists, equivalent widths, NFW halo,
+cosmological distances, lens ray tracing, IFU cube reading) give the known answers.
+It ends with `ALL CHECKS PASSED` or lists what failed. Use `rb_selftest -v` for full
+tracebacks, and include the whole report if you open an issue.
+
+### Full test suite (developers)
+
+From a clone of the repository:
+
+```bash
+pip install -e ".[testing]"
+pytest
 ```
 
 ## Dependencies
 
 ### Core Dependencies (automatically installed)
 
+Lower bounds are the oldest versions that support NumPy 2 and Python 3.12; upper bounds
+keep out the next major release until it has been tested. `setup.cfg` is the reference.
+
 ```
-PyQt5>=5.15.7           # GUI framework
-numpy>=1.22.3,<1.24     # Numerical computing  (upper bound required — numpy 1.24+ breaks compatibility)
-matplotlib>=3.5.0       # Plotting
-astropy>=5.3.3          # Astronomy utilities
-linetools>=0.3          # Spectroscopy tools
-scipy>=1.7.3            # Scientific computing
-pandas==1.3.5           # Data manipulation    (pinned — newer versions not yet tested)
-emcee>=3.0              # MCMC sampling
-photutils>=1.0          # Astronomy photometry
-corner>=2.0             # MCMC visualization
-scikit-learn>=1.5.0     # Machine learning
-tqdm>=4.65.0            # Progress bars
-regions>=0.5            # ds9 region file I/O (used by rb_ifuview)
-pytest>=6.0             # Testing framework
-pytest-cov>=2.0         # Test coverage reporting
+PyQt5>=5.15.10,<6       # GUI framework
+numpy>=2.0,<3           # Numerical computing
+scipy>=1.13,<2          # Scientific computing
+matplotlib>=3.9,<4      # Plotting
+astropy>=6.1,<9         # Astronomy utilities
+pandas>=2.2.2,<4        # Data manipulation
+linetools>=0.3.2,<0.4   # Spectroscopy tools
+emcee>=3.1,<4           # MCMC sampling
+photutils>=1.13,<4      # Astronomy photometry
+corner>=2.2,<3          # MCMC visualization
+scikit-learn>=1.5,<2    # Machine learning
+tqdm>=4.65,<5           # Progress bars
+regions>=0.9,<1         # ds9 region file I/O (used by rb_ifuview)
+ipywidgets>=8.0,<9      # Notebook widgets (interactive continuum fitting)
 ```
+
+Test dependencies (`pip install -e ".[testing]"`): `pytest`, `pytest-cov`.
+
+The exact set of versions used for testing is in `requirements-py312-lock.txt`; to
+reproduce it exactly: `pip install -r requirements-py312-lock.txt && pip install -e . --no-deps`.
 
 ### Optional Dependencies
 
@@ -223,7 +243,7 @@ echo $DISPLAY
 On Apple Silicon (M1/M2/M3) Macs, use conda for better compatibility:
 
 ```bash
-conda create -n rbcodes-env -c conda-forge python=3.10 pyqt5
+conda create -n rbcodes-env -c conda-forge python=3.12
 conda activate rbcodes-env
 pip install -e .
 ```
@@ -234,7 +254,7 @@ If you installed in development mode (`pip install -e .`):
 
 ```bash
 cd /path/to/rbcodes
-git pull origin main
+git pull origin master
 # No need to reinstall - changes are picked up automatically
 ```
 
@@ -264,8 +284,7 @@ If you encounter issues not covered here:
 
 1. Check [Existing Issues](https://github.com/rongmon/rbcodes/issues)
 2. Open a [New Issue](https://github.com/rongmon/rbcodes/issues/new) with:
-   - Python version: `python --version`
-   - rbcodes version: `python -c "import rbcodes; print(rbcodes.__version__)"`
+   - The full output of `rb_selftest`
    - Full error message and traceback
    - Steps to reproduce
 
@@ -277,16 +296,16 @@ To set up a development environment for contributing:
 
 ```bash
 # Create environment
-conda create -n rbcodes-dev python=3.10
+conda create -n rbcodes-dev python=3.12
 conda activate rbcodes-dev
 
 # Clone and install
 git clone https://github.com/rongmon/rbcodes.git
 cd rbcodes
-pip install -e .
+pip install -e ".[testing]"
 
-# Install development tools
-pip install pytest pytest-cov tox sphinx
+# Run the tests
+pytest
 
 # Run tests
 pytest
