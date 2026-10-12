@@ -405,29 +405,6 @@ Example code to plot to plot distances for differetn lens separations
 
         Plot of physical separation vs redshift
 
-### estimate_width_percentile() (`find_line_features_wavelet`)
-
-Estimate line width using percentile method around a detected line.
-    Returns width in wavelength units.
-
-### create_feature_mask() (`find_line_features_wavelet`)
-
-Create a mask for continuum fitting based on detected spectral lines.
-    
-    Parameters
-    ----------
-    wavelength : array-like
-        Wavelength array.
-    line_results : dict
-        Results from find_spectral_lines_wavelet.
-    width_scale_factor : float, optional
-        Factor to scale the line width for masking. Default is 3.0.
-        
-    Returns
-    -------
-    mask : ndarray
-        Boolean mask where False indicates regions to mask out (spectral lines).
-
 ### __init__() (`LLSFitter`)
 
 Initialize the LLSFitter object.

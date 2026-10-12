@@ -24,6 +24,9 @@ Python tools for astrophysical spectroscopy research by Rongmon Bordoloi and col
 ## Quick Start
 
 ```bash
+# Check the installation (versions, imports, numerical checks)
+rb_selftest
+
 # Interactive spectrum analysis (GUI)
 launch_specgui
 
@@ -58,18 +61,16 @@ spec.save_slice('results.json', file_format='json')
 ## Installation
 
 ```bash
-# 1. Create a conda environment (Python 3.10 recommended)
-conda create -n rbcodes-env python=3.10
+# 1. Create a conda environment (Python 3.12)
+conda create -n rbcodes-env python=3.12
 conda activate rbcodes-env
 
 # 2. Install rbcodes
 cd /path/to/rbcodes
 pip install -e .
-```
 
-**Optional** — pre-install dependencies via conda for better binary compatibility:
-```bash
-conda install -c conda-forge --file requirements_simple.txt
+# 3. Check the installation
+rb_selftest
 ```
 
 For full installation options, platform notes, and troubleshooting see [INSTALLATION.md](../INSTALLATION.md).
@@ -159,7 +160,7 @@ Standalone modules for dark matter halo calculations. Available for direct impor
 
 | Module | Description |
 |--------|-------------|
-| **lens_ang_sep.py** | Gravitational lensing ray-tracing — maps image-plane coordinates to source plane using deflection matrices. Includes cosmological distance utilities (`cosmic_D`, `ang_D12`). (A. Shaban 2020, R. Bordoloi 2021) |
+| **lens_ang_sep.py** | Gravitational lensing ray-tracing — maps image-plane coordinates to the source plane (or any plane between lens and source) using deflection matrices; nearest-pixel or bilinear lookup, NaN outside the maps. Includes cosmological distance utilities (`cosmic_D`, `ang_D12`, `ang_sep_D`). (A. Shaban 2020, R. Bordoloi 2021) |
 
 ---
 

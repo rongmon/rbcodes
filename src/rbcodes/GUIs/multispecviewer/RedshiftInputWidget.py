@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (QWidget, QLabel, QLineEdit, QComboBox, QPushButton,
                              QVBoxLayout, QHBoxLayout, QMessageBox, QApplication,
                              QGridLayout, QSpacerItem, QSizePolicy)
 from PyQt5.QtCore import pyqtSignal, Qt
-from PyQt5.QtGui import QColor
+from PyQt5.QtGui import QColor, QPalette
 
 # Import color utility from rb_utility
 try:

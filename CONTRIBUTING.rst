@@ -60,22 +60,15 @@ Documentation updates are contributed the same way as code contributions.
    which changes you have made and what your motivations are,
    then submit your proposal.
 
-When working on documentation changes in your local machine, you can
-compile them using |tox|_::
-
-    tox -e docs
-
-and use Python's built-in web server for a preview in your web browser
-(``http://localhost:8000``)::
-
-    python3 -m http.server --directory 'docs/_build/html'
+The documentation is plain Markdown: preview it on GitHub or in any Markdown
+viewer. There is no documentation build step.
 
 
 Code Contributions
 ==================
 
 For more information about the project structure and main modules, please see the
-`documentation <https://github.com/rongmon/rbcodes/blob/main/docs/main_readme.md>`_.
+`documentation <https://github.com/rongmon/rbcodes/blob/master/docs/main_readme.md>`_.
 
 Submit an issue
 ---------------
@@ -91,7 +84,7 @@ Before you start coding, we recommend creating an isolated `virtual
 environment`_ to avoid any problems with your installed Python packages.
 This can easily be done via Miniconda_::
 
-    conda create -n rbcodes python=3.10
+    conda create -n rbcodes python=3.12
     conda activate rbcodes
 
 Clone the repository
@@ -105,12 +98,15 @@ Clone the repository
     git clone https://github.com/<your-username>/rbcodes.git
     cd rbcodes
 
-#. Install the package in development mode::
+#. Install the package in development mode, with the test dependencies::
 
     pip install -U pip setuptools
-    pip install -e .
+    pip install -e ".[testing]"
 
    This allows you to import the package under development and test your changes.
+   Check the installation with::
+
+    rb_selftest
 
 Implement your changes
 ----------------------
@@ -142,6 +138,11 @@ Implement your changes
 #. Before submitting, check that your changes don't break unit tests::
 
     pytest
+
+   This includes package-wide checks that every module imports, that the source
+   compiles without warnings, and that no NumPy, SciPy, astropy, pandas or
+   matplotlib function removed in the installed versions is used. The same tests
+   run on GitHub for every push and pull request.
 
    or run the full test suite with::
 
@@ -184,19 +185,19 @@ package:
    ``.eggs``, as well as the ``*.egg-info`` folders in the ``src`` folder or
    potentially in the root of your project.
 
-#. Sometimes |tox|_ misses out when new dependencies are added, especially to
-   ``setup.cfg`` and ``docs/requirements.txt``. If you find any problems with
-   missing dependencies when running a command with |tox|_, try to recreate the
-   ``tox`` environment using the ``-r`` flag. For example, instead of::
+#. Sometimes |tox|_ misses out when new dependencies are added to
+   ``setup.cfg``. If you find any problems with missing dependencies when
+   running |tox|_, try to recreate the ``tox`` environment using the ``-r``
+   flag. For example, instead of::
 
-    tox -e docs
+    tox
 
    Try running::
 
-    tox -r -e docs
+    tox -r
 
 #. Make sure to have a reliable |tox|_ installation that uses the correct
-   Python version (e.g., 3.7+). When in doubt you can run::
+   Python version (3.12). When in doubt you can run::
 
     tox --version
     # OR
@@ -267,15 +268,12 @@ Automated releases to PyPI can be set up via GitHub Actions if desired in the fu
 .. _GitHub's fork and pull request workflow: https://guides.github.com/activities/forking/
 .. _guide created by FreeCodeCamp: https://github.com/FreeCodeCamp/how-to-contribute-to-open-source
 .. _Miniconda: https://docs.conda.io/en/latest/miniconda.html
-.. _MyST: https://myst-parser.readthedocs.io/en/latest/syntax/syntax.html
 .. _other kinds of contributions: https://opensource.guide/how-to-contribute
 .. _pre-commit: https://pre-commit.com/
 .. _PyPI: https://pypi.org/
 .. _PyScaffold's contributor's guide: https://pyscaffold.org/en/stable/contributing.html
 .. _Pytest can drop you: https://docs.pytest.org/en/stable/how-to/failures.html#using-python-library-pdb-with-pytest
 .. _Python Software Foundation's Code of Conduct: https://www.python.org/psf/conduct/
-.. _reStructuredText: https://www.sphinx-doc.org/en/master/usage/restructuredtext/
-.. _Sphinx: https://www.sphinx-doc.org/en/master/
 .. _tox: https://tox.wiki/en/stable/
 .. _virtual environment: https://realpython.com/python-virtual-environments-a-primer/
 .. _virtualenv: https://virtualenv.pypa.io/en/stable/

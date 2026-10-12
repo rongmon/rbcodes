@@ -116,7 +116,7 @@ def estimate_snr(wave, flux, error, binsize=3, snr_range=[-1, -1], verbose=True,
             plt.scatter(clipped_wave, clipped_snr_values, c='orange', marker='o', label='Used for Sigma Clipping', alpha=0.6)
         
         plt.legend(fontsize=20)
-        plt.xlabel('Wavelength [$\AA$]', size=20)
+        plt.xlabel(r'Wavelength [$\AA$]', size=20)
         plt.ylabel('SNR', size=20)
         plt.tight_layout()
         plt.show()

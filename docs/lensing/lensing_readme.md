@@ -20,14 +20,15 @@ Key components:
 - ``ang_D12(w_m, w_l, z1, z2)``         — angular diameter distance between two redshifts
 - ``ang_sep_D(xc1, yc1, xc2, yc2)``    — angular separation in radians
 - ``model_delens``                      — class to load lens deflection matrices and ray-trace
-  coordinates to a new source-plane redshift
+  coordinates to a new source-plane redshift (nearest-pixel or bilinear lookup of the
+  deflection; positions outside the maps give NaN)
 
 Example
 -------
     from rbcodes.lensing import lens_ang_sep as l
     s = l.model_delens(fits_x, fits_y, zl=0.392, zs_o=2.760)
-    s.raytrace_new_z(ra, dec, zs_n=0.5)
-    print(s.src_ra, s.src_dec)
+    src_ra, src_dec = s.raytrace_new_z(ra, dec, zs_n=0.5)                    # nearest pixel
+    src_ra, src_dec = s.raytrace_new_z(ra, dec, zs_n=0.5, interp='bilinear')
 
 Originally written by Ahmed Shaban (2020); extended by Rongmon Bordoloi (2021).
 
@@ -143,7 +144,23 @@ Raytrace a set of input RA DECs to their corresponding source plane at the given
            ralist: list of right ascension of the object at the image plane
            declist: list of declination of the object at the image plane.
            zs_n: redshift of the new source or plane at which you want to calculate the separation
-    
+           interp: 'nearest' (default) or 'bilinear' lookup of the deflection maps
+
            Output:
             returns the RA and Dec of the source plane location or the given redshift plane
+            (also stored as s.src_ra, s.src_dec). Positions outside the deflection maps give NaN.
+
+Note (2026): earlier versions truncated pixel positions with `int()`, so the deflection was often
+read from the neighbouring pixel. The default is now the pixel that contains the position. On the
+SGAS J1527 model (0.06" pixels) source-plane positions change by ~0.03" (median), well below the
+lens-model uncertainty from its realizations (~0.4").
+
+### deflection_at() (`lens_ang_sep`)
+
+Deflection, in deflection-map pixels, at 0-based pixel positions of the maps; `interp` as above.
+
+### deflection_scale() (`lens_ang_sep`)
+
+Factor applied to the deflections for a plane at `zs_n`: (D_ls/D_s)(zs_n) / (D_ls/D_s)(zs_o).
+It is 1 at `zs_n = zs_o` and 0 at the lens redshift.
 

@@ -39,14 +39,14 @@ Key Parameters:
 
 Note: These tests are designed to be robust and accommodate 
 the natural variations found in astronomical spectral data.
-python -m unittest -v rb_spec_unit_tests.py
+python -m pytest -v tests/test_gui/test_rb_spec.py
 """
 
 import os
 import unittest
 import numpy as np
 import matplotlib.pyplot as plt
-from pkg_resources import resource_filename
+from pathlib import Path
 
 # Correct import paths
 from rbcodes.GUIs import rb_spec as rs
@@ -69,8 +69,8 @@ class TestSpectralAnalysisPipelineWithTestFits(unittest.TestCase):
         - Set up spectroscopic analysis parameters
         - Load test spectrum
         """
-        # Use resource_filename to locate the test.fits file
-        cls.filename = resource_filename('rbcodes', 'example-data/test.fits')
+        # example-data/ lives at the repository root, two levels above this file
+        cls.filename = str(Path(__file__).resolve().parents[2] / 'example-data' / 'test.fits')
         
         # Specific parameters for spectral analysis
         cls.zabs = 0.348  # Absorber redshift

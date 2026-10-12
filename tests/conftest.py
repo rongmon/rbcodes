@@ -1,10 +1,11 @@
 """
-    Dummy conftest.py for rbcodes.
+Shared pytest configuration for rbcodes.
 
-    If you don't know what this is for, just leave it empty.
-    Read more about conftest.py under:
-    - https://docs.pytest.org/en/stable/fixture.html
-    - https://docs.pytest.org/en/stable/writing_plugins.html
+GUI modules are imported and exercised without a display: Qt uses the
+offscreen platform and matplotlib the Agg backend. Both must be set before
+PyQt5 or pyplot is first imported.
 """
+import os
 
-# import pytest
+os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+os.environ.setdefault('MPLBACKEND', 'Agg')

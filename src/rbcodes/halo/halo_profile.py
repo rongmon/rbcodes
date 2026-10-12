@@ -71,8 +71,8 @@ def NFW_escape_vel(r, Mvir, Rvir, CvirorRs, truncated=False):
         mtrunc = Mvir * (np.log(1 + Ctrunc) - Ctrunc / (1 + Ctrunc)) / fofC
 
         outer = r >= rtrunc
-        potential[outer] = - Gkpc * mtrunc / r[outer]
-        potential[~outer] = potential[~outer] + (Gkpc * Mvir / a) / (Ctrunc + 1) / fofC
+        potential[outer] = - cnst.G * mtrunc / r[outer]
+        potential[~outer] = potential[~outer] + (cnst.G * Mvir / a) / (Ctrunc + 1) / fofC
 
     vesc = (2 * np.abs(potential)) ** 0.5
     return vesc.to(u.km/u.s)

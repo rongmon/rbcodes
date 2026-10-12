@@ -20,7 +20,7 @@ def zfind_to_zgui_z(result: ZFindResult, idx: int = 0) -> list:
     Parameters
     ----------
     result : ZFindResult
-    idx : int  — which solution to use (0 = best)
+    idx : int  — which solution to use (0 = best); clamped to the valid range
 
     Returns
     -------

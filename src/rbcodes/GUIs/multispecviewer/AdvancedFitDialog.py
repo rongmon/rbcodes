@@ -955,7 +955,7 @@ class AdvancedFitDialog(QDialog):
             gauss_i = direction * MultiGauss._gauss(
                 wave / (1.0 + z), sig, amp, rest)
             cont_at_cen = np.interp(obs_cen, wave, cont)
-            ew = float(np.trapz(np.abs(gauss_i / (cont_at_cen + 1e-30)), wave))
+            ew = float(np.trapezoid(np.abs(gauss_i / (cont_at_cen + 1e-30)), wave))
             ew_list.append(ew)
             lines.append(
                 f'Line {i+1}: {name}  (rest {rest:.2f} Å)')

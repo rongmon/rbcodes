@@ -1,0 +1,49 @@
+# Runs the test suite and rb_selftest on every push and pull request, on Linux and
+# macOS, with the newest allowed dependency versions ("latest") and with the lower
+# bounds in setup.cfg ("minimum"). rbcodes is installed as a regular (non-editable)
+# package, so missing package data is caught too.
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / py3.12 / ${{ matrix.deps }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        deps: [latest, minimum]
+    env:
+      QT_QPA_PLATFORM: offscreen
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Qt system libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+
+      - name: Install rbcodes (${{ matrix.deps }} dependency versions)
+        run: |
+          uv venv --python 3.12
+          if [ "${{ matrix.deps }}" = "minimum" ]; then
+            uv pip install --resolution lowest-direct ".[testing]"
+          else
+            uv pip install ".[testing]"
+          fi
+          uv pip list
+
+      - name: rb_selftest
+        run: .venv/bin/rb_selftest -v
+
+      - name: pytest
+        run: .venv/bin/python -m pytest

@@ -787,7 +787,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
         flux1[q]=tmp_flx
         
         
-        EW=np.trapz(1.-flux1, x= ww)
+        EW=np.trapezoid(1.-flux1, x= ww)
         delw=np.double(ww[2]-ww[1])
         sig_w=delw*sig_flx1
         sig_wtot=np.sqrt(np.sum(sig_w**2.))
@@ -1107,7 +1107,7 @@ class mainWindow(QtWidgets.QMainWindow):#QtWidgets.QMainWindow
                     ss=self.ax.transData.transform((0, .9))
                     ydata=[0,ylim[1]]
                     lineplot,=self.ax.plot(xdata,ydata,'--',color=linecolor)                    
-                    tt=self.ax.text(xdata[0],0.75*ylim[1],data[i]['ion']+'  z='+ np.str(self.zabs),rotation=90,picker=True)
+                    tt=self.ax.text(xdata[0],0.75*ylim[1],data[i]['ion']+'  z='+ str(self.zabs),rotation=90,picker=True)
                     
                     #append text and plot artist objects
                     tt_temp.append(tt)
@@ -1676,7 +1676,7 @@ class LoadCatalog(QWidget):
                     xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                     #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
                     lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color=clr[color])
-                    tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
+                    tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ str(parent.line_list.loc[i].Zabs),rotation=90)
                     parent.identified_lines.append(lineplot)
                     parent.identified_text.append(tt)
                 parent.text = [[]]*len(parent.zabs_list.Zabs.tolist())
@@ -1694,7 +1694,7 @@ class LoadCatalog(QWidget):
                             xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                             #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
                             lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color='y')
-                            tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
+                            tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ str(parent.line_list.loc[i].Zabs),rotation=90)
                             parent.identified_lines.append(lineplot)
                             parent.identified_text.append(tt)
 
@@ -1707,7 +1707,7 @@ class LoadCatalog(QWidget):
                 xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                 #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
                 lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color='y')
-                tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
+                tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ str(parent.line_list.loc[i].Zabs),rotation=90)
                 parent.identified_lines.append(lineplot)
                 parent.identified_text.append(tt)
                 
@@ -1761,7 +1761,7 @@ class Identified_plotter:
                         lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],':',color=clr[color])
                     else: #Detection Plotting
                         lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color=clr[color])
-                    tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
+                    tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ str(parent.line_list.loc[i].Zabs),rotation=90)
                     parent.identified_lines.append(lineplot)
                     parent.identified_text.append(tt)
 
@@ -1778,7 +1778,7 @@ class Identified_plotter:
                             xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                             #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
                             lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color='y')
-                            tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
+                            tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ str(parent.line_list.loc[i].Zabs),rotation=90)
                             parent.identified_lines.append(lineplot)
                             parent.identified_text.append(tt)
         else:
@@ -1787,7 +1787,7 @@ class Identified_plotter:
                 xdata = [parent.line_list.loc[i].Wave_obs,parent.line_list.loc[i].Wave_obs]
                 #ylow = np.interp(xdata[0],parent.wave,parent.flux)+.75
                 lineplot,=parent.ax.plot(xdata,[1.5*ylim[0],0.75*ylim[1]],'--',color='y')
-                tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ np.str(parent.line_list.loc[i].Zabs),rotation=90)
+                tt = parent.ax.text(xdata[0],0.75*ylim[1],parent.line_list.loc[i].Name+'  z='+ str(parent.line_list.loc[i].Zabs),rotation=90)
                 parent.identified_lines.append(lineplot)
                 parent.identified_text.append(tt)
                                     

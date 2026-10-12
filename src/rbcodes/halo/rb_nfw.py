@@ -60,7 +60,7 @@ def rb_nfw(m200,c,z):
     rs = r200 / c; 
     ss=(((r/rs)*(1.+(r/rs))**2.)*1000.**3);
     rho = (rho_crit * deltac)/(ss); 
-    M_r = 4.*np.pi* integrate.cumtrapz((r**2)*rho, r,initial=0.)
+    M_r = 4.*np.pi* integrate.cumulative_trapezoid((r**2)*rho, r,initial=0.)
     
     x = r/r200 ;
     tab=1./x*(np.log(1.+c*x)-c*x/(1.+c*x))/(np.log(1.+c)-c/(1.+c));
@@ -74,8 +74,8 @@ def rb_nfw(m200,c,z):
     Phi_new = r * 0.0;
     vesc = r * 0.0 ;
     for ir in range(2,len(r)-4):
-        term1 = (np.trapz(rho[0:ir]*(r[0:ir]**2.),x=r[0:ir])/(r[ir]))* msun; 
-        term2 = np.trapz(rho[ir:len(r)]*r[ir:len(r)],x=r[ir:len(r)])*msun;        
+        term1 = (np.trapezoid(rho[0:ir]*(r[0:ir]**2.),x=r[0:ir])/(r[ir]))* msun; 
+        term2 = np.trapezoid(rho[ir:len(r)]*r[ir:len(r)],x=r[ir:len(r)])*msun;        
         Phi_new[ir] = -4. *np.pi*6.67e-8*(term1 + term2)/3.086e21 ;
         vesc[ir] = ((2. * np.abs(Phi_new[ir]))**0.5) / 1e5 ; # See Binney & Tremaine (2-22) 
     
@@ -86,7 +86,7 @@ def rb_nfw(m200,c,z):
     #M_r in gram
     M_r_gram=M_r*msun;
 
-    Phi=G*integrate.cumtrapz((M_r_gram/rcm**(2)),rcm,initial=0);
+    Phi=G*integrate.cumulative_trapezoid((M_r_gram/rcm**(2)),rcm,initial=0);
     
     Phi=Phi*(1./((1e5)**2.));#%km^2/s^2
     Phi_out=np.max(Phi);

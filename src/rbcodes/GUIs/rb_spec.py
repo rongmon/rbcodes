@@ -994,7 +994,7 @@ class rb_spec(object):
         
         # Check for empty arrays - this could happen if slice_spec found no data in the range
         if len(self.wave_slice) == 0 or len(self.flux_slice) == 0 or len(self.velo) == 0:                            
-            raise ValueError(f"No data points in the sliced spectrum.{available_range}\n"
+            raise ValueError("No data points in the sliced spectrum.\n"
                            f"Try different parameters in the slice_spec method.")
 
 
@@ -1463,14 +1463,13 @@ class rb_spec(object):
         """
         # Import matplotlib and set style
         import matplotlib.pyplot as plt
-        try:
-            plt.style.use('seaborn-darkgrid')
-        except (OSError, ValueError):
+        # seaborn styles were renamed 'seaborn-v0_8-*' in matplotlib 3.6
+        for style in ('seaborn-v0_8-darkgrid', 'seaborn-darkgrid', 'default'):
             try:
-                plt.style.use('seaborn')
+                plt.style.use(style)
+                break
             except (OSError, ValueError):
-                # Use default matplotlib style with customization
-                plt.style.use('default')
+                continue
         
         # Custom settings for better appearance
         plt.rcParams.update({
@@ -1680,6 +1679,12 @@ class rb_spec(object):
     def plot_spec(self):
         """Quick wrapper to call an interactive plotter for the full spectrum as given in input file.
         """
+        warnings.warn(
+            "plot_spec uses the deprecated PlotSpec_Integrated GUI and will be removed "
+            "in a future release; use rb_multispec instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         try:
             from rbcodes.GUIs import PlotSpec_Integrated as sp
         except:

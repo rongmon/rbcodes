@@ -131,10 +131,12 @@ if result['line_saturation']:
 
 ```python
 spec.plot_continuum_fit(verbose=True)
-spec.plot_spec()
 spec.plot_slice()
 spec.plot_doublet(1548.2, 1550.8, vmin=-600, vmax=600)
 ```
+
+`spec.plot_spec()` (full-spectrum viewer) is deprecated: it opens the old
+`PlotSpec_Integrated` GUI and will be removed. Use `rb_multispec` instead.
 
 <img src="images/spectrum_visualization.png" width="700" alt="Spectrum Visualization">
 

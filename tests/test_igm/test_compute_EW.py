@@ -67,7 +67,7 @@ class TestComputeEW(unittest.TestCase):
         noisy_flux = flux + np.random.normal(0, noise_level, size=flux.shape)
         
         # Calculate theoretical EW directly in wavelength space
-        theoretical_ew = np.trapz(1-flux, x=self.wavelength)
+        theoretical_ew = np.trapezoid(1-flux, x=self.wavelength)
         
         # Log column density
         log_N = np.log10(N_col)
