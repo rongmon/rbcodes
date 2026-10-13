@@ -105,6 +105,8 @@ def test_realizations(lensdir):
     assert [k for k, _ in outs] == [0, 1, 2]
     centres = {tuple(o.meta['lens']['centre']) for _, o in outs}
     assert len(centres) == 1                                         # same origin for all
+    b0 = outs[0][1]                                                  # default origin: mean source position (best fit)
+    assert abs(np.nanmean(b0.beta_x[b0.mask])) < 1e-6 and abs(np.nanmean(b0.beta_y[b0.mask])) < 1e-6
     # a spaxel at +3" on the x axis maps to 3 - theta_E
     iy, ix = 20, 35
     k = _kpc(ZS)

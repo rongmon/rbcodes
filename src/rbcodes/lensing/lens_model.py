@@ -17,7 +17,7 @@ Ray tracing moves positions only: velocities and errors stay with their image-pl
 Astrometry of the cube and the lens model must already agree (it is not adjusted here).
 
 Source-plane coordinates: offsets from a fixed sky position ``centre`` (default: the mean
-image-plane position of the kept spaxels), x = -(RA - RA0) cos(Dec0), y = Dec - Dec0
+source-plane position of the kept spaxels under the best-fit model), x = -(RA - RA0) cos(Dec0), y = Dec - Dec0
 (x increases westward, like the pixel x axis of a north-up, east-left image), converted to
 proper kpc at the plane redshift with a flat-LambdaCDM cosmology (H0 = 70, the model's Omega_m),
 matching the distances used by the ray tracer.
@@ -110,15 +110,16 @@ class LensModel:
         images : {id: bool (ny, nx) mask or ds9 region file/text}, optional
             Which multiple image each spaxel belongs to (others get -1).
         centre : (ra, dec) in degrees, optional
-            Origin of the source-plane coordinates; keep it fixed when comparing realizations.
+            Origin of the source-plane coordinates (default ``source_centre``: the mean source-plane
+            position of the kept spaxels under the best-fit model, the same for every realization).
         """
         if vm.wcs is None:
             raise ValueError('The VelocityMap has no WCS; it is needed to ray-trace its spaxels.')
         ra, dec = vm.wcs.pixel_to_world_values(vm.x, vm.y)
-        if centre is None:
-            centre = (float(np.mean(ra[vm.mask])), float(np.mean(dec[vm.mask])))
         sra, sdec = self.source_positions(ra.ravel(), dec.ravel(), z, realization, interp)
         sra, sdec = np.reshape(sra, vm.shape), np.reshape(sdec, vm.shape)
+        if centre is None:
+            centre = self.source_centre(vm, z, interp) if realization != 0 else _mean_pos(sra, sdec, vm.mask)
         k = self.kpc_per_arcsec(z) * 3600.
         bx = -(sra - centre[0]) * np.cos(np.radians(centre[1])) * k
         by = (sdec - centre[1]) * k
@@ -134,10 +135,15 @@ class LensModel:
     def raytrace_realizations(self, vm, z, images=None, centre=None, interp='nearest'):
         """Yield (k, VelocityMap) for every lens model, k = 0 the best fit; same centre for all."""
         if centre is None:
-            ra, dec = vm.wcs.pixel_to_world_values(vm.x[vm.mask], vm.y[vm.mask])
-            centre = (float(np.mean(ra)), float(np.mean(dec)))
+            centre = self.source_centre(vm, z, interp)
         for k in range(self.n_realizations):
             yield k, self.raytrace(vm, z, k, images, centre, interp)
+
+    def source_centre(self, vm, z, interp='nearest'):
+        """Mean source-plane (RA, Dec) of the kept spaxels of ``vm`` under the best-fit model (realization 0)."""
+        ra, dec = vm.wcs.pixel_to_world_values(vm.x[vm.mask], vm.y[vm.mask])
+        sra, sdec = self.source_positions(ra, dec, z, 0, interp)
+        return _mean_pos(sra, sdec, np.ones(np.shape(sra), bool))
 
     # --- magnification ----------------------------------------------------------
 
@@ -184,6 +190,13 @@ class LensModel:
         out['kappa'] = 1. - 0.5 * (out['a11'] + out['a22'])
         out['gamma'] = np.hypot(0.5 * (out['a11'] - out['a22']), 0.5 * (out['a12'] + out['a21']))
         return out
+
+
+def _mean_pos(ra, dec, mask):
+    ok = mask & np.isfinite(ra) & np.isfinite(dec)
+    if not ok.any():
+        raise ValueError('No kept spaxel falls inside the deflection maps.')
+    return float(np.mean(ra[ok])), float(np.mean(dec[ok]))
 
 
 def _image_ids(vm, images):
