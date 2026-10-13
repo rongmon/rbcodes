@@ -38,6 +38,9 @@ New Features
   ``Kurtosis``, ``LineWidth`` blocks and ``Summaries`` (measured on the data's pairs after the same
   bulk removal; optional variance-stabilising transforms), ported from vsf_pipeline.
   ``StructureFunction.s2``/``increments`` accept other velocities at the same spaxels (``values``).
+* ``rbcodes.turbulence.inference`` (synthetic likelihood, Latin hypercube, ``Emulator`` with held-out
+  validation, adaptive Metropolis, Gelman-Rubin, Fisher, MOPED) and ``rbcodes.turbulence.results``
+  (results.json -> results.tex macros, number formatting, savefig), ported from vsf_pipeline.
 * ``rbcodes.lensing.lens_model``: ``LensModel`` (best fit + optional realizations, e.g. a folder of
   ``dplx_k``/``dply_k`` maps) ray-traces a ``VelocityMap`` with ``model_delens`` into source-plane
   kpc, gives the magnification tensor; ``match_images`` pairs spaxels of different images that

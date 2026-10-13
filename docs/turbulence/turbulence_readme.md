@@ -118,3 +118,33 @@ orientations), `Kurtosis` / `'KURT'` (excess kurtosis of increments at 2, 4, 8 p
 `LineWidth` / `'SIG'` (16/50/84th percentiles of width², needs a width map such as 3-D mocks).
 `transform=True`: asinh(S2/s2_ref), asinh(kurtosis), log(width²). `sf.s2(u=sf.values(mock))`
 gives S2 of any map on the data's pairs.
+
+## inference
+
+```python
+from rbcodes.turbulence.inference import (latin_hypercube, Emulator, validate_emulator,
+                                          adaptive_metropolis, gelman_rubin, fisher,
+                                          moped_vectors, moped_loglike, synthetic_loglike)
+design = latin_hypercube(400, bounds, rng)                         # theta = (log10 sigma, alpha, log10 L, gamma)
+sims   = np.array([[summ(obs.simulate((10**t[0], *t[1:]), rng)) for _ in range(nrep)] for t in design])
+emu_var, report = validate_emulator(design, sims, bounds, rng)     # held-out std(z), emulator error
+emu    = Emulator(bounds).fit(design, sims).set_emulator_error(emu_var)
+chain, lp, acc = adaptive_metropolis(logpost, x0, 20000, rng)
+F, err = fisher(emu, theta_map)                                    # per summary block with idx=
+```
+
+* `synthetic_loglike`: Gaussian synthetic likelihood (Wood 2010) with the Hartlap factor.
+* `Emulator`: polynomial mean (degree 3) and log-variance (degree 2) in θ scaled to [−1, 1], pooled
+  correlation matrix; `set_emulator_error` adds the held-out emulator variance.
+* `adaptive_metropolis` (Haario et al. 2001), `gelman_rubin` (R̂), `fisher` (J^T Σ^−1 J),
+  `moped_vectors` / `moped_loglike` (score compression; lossless for a linear Gaussian model),
+  `credible_interval` for gridded posteriors. Random generators are explicit arguments.
+
+## results
+
+```python
+from rbcodes.turbulence.results import Results, pm, asym, num, savefig
+R = Results('paper/results.json', 'paper/results.tex')
+R.update({'alpha-plane': pm(1.08, 0.46)}, section='nb03')         # a rerun replaces its section
+```
+In LaTeX: `\input{results.tex}`, `\newcommand{\R}[1]{\csname R@#1\endcsname}`, then `\R{alpha-plane}`.
