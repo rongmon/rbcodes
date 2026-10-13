@@ -167,6 +167,9 @@ class GaussianFitter:
         cont_p0=0 assumes continuum-subtracted cubes).
     cont_p0 : float
         Starting continuum level.
+    (With ``LineModel(..., continuum='linear')`` the continuum C + S (lambda - lambda_c) of each line
+    is unbounded and starts from a straight-line fit to the fit-window channels more than ``vmax``
+    km/s from the lines; ``cont_bound`` / ``cont_p0`` apply to the constant continuum only.)
 
     ``curve_fit(sigma=noise, absolute_sigma=True)``: the covariance follows the noise model.
     """
@@ -201,8 +204,24 @@ class GaussianFitter:
         dl = np.median(np.diff(lam))
         gi = m._group_index(lam)
         g0 = gi == 0
+        lin = getattr(m, 'continuum', 'constant') == 'linear'
+        cont = np.zeros_like(fs)                       # continuum estimate (linear model only)
+        cs = {}
+        if lin:
+            for i, g in enumerate(m.groups):
+                sel = gi == i
+                off = sel & np.all(np.abs(lam[:, None] - g['obs'][None]) > g['obs'][None] * vmax / C_KMS, axis=1)
+                if off.sum() < 3:
+                    off = sel
+                if off.sum() >= 2:
+                    sl_, c_ = np.polyfit(lam[off] - g['lc'], fs[off], 1)
+                else:
+                    sl_, c_ = 0., float(np.median(fs[sel]))
+                cs[i] = (c_, sl_)
+                cont[sel] = c_ + sl_ * (lam[sel] - g['lc'])
+        fl = fs - cont                                 # line part (for the starting values)
         if p0_v is None:
-            fp = np.clip(fs[g0], 0, None)
+            fp = np.clip(fl[g0], 0, None)
             g = m.groups[0]
             lc = np.sum(fp * lam[g0]) / fp.sum() if fp.sum() > 0 else g['obs'].mean()
             wts = m.weights(g, 1.3) if g['kind'] == 'free' else g['w']
@@ -213,10 +232,15 @@ class GaussianFitter:
         p0, lo, hi = [], [], []
         for i, g in enumerate(m.groups):
             sel = gi == i
-            F0 = max(np.sum(fs[sel]) * dl, 3 * dl)
-            p0 += [c0, F0]
-            lo += [c0 - self.cont_bound, 0.]
-            hi += [c0 + self.cont_bound, 50 * F0 + 1]
+            F0 = max(np.sum(fl[sel]) * dl, 3 * dl)
+            if lin:                                    # linear continuum: unbounded C and S
+                p0 += [cs[i][0], cs[i][1], F0]
+                lo += [-np.inf, -np.inf, 0.]
+                hi += [np.inf, np.inf, 50 * F0 + 1]
+            else:
+                p0 += [c0, F0]
+                lo += [c0 - self.cont_bound, 0.]
+                hi += [c0 + self.cont_bound, 50 * F0 + 1]
             if g['kind'] == 'free':
                 rb = ratio_bounds if (ratio_bounds is not None and m.single) else g['ratio_bounds']
                 p0.append(float(np.clip(1.2, rb[0] * 1.01, rb[1] * 0.99)))
@@ -233,8 +257,8 @@ class GaussianFitter:
         pe = np.sqrt(np.clip(np.diag(cov), 0, None))
         chi2 = np.sum(((fs - m(lam, *p)) / es) ** 2) / max(len(lam) - m.npar, 1)
         k = np.sqrt(max(1., chi2)) if self.inflate else 1.
-        # back to the input flux units: continua and fluxes scale with ce
-        scale = np.array([ce if n.startswith(('C', 'F')) else 1. for n in m.param_names])
+        # back to the input flux units: continua, slopes and fluxes scale with ce
+        scale = np.array([ce if n.startswith(('C', 'S', 'F')) else 1. for n in m.param_names])
         p, pe = p * scale, pe * scale
         val = dict(zip(m.param_names, p))
         err = dict(zip(m.param_names, pe * k))
@@ -243,6 +267,7 @@ class GaussianFitter:
         out.update(status=0, p=p, perr=pe * k, chi2=chi2, inflate=k, v=val['v'], v_err=err['v'],
                    sig=val['sig'], sig_err=err['sig'], F=val[key('F')], F_err=err[key('F')],
                    R=val.get(key('R'), np.nan), R_err=err.get(key('R'), np.nan), C=val[key('C')],
+                   S=val.get(key('S'), np.nan), S_err=err.get(key('S'), np.nan),
                    lo=np.array(lo) * scale, hi=np.array(hi) * scale, nchan=len(lam))
         if not m.single:
             for n in m.param_names[:-2]:
@@ -250,7 +275,11 @@ class GaussianFitter:
         return out
 
     def _map_keys(self):
-        extra = [] if self.model.single else [k for n in self.model.param_names[:-2] for k in (n, n + '_err')]
+        m = self.model
+        if m.single:
+            extra = ['S', 'S_err'] if getattr(m, 'continuum', 'constant') == 'linear' else []
+        else:
+            extra = [k for n in m.param_names[:-2] for k in (n, n + '_err')]
         return FIT_KEYS + extra
 
     def fit_cube(self, cube, noise, detect=None, detect_snr=3., overrides=None, decisions=None, wave=None,
@@ -705,8 +734,9 @@ def plot_spaxel(axes, model, wave, flux, noise, iy, ix, result=None, alt=None, a
             continue
         a.plot(lf, model(lf, *res['p']), color=col, lw=1.4,
                label=f'{lab}: χ²ν={res["chi2"]:.2f}, v={res["v"]:.0f}±{res["v_err"]:.0f}')
+        base = model.continuum_at(lf, *res['p']) if hasattr(model, 'continuum_at') else res['p'][0]
         for comp in model.components(lf, *res['p']):
-            a.plot(lf, res['p'][0] + comp, ':', color=col, lw=1)
+            a.plot(lf, base + comp, ':', color=col, lw=1)
         b.step(wave[dom], (f[dom] - model(wave[dom], *res['p'])) / e[dom], where='mid', color=col, lw=0.9)
     for lo_ in model.obs:
         a.axvline(lo_, color='C1', ls=':', lw=0.8)

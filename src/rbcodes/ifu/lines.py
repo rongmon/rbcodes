@@ -44,6 +44,10 @@ LINES = {
                    ratio='fixed', ratios=(1.0, 1 / 3.05), amu=14.01),
     'MgII':   dict(label='Mg II 2796,2803', air=(2795.528, 2802.705), vac=(2796.354, 2803.531),
                    ratio='free', ratio_bounds=(1.0, 2.0), amu=24.31),
+    # below 2000 A air and vacuum wavelengths are the same by convention; R = F(1909)/F(1907)
+    # (low-density limit F(1907)/F(1909) ~ 1.5, i.e. R ~ 0.65; higher densities give larger R)
+    'CIII':   dict(label='[C III] 1907, C III] 1909', air=(1906.683, 1908.734), vac=(1906.683, 1908.734),
+                   ratio='free', ratio_bounds=(0.5, 10.0), amu=12.01),
 }
 
 
@@ -150,12 +154,18 @@ class LineModel:
     ratios : sequence or {name: sequence}, optional
         Fixed flux ratios for 'fixed' multiplets (default: the catalogue value).
     catalogue : dict, optional
-        Line definitions (default ``LINES``); e.g. ``{**LINES, 'CIII': dict(label='C III]',
-        air=(...), vac=(1906.68, 1908.73), ratio='free', ratio_bounds=(0.5, 2.))}``.
+        Line definitions (default ``LINES``); e.g. ``{**LINES, 'NeIII': dict(label='[Ne III] 3869',
+        air=(3868.760,), vac=(3869.860,), ratio='single')}``.
+    continuum : {'constant', 'linear'}
+        Continuum of each line in its fit window: C (default), or C + S (lambda - lambda_c) with
+        lambda_c the centre of the fit window (for cubes that are not continuum-subtracted).
     """
 
     def __init__(self, names, z, windows, air=False, lsf=None, ratio_bounds=None, ratios=None,
-                 catalogue=None):
+                 catalogue=None, continuum='constant'):
+        if continuum not in ('constant', 'linear'):
+            raise ValueError("continuum must be 'constant' or 'linear'.")
+        self.continuum = continuum
         cat = LINES if catalogue is None else catalogue
         single = isinstance(names, str)
         names = [names] if single else list(names)
@@ -187,11 +197,13 @@ class LineModel:
             if b[0] < a[1]:
                 raise ValueError(f"Fit windows of '{a[2]}' and '{b[2]}' overlap; use one multiplet entry instead.")
 
-        # parameter layout: per line (C, F[, R]), then v, s
+        # parameter layout: per line (C[, S], F[, R]), then v, s
         pn = []
         for g in self.groups:
             sfx = '' if single else f'_{g["name"]}'
-            pn += [f'C{sfx}', f'F{sfx}'] + ([f'R{sfx}'] if g['kind'] == 'free' else [])
+            g['lc'] = 0.5 * (g['W']['fit'][0] + g['W']['fit'][1])
+            pn += ([f'C{sfx}'] + ([f'S{sfx}'] if continuum == 'linear' else []) + [f'F{sfx}']
+                   + ([f'R{sfx}'] if g['kind'] == 'free' else []))
         self.param_names = tuple(pn + ['v', 'sig'])
         self.npar = len(self.param_names)
         self.obs = np.concatenate([g['obs'] for g in self.groups])
@@ -204,15 +216,17 @@ class LineModel:
     # --- parameters ---------------------------------------------------------
 
     def _split(self, p):
-        """[(C, F, R or None) per line], v, s."""
+        """[(C, S, F, R or None) per line], v, s  (S = 0 for a constant continuum)."""
         out, i = [], 0
+        lin = self.continuum == 'linear'
         for g in self.groups:
-            if g['kind'] == 'free':
-                out.append((p[i], p[i + 1], p[i + 2]))
-                i += 3
-            else:
-                out.append((p[i], p[i + 1], None))
-                i += 2
+            C = p[i]
+            S = p[i + 1] if lin else 0.
+            i += 2 if lin else 1
+            F = p[i]
+            R = p[i + 1] if g['kind'] == 'free' else None
+            i += 2 if g['kind'] == 'free' else 1
+            out.append((C, S, F, R))
         return out, p[i], p[i + 1]
 
     @staticmethod
@@ -244,10 +258,21 @@ class LineModel:
         per, v, s = self._split(p)
         out = np.zeros_like(lam)
         gi = self._group_index(lam)
-        for i, (g, (C, F, R)) in enumerate(zip(self.groups, per)):
+        for i, (g, (C, S, F, R)) in enumerate(zip(self.groups, per)):
             m = gi == i
             if m.any():
-                out[m] = C + np.sum(self._gauss(g, lam[m], F, R, v, s), axis=0)
+                out[m] = C + S * (lam[m] - g['lc']) + np.sum(self._gauss(g, lam[m], F, R, v, s), axis=0)
+        return out
+
+    def continuum_at(self, lam, *p):
+        """The continuum part of the model at ``lam``."""
+        lam = np.asarray(lam, dtype=float)
+        per, v, s = self._split(p)
+        gi = self._group_index(lam)
+        out = np.zeros_like(lam)
+        for i, (g, (C, S, F, R)) in enumerate(zip(self.groups, per)):
+            m = gi == i
+            out[m] = C + S * (lam[m] - g['lc'])
         return out
 
     def components(self, lam, *p):
@@ -255,7 +280,7 @@ class LineModel:
         lam = np.asarray(lam, dtype=float)
         per, v, s = self._split(p)
         out = []
-        for g, (C, F, R) in zip(self.groups, per):
+        for g, (C, S, F, R) in zip(self.groups, per):
             out += self._gauss(g, lam, F, R, v, s)
         return out
 
@@ -284,7 +309,7 @@ class LineModel:
 
     def meta(self):
         """Settings for file headers."""
-        return dict(line=self.name, z=self.z, air=self.air,
+        return dict(line=self.name, z=self.z, air=self.air, continuum=self.continuum,
                     rest=[float(r) for g in self.groups for r in g['rest']],
                     windows={g['name']: g['W'] for g in self.groups},
                     lsf={g['name']: getattr(g['lsf'], 'description', getattr(g['lsf'], '__name__', 'custom'))

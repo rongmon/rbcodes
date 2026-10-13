@@ -76,6 +76,11 @@ within bounds), `'fixed'`, or `'single'`. Several lines: `LineModel(['OII', 'Hbe
 windows={'OII': dict(fit=...), 'Hbeta': dict(fit=...)})` — independent fluxes and continua,
 each line in its own fit window with its own LSF (`lsf={'OII': ..., 'Hbeta': ...}`).
 
+**Continuum:** `LineModel(..., continuum='linear')` fits C + S (λ − λ_c) for each line (λ_c = centre
+of its fit window) — for cubes that are not continuum-subtracted. It starts from a straight-line
+fit to the fit-window channels more than `vmax` km/s from the lines and is unbounded; maps `S`,
+`S_err`. The default `'constant'` keeps C within ±`cont_bound` × noise of `cont_p0`.
+
 **Windows** are observed-frame Å per line: `fit` (required), `flux` (detection S/N; default
 `fit`), `exclude` (ranges dropped from the fit), `linefree` (noise estimate; default: more
 than 5 Å outside `fit`).

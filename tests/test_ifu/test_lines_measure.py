@@ -382,3 +382,65 @@ def test_sky_mask_from_region_file(tmp_path):
     f.write_text('image\nbox(8.5,3,16,5,0)')
     m = sky_mask_from_region(f, None, (14, 16))
     assert m[:5].all() and not m[5:].any()
+
+
+# ---------------------------------------------------------------------------
+# linear continuum and C III]
+# ---------------------------------------------------------------------------
+
+class TestLinearContinuum:
+
+    @staticmethod
+    def _spec(scale=1.):
+        lm = LineModel('CIII', 1.701, dict(fit=(5130., 5180.)), lsf=lsf_muse, continuum='linear')
+        wave = np.arange(5130., 5180., 1.25)
+        true = (2.0 * scale, 0.03 * scale, 6. * scale, 0.9, 45., 40.)       # C, S, F, R, v, sig
+        return lm, wave, true
+
+    def test_ciii_entry_and_parameters(self):
+        lm, _, _ = self._spec()
+        np.testing.assert_allclose(lm.groups[0]['rest'], [1906.683, 1908.734])
+        assert lm.param_names == ('C', 'S', 'F', 'R', 'v', 'sig')
+        assert LineModel('CIII', 1.701, dict(fit=(5130., 5180.)), air=True).groups[0]['rest'][0] == 1906.683
+        with pytest.raises(ValueError):
+            LineModel('CIII', 1.7, dict(fit=(5130., 5180.)), continuum='quadratic')
+
+    def test_noiseless_recovery_any_units(self):
+        for scale in (1., 1e-20, 1e4):
+            lm, wave, true = self._spec(scale)
+            r = GaussianFitter(lm).fit_spectrum(wave, lm(wave, *true), np.full(wave.size, 0.05 * scale))
+            assert r['status'] == 0 and r['chi2'] < 1e-6
+            np.testing.assert_allclose(r['p'], true, rtol=1e-4, atol=1e-6 * scale)
+            assert r['S'] == pytest.approx(true[1]) and r['C'] == pytest.approx(true[0])
+
+    def test_constant_model_is_biased_by_a_sloped_continuum(self):
+        lm, wave, true = self._spec()
+        f = lm(wave, *true)
+        e = np.full(wave.size, 0.05)
+        const = LineModel('CIII', 1.701, dict(fit=(5130., 5180.)), lsf=lsf_muse)
+        bad = GaussianFitter(const).fit_spectrum(wave, f, e)
+        assert bad['status'] != 0 or bad['chi2'] > 100                   # continuum outside +-5 sigma, slope ignored
+        good = GaussianFitter(lm).fit_spectrum(wave, f, e)
+        assert good['v'] == pytest.approx(45., abs=1e-3)
+
+    def test_cube_with_continuum(self):
+        lm, wave, true = self._spec()
+        rng = np.random.default_rng(12)
+        ny, nx = 6, 7
+        v = rng.uniform(-80, 80, (ny, nx))
+        cube = np.empty((wave.size, ny, nx))
+        for iy in range(ny):
+            for ix in range(nx):
+                cube[:, iy, ix] = lm(wave, 2.0 + 0.2 * ix, 0.02 * iy, 6., 0.9, v[iy, ix], 40.)
+        sig = np.full_like(cube, 0.05)
+        cube += rng.normal(0, 0.05, cube.shape)
+        fit = GaussianFitter(lm).fit_cube(cube, sig, wave=wave, detect=np.ones((ny, nx), bool), verbose=False)
+        pull = (fit['v'] - v) / fit['v_err']
+        assert np.all(np.isfinite(pull)) and np.abs(pull).max() < 4
+        assert 'S' in fit.keys() and fit['S'][3, 0] == pytest.approx(0.06, abs=0.01)
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        fig, axes = plt.subplots(2, 1)
+        plot_spaxel(axes, lm, wave, cube, sig, 2, 3, GaussianFitter(lm).refit(cube, sig, 2, 3, wave=wave))
+        plt.close(fig)
