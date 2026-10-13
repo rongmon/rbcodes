@@ -63,6 +63,13 @@ New Features
   map to the same source position.
 * ``rb_selftest`` checks the line fit.
 
+Unreleased (bug fixes)
+======================
+
+* ``rb_multispec``: spectra passed as data (``from_data``, e.g. "→ rb_multispec" in rb_ifuview) without
+  an error array now get the same default as files: 5% of the flux, with a warning in the message
+  box (one shared check, ``IOManager.ensure_error``). Without it, vStack crashed on such spectra.
+
 Version 3.0.0 (2026-10-12)
 ==========================
 
