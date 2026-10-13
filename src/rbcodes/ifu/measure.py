@@ -167,6 +167,13 @@ class GaussianFitter:
         cont_p0=0 assumes continuum-subtracted cubes).
     cont_p0 : float
         Starting continuum level.
+    multistart : bool
+        For multiplets, also fit from one component spacing (dv_sep) bluer and redder than the
+        usual start, and record ``dchi2_alt`` = chi2(best alternative) - chi2(chosen fit) (not
+        reduced; NaN if no alternative converged elsewhere). The chosen fit is NOT replaced: at low
+        S/N the alternative (the other doublet component) can fit the noise better by chance, so a
+        small or negative dchi2_alt marks a fit whose line identification is ambiguous — exclude
+        those (e.g. dchi2_alt < 4).
     (With ``LineModel(..., continuum='linear')`` the continuum C + S (lambda - lambda_c) of each line
     is unbounded and starts from a straight-line fit to the fit-window channels more than ``vmax``
     km/s from the lines; ``cont_bound`` / ``cont_p0`` apply to the constant continuum only.)
@@ -174,13 +181,19 @@ class GaussianFitter:
     ``curve_fit(sigma=noise, absolute_sigma=True)``: the covariance follows the noise model.
     """
 
-    def __init__(self, model, vmax=600., sig_bounds=(1., 500.), inflate=True, cont_bound=5., cont_p0=0.):
+    def __init__(self, model, vmax=600., sig_bounds=(1., 500.), inflate=True, cont_bound=5., cont_p0=0.,
+                 multistart=False):
         self.model, self.vmax, self.sig_bounds = model, float(vmax), tuple(sig_bounds)
         self.inflate, self.cont_bound, self.cont_p0 = inflate, float(cont_bound), float(cont_p0)
+        self.multistart = bool(multistart)
+        g = model.groups[0]
+        # velocity spacing of the first line's components (for multistart): the fit can lock onto
+        # the wrong component of a doublet, i.e. land one spacing away from the true velocity
+        self.dv_sep = float(C_KMS * (g['obs'].max() / g['obs'].min() - 1)) if len(g['obs']) > 1 else 0.
 
     def settings(self):
         return dict(vmax=self.vmax, sig_bounds=self.sig_bounds, inflate=self.inflate,
-                    cont_bound=self.cont_bound, cont_p0=self.cont_p0)
+                    cont_bound=self.cont_bound, cont_p0=self.cont_p0, multistart=self.multistart)
 
     def fit_spectrum(self, lam, f, e, vmax=None, sig_bounds=None, ratio_bounds=None, p0_v=None, p0_sig=None):
         """
@@ -249,13 +262,29 @@ class GaussianFitter:
         p0 += [p0_v, s0]
         lo += [-vmax, sig_bounds[0]]
         hi += [vmax, sig_bounds[1]]
-        try:
-            p, cov = curve_fit(m, lam, fs, p0=p0, sigma=es, absolute_sigma=True, bounds=(lo, hi), maxfev=5000)
-        except Exception:
+        starts = [p0_v]
+        if self.multistart and self.dv_sep > 0:
+            for sv in (p0_v - self.dv_sep, p0_v + self.dv_sep):
+                if abs(sv) < vmax:
+                    starts.append(float(sv))
+        sols = []
+        for sv in starts:
+            p0[-2] = sv
+            try:
+                p_, cov_ = curve_fit(m, lam, fs, p0=p0, sigma=es, absolute_sigma=True, bounds=(lo, hi), maxfev=5000)
+            except Exception:
+                continue
+            sols.append((np.sum(((fs - m(lam, *p_)) / es) ** 2), p_, cov_))
+        if not sols:
             out['status'] = 2
             return out
+        # the chosen fit is the one from the usual start (the first that converged); alternatives
+        # only measure how much worse (or better) the other line identification is
+        chi2_raw, p, cov = sols[0]
+        others = [c for c, q_, _ in sols[1:] if abs(q_[-2] - p[-2]) > 0.5 * self.dv_sep]
+        dchi2_alt = (min(others) - chi2_raw) if others else np.nan
         pe = np.sqrt(np.clip(np.diag(cov), 0, None))
-        chi2 = np.sum(((fs - m(lam, *p)) / es) ** 2) / max(len(lam) - m.npar, 1)
+        chi2 = chi2_raw / max(len(lam) - m.npar, 1)
         k = np.sqrt(max(1., chi2)) if self.inflate else 1.
         # back to the input flux units: continua, slopes and fluxes scale with ce
         scale = np.array([ce if n.startswith(('C', 'S', 'F')) else 1. for n in m.param_names])
@@ -268,7 +297,7 @@ class GaussianFitter:
                    sig=val['sig'], sig_err=err['sig'], F=val[key('F')], F_err=err[key('F')],
                    R=val.get(key('R'), np.nan), R_err=err.get(key('R'), np.nan), C=val[key('C')],
                    S=val.get(key('S'), np.nan), S_err=err.get(key('S'), np.nan),
-                   lo=np.array(lo) * scale, hi=np.array(hi) * scale, nchan=len(lam))
+                   lo=np.array(lo) * scale, hi=np.array(hi) * scale, nchan=len(lam), dchi2_alt=dchi2_alt)
         if not m.single:
             for n in m.param_names[:-2]:
                 out[n], out[n + '_err'] = val[n], err[n]
@@ -280,6 +309,8 @@ class GaussianFitter:
             extra = ['S', 'S_err'] if getattr(m, 'continuum', 'constant') == 'linear' else []
         else:
             extra = [k for n in m.param_names[:-2] for k in (n, n + '_err')]
+        if self.multistart:
+            extra = extra + ['dchi2_alt']
         return FIT_KEYS + extra
 
     def fit_cube(self, cube, noise, detect=None, detect_snr=3., overrides=None, decisions=None, wave=None,

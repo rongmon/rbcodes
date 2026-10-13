@@ -13,6 +13,7 @@ Unreleased (3.1.0)
   ``CIII`` (1907, 1909) catalogue entry.
 * ``rb_ifuview``: load only a wavelength range (and convert air -> vacuum) — a dialog for cubes larger
   than 1 GB, File -> "Open Wavelength Range…", and ``--wave-range LO HI`` / ``--air-to-vacuum``.
+* ``GaussianFitter(..., multistart=True)``: doublet line-identification check (``dchi2_alt``).
 * ``rbcodes.ifu.binning.bin_cube``: block binning (summed flux and variance, rescaled WCS).
 * ``rbcodes.ifu.noise.narrowband``: continuum-subtracted narrow-band images with noise propagated from
   the variance cube and calibrated on blank sky (sigma = k sigma_STAT), S/N maps, automatic sky.

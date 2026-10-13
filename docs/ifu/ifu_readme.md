@@ -93,6 +93,12 @@ noise around `cont_p0` (defaults 5 and 0 assume continuum-subtracted cubes). Fit
 units of the median noise, so any flux units work. Per-spaxel `overrides={(iy, ix): dict(fit=,
 exclude=, vmax=, sig_bounds=, ratio_bounds=, p0_v=, p0_sig=)}`; `refit(...)` fits one spaxel.
 
+**Doublet line identification** (`multistart=True`): at low S/N a doublet fit can settle on the wrong
+component (one line spacing away). The fitter then also fits from ± one spacing and records
+`dchi2_alt` = χ²(alternative) − χ²(chosen); it does not replace the chosen fit (picking the lowest χ²
+makes things worse — at low S/N the wrong identification often fits the noise better). Exclude
+`dchi2_alt < 0`: for C III] at S/N > 5 this leaves 0.2% swapped fits (from 0.7%) and keeps 93%.
+
 **MomentMeasurer.** Fixed velocity window moments (v, width including the instrument, flux) with
 analytic errors; the components of tied lines are stacked in velocity with inverse-variance
 weights (gains S/N for lines of similar strength). Choose `vwin` close to the line extent.

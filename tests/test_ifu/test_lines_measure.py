@@ -500,3 +500,47 @@ class TestNarrowBand:
         assert nb.k == pytest.approx(np.median(nbv.sigma[nbv.sky_mask]), rel=0.15)
         with pytest.raises(ValueError):
             narrowband(flux, (5140., 5160.), [(5000., 5010.)], wave=wave)
+
+
+class TestLineSwapCheck:
+
+    @staticmethod
+    def _setup():
+        lm = LineModel('CIII', 1.70333, dict(fit=(5120., 5195.)), lsf=lsf_muse, continuum='linear')
+        wave = np.arange(5120., 5195., 1.25)
+        return lm, wave, (30., -0.05, 150., 0.85, 20., 55.)
+
+    def test_noiseless_keeps_the_true_solution(self):
+        lm, wave, true = self._setup()
+        g = GaussianFitter(lm, vmax=500., multistart=True)
+        assert g.dv_sep == pytest.approx(C_KMS * (1908.734 / 1906.683 - 1))
+        r = g.fit_spectrum(wave, lm(wave, *true), np.full(wave.size, 5.))
+        assert r['v'] == pytest.approx(20., abs=1e-3)
+        assert r['dchi2_alt'] > 4                                           # the other identification fits clearly worse
+        plain = GaussianFitter(lm, vmax=500.).fit_spectrum(wave, lm(wave, *true), np.full(wave.size, 5.))
+        np.testing.assert_allclose(plain['p'], r['p'])                      # the chosen fit is not changed
+
+    def test_cut_removes_line_swaps(self):
+        lm, wave, true = self._setup()
+        g = GaussianFitter(lm, vmax=500., multistart=True)
+        rng = np.random.default_rng(0)
+        sw, d, sn = [], [], []
+        for _ in range(400):
+            r = g.fit_spectrum(wave, lm(wave, *true) + rng.normal(0, 5., wave.size), np.full(wave.size, 5.))
+            if r['status'] == 0:
+                sw.append(abs(r['v'] - 20.) > 0.6 * g.dv_sep)
+                d.append(r['dchi2_alt'])
+                sn.append(r['F'] / r['F_err'])
+        sw, d, sn = map(np.array, (sw, d, sn))
+        keep = (sn > 5) & ~(d < 0)
+        assert sw[sn > 5].sum() >= 1 and sw[keep].sum() < sw[sn > 5].sum()
+        assert keep.mean() > 0.85
+
+    def test_map_only_with_multistart(self):
+        lm, wave, true = self._setup()
+        cube = (lm(wave, *true)[:, None, None] + np.zeros((1, 2, 3)))
+        sig = np.full(cube.shape, 5.)
+        on = GaussianFitter(lm, multistart=True).fit_cube(cube, sig, wave=wave, detect=np.ones((2, 3), bool), verbose=False)
+        off = GaussianFitter(lm).fit_cube(cube, sig, wave=wave, detect=np.ones((2, 3), bool), verbose=False)
+        assert 'dchi2_alt' in on.keys() and 'dchi2_alt' not in off.keys()
+        np.testing.assert_allclose(on['v'], off['v'])
