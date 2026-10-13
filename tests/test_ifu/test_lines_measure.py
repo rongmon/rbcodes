@@ -544,3 +544,15 @@ class TestLineSwapCheck:
         off = GaussianFitter(lm).fit_cube(cube, sig, wave=wave, detect=np.ones((2, 3), bool), verbose=False)
         assert 'dchi2_alt' in on.keys() and 'dchi2_alt' not in off.keys()
         np.testing.assert_allclose(on['v'], off['v'])
+
+
+def test_narrowband_multiple_bands():
+    from rbcodes.ifu.noise import narrowband
+    wave, flux, stat, amp = TestNarrowBand._cube(5)
+    cont = [(5105., 5125.), (5175., 5195.)]
+    two = narrowband(flux, [(5140., 5146.), (5154., 5160.)], cont, var=stat, wave=wave)
+    a = narrowband(flux, (5140., 5146.), cont, var=stat, wave=wave, sky_mask=two.sky_mask)
+    b = narrowband(flux, (5154., 5160.), cont, var=stat, wave=wave, sky_mask=two.sky_mask)
+    np.testing.assert_allclose(two.image, a.image + b.image)            # linear in the band channels
+    assert isinstance(two.band, list) and len(two.band) == 2
+    assert np.all(two.sigma_stat <= a.sigma_stat + b.sigma_stat + 1e-12)

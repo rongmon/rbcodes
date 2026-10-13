@@ -230,7 +230,8 @@ def narrowband(cube, band, windows, var=None, wave=None, wcs=None, continuum='li
     Parameters
     ----------
     cube : IFUCube or ndarray (n_wave, ny, nx)
-    band : (lo, hi) Angstrom
+    band : (lo, hi) Angstrom, or a list of (lo, hi) whose channels are summed together (e.g. one
+        window per component of a doublet, skipping an absorption trough between them)
     windows : list of (lo, hi) Angstrom, continuum (line-free) windows
     var : variance cube (default ``cube.var``); without one sigma_stat = 1 and k is the sky noise
     wave, wcs : for an array cube
@@ -253,7 +254,10 @@ def narrowband(cube, band, windows, var=None, wave=None, wcs=None, continuum='li
     wave = np.asarray(wave, dtype=float)
     if continuum not in ('linear', 'constant'):
         raise ValueError("continuum must be 'linear' or 'constant'.")
-    b = (wave >= band[0]) & (wave <= band[1])
+    bands = [tuple(band)] if np.ndim(band) == 1 else [tuple(x) for x in band]
+    b = np.zeros(len(wave), bool)
+    for lo, hi in bands:
+        b |= (wave >= lo) & (wave <= hi)
     c = np.zeros(len(wave), bool)
     for lo, hi in windows:
         c |= (wave >= lo) & (wave <= hi)
@@ -291,4 +295,5 @@ def narrowband(cube, band, windows, var=None, wave=None, wcs=None, continuum='li
     with np.errstate(invalid='ignore', divide='ignore'):
         snr = np.where(finite, image / sigma, np.nan)
     return NarrowBand(image=image, sigma_stat=sigma_stat, k=k, sigma=sigma, snr=snr, continuum=cont,
-                      sky_mask=sky, band=tuple(band), windows=list(windows), continuum_kind=continuum)
+                      sky_mask=sky, band=bands[0] if len(bands) == 1 else bands, windows=list(windows),
+                      continuum_kind=continuum)

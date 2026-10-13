@@ -15,7 +15,8 @@ Unreleased (3.1.0)
   than 1 GB, File -> "Open Wavelength Range…", and ``--wave-range LO HI`` / ``--air-to-vacuum``.
 * ``GaussianFitter(..., multistart=True)``: doublet line-identification check (``dchi2_alt``).
 * ``rbcodes.ifu.binning.bin_cube``: block binning (summed flux and variance, rescaled WCS).
-* ``rbcodes.ifu.noise.narrowband``: continuum-subtracted narrow-band images with noise propagated from
+* ``rbcodes.ifu.noise.narrowband``: ``band`` may be a list of windows summed together (e.g. both
+  components of a doublet, skipping an absorption trough). Continuum-subtracted narrow-band images with noise propagated from
   the variance cube and calibrated on blank sky (sigma = k sigma_STAT), S/N maps, automatic sky.
 * ``rbcodes.utils.rb_spectrum``: standalone ``air_to_vacuum`` / ``vacuum_to_air`` (used by the
   ``rb_spectrum.air2vac`` / ``vac2air`` methods; same numbers).
