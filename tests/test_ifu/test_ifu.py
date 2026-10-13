@@ -225,3 +225,54 @@ def test_rb_spectrum_air_vacuum_functions():
     np.testing.assert_array_equal(s.wavelength.to(u.AA).value, vac)          # the method uses the function
     s.vac2air()
     np.testing.assert_array_equal(s.wavelength.to(u.AA).value, vacuum_to_air(vac))
+
+
+class TestBinCube:
+
+    def _cube(self, tmp_path, cd=False):
+        rng = np.random.default_rng(3)
+        flux, var = rng.normal(size=(NW, NY, NX)), rng.random((NW, NY, NX)) + 0.5
+        h = _cube_header()
+        if cd:
+            for k in ('CDELT1', 'CDELT2'):
+                del h[k]
+            h['CD1_1'], h['CD2_2'], h['CD1_2'], h['CD2_1'] = -PIX, PIX, 0., 0.
+        p = tmp_path / ('cd.fits' if cd else 'c.fits')
+        fits.HDUList([fits.PrimaryHDU(header=fits.Header({'INSTRUME': 'MUSE'})), fits.ImageHDU(flux, h, name='DATA'),
+                      fits.ImageHDU(var, h, name='STAT')]).writeto(p)
+        return load_fits(p), flux, var
+
+    @pytest.mark.parametrize('cd', [False, True])
+    def test_sums_and_wcs(self, tmp_path, cd):
+        from rbcodes.ifu.binning import bin_cube
+        cube, flux, var = self._cube(tmp_path, cd)
+        b = bin_cube(cube, 3)
+        assert b.flux.shape == (NW, NY // 3, NX // 3) and b.binning == 3
+        np.testing.assert_allclose(b.flux[:, 1, 2], flux[:, 3:6, 6:9].sum((1, 2)))
+        np.testing.assert_allclose(b.var[:, 1, 2], var[:, 3:6, 6:9].sum((1, 2)))
+        np.testing.assert_array_equal(b.wave, cube.wave)
+        # the centre of a new pixel is the centre of its block
+        for iy, ix in ((0, 0), (1, 2), (3, 4)):
+            got = b.wcs.pixel_to_world_values(ix, iy)
+            ref = cube.wcs.pixel_to_world_values(3 * ix + 1, 3 * iy + 1)
+            np.testing.assert_allclose(got, ref, atol=1e-10)
+        from rbcodes.ifu.io.auto_cube import _make_2d_wcs
+        hw = _make_2d_wcs(b.header)                                  # header agrees with b.wcs
+        np.testing.assert_allclose(hw.pixel_to_world_values(2, 1), b.wcs.pixel_to_world_values(2, 1), atol=1e-10)
+
+    def test_nan_blocks_and_noise(self, tmp_path):
+        from rbcodes.ifu.binning import bin_cube
+        cube, flux, var = self._cube(tmp_path)
+        cube.flux[:, 0, 0] = np.nan
+        b = bin_cube(cube, 2)
+        assert np.all(np.isnan(b.flux[:, 0, 0])) and np.all(np.isfinite(b.flux[:, 0, 1]))
+        part = bin_cube(cube, 2, require_all=False)
+        np.testing.assert_allclose(part.flux[:, 0, 0], np.nansum(cube.flux[:, 0:2, 0:2], (1, 2)))
+        # independent noise: binned variance = sum, so sum / sqrt(var) keeps unit scatter
+        rng = np.random.default_rng(4)
+        cube.var = np.full((NW, NY, NX), 4.)
+        cube.flux = rng.normal(0, 2., (NW, NY, NX))
+        b = bin_cube(cube, 2)
+        assert np.std(b.flux / np.sqrt(b.var)) == pytest.approx(1., abs=0.05)
+        with pytest.raises(ValueError):
+            bin_cube(cube, 0)

@@ -29,6 +29,7 @@ cube.wcs     # 2D spatial WCS
 | `lines` | `LINES` catalogue (air and vacuum rest wavelengths), `LineModel` (single lines, multiplets with fixed or bounded free ratios, several lines tied in v and σ), LSFs (`lsf_muse`, `lsf_resolution(R)`, `lsf_constant`) |
 | `measure` | `GaussianFitter`, `MomentMeasurer`, `MCErrors`, `QualityMask`, `SpaxelDecisions`, `FitResult` (maps; FITS save/load), `spaxel_report`, `plot_spaxel` |
 | `vmap` | `VelocityMap`: v, σ_v, width, flux, mask, rejection codes; image-plane pixel positions and optional source-plane β (kpc) + image id; kpc/pix, PSF, line, z, provenance; `from_fit`, `from_moments`, `select`, `subtract_bulk`, `points`, `save`/`load`, `plot` |
+| `binning` | `bin_cube(cube, factor)` — sum flux and variance over non-overlapping factor×factor blocks (independent errors between bins), rescaled WCS; returns an ordinary cube |
 | `spatial_mask` | `parse_ds9_regions(text)`, `region_to_mask(region, wcs, ny, nx)` (pixel-centre rule; image or sky coordinates), `draw_region_overlay`, `regions_to_ds9_text`, `iau_name` |
 
 ## Example: velocity map inside a ds9 region
