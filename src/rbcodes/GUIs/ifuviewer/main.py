@@ -187,6 +187,10 @@ class MainWindow(QMainWindow):
         open_action.triggered.connect(self._on_open)
         file_menu.addAction(open_action)
 
+        open_range_action = QAction("Open Wavelength Range…", self)
+        open_range_action.triggered.connect(lambda: self._on_open(always_ask=True))
+        file_menu.addAction(open_range_action)
+
         load_reg_action = QAction("Load Region File…", self)
         load_reg_action.setToolTip(
             "Load a ds9 .reg region file from disk (no ds9 required).\n"
@@ -502,7 +506,8 @@ class MainWindow(QMainWindow):
     # Slots
     # ------------------------------------------------------------------
 
-    def _on_open(self):
+    def _on_open(self, always_ask=False):
+        from rbcodes.GUIs.ifuviewer.load_options import ask_load_options
         paths, _ = QFileDialog.getOpenFileNames(
             self,
             "Open FITS file(s)",
@@ -510,8 +515,11 @@ class MainWindow(QMainWindow):
             "FITS files (*.fits *.fit *.fits.gz *.fit.gz);;All files (*)",
         )
         for p in paths:
+            opts = ask_load_options(p, self, always=always_ask)   # asked for > 1 GB cubes
+            if opts is None:
+                continue
             try:
-                self._sidebar.add_dataset(p)
+                self._sidebar.add_dataset(p, **opts)
             except RuntimeError as exc:
                 QMessageBox.warning(self, "Load error", str(exc))
 
@@ -3706,7 +3714,7 @@ class BatchExtractDialog(QDialog):
                 open_multispec, run_bg)
 
 
-def launch_viewer(files=None):
+def launch_viewer(files=None, wave_range=None, air_to_vacuum=False):
     """
     Start the IFU Viewer GUI.
 
@@ -3714,6 +3722,10 @@ def launch_viewer(files=None):
     ----------
     files : str or list of str or None
         FITS file(s) to load on startup.
+    wave_range : (lo, hi) or None
+        Load only this wavelength range of the cubes (Angstrom).
+    air_to_vacuum : bool
+        Convert air-wavelength cubes to vacuum.
     """
     QApplication.setAttribute(Qt.AA_DisableHighDpiScaling, True)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
@@ -3725,7 +3737,7 @@ def launch_viewer(files=None):
             files = [files]
         for f in files:
             try:
-                win._sidebar.add_dataset(f)
+                win._sidebar.add_dataset(f, wave_range=wave_range, air_to_vacuum=air_to_vacuum)
             except Exception as exc:
                 print(f"[rb_ifuview] could not load '{f}': {exc}")
     app.setStyleSheet(_QSS)

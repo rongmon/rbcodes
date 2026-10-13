@@ -11,6 +11,8 @@ Unreleased (3.1.0)
 * ``rbcodes.ifu.lines.LineModel(..., continuum='linear')``: a linear continuum per line (for cubes that
   are not continuum-subtracted); ``GaussianFitter`` starts it from the off-line channels. New
   ``CIII`` (1907, 1909) catalogue entry.
+* ``rb_ifuview``: load only a wavelength range (and convert air -> vacuum) — a dialog for cubes larger
+  than 1 GB, File -> "Open Wavelength Range…", and ``--wave-range LO HI`` / ``--air-to-vacuum``.
 * ``rbcodes.ifu.noise.narrowband``: continuum-subtracted narrow-band images with noise propagated from
   the variance cube and calibrated on blank sky (sigma = k sigma_STAT), S/N maps, automatic sky.
 * ``rbcodes.utils.rb_spectrum``: standalone ``air_to_vacuum`` / ``vacuum_to_air`` (used by the

@@ -29,6 +29,8 @@ def main():
             '  rb_ifuview cube.fits                    # load one cube\n'
             '  rb_ifuview cube1.fits cube2.fits        # load two cubes\n'
             '  rb_ifuview cube.fits hst_image.fits     # cube + 2-D image\n'
+            '  rb_ifuview big.fits --wave-range 7520 7600 --air-to-vacuum\n'
+            '                                          # only a wavelength slab, in vacuum\n'
         ),
     )
 
@@ -45,6 +47,18 @@ def main():
         help='Print instructions for installing optional dependencies (pyds9 etc.) and exit.',
     )
 
+    parser.add_argument(
+        '--wave-range',
+        nargs=2, type=float, metavar=('LO', 'HI'),
+        help='Load only this wavelength range of the cube(s) (Angstrom). Default: everything.',
+    )
+
+    parser.add_argument(
+        '--air-to-vacuum',
+        action='store_true',
+        help='Convert air-wavelength cubes (CTYPE3 = AWAV) to vacuum.',
+    )
+
     # --- future flags go here ---
     # parser.add_argument('--variance', metavar='VAR_FITS',
     #     help='Variance cube to assign to the first loaded cube.')
@@ -59,7 +73,9 @@ def main():
         return
 
     from rbcodes.GUIs.ifuviewer.main import launch_viewer
-    launch_viewer(files=args.files if args.files else None)
+    launch_viewer(files=args.files if args.files else None,
+                  wave_range=tuple(args.wave_range) if args.wave_range else None,
+                  air_to_vacuum=args.air_to_vacuum)
 
 
 def _print_install_instructions():
