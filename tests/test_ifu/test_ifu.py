@@ -158,3 +158,70 @@ class TestRegions:
     def test_region_outside_fov_is_empty(self, line_cube):
         reg = parse_ds9_regions('image\ncircle(500,500,3)')
         assert not region_to_mask(reg[0], None, NY, NX).any()
+
+
+class TestPartialAndVacuum:
+
+    @staticmethod
+    def _write(tmp_path, ctype='AWAV', name='c.fits'):
+        rng = np.random.default_rng(0)
+        flux, var = rng.normal(size=(NW, NY, NX)), rng.random((NW, NY, NX)) + 0.5
+        h = _cube_header()
+        h['CTYPE3'] = ctype
+        p = tmp_path / name
+        fits.HDUList([fits.PrimaryHDU(header=fits.Header({'INSTRUME': 'MUSE'})),
+                      fits.ImageHDU(flux, header=h, name='DATA'),
+                      fits.ImageHDU(var, header=h, name='STAT')]).writeto(p)
+        return p, flux, var
+
+    def test_wave_range_reads_a_slab(self, tmp_path):
+        from rbcodes.ifu.io.auto_cube import _build_wave
+        p, flux, var = self._write(tmp_path)
+        full = load_fits(p)
+        part = load_fits(p, wave_range=(6540., 6560.))
+        sel = (full.wave >= 6540.) & (full.wave <= 6560.)
+        np.testing.assert_array_equal(part.wave, full.wave[sel])
+        np.testing.assert_array_equal(part.flux, flux[sel])
+        np.testing.assert_array_equal(part.var, var[sel])
+        np.testing.assert_allclose(_build_wave(part.header), part.wave)       # header matches the slab
+        assert part.header['NAXIS3'] == sel.sum() and full.header['NAXIS3'] == NW
+        np.testing.assert_array_equal(full.flux, flux)                         # default: everything
+        with pytest.raises(ValueError):
+            load_fits(p, wave_range=(9000., 9100.))
+
+    def test_wave_range_with_external_variance(self, tmp_path):
+        p, flux, var = self._write(tmp_path)
+        pv = tmp_path / 'v.fits'
+        fits.PrimaryHDU(2 * var).writeto(pv)
+        part = load_fits(p, var=pv, wave_range=(6510., 6520.))
+        sel = (_wave() >= 6510.) & (_wave() <= 6520.)
+        np.testing.assert_array_equal(part.var, 2 * var[sel])
+
+    def test_air_to_vacuum(self, tmp_path):
+        from rbcodes.utils.rb_spectrum import air_to_vacuum
+        p, _, _ = self._write(tmp_path)
+        air = load_fits(p)
+        vac = load_fits(p, air_to_vacuum=True, wave_range=(6540., 6560.))
+        assert air.airvac == 'air' and vac.airvac == 'vac'
+        sel = (_wave() >= 6540.) & (_wave() <= 6560.)
+        np.testing.assert_allclose(vac.wave, air_to_vacuum(_wave()[sel]))
+        assert np.all(vac.wave - _wave()[sel] > 1.7)                           # ~1.8 A at 6550 A
+        pw, _, _ = self._write(tmp_path, ctype='WAVE', name='vac.fits')
+        with pytest.warns(UserWarning, match='already in vacuum'):
+            already = load_fits(pw, air_to_vacuum=True)
+        np.testing.assert_array_equal(already.wave, _wave()) and already.airvac == 'vac'
+
+
+def test_rb_spectrum_air_vacuum_functions():
+    from astropy import units as u
+    from rbcodes.utils.rb_spectrum import air_to_vacuum, rb_spectrum, vacuum_to_air
+    w = np.array([1500., 3726.032, 5006.843, 6562.80, 8000.])
+    vac = air_to_vacuum(w)
+    assert vac[0] == 1500. and vac[3] == pytest.approx(6564.61, abs=0.01)
+    np.testing.assert_allclose(vacuum_to_air(vac), w, atol=2e-3)
+    s = rb_spectrum.from_tuple((w * u.AA, np.ones(5), np.ones(5)))
+    s.meta['airvac'] = 'air'                                                  # from_tuple assumes vacuum
+    s.air2vac()
+    np.testing.assert_array_equal(s.wavelength.to(u.AA).value, vac)          # the method uses the function
+    s.vac2air()
+    np.testing.assert_array_equal(s.wavelength.to(u.AA).value, vacuum_to_air(vac))

@@ -9,6 +9,7 @@ usable directly in scripts and notebooks. (Moved here from `GUIs/ifuviewer/io` a
 ```python
 from rbcodes.ifu import load_fits
 cube = load_fits('cube.fits')              # optional: load_fits('cube.fits', var='var.fits')
+cube = load_fits('big_cube.fits', wave_range=(7520, 7600), air_to_vacuum=True)   # read only a slab
 cube.flux    # (n_wave, ny, nx)
 cube.var     # same shape, or None
 cube.wave    # (n_wave,) Angstrom
@@ -19,7 +20,7 @@ cube.wcs     # 2D spatial WCS
 
 | Module | Contents |
 |--------|----------|
-| `io` | `load_fits(path, var=None)` — reads the `INSTRUME` keyword and returns a `MUSECube` (flux in `DATA`, variance in `STAT`), `KCWICube` or `GenericCube`; a 2D file gives a `FITSImage`. Variance is taken from a `VAR`/`VARIANCE`/`STAT`/`ERR` extension or a separate file. `load_image(path)` reads a 2D image. New instruments: subclass `GenericCube` and add it to `_INSTRUMENT_MAP` in `io/auto_cube.py`. |
+| `io` | `load_fits(path, var=None, wave_range=None, air_to_vacuum=False)` — `wave_range` reads only the channels in that range (default: all); `air_to_vacuum` converts an air-wavelength cube (CTYPE3 `AWAV`) to vacuum (`cube.airvac` records the convention).  reads the `INSTRUME` keyword and returns a `MUSECube` (flux in `DATA`, variance in `STAT`), `KCWICube` or `GenericCube`; a 2D file gives a `FITSImage`. Variance is taken from a `VAR`/`VARIANCE`/`STAT`/`ERR` extension or a separate file. `load_image(path)` reads a 2D image. New instruments: subclass `GenericCube` and add it to `_INSTRUMENT_MAP` in `io/auto_cube.py`. |
 | `cube_collapse` | `build_whitelight(flux, wave, wmin, wmax, method)`, `build_narrowband`, `build_continuum_sub` (on-band minus one or two continuum windows) |
 | `moment_maps` | `moment0/1/2(flux, wave, wmin, wmax[, lambda_rest])` (flux, velocity in km/s, dispersion in km/s), `moment_map(..., order)`, `compute_snr_map`, `sky_stats`, `subtract_linear_continuum`, `velocity_array` |
 | `aperture_extract` | `make_circular_mask`, `make_square_mask`, `make_annulus_mask`; `extract_aperture` (sum, error from variance), `extract_variance_weighted` (inverse-variance weighted mean), `extract_with_method`, `subtract_background` |

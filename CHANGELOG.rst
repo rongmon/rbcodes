@@ -5,6 +5,12 @@ Changelog
 Unreleased (3.1.0)
 ==================
 
+* ``rbcodes.ifu.load_fits``: optional ``wave_range=(lo, hi)`` reads only those channels (a 3.7 GB MUSE
+  cube slab loads in 0.1 s); optional ``air_to_vacuum`` converts air-wavelength cubes; ``cube.airvac``.
+  The loader no longer reads the data to decide whether a file is a cube.
+* ``rbcodes.utils.rb_spectrum``: standalone ``air_to_vacuum`` / ``vacuum_to_air`` (used by the
+  ``rb_spectrum.air2vac`` / ``vac2air`` methods; same numbers).
+
 Changes
 -------
 * New ``rbcodes.ifu`` package: the IFU cube reader and image/moment/extraction/region
