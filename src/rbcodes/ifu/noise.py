@@ -17,7 +17,7 @@ import os
 
 import numpy as np
 
-__all__ = ['robust_std', 'NoiseModel', 'sky_mask_from_region']
+__all__ = ['robust_std', 'NoiseModel', 'sky_mask_from_region', 'narrowband', 'NarrowBand']
 
 
 def robust_std(x, axis=None):
@@ -182,3 +182,113 @@ class NoiseModel:
         both = lf[:-1] & lf[1:]
         out['rho_lambda'], out['n_lambda'] = pearson(r[:-1][both][:, sky], r[1:][both][:, sky])
         return out
+
+
+class NarrowBand:
+    """
+    Continuum-subtracted narrow-band image with its noise (from ``narrowband``).
+
+    Attributes: ``image`` (flux x Angstrom), ``sigma_stat`` (propagated from the variance cube),
+    ``k`` (sky calibration), ``sigma`` = k sigma_stat, ``snr`` = image / sigma, ``continuum``
+    (mean continuum level per spaxel), ``sky_mask``, ``band``, ``windows``.
+    """
+
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+    def __repr__(self):
+        return (f'NarrowBand(band={self.band}, k={self.k:.3f}, sky spaxels={int(self.sky_mask.sum())}, '
+                f'S/N>3: {int(np.nansum(self.snr > 3))})')
+
+
+def _auto_sky(cont, finite, nb_over_sig, clip, edge=3, grow=2):
+    """Blank sky: interior, off continuum sources, then without strong line emitters."""
+    from scipy.ndimage import binary_dilation, binary_erosion
+    interior = binary_erosion(finite, iterations=edge)
+    c = cont[interior]
+    med, rs = np.nanmedian(c), robust_std(c)
+    src = np.zeros_like(finite)
+    src[interior] = cont[interior] > med + 3 * rs
+    src = binary_dilation(src, iterations=grow)
+    sky = interior & ~src & np.isfinite(nb_over_sig)
+    k = robust_std(nb_over_sig[sky])
+    sky &= np.abs(nb_over_sig - np.nanmedian(nb_over_sig[sky])) < clip * k
+    return sky
+
+
+def narrowband(cube, band, windows, var=None, wave=None, wcs=None, continuum='linear', sky_box=None,
+               sky_mask=None, sky_region=None, clip=4.):
+    """
+    Continuum-subtracted narrow-band image and its calibrated noise.
+
+    NB = sum over the band of (f - continuum) dlambda, with the continuum a constant or a straight
+    line fitted per spaxel to the channels in ``windows``. sigma_stat is propagated exactly from the
+    variance (band channels and continuum channels with their weights). k = robust scatter of
+    NB / sigma_stat over blank sky, and sigma = k sigma_stat: the variance cube sets the spatial
+    pattern, the sky sets the level (MUSE variance cubes miss the correlated noise, so k > 1).
+
+    Parameters
+    ----------
+    cube : IFUCube or ndarray (n_wave, ny, nx)
+    band : (lo, hi) Angstrom
+    windows : list of (lo, hi) Angstrom, continuum (line-free) windows
+    var : variance cube (default ``cube.var``); without one sigma_stat = 1 and k is the sky noise
+    wave, wcs : for an array cube
+    continuum : 'linear' or 'constant'
+    sky_box / sky_mask / sky_region : blank sky; default automatic (see ``NarrowBand``)
+    clip : line emitters with |NB / sigma_stat| > clip k are removed from the automatic sky
+
+    Returns
+    -------
+    NarrowBand
+    """
+    if hasattr(cube, 'flux'):
+        flux, wave = cube.flux, cube.wave
+        var = cube.var if var is None else var
+        wcs = cube.wcs if wcs is None else wcs
+    else:
+        flux = np.asarray(cube, dtype=float)
+        if wave is None:
+            raise ValueError('With an array cube, give wave=.')
+    wave = np.asarray(wave, dtype=float)
+    if continuum not in ('linear', 'constant'):
+        raise ValueError("continuum must be 'linear' or 'constant'.")
+    b = (wave >= band[0]) & (wave <= band[1])
+    c = np.zeros(len(wave), bool)
+    for lo, hi in windows:
+        c |= (wave >= lo) & (wave <= hi)
+    c &= ~b
+    if b.sum() == 0 or c.sum() < 2:
+        raise ValueError(f'The band has {b.sum()} channels and the continuum windows {c.sum()}; need >= 1 and >= 2.')
+    dl = np.gradient(wave)
+    lam0 = np.mean(wave[b])
+    if continuum == 'linear':
+        X = np.c_[np.ones(c.sum()), wave[c] - lam0]
+        P = np.linalg.pinv(X)                                     # (2, Nc)
+        W = np.c_[np.ones(b.sum()), wave[b] - lam0] @ P           # (Nb, Nc): continuum at band channels
+    else:
+        W = np.full((b.sum(), c.sum()), 1. / c.sum())
+    w = dl[b] @ W                                                 # weight of each continuum channel
+    fb, fc = flux[b], flux[c]
+    image = np.tensordot(dl[b], fb, 1) - np.tensordot(w, fc, 1)
+    if var is not None:
+        vb, vc = var[b], var[c]
+        sigma_stat = np.sqrt(np.tensordot(dl[b] ** 2, vb, 1) + np.tensordot(w ** 2, vc, 1))
+    else:
+        sigma_stat = np.ones(image.shape)
+    cont = np.nanmean(fc, axis=0)
+    finite = np.isfinite(image) & np.isfinite(sigma_stat) & (sigma_stat > 0)
+    with np.errstate(invalid='ignore', divide='ignore'):
+        r = np.where(finite, image / sigma_stat, np.nan)
+    if any(x is not None for x in (sky_box, sky_mask, sky_region)):
+        sky = _sky(image.shape, sky_box, sky_mask, sky_region, wcs) & finite
+    else:
+        sky = _auto_sky(cont, finite, r, clip)
+    if sky.sum() < 20:
+        raise ValueError(f'Only {sky.sum()} blank-sky spaxels; give sky_box / sky_mask / sky_region.')
+    k = float(robust_std(r[sky]))
+    sigma = k * sigma_stat
+    with np.errstate(invalid='ignore', divide='ignore'):
+        snr = np.where(finite, image / sigma, np.nan)
+    return NarrowBand(image=image, sigma_stat=sigma_stat, k=k, sigma=sigma, snr=snr, continuum=cont,
+                      sky_mask=sky, band=tuple(band), windows=list(windows), continuum_kind=continuum)

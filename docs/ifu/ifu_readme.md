@@ -25,6 +25,7 @@ cube.wcs     # 2D spatial WCS
 | `moment_maps` | `moment0/1/2(flux, wave, wmin, wmax[, lambda_rest])` (flux, velocity in km/s, dispersion in km/s), `moment_map(..., order)`, `compute_snr_map`, `sky_stats`, `subtract_linear_continuum`, `velocity_array` |
 | `aperture_extract` | `make_circular_mask`, `make_square_mask`, `make_annulus_mask`; `extract_aperture` (sum, error from variance), `extract_variance_weighted` (inverse-variance weighted mean), `extract_with_method`, `subtract_background` |
 | `noise` | `NoiseModel.from_cube(cube, linefree=..., sky_box= / sky_mask= / sky_region=, spaxel_scale=True)` — sqrt(variance), or the hybrid model σ_sky(λ)·s(y,x) from a user-defined sky region; `.correlation(...)` estimates adjacent-spaxel / adjacent-channel noise correlation |
+| `noise` (narrow band) | `narrowband(cube, band, windows)` → `NarrowBand`: continuum-subtracted narrow-band image, σ = k σ_STAT with k from blank sky, S/N, automatic sky mask |
 | `lines` | `LINES` catalogue (air and vacuum rest wavelengths), `LineModel` (single lines, multiplets with fixed or bounded free ratios, several lines tied in v and σ), LSFs (`lsf_muse`, `lsf_resolution(R)`, `lsf_constant`) |
 | `measure` | `GaussianFitter`, `MomentMeasurer`, `MCErrors`, `QualityMask`, `SpaxelDecisions`, `FitResult` (maps; FITS save/load), `spaxel_report`, `plot_spaxel` |
 | `vmap` | `VelocityMap`: v, σ_v, width, flux, mask, rejection codes; image-plane pixel positions and optional source-plane β (kpc) + image id; kpc/pix, PSF, line, z, provenance; `from_fit`, `from_moments`, `select`, `subtract_bulk`, `points`, `save`/`load`, `plot` |
@@ -107,6 +108,19 @@ include, 10 forced exclude. No hole filling.
 fitter.refit(...))` writes a refit into the maps and stores its override; `reject(line, iy, ix)`;
 `forget(line, iy, ix)`. Re-applied by `fit_cube(..., decisions=)` and `QualityMask.apply(...,
 decisions=)`; they change the maps without refitting the cube.
+
+**Narrow-band images and detection.** `narrowband(cube, band, windows)` gives the
+continuum-subtracted narrow-band image (constant or linear continuum per spaxel from the
+`windows`), its noise propagated from the variance cube (σ_STAT), a sky calibration k = robust
+scatter of NB/σ_STAT over blank sky, σ = k σ_STAT and S/N. The variance sets the spatial pattern,
+the sky the level: MUSE variance cubes miss the correlated noise (k ≈ 1.5 for RCS0327 C III]).
+Blank sky is automatic (interior, off continuum sources, line emitters clipped) or given by
+`sky_box` / `sky_mask` / `sky_region`.
+
+```python
+nb = narrowband(cube, band=(5145, 5161), windows=[(5115, 5138), (5168, 5195)])
+arc = nb.snr > 3
+```
 
 **No variance extension?** Give a blank-sky region (`sky_box`, `sky_mask`, or a ds9
 `sky_region`) and line-free channels: σ(λ, y, x) = σ_sky(λ) × s(y, x), where σ_sky is the

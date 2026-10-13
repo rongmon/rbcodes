@@ -444,3 +444,59 @@ class TestLinearContinuum:
         fig, axes = plt.subplots(2, 1)
         plot_spaxel(axes, lm, wave, cube, sig, 2, 3, GaussianFitter(lm).refit(cube, sig, 2, 3, wave=wave))
         plt.close(fig)
+
+
+class TestNarrowBand:
+
+    @staticmethod
+    def _cube(seed, true_scale=1.25, ny=40, nx=40):
+        """Sloped continuum everywhere, a bright continuum source, line emitters; noise = true_scale x sqrt(STAT)."""
+        from rbcodes.ifu.noise import narrowband  # noqa: F401
+        rng = np.random.default_rng(seed)
+        wave = np.arange(5100., 5200., 1.25)
+        stat = np.full((wave.size, ny, nx), 0.04) * (1 + 0.5 * np.linspace(0, 1, nx))[None, None, :]
+        cont = 1.0 + 0.004 * (wave - 5150.)[:, None, None] * np.ones((1, ny, nx))
+        cont[:, 5:9, 30:34] += 20.                                           # continuum source
+        line = np.exp(-0.5 * ((wave - 5150.) / 2.) ** 2)[:, None, None]
+        amp = np.zeros((ny, nx))
+        amp[15:25, 10:20] = 3.                                               # line emitter (no continuum)
+        flux = cont + line * amp + rng.normal(size=stat.shape) * np.sqrt(stat) * true_scale
+        return wave, flux, stat, amp
+
+    def test_propagated_sigma_matches_scatter(self):
+        from rbcodes.ifu.noise import narrowband
+        rng = np.random.default_rng(0)
+        wave = np.arange(5100., 5200., 1.25)
+        stat = rng.uniform(0.02, 0.08, (wave.size, 1, 4000))
+        for kind in ('linear', 'constant'):
+            flux = rng.normal(size=stat.shape) * np.sqrt(stat)
+            nb = narrowband(flux, (5140., 5160.), [(5105., 5130.), (5170., 5195.)], var=stat, wave=wave,
+                            continuum=kind, sky_mask=np.ones((1, 4000), bool))
+            assert np.std(nb.image / nb.sigma_stat) == pytest.approx(1., abs=0.04)
+            assert nb.k == pytest.approx(1., abs=0.05)
+
+    def test_calibration_line_flux_and_auto_sky(self):
+        from rbcodes.ifu.noise import narrowband
+        wave, flux, stat, amp = self._cube(1)
+        nb = narrowband(flux, (5140., 5160.), [(5105., 5130.), (5170., 5195.)], var=stat, wave=wave)
+        assert nb.k == pytest.approx(1.25, rel=0.06)                          # STAT underestimates by 1.25
+        assert np.std(nb.snr[nb.sky_mask]) == pytest.approx(1., abs=0.08)
+        assert not nb.sky_mask[5:9, 30:34].any() and not nb.sky_mask[15:25, 10:20].any()
+        expected = 3. * 2. * np.sqrt(2 * np.pi)                               # amp x sigma x sqrt(2 pi)
+        assert np.mean(nb.image[15:25, 10:20]) == pytest.approx(expected, rel=0.02)
+        # no continuum-subtraction bias on the sky (checked over 40 seeds: mean z = 0.15)
+        assert abs(np.mean(nb.image[nb.sky_mask])) < 4 * np.std(nb.image[nb.sky_mask]) / np.sqrt(nb.sky_mask.sum())
+        assert (nb.snr[15:25, 10:20] > 3).all()
+        box = narrowband(flux, (5140., 5160.), [(5105., 5130.), (5170., 5195.)], var=stat, wave=wave,
+                         sky_box=(28, 38, 2, 38))
+        assert box.k == pytest.approx(nb.k, rel=0.1)
+
+    def test_without_variance(self):
+        from rbcodes.ifu.noise import narrowband
+        wave, flux, stat, amp = self._cube(2, true_scale=1.)
+        nb = narrowband(flux, (5140., 5160.), [(5105., 5130.), (5170., 5195.)], wave=wave)
+        nbv = narrowband(flux, (5140., 5160.), [(5105., 5130.), (5170., 5195.)], var=stat, wave=wave)
+        assert np.all(nb.sigma_stat == 1)
+        assert nb.k == pytest.approx(np.median(nbv.sigma[nbv.sky_mask]), rel=0.15)
+        with pytest.raises(ValueError):
+            narrowband(flux, (5140., 5160.), [(5000., 5010.)], wave=wave)
