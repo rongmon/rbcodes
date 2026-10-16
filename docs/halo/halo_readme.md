@@ -28,11 +28,21 @@ Stellar-mass to halo-mass conversions via the Behroozi UniverseMachine relation.
 Standalone module — not imported by other package modules; available for direct use.
 
 Provides:
-- ``stellarToHaloMass(z, stellar_mass)`` — convert log stellar mass to log halo mass
-  using the Behroozi et al. UniverseMachine SMHM relation.  Requires the parameter
-  file ``smhm_med_params.txt`` to be present in the working directory.
+- ``haloMassAtStellarMass(z, stellar_mass, population=None, centrals=True)`` —
+  log halo mass at fixed stellar mass, read directly from the UniverseMachine DR1
+  mock catalogues (``um_dr1_hm_averages.npz``).  ``population`` selects all
+  (default), star-forming (``'sf'``) or quenched/passive (``'q'``) galaxies.
+  Recommended for assigning halo masses to observed galaxies.
+- ``stellarToHaloMass(z, stellar_mass, population=None, centrals=False)`` — the
+  inverted relation: inverts the Behroozi et al. (2019) fit to median M* at fixed
+  halo mass (``smhm_med*_params.txt``, copied unchanged from UniverseMachine DR1).
+  Biased high at log M* >~ 10.8.
 - ``R_200(Mh, z)``                       — compute the virial radius R_200 from a
   log halo mass and redshift (uses Planck18 cosmology).
+- ``V_200(Mh, z)``, ``concentration_200c(Mh, z)``, ``nfw_vesc(Mh, z, R)`` — circular
+  velocity, Dutton & Maccio (2014) concentration, and NFW escape velocity at R.
+- ``halo_properties(z, stellar_mass, method='direct', population=None, centrals=True,
+  R=None)`` — log_Mh, R200, V200, c200 and (given R) R/R200 and v_esc in one call.
 
 Note: scatter in the SMHM relation is ~0.1 dex (range 0.04–0.13 dex).
 
@@ -40,9 +50,10 @@ Example
 -------
     from rbcodes.halo import halos as h
     import numpy as np
-    sm = np.arange(8, 10, 0.2)          # log stellar mass
-    mh = [h.stellarToHaloMass(0.5, s) for s in sm]
-    rv = [h.R_200(m, 0.5) for m in mh]
+    mh_sf = h.haloMassAtStellarMass(0.43, 11.0, population='sf')   # direct
+    mh_inv = h.stellarToHaloMass(0.43, 11.0)                       # inverted
+    p = h.halo_properties(0.43, 11.0, population='sf', R=100.)
+    p['log_Mh'], p['R200'], p['V200'], p['R_over_R200'], p['v_esc']
 
 ### rb_nfw
 
