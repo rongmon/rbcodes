@@ -15,7 +15,8 @@ Provides:
   halo mass (``smhm_med*_params.txt``, copied unchanged from UniverseMachine DR1).
   Biased high at log M* >~ 10.8.
 - ``R_200(Mh, z)``                       — compute the virial radius R_200 from a
-  log halo mass and redshift (uses Planck18 cosmology).
+  log halo mass and redshift (Planck18 by default; any astropy cosmology via
+  ``cosmo=``).
 - ``V_200(Mh, z)``, ``concentration_200c(Mh, z)``, ``nfw_vesc(Mh, z, R)`` — circular
   velocity, Dutton & Maccio (2014) concentration, and NFW escape velocity at R.
 - ``halo_properties(z, stellar_mass, method='direct', population=None, centrals=True,
@@ -202,9 +203,10 @@ def stellarToHaloMass(z,stellar_mass,population=None,centrals=False):
 #
 #  Takes a linear (not log) halo mass and returns Virial radius
 
-def R_200(Mh, z):
+def R_200(Mh, z, cosmo=Planck18):
     """
-    R_200c (kpc) for a log10 halo mass Mh (Msun) at redshift z, Planck18.
+    R_200c (kpc) for a log10 halo mass Mh (Msun) at redshift z.
+    cosmo is any astropy cosmology (default Planck18).
 
     Examples
     --------
@@ -218,7 +220,7 @@ def R_200(Mh, z):
     #    Mh = log10(Mh)
     
     Mh = np.asarray(Mh, dtype=float)
-    H = Planck18.H(z)
+    H = cosmo.H(z)
     r200 =(((G * (10**Mh * u.M_sun).to(u.kg) / (100 * H.cgs**2))**(1/3)).to(u.kpc)).flatten()
 
     if (len(r200) == 1):
@@ -326,7 +328,7 @@ def haloMassAtStellarMass(z, stellar_mass, population=None, centrals=True,
 #
 #  Halo properties for a log M200c halo mass
 
-def V_200(Mh, z):
+def V_200(Mh, z, cosmo=Planck18):
     """
     Circular velocity at R_200c, sqrt(G M200c / R200c), in km/s.
 
@@ -335,11 +337,12 @@ def V_200(Mh, z):
     >>> V_200(12.5, 0.43)
     <Quantity 226.6 km / s>
     """
-    return np.sqrt(G * (10**np.asarray(Mh) * u.M_sun) / R_200(Mh, z)).to(u.km / u.s)
+    return np.sqrt(G * (10**np.asarray(Mh) * u.M_sun) / R_200(Mh, z, cosmo)).to(u.km / u.s)
 
-def concentration_200c(Mh, z):
+def concentration_200c(Mh, z, cosmo=Planck18):
     """
-    NFW concentration c200c(M, z) of Dutton & Maccio (2014), Planck cosmology.
+    NFW concentration c200c(M, z) of Dutton & Maccio (2014), calibrated on a
+    Planck cosmology; cosmo only sets h for the M200c [Msun/h] conversion.
 
     Examples
     --------
@@ -348,13 +351,14 @@ def concentration_200c(Mh, z):
     """
     a = 0.520 + (0.905 - 0.520) * np.exp(-0.617 * z**1.21)
     b = -0.101 + 0.026 * z
-    return 10**(a + b * (np.asarray(Mh) + log10(Planck18.h) - 12.0))
+    return 10**(a + b * (np.asarray(Mh) + log10(cosmo.h) - 12.0))
 
-def nfw_vesc(Mh, z, R, c=None):
+def nfw_vesc(Mh, z, R, c=None, cosmo=Planck18):
     """
     Escape velocity (to infinity) at radius R from an NFW halo of log mass
     M200c, in km/s.  R in kpc (or an astropy length).  c defaults to the
-    Dutton & Maccio (2014) concentration.
+    Dutton & Maccio (2014) concentration.  cosmo: astropy cosmology (default
+    Planck18).
 
     Evaluated at the projected impact parameter this is an upper limit on the
     local escape velocity of the absorbing gas, which lies at r >= R.  Compare
@@ -376,13 +380,13 @@ def nfw_vesc(Mh, z, R, c=None):
     <Quantity 536.8 km / s>                       # from a stellar mass
     """
     if c is None:
-        c = concentration_200c(Mh, z)
-    x = (u.Quantity(R, u.kpc) / R_200(Mh, z)).decompose().value
+        c = concentration_200c(Mh, z, cosmo)
+    x = (u.Quantity(R, u.kpc) / R_200(Mh, z, cosmo)).decompose().value
     mc = np.log(1 + c) - c / (1 + c)
-    return V_200(Mh, z) * np.sqrt(2 * np.log(1 + c * x) / (x * mc))
+    return V_200(Mh, z, cosmo) * np.sqrt(2 * np.log(1 + c * x) / (x * mc))
 
 def halo_properties(z, stellar_mass, method='direct', population=None,
-                    centrals=True, R=None):
+                    centrals=True, R=None, cosmo=Planck18):
     """
     Halo mass and derived properties for a galaxy of log stellar mass at z.
 
@@ -391,6 +395,7 @@ def halo_properties(z, stellar_mass, method='direct', population=None,
                  M*(Mh) fit, biased high at log M* >~ 10.8).
     population, centrals : as in haloMassAtStellarMass / stellarToHaloMass.
     R          : optional impact parameter (kpc) for R/R200 and v_esc.
+    cosmo      : astropy cosmology for R200, V200, c200, v_esc (default Planck18).
 
     The halo mass is treated as M200c.  Returns a dict with log_Mh, R200
     (kpc), V200 (km/s), c200 and, if R is given, R_over_R200 and v_esc (km/s).
@@ -427,12 +432,12 @@ def halo_properties(z, stellar_mass, method='direct', population=None,
     else:
         raise ValueError("method must be 'direct' or 'inverted' (got %r)" % (method,))
 
-    out = {'log_Mh': Mh, 'R200': R_200(Mh, z), 'V200': V_200(Mh, z),
-           'c200': concentration_200c(Mh, z)}
+    out = {'log_Mh': Mh, 'R200': R_200(Mh, z, cosmo), 'V200': V_200(Mh, z, cosmo),
+           'c200': concentration_200c(Mh, z, cosmo)}
     if R is not None:
         R = u.Quantity(R, u.kpc)
         out['R_over_R200'] = (R / out['R200']).decompose().value
-        out['v_esc'] = nfw_vesc(Mh, z, R)
+        out['v_esc'] = nfw_vesc(Mh, z, R, cosmo=cosmo)
     return out
 
 
