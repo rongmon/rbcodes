@@ -2,8 +2,8 @@
 Changelog
 =========
 
-Unreleased (3.1.0)
-==================
+Version 3.1.0 (2026-10-20)
+==========================
 
 * ``rbcodes.ifu.load_fits``: optional ``wave_range=(lo, hi)`` reads only those channels (a 3.7 GB MUSE
   cube slab loads in 0.1 s); optional ``air_to_vacuum`` converts air-wavelength cubes; ``cube.airvac``.
@@ -63,8 +63,8 @@ New Features
   map to the same source position.
 * ``rb_selftest`` checks the line fit.
 
-Unreleased (bug fixes)
-======================
+Bug Fixes
+---------
 
 * ``rb_multispec``: spectra passed as data (``from_data``, e.g. "→ rb_multispec" in rb_ifuview) without
   an error array now get the same default as files: 5% of the flux, with a warning in the message
