@@ -565,7 +565,7 @@ class ImageCanvas(FigureCanvasQTAgg):
         -------
         list of artists
         """
-        from rbcodes.GUIs.ifuviewer.processing.spatial_mask import draw_region_overlay
+        from rbcodes.ifu.spatial_mask import draw_region_overlay
 
         artists = draw_region_overlay(region, self._ax, wcs,
                                       color=color, draw_label=True)

@@ -1,0 +1,23 @@
+"""
+IFU cube tools: reading, images, moment maps, extraction, regions and line fitting.
+
+    from rbcodes.ifu import load_fits
+    cube = load_fits('cube.fits')          # cube.flux (n_wave, ny, nx), .var, .wave, .wcs (2D)
+
+Modules
+-------
+io               load_fits (auto-detects KCWI/MUSE/generic cubes and 2D images), load_image
+cube_collapse    white-light, narrow-band and continuum-subtracted images
+moment_maps      moment 0/1/2 maps, S/N maps, linear continuum subtraction
+aperture_extract aperture masks and 1D spectrum extraction
+spatial_mask     ds9 region parsing, region -> pixel mask, overlays, region export
+noise            NoiseModel: variance, or hybrid estimate from a user-defined sky region
+lines            line catalogue (air/vacuum) and LineModel (single, multiplet, tied lines)
+measure          GaussianFitter, MomentMeasurer, MCErrors, QualityMask, SpaxelDecisions
+binning          bin_cube: sum over non-overlapping spaxel blocks
+vmap             VelocityMap: velocity field + errors, mask, image/source-plane positions
+"""
+from .io import load_fits
+from .io.image2d import load_image
+
+__all__ = ['load_fits', 'load_image']

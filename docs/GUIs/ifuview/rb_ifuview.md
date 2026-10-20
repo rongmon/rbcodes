@@ -12,6 +12,17 @@ rb_ifuview --help                             # show help
 rb_ifuview --install                          # show optional dependency instructions
 ```
 
+### Large cubes: loading a wavelength range
+
+Cubes larger than 1 GB open a **Load options** dialog: load the full cube, or only a wavelength
+range (only those channels are read from disk), and optionally convert air wavelengths to vacuum
+(for cubes with `CTYPE3 = AWAV`). The same dialog is available for any cube from
+**File → Open Wavelength Range…**, and from the command line:
+
+```bash
+rb_ifuview big_cube.fits --wave-range 7520 7600 --air-to-vacuum
+```
+
 ### Supported file formats
 
 | Instrument | Auto-detected | Notes |

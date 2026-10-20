@@ -15,6 +15,9 @@ except ImportError:
     # Fallback if import fails
     __version__ = "1.5.0"
 
+DEFAULT_ERROR_FRACTION = 0.05   # error assumed for spectra without an error array (fraction of the flux)
+
+
 class IOManager:
     """
     Singleton class to handle all file I/O operations for MultispecViewer.
@@ -54,6 +57,30 @@ class IOManager:
         """Set the message box reference for displaying messages"""
         self.message_box = message_box
     
+    def ensure_error(self, spec, name=None):
+        """
+        Spectrum with an error array: if ``spec`` has none, attach DEFAULT_ERROR_FRACTION x flux
+        as its error, warn, and say so in the message box. Used for spectra loaded from files and
+        for spectra passed as data (``rb_multispec.from_data``, e.g. from rb_ifuview).
+        """
+        if spec.sig_is_set:
+            return spec
+        name = os.path.basename(str(name or getattr(spec, 'filename', None) or 'spectrum'))
+        sig_array = DEFAULT_ERROR_FRACTION * spec.flux.value
+        from rbcodes.utils.rb_spectrum import rb_spectrum
+        if isinstance(spec, rb_spectrum):
+            spec = rb_spectrum.from_tuple((spec.wavelength, spec.flux, sig_array),
+                                          filename=getattr(spec, 'filename', None), meta=getattr(spec, 'meta', None))
+        else:
+            from linetools.spectra.xspectrum1d import XSpectrum1D
+            filename = getattr(spec, 'filename', None)
+            spec = XSpectrum1D.from_tuple((spec.wavelength, spec.flux, sig_array), verbose=False)
+            spec.filename = filename
+        pct = f'{DEFAULT_ERROR_FRACTION:.0%}'
+        warnings.warn(f"{name}: no error array found — assuming {pct} of flux as error.", UserWarning, stacklevel=2)
+        self.show_message(f"No error spectrum found for {name}. Using {pct} of flux values as error.", "#FFA500")
+        return spec
+
     def show_message(self, message, color="#FFFFFF"):
         """Display a message in the message box if available, otherwise print"""
         if self.message_box:
@@ -106,31 +133,10 @@ class IOManager:
                     if hasattr(spec, '_read_failed') and spec._read_failed:
                         from linetools.spectra.xspectrum1d import XSpectrum1D
                         spec = XSpectrum1D.from_file(file_path)
-                        
-                        # Add error array if missing from XSpectrum1D
-                        if not spec.sig_is_set:
-                            sig_array = 0.05 * spec.flux.value
-                            spec = XSpectrum1D.from_tuple(
-                                (spec.wavelength, spec.flux, sig_array), verbose=False)
-                            spec.filename = file_path
-                            warnings.warn(
-                                f"{os.path.basename(file_path)}: no error array found — "
-                                f"assuming 5% of flux as error.", UserWarning, stacklevel=2)
-                            self.show_message(
-                                f"No error spectrum found for {os.path.basename(file_path)}. "
-                                f"Using 5% of flux values as error.", "#FFA500")
-                    else:
-                        # rb_spectrum succeeded, add error array if missing
-                        if not spec.sig_is_set:
-                            sig_array = 0.05 * spec.flux.value
-                            spec = rb_spectrum.from_tuple(
-                                (spec.wavelength, spec.flux, sig_array), filename=file_path)
-                            warnings.warn(
-                                f"{os.path.basename(file_path)}: no error array found — "
-                                f"assuming 5% of flux as error.", UserWarning, stacklevel=2)
-                            self.show_message(
-                                f"No error spectrum found for {os.path.basename(file_path)}. "
-                                f"Using 5% of flux values as error.", "#FFA500")
+                        spec.filename = file_path
+
+                    # Add an error array if missing (same check as for spectra passed as data)
+                    spec = self.ensure_error(spec, file_path)
                     
                     spectra.append(spec)
                     loaded_files.append(os.path.basename(file_path))

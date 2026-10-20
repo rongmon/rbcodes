@@ -1,5 +1,9 @@
 # IFU Viewer — Build Plan
 
+> **Note (2026-10):** the `io/` and `processing/` folders described below now live in
+> `rbcodes/ifu/` (`rbcodes.ifu.io`, `rbcodes.ifu.cube_collapse`, `rbcodes.ifu.moment_maps`,
+> `rbcodes.ifu.aperture_extract`, `rbcodes.ifu.spatial_mask`). This file is the original build log.
+
 ## What It Does (High Level)
 
 1. **Multi-dataset sidebar** — load any number of FITS cubes or 2D images, switch active dataset with one click
@@ -121,7 +125,7 @@ class IFUCube:
 
 **Test**:
 ```python
-from rbcodes.GUIs.ifuviewer.io.auto_cube import load_fits
+from rbcodes.ifu.io.auto_cube import load_fits
 cube = load_fits('my_cube.fits')
 assert cube.flux.ndim == 3
 assert len(cube.wave) == cube.flux.shape[0]
@@ -1196,7 +1200,7 @@ Each phase has a standalone test. Run from the repo root:
 
 ```bash
 # Phase 1
-python -c "from rbcodes.GUIs.ifuviewer.io.auto_cube import load_fits; c = load_fits('test.fits'); print(c.flux.shape, c.wave[0], c.wave[-1])"
+python -c "from rbcodes.ifu.io.auto_cube import load_fits; c = load_fits('test.fits'); print(c.flux.shape, c.wave[0], c.wave[-1])"
 
 # Phase 2
 python -m rbcodes.GUIs.ifuviewer.main   # window opens, load files manually

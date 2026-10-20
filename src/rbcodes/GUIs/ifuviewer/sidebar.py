@@ -7,8 +7,8 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QColor
 
-from rbcodes.GUIs.ifuviewer.io.auto_cube import load_fits
-from rbcodes.GUIs.ifuviewer.io.image2d import FITSImage
+from rbcodes.ifu.io.auto_cube import load_fits
+from rbcodes.ifu.io.image2d import FITSImage
 
 
 class DatasetSidebar(QWidget):
@@ -73,13 +73,13 @@ class DatasetSidebar(QWidget):
     # Public API
     # ------------------------------------------------------------------
 
-    def add_dataset(self, path, var_path=None):
+    def add_dataset(self, path, var_path=None, wave_range=None, air_to_vacuum=False):
         """
         Load *path* (and optional *var_path*) and append to the list.
-        Selects the new item automatically.
+        Selects the new item automatically. ``wave_range`` / ``air_to_vacuum`` as in ``load_fits``.
         """
         try:
-            cube = load_fits(path, var=var_path)
+            cube = load_fits(path, var=var_path, wave_range=wave_range, air_to_vacuum=air_to_vacuum)
         except Exception as exc:
             raise RuntimeError(f"Cannot load '{path}': {exc}") from exc
 
@@ -119,9 +119,13 @@ class DatasetSidebar(QWidget):
             "",
             "FITS files (*.fits *.fit *.fits.gz *.fit.gz);;All files (*)",
         )
+        from rbcodes.GUIs.ifuviewer.load_options import ask_load_options
         for p in paths:
+            opts = ask_load_options(p, self)
+            if opts is None:
+                continue
             try:
-                self.add_dataset(p)
+                self.add_dataset(p, **opts)
             except RuntimeError as exc:
                 # Surface the error via status bar / message box in MainWindow
                 self.dataset_changed.emit(None)   # signal with None = error sentinel

@@ -21,6 +21,26 @@ except ImportError:
     HDF5_AVAILABLE = False
 
 
+def _air_vac_factor(wave_aa):
+    """n(lambda) used for air <-> vacuum conversion (Ciddor 1996); 1 below 2000 A."""
+    wave_aa = np.asarray(wave_aa, dtype=float)
+    sigma_sq = (1e4 / wave_aa) ** 2
+    factor = (1 + (5.792105e-2 / (238.0185 - sigma_sq)) +
+              (1.67918e-3 / (57.362 - sigma_sq)))
+    return factor * (wave_aa >= 2000.) + 1. * (wave_aa < 2000.)
+
+
+def air_to_vacuum(wave_aa):
+    """Air -> vacuum wavelengths in Angstrom (Ciddor 1996; unchanged below 2000 A).
+    The conversion used by ``rb_spectrum.air2vac``."""
+    return np.asarray(wave_aa, dtype=float) * _air_vac_factor(wave_aa)
+
+
+def vacuum_to_air(wave_aa):
+    """Vacuum -> air wavelengths in Angstrom (inverse of ``air_to_vacuum``, as in ``rb_spectrum.vac2air``)."""
+    return np.asarray(wave_aa, dtype=float) / _air_vac_factor(wave_aa)
+
+
 class rb_spectrum:
     """
     A simple 1D spectrum class for reading/writing spectral data
@@ -534,17 +554,7 @@ class rb_spectrum:
             warnings.warn("Already in vacuum. Not applying correction")
             return
             
-        # Convert to Angstroms
-        wave_aa = self.wavelength.to(u.AA).value
-        
-        # Standard conversion
-        sigma_sq = (1e4 / wave_aa)**2
-        factor = (1 + (5.792105e-2/(238.0185-sigma_sq)) + 
-                 (1.67918e-3/(57.362-sigma_sq)))
-        factor = factor * (wave_aa >= 2000.) + 1. * (wave_aa < 2000.)
-        
-        # Apply conversion
-        new_wave = wave_aa * factor * u.AA
+        new_wave = air_to_vacuum(self.wavelength.to(u.AA).value) * u.AA
         self.wavelength = new_wave.to(self.wavelength.unit)
         self.meta['airvac'] = 'vac'
         
@@ -557,17 +567,7 @@ class rb_spectrum:
             warnings.warn("Already in air. Not applying correction")
             return
             
-        # Convert to Angstroms
-        wave_aa = self.wavelength.to(u.AA).value
-        
-        # Standard conversion (inverse of air to vac)
-        sigma_sq = (1e4 / wave_aa)**2
-        factor = (1 + (5.792105e-2/(238.0185-sigma_sq)) + 
-                 (1.67918e-3/(57.362-sigma_sq)))
-        factor = factor * (wave_aa >= 2000.) + 1. * (wave_aa < 2000.)
-        
-        # Apply inverse conversion
-        new_wave = wave_aa / factor * u.AA
+        new_wave = vacuum_to_air(self.wavelength.to(u.AA).value) * u.AA
         self.wavelength = new_wave.to(self.wavelength.unit)
         self.meta['airvac'] = 'air'
     

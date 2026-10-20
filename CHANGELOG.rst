@@ -2,6 +2,74 @@
 Changelog
 =========
 
+Version 3.1.0 (2026-10-20)
+==========================
+
+* ``rbcodes.ifu.load_fits``: optional ``wave_range=(lo, hi)`` reads only those channels (a 3.7 GB MUSE
+  cube slab loads in 0.1 s); optional ``air_to_vacuum`` converts air-wavelength cubes; ``cube.airvac``.
+  The loader no longer reads the data to decide whether a file is a cube.
+* ``rbcodes.ifu.lines.LineModel(..., continuum='linear')``: a linear continuum per line (for cubes that
+  are not continuum-subtracted); ``GaussianFitter`` starts it from the off-line channels. New
+  ``CIII`` (1907, 1909) catalogue entry.
+* ``rb_ifuview``: load only a wavelength range (and convert air -> vacuum) — a dialog for cubes larger
+  than 1 GB, File -> "Open Wavelength Range…", and ``--wave-range LO HI`` / ``--air-to-vacuum``.
+* ``GaussianFitter(..., multistart=True)``: doublet line-identification check (``dchi2_alt``).
+* ``rbcodes.ifu.binning.bin_cube``: block binning (summed flux and variance, rescaled WCS).
+* ``rbcodes.ifu.noise.narrowband``: ``band`` may be a list of windows summed together (e.g. both
+  components of a doublet, skipping an absorption trough). Continuum-subtracted narrow-band images with noise propagated from
+  the variance cube and calibrated on blank sky (sigma = k sigma_STAT), S/N maps, automatic sky.
+* ``rbcodes.utils.rb_spectrum``: standalone ``air_to_vacuum`` / ``vacuum_to_air`` (used by the
+  ``rb_spectrum.air2vac`` / ``vac2air`` methods; same numbers).
+
+Changes
+-------
+* New ``rbcodes.ifu`` package: the IFU cube reader and image/moment/extraction/region
+  functions moved out of ``GUIs/ifuviewer/io`` and ``GUIs/ifuviewer/processing`` so they
+  can be used outside the GUI (``from rbcodes.ifu import load_fits``). ``rb_ifuview`` and
+  ``rb_align`` now import from there; the old import paths are removed. Tests in
+  ``tests/test_ifu``; docs in ``docs/ifu/ifu_readme.md``.
+
+New Features
+------------
+* ``rbcodes.ifu.lines``: line catalogue (air and vacuum) and ``LineModel`` (single lines,
+  multiplets with fixed or bounded free ratios, several lines tied in velocity and width,
+  per-line LSF); windows in observed-frame Angstrom.
+* ``rbcodes.ifu.noise``: ``NoiseModel`` (variance, or hybrid estimate from a user-defined sky
+  region; correlated-noise estimate).
+* ``rbcodes.ifu.measure``: ``GaussianFitter``, ``MomentMeasurer``, ``MCErrors``,
+  ``QualityMask`` (rejection codes 0-10), ``SpaxelDecisions``, ``FitResult`` (FITS save/load).
+* ``rbcodes.ifu.vmap``: ``VelocityMap`` (velocity field with errors, mask, codes, image- and
+  source-plane positions, metadata and provenance; select, bulk subtraction, FITS save/load).
+* New ``rbcodes.turbulence`` package: ``bulk`` (Constant, Plane, Quadratic, ArctanDisk, TwoLobe,
+  compare_bulk) and ``vsf`` (StructureFunction: raw/debiased/ivw/cross estimators, jackknife
+  covariance, directional S2, image or source plane, power-law fits with optional noise floor
+  or PSF smoothing, r_geo, r_turn). Docs in ``docs/turbulence/turbulence_readme.md``.
+* ``rbcodes.turbulence.forward`` (``grf``, ``psf_weight``, ``TurbulenceField``, ``Observation``: mock
+  ``VelocityMap`` objects from 2-D or 3-D slab turbulent fields with toy intermittency, flux-weighted
+  PSF, mask, bulk flow and noise) and ``rbcodes.turbulence.demo`` (``demo_velocity_field``,
+  ``demo_cube``), ported from vsf_pipeline. ``Observation`` also forward-models lensed systems:
+  the field is made in the source plane and sampled at each spaxel's source-plane position
+  (``beta=``, or ``from_vmap(traced_map, positions='source')``) before the image-plane PSF and noise.
+* ``rbcodes.turbulence.summaries``: ``S2``, ``Scattering`` (reduced wavelet scattering transform),
+  ``Kurtosis``, ``LineWidth`` blocks and ``Summaries`` (measured on the data's pairs after the same
+  bulk removal; optional variance-stabilising transforms), ported from vsf_pipeline.
+  ``StructureFunction.s2``/``increments`` accept other velocities at the same spaxels (``values``).
+* ``rbcodes.turbulence.inference`` (synthetic likelihood, Latin hypercube, ``Emulator`` with held-out
+  validation, adaptive Metropolis, Gelman-Rubin, Fisher, MOPED) and ``rbcodes.turbulence.results``
+  (results.json -> results.tex macros, number formatting, savefig), ported from vsf_pipeline.
+* ``rbcodes.lensing.lens_model``: ``LensModel`` (best fit + optional realizations, e.g. a folder of
+  ``dplx_k``/``dply_k`` maps) ray-traces a ``VelocityMap`` with ``model_delens`` into source-plane
+  kpc, gives the magnification tensor; ``match_images`` pairs spaxels of different images that
+  map to the same source position.
+* ``rb_selftest`` checks the line fit.
+
+Bug Fixes
+---------
+
+* ``rb_multispec``: spectra passed as data (``from_data``, e.g. "→ rb_multispec" in rb_ifuview) without
+  an error array now get the same default as files: 5% of the flux, with a warning in the message
+  box (one shared check, ``IOManager.ensure_error``). Without it, vStack crashed on such spectra.
+
 Version 3.0.0 (2026-10-12)
 ==========================
 

@@ -264,7 +264,7 @@ def check_lens_raytrace():
 def check_ifu_cube_io():
     import numpy as np
     from astropy.io import fits
-    from rbcodes.GUIs.ifuviewer.io import load_fits
+    from rbcodes.ifu.io import load_fits
     nw, ny, nx = 50, 6, 7
     h = fits.Header()
     h['INSTRUME'] = 'MUSE'
@@ -283,8 +283,19 @@ def check_ifu_cube_io():
     assert cube.wcs is not None and cube.wcs.naxis == 2
 
 
+def check_ifu_line_fit():
+    import numpy as np
+    from rbcodes.ifu.lines import LineModel, lsf_muse
+    from rbcodes.ifu.measure import GaussianFitter
+    lm = LineModel('OII', z=0.785, windows=dict(fit=(6620., 6690.)), air=False, lsf=lsf_muse)
+    wave = np.arange(6620., 6690., 1.25)
+    true = (0.02, 4., 1.2, -75., 35.)          # continuum within the default +-5 x noise bound
+    r = GaussianFitter(lm).fit_spectrum(wave, lm(wave, *true), np.full(wave.size, 0.01))
+    assert r['status'] == 0 and np.allclose(r['p'], true, rtol=1e-4, atol=1e-4), r.get('p')
+
+
 NUMERICAL_CHECKS = (check_package_data, check_line_list, check_equivalent_width, check_nfw_mass,
-                    check_cosmology, check_lens_raytrace, check_ifu_cube_io)
+                    check_cosmology, check_lens_raytrace, check_ifu_cube_io, check_ifu_line_fit)
 
 
 # ---------------------------------------------------------------------------

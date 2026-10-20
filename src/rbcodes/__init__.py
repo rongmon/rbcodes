@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-__version__ = "3.0.0"
+__version__ = "3.1.0"
 
 
 def selftest(verbose=False):

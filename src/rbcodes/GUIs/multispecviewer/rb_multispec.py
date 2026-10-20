@@ -186,6 +186,8 @@ def from_data(spectrum_data, show=True):
             
         # Create MainWindow instance
         window = multispec.MainWindow()
+        # Spectra without an error array get the default error (same check as for files)
+        spectra_list = [window.io_manager.ensure_error(s) for s in spectra_list]
         
         # Load spectra directly into the window
         window.spectra = spectra_list

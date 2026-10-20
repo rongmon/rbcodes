@@ -27,23 +27,39 @@ class GenericCube(IFUCube):
     - Strip 3rd WCS axis to get 2D spatial WCS.
     """
 
-    def load(self, path, var_path=None):
+    def load(self, path, var_path=None, wave_range=None, air_to_vacuum=False):
         path = Path(path)
         self.path = str(path)
         self.name = path.stem
 
         with fits.open(path) as hdul:
-            flux_hdu, flux_data = _find_flux_hdu(hdul)
-            self.header = flux_hdu.header.copy()
-            self.flux = flux_data.astype(np.float64)
-            self.var = _find_variance(hdul, self.flux.shape)
-            self.wave = _build_wave(self.header)
-            self.wcs = _make_2d_wcs(self.header)
+            flux_hdu, _ = _find_flux_hdu(hdul)
+            self._read(hdul, flux_hdu, ('VAR', 'VARIANCE', 'STAT', 'ERR'), wave_range)
 
         if var_path is not None:
-            self.var = _load_external_var(var_path, self.flux.shape)
-
+            self.var = _load_external_var(var_path, self._full_shape, self._channels)
+        _finish(self, air_to_vacuum)
         return self
+
+    def _read(self, hdul, flux_hdu, var_names, wave_range):
+        """Read flux (and variance) — only the channels in wave_range if given."""
+        header = flux_hdu.header.copy()
+        full_wave = _build_wave(header)
+        sl = _channel_slice(full_wave, wave_range)
+        self._channels = sl
+        self._full_shape = flux_hdu.shape
+        self.flux = np.asarray(flux_hdu.section[sl], dtype=np.float64)
+        self.var = None
+        var_hdu = _get_extension(hdul, var_names)
+        if var_hdu is not None and var_hdu.header.get('NAXIS', 0) == 3 and var_hdu.shape == flux_hdu.shape:
+            self.var = np.asarray(var_hdu.section[sl], dtype=np.float64)
+        self.wave = full_wave[sl]
+        if sl.start or sl.stop != len(full_wave):
+            header['NAXIS3'] = self.flux.shape[0]
+            header['CRPIX3'] = float(header.get('CRPIX3', 1.0)) - sl.start
+            header.add_history(f'rbcodes: channels {sl.start}-{sl.stop - 1} of {len(full_wave)} read')
+        self.header = header
+        self.wcs = _make_2d_wcs(header)
 
 
 # ---------------------------------------------------------------------------
@@ -53,8 +69,8 @@ class GenericCube(IFUCube):
 class KCWICube(GenericCube):
     """KCWI-specific loader. Currently uses GenericCube logic."""
 
-    def load(self, path, var_path=None):
-        super().load(path, var_path=var_path)
+    def load(self, path, var_path=None, wave_range=None, air_to_vacuum=False):
+        super().load(path, var_path=var_path, wave_range=wave_range, air_to_vacuum=air_to_vacuum)
         # KCWI stores flux in e-/s; variance in (e-/s)^2 — no unit conversion needed
         return self
 
@@ -66,7 +82,7 @@ class KCWICube(GenericCube):
 class MUSECube(GenericCube):
     """MUSE-specific loader. MUSE stores flux in DATA ext, variance in STAT."""
 
-    def load(self, path, var_path=None):
+    def load(self, path, var_path=None, wave_range=None, air_to_vacuum=False):
         path = Path(path)
         self.path = str(path)
         self.name = path.stem
@@ -77,19 +93,11 @@ class MUSECube(GenericCube):
                 flux_hdu = hdul['DATA']
             else:
                 flux_hdu, _ = _find_flux_hdu(hdul)
-            self.header = flux_hdu.header.copy()
-            self.flux = flux_hdu.data.astype(np.float64)
-            # MUSE variance extension
-            var_hdu = _get_extension(hdul, ('STAT', 'VAR', 'VARIANCE', 'ERR'))
-            if var_hdu is not None and var_hdu.data is not None:
-                if var_hdu.data.shape == self.flux.shape:
-                    self.var = var_hdu.data.astype(np.float64)
-            self.wave = _build_wave(self.header)
-            self.wcs = _make_2d_wcs(self.header)
+            self._read(hdul, flux_hdu, ('STAT', 'VAR', 'VARIANCE', 'ERR'), wave_range)
 
         if var_path is not None:
-            self.var = _load_external_var(var_path, self.flux.shape)
-
+            self.var = _load_external_var(var_path, self._full_shape, self._channels)
+        _finish(self, air_to_vacuum)
         return self
 
 
@@ -110,7 +118,7 @@ _INSTRUMENT_MAP = {
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def load_fits(path, var=None):
+def load_fits(path, var=None, wave_range=None, air_to_vacuum=False):
     """
     Load a FITS file and return the appropriate IFUCube subclass.
 
@@ -124,6 +132,14 @@ def load_fits(path, var=None):
     var : str or Path, optional
         Path to a separate variance FITS file.  When provided, overrides any
         variance extension found inside *path*.
+    wave_range : (lo, hi) in Angstrom, optional
+        Read only the channels with lo <= wavelength <= hi (in the file's own air/vacuum
+        convention). Default: the whole cube. Useful for large cubes: only those channels
+        are read from disk.
+    air_to_vacuum : bool
+        Convert the wavelength axis from air to vacuum (``rbcodes.utils.rb_spectrum.air_to_vacuum``)
+        when the cube is in air (CTYPE3 = 'AWAV'). A cube already in vacuum (CTYPE3 = 'WAVE') is
+        left unchanged with a warning. ``cube.airvac`` records the result ('air', 'vac' or 'unknown').
 
     Returns
     -------
@@ -132,12 +148,10 @@ def load_fits(path, var=None):
     from .image2d import FITSImage
     path = Path(path)
 
-    # Peek at the header to decide cube vs. 2D image
+    # Peek at the headers to decide cube vs. 2D image (without reading the data)
     with fits.open(path) as hdul:
         instrume = _read_instrume(hdul)
-        has_3d = any(
-            hdu.data is not None and hdu.data.ndim == 3 for hdu in hdul
-        )
+        has_3d = any(hdu.header.get('NAXIS', 0) == 3 for hdu in hdul)
 
     if not has_3d:
         img = FITSImage()
@@ -146,7 +160,7 @@ def load_fits(path, var=None):
 
     cls = _INSTRUMENT_MAP.get(instrume.upper() if instrume else '', GenericCube)
     cube = cls()
-    cube.load(path, var_path=var)
+    cube.load(path, var_path=var, wave_range=wave_range, air_to_vacuum=air_to_vacuum)
     return cube
 
 
@@ -165,17 +179,17 @@ def _read_instrume(hdul):
 
 def _find_flux_hdu(hdul):
     """
-    Return (hdu, data) for the first 3D extension found.
+    Return (hdu, None) for the first 3D extension found (the data are not read here).
     Tries extension 0 first, then extension 1, then all remaining.
     """
     candidates = [hdul[0], hdul[1]] if len(hdul) > 1 else [hdul[0]]
     for hdu in candidates:
-        if hdu.data is not None and hdu.data.ndim == 3:
-            return hdu, hdu.data
+        if hdu.header.get('NAXIS', 0) == 3:
+            return hdu, None
     # Fallback: scan all extensions
     for hdu in hdul:
-        if hdu.data is not None and hdu.data.ndim == 3:
-            return hdu, hdu.data
+        if hdu.header.get('NAXIS', 0) == 3:
+            return hdu, None
     raise ValueError("No 3D extension found in FITS file.")
 
 
@@ -225,21 +239,53 @@ def _build_wave(header):
     return wave
 
 
-def _load_external_var(var_path, flux_shape):
+def _load_external_var(var_path, flux_shape, channels=slice(None)):
     """
-    Load variance from a separate FITS file.
+    Load variance from a separate FITS file (channels ``channels`` only).
 
-    Searches for the first 3D extension whose shape matches *flux_shape*.
+    Searches for the first 3D extension whose shape matches *flux_shape* (the full cube).
     Raises ValueError if none is found.
     """
     var_path = Path(var_path)
     with fits.open(var_path) as hdul:
         for hdu in hdul:
-            if hdu.data is not None and hdu.data.shape == flux_shape:
-                return hdu.data.astype(np.float64)
+            if hdu.header.get('NAXIS', 0) == 3 and hdu.shape == tuple(flux_shape):
+                return np.asarray(hdu.section[channels], dtype=np.float64)
     raise ValueError(
         f"No array with shape {flux_shape} found in variance file '{var_path}'."
     )
+
+
+def _channel_slice(wave, wave_range):
+    """Slice of the channels with lo <= wave <= hi (all channels if wave_range is None)."""
+    if wave_range is None:
+        return slice(0, len(wave))
+    lo, hi = wave_range
+    idx = np.flatnonzero((wave >= lo) & (wave <= hi))
+    if len(idx) == 0:
+        raise ValueError(f'No channels in wave_range {wave_range}; the cube covers '
+                         f'{wave.min():.1f}-{wave.max():.1f} A.')
+    return slice(int(idx[0]), int(idx[-1]) + 1)
+
+
+def _finish(cube, air_to_vacuum):
+    """Record the air/vacuum convention and convert to vacuum if asked."""
+    ctype = str(cube.header.get('CTYPE3', '')).strip().upper()
+    cube.airvac = {'AWAV': 'air', 'WAVE': 'vac'}.get(ctype, 'unknown')
+    if not air_to_vacuum:
+        return
+    if cube.airvac == 'vac':
+        import warnings
+        warnings.warn('air_to_vacuum: the cube is already in vacuum (CTYPE3 = WAVE); not converted.')
+        return
+    if cube.airvac == 'unknown':
+        import warnings
+        warnings.warn('air_to_vacuum: CTYPE3 does not say air or vacuum; converting as asked.')
+    from rbcodes.utils.rb_spectrum import air_to_vacuum as _a2v
+    cube.wave = _a2v(cube.wave)
+    cube.airvac = 'vac'
+    cube.header['HISTORY'] = 'rbcodes: wavelengths converted air -> vacuum (cube.wave); header WCS is still air'
+
 
 
 def _make_2d_wcs(header):

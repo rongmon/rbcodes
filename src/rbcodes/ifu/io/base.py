@@ -25,6 +25,9 @@ class IFUCube:
         Filename stem (no directory, no extension).
     path : str
         Full file path.
+    airvac : str
+        'air', 'vac' or 'unknown': the convention of ``wave`` (from CTYPE3 AWAV / WAVE, or
+        'vac' after ``load_fits(..., air_to_vacuum=True)``).
     """
 
     def __init__(self):
@@ -35,6 +38,7 @@ class IFUCube:
         self.wcs = None
         self.name = ''
         self.path = ''
+        self.airvac = 'unknown'
 
     def load(self, path):
         """Load data from *path*. Must set flux, var, wave, header, wcs, name."""

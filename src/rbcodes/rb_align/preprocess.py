@@ -1,5 +1,5 @@
 """
-preprocess.py — thin wrapper around GUIs.ifuviewer.processing.cube_collapse.
+preprocess.py — thin wrapper around rbcodes.ifu.cube_collapse.
 
 Collapses IFU cubes to 2D images for alignment.
 No-op for 2D images.
@@ -10,7 +10,7 @@ from typing import Callable, List, Optional
 
 import numpy as np
 
-from rbcodes.GUIs.ifuviewer.processing.cube_collapse import (
+from rbcodes.ifu.cube_collapse import (
     build_whitelight,
     build_narrowband,
 )
